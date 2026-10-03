@@ -17,10 +17,13 @@ export function useOperationMqttShiftOverlay(
   const fleetPayload = useShiftVehicleOperationMqtt(enabled ? vehicleCode : undefined);
   const rowOrderId = String(sqlRow?.shift_key ?? sqlRow?.order_id ?? '').trim();
   const mqttOrderId = String(fleetPayload?.order_id ?? '').trim();
+  // 只套用「同一張單」的回報：任一邊沒有單號就不套，不能因為車號相同就把上一班的回報
+  // 掛到這張卡上
   const freshPayload =
     fleetPayload
     && mqttPayloadIsFresh(fleetPayload)
-    && (!rowOrderId || !mqttOrderId || rowOrderId === mqttOrderId)
+    && rowOrderId !== ''
+    && rowOrderId === mqttOrderId
       ? fleetPayload
       : null;
   const simTick = useSimClockFrame(enabled && simPlaying && !!freshPayload);

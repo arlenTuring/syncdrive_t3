@@ -222,6 +222,12 @@ const QUERY_CACHE_TTL_MS = 2_000;
 const QUERY_CACHE_MAX_ENTRIES = 128;
 const queryCache = new Map<string, { rows: Record<string, unknown>[]; at: number }>();
 const inflightQueries = new Map<string, Promise<Record<string, unknown>[]>>();
+/**
+ * 每支查詢的版本號：失效通知（訂單寫入、清空、重置）一來就加一。
+ * 失效前就送出去的查詢晚回來時，版本已經不同，結果不能再寫回快取，也不會被
+ * 新的呼叫共用——否則清空前的舊名冊會在清空後被「補」回來。
+ */
+const queryGeneration = new Map<string, number>();
 
 /** 清除過期與超量 SQL 快取（避免長時間運行後 Map 無限膨脹） */
 export function pruneDatasourceQueryCache(now = Date.now()): void {
@@ -257,21 +263,16 @@ export function clearDatasourceQueryCacheForQuery(datasourceId: string, sqlQuery
 
 /** 僅清除與失效標籤重疊的 SQL 快取（避免整池清空造成查詢雪崩） */
 export function clearDatasourceQueryCacheForTags(incomingTags: string[]): void {
-  if (incomingTags.length === 0) {
-    queryCache.clear();
-    return;
-  }
-  for (const [cacheKey] of queryCache) {
+  const keys = new Set([...queryCache.keys(), ...inflightQueries.keys()]);
+  for (const cacheKey of keys) {
     const sep = cacheKey.indexOf('::');
-    if (sep < 0) {
-      queryCache.delete(cacheKey);
-      continue;
-    }
-    const sql = cacheKey.slice(sep + 2);
-    const tags = inferInvalidateTagsFromSql(sql);
-    if (tagsOverlap(tags, incomingTags)) {
-      queryCache.delete(cacheKey);
-    }
+    const hit = incomingTags.length === 0
+      || sep < 0
+      || tagsOverlap(inferInvalidateTagsFromSql(cacheKey.slice(sep + 2)), incomingTags);
+    if (!hit) continue;
+    queryCache.delete(cacheKey);
+    inflightQueries.delete(cacheKey);
+    queryGeneration.set(cacheKey, (queryGeneration.get(cacheKey) ?? 0) + 1);
   }
 }
 
@@ -297,6 +298,7 @@ export async function executeDatasourceQuery(
   const existing = inflightQueries.get(cacheKey);
   if (existing) return existing;
 
+  const generation = queryGeneration.get(cacheKey) ?? 0;
   const promise = (async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -322,12 +324,15 @@ export async function executeDatasourceQuery(
         throw new Error(msg ?? `HTTP ${res.status}`);
       }
       const { rows } = await res.json() as { rows: Record<string, unknown>[] };
-      queryCache.set(cacheKey, { rows, at: Date.now() });
-      pruneDatasourceQueryCache();
+      if ((queryGeneration.get(cacheKey) ?? 0) === generation) {
+        queryCache.set(cacheKey, { rows, at: Date.now() });
+        pruneDatasourceQueryCache();
+      }
       return rows;
     } finally {
       clearTimeout(timeoutId);
-      inflightQueries.delete(cacheKey);
+      // 版本變了代表失效時已移除；此時表裡可能是新一輪的查詢，不能誤刪
+      if ((queryGeneration.get(cacheKey) ?? 0) === generation) inflightQueries.delete(cacheKey);
     }
   })();
 

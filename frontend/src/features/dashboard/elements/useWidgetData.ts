@@ -89,6 +89,15 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     lastShownJson.current = json;
     setState({ data: rows, loading: false, error: null });
   };
+  /**
+   * 查詢失敗：顯示錯誤，跟「查無資料」分開。資料只沿用「上次成功、而且之後沒有收到
+   * 失效通知」的那份（暫時連不上時畫面不閃）；收到失效通知後就沒有可沿用的資料。
+   */
+  const showError = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastShownJson.current = null;
+    setState({ data: lastGoodData.current, loading: false, error: msg || '查詢失敗' });
+  };
   const vars = useVariables();
   const varsKey = useMemo(() => {
     const keys = Object.keys(vars).sort();
@@ -119,8 +128,18 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     let timer: ReturnType<typeof setInterval> | undefined;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
     let aborted = false;
+    /**
+     * 請求順序。回來的結果只在「比畫面上那份新」且「不是失效前送出的」時才採用：
+     * 清空訂單後的通知會讓 validFrom 往前跳，清空前送出、晚回來的查詢就被丟掉，
+     * 不會把已刪除的卡片補回來。
+     */
+    let requestSeq = 0;
+    let appliedSeq = 0;
+    let validFrom = 0;
+    const isStale = (seq: number) => aborted || seq < validFrom || seq < appliedSeq;
 
     const fetchData = async (force = false) => {
+      const seq = ++requestSeq;
       if (dataSourceId && sqlQuery?.trim()) {
         const finalSql = interpolateVariables(expandBuiltinSqlMacros(sqlQuery), vars);
         if (/\{[a-zA-Z_]\w*\}/.test(finalSql)) {
@@ -135,16 +154,13 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
         try {
           if (force) clearDatasourceQueryCacheForQuery(dataSourceId, finalSql);
           const rows = await executeDatasourceQuery(dataSourceId, finalSql, FETCH_TIMEOUT_MS);
-          if (aborted) return;
+          if (isStale(seq)) return;
+          appliedSeq = seq;
           showRows(rows);
         } catch (e: unknown) {
-          if (aborted) return;
-          const msg = e instanceof Error ? e.message : String(e);
-          setState({
-            data: lastGoodData.current,
-            loading: false,
-            error: msg,
-          });
+          if (isStale(seq)) return;
+          appliedSeq = seq;
+          showError(e);
         }
         return;
       }
@@ -153,13 +169,14 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
         try {
           const finalUrl = interpolateVariables(dataUrl, vars);
           const d = await fetchJsonShared(finalUrl) as Record<string, unknown> | Record<string, unknown>[];
-          if (aborted) return;
+          if (isStale(seq)) return;
+          appliedSeq = seq;
           const rows = Array.isArray(d) ? d : ((d.data as Record<string, unknown>[] | undefined) ?? [d]);
           showRows(rows);
         } catch (e: unknown) {
-          if (aborted) return;
-          const msg = e instanceof Error ? e.message : String(e);
-          setState({ data: lastGoodData.current, loading: false, error: msg });
+          if (isStale(seq)) return;
+          appliedSeq = seq;
+          showError(e);
         }
         return;
       }
@@ -185,9 +202,13 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     }
 
     let unsubscribeInvalidate: (() => void) | undefined;
-    if (refreshMode === 'event' && invalidateTags.length > 0) {
+    // 輪詢／只查一次的元件也要聽：資料清空後不能等下一輪輪詢，也不能讓失效前的查詢晚回來蓋掉
+    if (invalidateTags.length > 0) {
       unsubscribeInvalidate = subscribeDatasourceInvalidation((payload) => {
         if (!tagsOverlap(invalidateTags, payload.tags)) return;
+        // 資料已經變了：之前送出的查詢一律作廢，失敗時也不能再拿失效前的資料頂著
+        validFrom = requestSeq + 1;
+        lastGoodData.current = [];
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           void fetchData(true);

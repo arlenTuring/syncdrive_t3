@@ -4,6 +4,7 @@ import {
   needsDashboardRuntimePatch,
   patchDashboardRuntimeFixes,
 } from './migrateVehicleMonitorProtocol';
+import { upgradeSystemQueries } from './systemQueries';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -89,7 +90,9 @@ export function migratePlane(plane: DashboardPlane): DashboardPlane {
     ...plane,
     elements: (plane.elements ?? []).map(migrateCanvasElement),
   };
-  return needsDashboardRuntimePatch(compatible)
+  const patched = needsDashboardRuntimePatch(compatible)
     ? patchDashboardRuntimeFixes(compatible)
     : compatible;
+  // 每次都跑：只換「確定是系統舊版原文」的 SQL（含泛用群組內部來源），其他不動；第二次跑不會再變
+  return upgradeSystemQueries(patched).plane;
 }

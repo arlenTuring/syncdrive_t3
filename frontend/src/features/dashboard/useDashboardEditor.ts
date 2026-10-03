@@ -12,7 +12,7 @@ import {
 } from '../../lib/canvasCacheReset';
 import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
-import { fetchDashboardPlanes, saveDashboardPlanes } from './api/dashboardPlanesApi';
+import { DASHBOARD_PLANES_TAG, fetchDashboardPlanes, saveDashboardPlane, saveDashboardPlanes } from './api/dashboardPlanesApi';
 import { cloneDemoPlane } from './constants/demoPlane';
 import {
   applyWidgetFormat,
@@ -26,6 +26,9 @@ import {
   type DualCanvasLane,
 } from './utils/dualCanvas';
 import { migratePlane } from './utils/migrateDashboardPlane';
+import { subscribeDatasourceInvalidation } from './utils/datasourceInvalidationBus';
+
+/** 後端版面存檔後推送的失效標籤（見 backend dashboard-plane.service.ts） */
 
 const DEMO_LAYOUT_VERSION = 114;
 
@@ -197,13 +200,25 @@ export function useDashboardEditor() {
           return;
         }
         const migrated = remote.map(migratePlane);
-        // 內建來源的修正要成為共用版本；只在內容真的改變時寫回，且遷移只替換
-        // 綁定協議，不碰使用者排好的座標、尺寸、樣式或自訂元件。
-        if (JSON.stringify(migrated) !== JSON.stringify(remote)) {
-          void saveDashboardPlanes(migrated).catch(() => {
-            /* 後端暫時不可用：畫面先使用已遷移版本，下次載入再補寫 */
-          });
-        }
+        /*
+         * 內建來源的修正要成為共用版本：有變動的那幾張<strong>逐張</strong>存回去。
+         * 不用整批覆寫——整批的語意是「送出的清單就是全部」，這時候別人剛新增的版面
+         * 會被刪掉。單張存檔帶讀到的版本，期間有人存過就不覆蓋（下次載入再升級）。
+         */
+        remote.forEach((original, index) => {
+          const upgraded = migrated[index];
+          if (JSON.stringify(original.elements) === JSON.stringify(upgraded.elements)) return;
+          void saveDashboardPlane(upgraded)
+            .then((saved) => {
+              if (cancelled) return;
+              setPlanes((current) => current.map((plane) => (
+                plane.id === saved.id ? { ...plane, serverVersion: saved.serverVersion } : plane
+              )));
+            })
+            .catch((err: unknown) => {
+              console.warn('[dashboard] 版面升級沒有存回伺服器：', err);
+            });
+        });
         setPlanes(migrated);
         setActivePlaneId((current) =>
           current && migrated.some((plane) => plane.id === current)
@@ -242,9 +257,16 @@ export function useDashboardEditor() {
     };
     window.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
+    // 別的頁面（其他帳號、其他瀏覽器、升級程序）存了版面：沒有未送出的修改就重新讀取
+    const unsubscribe = subscribeDatasourceInvalidation((payload) => {
+      if (!payload.tags.includes(DASHBOARD_PLANES_TAG)) return;
+      if (pendingPlanes) return;
+      setReloadNonce((n) => n + 1);
+    });
     return () => {
       window.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
+      unsubscribe();
     };
   }, []);
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
