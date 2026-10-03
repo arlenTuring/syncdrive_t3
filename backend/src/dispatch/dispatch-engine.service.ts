@@ -24,6 +24,7 @@ import { extractYardMoves } from './dispatch.yard-moves';
 import { extractYardTasks } from './dispatch.yard-tasks';
 import { buildChargingLookup, maintenancePayloadFields } from './dispatch.charging';
 import { MaintenanceTaskService } from '../maintenance-task/maintenance-task.service';
+import { businessLineKind } from './dispatch-order-kind';
 
 /**
  * 即時調度引擎。
@@ -68,8 +69,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   /** issued 集合對應的日期（當地零點）。換日就重置。 */
   private issuedDay = 0;
 
-  /** 執行期開關。與環境變數的差別是這個可以線上改，不必重啟。 */
-  private runtimeEnabled: boolean | null = null;
+  private static readonly ENABLED_SETTING = 'dispatch.execution.enabled';
+  private static readonly EXECUTOR_LOCK = 814729351;
 
   private lastTickAt: number | null = null;
 
@@ -111,11 +112,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     // 讓 timer 不要擋住程序結束（測試與優雅關閉）
     this.timer.unref?.();
     this.logger.log(
-      dispatchConfig.enabled
-        ? `即時調度引擎啟動：每 ${dispatchConfig.tickSeconds} 秒檢查一次，` +
-            `提前 ${dispatchConfig.leadSeconds} 秒下訂單`
-        : '即時調度引擎目前停用（DISPATCH_ENABLED=false）；' +
-            'POST /syncdrive-api/dispatch/enable 可以線上開啟，不必重啟',
+      `即時調度計時器啟動：每 ${dispatchConfig.tickSeconds} 秒檢查一次；` +
+      '是否下單以資料庫中的持久開關為準',
     );
   }
 
@@ -127,13 +125,27 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** 線上開關。停用時保留既有訂單，只是不再發新的。 */
-  setEnabled(enabled: boolean): void {
-    this.runtimeEnabled = enabled;
-    this.logger.log(`即時調度引擎${enabled ? '啟用' : '停用'}（執行期指令）`);
+  async setEnabled(enabled: boolean): Promise<void> {
+    await this.orderRepository.manager.query(`
+      INSERT INTO system_settings
+        (setting_key, setting_value, value_type, description, updated_by, created_at, updated_at)
+      VALUES ($1, $2::jsonb, 'boolean', '調度下單持久開關；完整重置後保持停用', 'dispatch', $3, $3)
+      ON CONFLICT (setting_key) DO UPDATE SET
+        setting_value = EXCLUDED.setting_value,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = EXCLUDED.updated_at
+    `, [DispatchEngineService.ENABLED_SETTING, JSON.stringify(enabled), Date.now()]);
+    this.logger.log(`即時調度引擎${enabled ? '啟用' : '停用'}（已保存）`);
   }
 
-  private get isEnabled(): boolean {
-    return this.runtimeEnabled ?? dispatchConfig.enabled;
+  private async isEnabled(): Promise<boolean> {
+    const rows = await this.orderRepository.manager.query(
+      'SELECT setting_value FROM system_settings WHERE setting_key = $1',
+      [DispatchEngineService.ENABLED_SETTING],
+    );
+    if (rows.length) return rows[0].setting_value === true;
+    await this.setEnabled(dispatchConfig.enabled);
+    return dispatchConfig.enabled;
   }
 
   /**
@@ -250,8 +262,23 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     this.lastTickAt = now;
 
     const empty = { checked: 0, issued: [], expired: [], skipped: [] };
-    if (!dryRun && !this.isEnabled) return empty;
+    if (!dryRun && !(await this.isEnabled())) return empty;
 
+    // 同一資料庫即使啟動多個後端，也只有取得 advisory lock 的程序可下單。
+    const lockRunner = this.orderRepository.manager.connection.createQueryRunner();
+    if (!dryRun) {
+      await lockRunner.connect();
+      const locked = await lockRunner.query(
+        'SELECT pg_try_advisory_lock($1) AS locked',
+        [DispatchEngineService.EXECUTOR_LOCK],
+      );
+      if (!locked[0]?.locked) {
+        await lockRunner.release();
+        return empty;
+      }
+    }
+
+    try {
     // 換日就把記憶體的已發清單重置——昨天的 order_id 今天不會再出現
     const today = localMidnight(now);
     if (today !== this.issuedDay) {
@@ -332,6 +359,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       expired,
       skipped: plan.skipped,
     };
+    } finally {
+      if (!dryRun) {
+        await lockRunner.query('SELECT pg_advisory_unlock($1)', [DispatchEngineService.EXECUTOR_LOCK]);
+        await lockRunner.release();
+      }
+    }
   }
 
   /** 班表綁定的整備任務 → 充電參數查詢表。取不到就讓每張充電單都帶著原因。 */
@@ -364,12 +397,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       order_id: item.orderId,
       vehicle_code: item.vehicleCode,
       trip_code: item.tripCode,
-      // 三種訂單分開標記：正線營運、空車移動、整備。狀態統計與圖台徽章都靠它分流。
-      // 只有載客班次進正線班表；其餘一律是整備班次。
-      //
-      // 空車移動（出廠、入廠、讓站）雖然車真的在開，但那是把車在場區之間挪
-      // 位置，還沒開始營運——它屬於整備班次，也停在整備區。
-      line_kind: item.kind === 'passenger' ? 'MAINLINE' : 'MAINTENANCE',
+      // 業務分類與資料來源分開：載客、空車過渡、整備各自保留結構化用途。
+      line_kind: businessLineKind(item),
       ...(item.maintenance
         ? {
             maint_type_label: item.maintenance.typeLabel,
@@ -444,7 +473,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       .slice(0, 10);
 
     return {
-      enabled: this.isEnabled,
+      enabled: await this.isEnabled(),
       config: {
         tick_seconds: dispatchConfig.tickSeconds,
         lead_seconds: dispatchConfig.leadSeconds,

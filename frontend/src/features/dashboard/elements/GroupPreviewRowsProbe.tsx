@@ -18,6 +18,7 @@ export interface GroupPreviewRowsState {
   rows: Record<string, unknown>[];
   loading: boolean;
   error: string | null;
+  stale: boolean;
 }
 
 function GenericGroupRowsProbe({
@@ -32,20 +33,29 @@ function GenericGroupRowsProbe({
   const config = group.genericGroup;
   const capacity = Math.max(1, config?.capacityConfig?.capacity ?? group.slotCount ?? group.gridColumns ?? 6);
   const sourcePostProcessors = useShiftSourcePostProcessors();
-  const { fetchers, slots, isInitialLoading, templatesBySlot } = useGenericGroupSlots(config, capacity, {
+  const { fetchers, candidates, isInitialLoading, sourceStates, postProcessProblems } = useGenericGroupSlots(config, capacity, {
     sourcePostProcessors,
   });
   const rows = useMemo(
-    () => slots
-      .map((cell, index) => (cell && (!templateId || templatesBySlot[index]?.id === templateId) ? cell.row : null))
-      .filter((row): row is Record<string, unknown> => row !== null),
-    [slots, templatesBySlot, templateId],
+    () => candidates
+      .filter((candidate) => !templateId || candidate.template?.id === templateId)
+      .map((candidate) => candidate.row),
+    [candidates, templateId],
   );
+  const errors = Object.entries(sourceStates)
+    .filter(([, state]) => state.error)
+    .map(([id, state]) => `${id}: ${state.error}`);
+  const stale = Object.values(sourceStates).some((state) => !!state.error && state.data.length > 0);
   const fingerprint = JSON.stringify(rows);
   useEffect(() => {
-    onChange({ rows, loading: isInitialLoading, error: null });
+    onChange({
+      rows,
+      loading: isInitialLoading,
+      error: [...errors, ...postProcessProblems].join('；') || null,
+      stale,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerprint, isInitialLoading]);
+  }, [fingerprint, isInitialLoading, errors.join('|'), stale, postProcessProblems.join('|'), candidates.length, capacity]);
   return <>{fetchers}</>;
 }
 
@@ -73,7 +83,7 @@ function LegacyGroupRowsProbe({
   }, [group.label, data, fleetMqtt]);
   const fingerprint = JSON.stringify(rows);
   useEffect(() => {
-    onChange({ rows, loading, error: error ?? null });
+    onChange({ rows, loading, error: error ?? null, stale: !!error && rows.length > 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprint, loading, error]);
   return null;

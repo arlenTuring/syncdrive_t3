@@ -62,7 +62,7 @@ export function ImportTemplateButton({ onImported, variant = 'card' }: ImportPro
       const text = await file.text();
       const json = JSON.parse(text) as unknown;
       const template = parseTemplateFile(json);
-      const result = importDashboardTemplate(template, {
+      const result = await importDashboardTemplate(template, {
         applyTemplateConnections: applyConnections,
         planeName: template.meta?.name,
       });

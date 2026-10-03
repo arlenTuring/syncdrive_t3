@@ -1,15 +1,40 @@
-import { Controller, Get, Post, Body, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { DatasourceService } from './datasource.service';
 import { DashboardDemoSeedService } from '../database/dashboard-demo-seed.service';
+import {
+  DatasourceDefinitionsService,
+  type DataSourceDefinitionPayload,
+} from './datasource-definitions.service';
 
 @ApiTags('Datasource')
 @Controller('syncdrive-api/datasource')
 export class DatasourceController {
   constructor(
     private readonly datasourceService: DatasourceService,
+    private readonly definitions: DatasourceDefinitionsService,
     private readonly dashboardDemoSeed: DashboardDemoSeedService,
   ) {}
+
+  /** 共用資料來源定義；畫布只保存穩定的 sourceKey，不保存密碼或 token。 */
+  @Get('definitions')
+  async listDefinitions() {
+    return this.definitions.list();
+  }
+
+  @Put('definitions/:sourceKey')
+  async saveDefinition(
+    @Param('sourceKey') sourceKey: string,
+    @Body() body: DataSourceDefinitionPayload,
+  ) {
+    return this.definitions.save(sourceKey, body);
+  }
+
+  @Delete('definitions/:sourceKey')
+  async deleteDefinition(@Param('sourceKey') sourceKey: string) {
+    await this.definitions.remove(sourceKey);
+    return { ok: true };
+  }
 
   /** 連線測試 */
   @Get('ping')

@@ -105,8 +105,26 @@ function build(
       { vehicleCode: 'PMS01', isActive: true },
     ]),
   };
+  let persistedEnabled: boolean | undefined;
+  const lockRunner = {
+    connect: jest.fn(),
+    query: jest.fn().mockImplementation((sql: string) =>
+      Promise.resolve(sql.includes('pg_try_advisory_lock') ? [{ locked: true }] : [{ pg_advisory_unlock: true }]),
+    ),
+    release: jest.fn(),
+  };
   const orderRepository = {
     find: jest.fn().mockResolvedValue(existingOrderIds.map((id) => ({ id }))),
+    manager: {
+      query: jest.fn().mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('SELECT setting_value')) {
+          return Promise.resolve(persistedEnabled === undefined ? [] : [{ setting_value: persistedEnabled }]);
+        }
+        if (sql.includes('INSERT INTO system_settings')) persistedEnabled = JSON.parse(String(params[1]));
+        return Promise.resolve([]);
+      }),
+      connection: { createQueryRunner: () => lockRunner },
+    },
   };
 
   const maintenanceTaskService = {
@@ -179,7 +197,7 @@ describe('DispatchEngineService.tick', () => {
 
   it('停用時不下訂單', async () => {
     const { engine, created } = build([trip(12 * 3600 + 60)]);
-    engine.setEnabled(false);
+    await engine.setEnabled(false);
 
     await engine.tick({ now: REFERENCE });
 
@@ -316,12 +334,12 @@ describe('空車移動', () => {
     });
   });
 
-  it('空車移動屬於整備班次：只有載客進正線班表', async () => {
+  it('空車移動屬於過渡班次，不冒充整備作業', async () => {
     const { engine, created } = build([], [], YARD_BODY);
 
     await engine.tick({ now: REFERENCE });
 
-    expect(created.every((order) => order.line_kind === 'MAINTENANCE')).toBe(
+    expect(created.every((order) => order.line_kind === 'TRANSITION')).toBe(
       true,
     );
     // 移動中的徽章是「調度」，格位取場區那一端
@@ -517,7 +535,7 @@ describe('線上開關要真的能開', () => {
       const off = await engine.tick({ now: REFERENCE });
       expect(off.issued).toHaveLength(0);
 
-      engine.setEnabled(true);
+      await engine.setEnabled(true);
       const on = await engine.tick({ now: REFERENCE });
 
       expect(on.issued).toHaveLength(1);

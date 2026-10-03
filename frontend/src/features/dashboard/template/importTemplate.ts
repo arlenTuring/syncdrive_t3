@@ -71,11 +71,11 @@ export interface ImportTemplateOptions {
 }
 
 /** 解析樣板、合併資料來源、建立新平面 */
-export function importDashboardTemplate(
+export async function importDashboardTemplate(
   file: DashboardTemplateFile,
   options: ImportTemplateOptions = {},
-): TemplateImportResult {
-  const { warnings } = mergeTemplateDataSources(file.dataSources, {
+): Promise<TemplateImportResult> {
+  const { warnings } = await mergeTemplateDataSources(file.dataSources, {
     overwriteExisting: options.applyTemplateConnections ?? false,
   });
 

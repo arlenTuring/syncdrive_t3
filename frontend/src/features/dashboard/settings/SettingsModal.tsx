@@ -21,7 +21,10 @@ const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 p
 
 export function SettingsModal({ onClose, onClearAll }: Props) {
   const { t } = useTranslation();
-  const { dataSources, addDataSource, updateDataSource, deleteDataSource } = useDataSourceStore();
+  const {
+    dataSources, loading: dataSourcesLoading, error: dataSourcesError, legacySources,
+    importLegacyDataSources, addDataSource, updateDataSource, deleteDataSource,
+  } = useDataSourceStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [pingStates, setPingStates] = useState<Record<string, PingState>>({});
@@ -78,6 +81,25 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
               <div className="bg-purple-900/20 border border-purple-800/40 rounded-lg px-4 py-3 text-xs text-purple-300 leading-relaxed">
                 {t('dashboard.settings.datasourceIntro')}
               </div>
+              {dataSourcesLoading && <div className="text-xs text-zinc-400">正在讀取伺服器資料來源…</div>}
+              {dataSourcesError && <div className="rounded border border-red-700/50 bg-red-950/30 p-2 text-xs text-red-300">讀取失敗：{dataSourcesError}</div>}
+              {legacySources.length > 0 && (
+                <div className="rounded border border-amber-700/50 bg-amber-950/20 p-3 text-xs text-amber-200">
+                  偵測到這個瀏覽器的舊資料來源設定。伺服器同 ID 的設定不會被覆寫。
+                  <button
+                    type="button"
+                    className="ml-2 underline"
+                    onClick={async () => {
+                      try {
+                        const conflicts = await importLegacyDataSources();
+                        alert(conflicts.length ? `匯入完成：\n${conflicts.join('\n')}` : '舊資料來源已匯入伺服器');
+                      } catch (e) {
+                        alert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
+                      }
+                    }}
+                  >匯入舊設定</button>
+                </div>
+              )}
 
               {dataSourceSections.map(section => {
                 const sectionSources = dataSources.filter(ds => ds.type === section.type);
@@ -102,8 +124,14 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                           pingState={pingStates[ds.id] ?? 'idle'}
                           isEditing={editingId === ds.id}
                           onEdit={() => setEditingId(editingId === ds.id ? null : ds.id)}
-                          onSave={(patch) => { updateDataSource(ds.id, patch); setEditingId(null); }}
-                          onDelete={() => deleteDataSource(ds.id)}
+                          onSave={async (patch) => {
+                            try { await updateDataSource(ds.id, patch); setEditingId(null); }
+                            catch (e) { alert(`儲存失敗：${e instanceof Error ? e.message : String(e)}`); }
+                          }}
+                          onDelete={async () => {
+                            try { await deleteDataSource(ds.id); }
+                            catch (e) { alert(`刪除失敗：${e instanceof Error ? e.message : String(e)}`); }
+                          }}
                           onPing={() => pingDataSource(ds)}
                         />
                       ))
@@ -114,7 +142,10 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
 
               {showAddForm
                 ? <AddDataSourceForm
-                    onAdd={(cfg) => { addDataSource(cfg); setShowAddForm(false); }}
+                    onAdd={async (cfg) => {
+                      try { await addDataSource(cfg); setShowAddForm(false); }
+                      catch (e) { alert(`新增失敗：${e instanceof Error ? e.message : String(e)}`); }
+                    }}
                     onCancel={() => setShowAddForm(false)}
                   />
                 : (
@@ -208,8 +239,8 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   pingState: PingState;
   isEditing: boolean;
   onEdit: () => void;
-  onSave: (patch: Partial<DataSourceConfig>) => void;
-  onDelete: () => void;
+  onSave: (patch: Partial<DataSourceConfig>) => void | Promise<void>;
+  onDelete: () => void | Promise<void>;
   onPing: () => void;
 }) {
   const { t } = useTranslation();
@@ -323,14 +354,14 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
 }
 
 function AddDataSourceForm({ onAdd, onCancel }: {
-  onAdd: (cfg: Omit<DataSourceConfig, 'id' | 'createdAt'>) => void;
+  onAdd: (cfg: Omit<DataSourceConfig, 'id' | 'createdAt'>) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({
     name: '',
     type: 'internal' as DataSourceType,
-    backendUrl: 'http://localhost:3000',
+    backendUrl: '',
     description: '',
     mqttTopic: 'v1/vtms/+/telemetry/update',
   });
@@ -361,8 +392,8 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         </div>
       </div>
       <div>
-        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrlRequired')}</label>
-        <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder="http://localhost:3000" />
+        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrlOptional')}</label>
+        <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder={t('dashboard.settings.backendUrlPlaceholder')} />
       </div>
       {form.type === 'mqtt' && (
         <div>
@@ -382,7 +413,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
       <div className="flex gap-2 pt-1">
         <button
           onClick={() => {
-            if (!form.name || !form.backendUrl) return;
+            if (!form.name) return;
             const { mqttTopic, ...rest } = form;
             onAdd(
               rest.type === 'mqtt'
@@ -390,7 +421,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
                 : rest,
             );
           }}
-          disabled={!form.name || !form.backendUrl}
+          disabled={!form.name}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-500 disabled:opacity-40 transition-colors"
         >
           <Plus size={12} /> {t('dashboard.settings.add')}

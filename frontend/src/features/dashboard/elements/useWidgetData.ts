@@ -61,6 +61,12 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
   const { dataSourceId, sqlQuery, dataUrl } = opts;
   const [state, setState] = useState<WidgetFetchState>({ data: [], loading: false, error: null });
   const lastGoodData = useRef<Record<string, unknown>[]>([]);
+  const [dataSourceRevision, setDataSourceRevision] = useState(0);
+  useEffect(() => {
+    const changed = () => setDataSourceRevision((value) => value + 1);
+    window.addEventListener('syncdrive-datasources-changed', changed);
+    return () => window.removeEventListener('syncdrive-datasources-changed', changed);
+  }, []);
   /**
    * 上一次交給畫面的資料（序列化）。重查結果一模一樣就不 setState：失效通知一來，
    * 綁同一張表的元件全部重查，但絕大多數時候資料根本沒變，照樣 setState 會讓整排
@@ -204,7 +210,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [dataSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags]);
+  }, [dataSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags, dataSourceRevision]);
 
   return state;
 }

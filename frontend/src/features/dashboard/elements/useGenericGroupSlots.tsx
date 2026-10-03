@@ -3,6 +3,7 @@ import type { CanvasElementProps, FreshnessPolicy, GenericGroupConfig, GroupTemp
 import { useWidgetData, type WidgetFetchState } from './useWidgetData';
 import { buildCandidatesFromSource, selectTemplate } from '../utils/groupCandidates';
 import { assignPrioritySlots, type PrioritySlotCell } from '../utils/groupPriorityPool';
+import { withRowSourceMetadata } from '../utils/rowRules';
 
 /** 有效開始／結束時間到了要自動重新評估（規格 §6），不能只靠資料更新觸發。 */
 const REVALIDATE_TICK_MS = 15_000;
@@ -65,6 +66,9 @@ export interface GenericGroupSlotsState {
   isInitialLoading: boolean;
   /** 已選定的樣板（依 slot 索引對齊，null 代表用 element.children 備援） */
   templatesBySlot: (GroupTemplateDef | null)[];
+  candidates: Array<{ row: Record<string, unknown>; template: GroupTemplateDef | null }>;
+  sourceStates: Record<string, WidgetFetchState>;
+  postProcessProblems: string[];
 }
 
 /**
@@ -128,7 +132,8 @@ export function useGenericGroupSlots(
 
   const poolRef = useRef<PrioritySlotCell[]>(Array.from({ length: capacity }, () => null));
 
-  const { slots, pendingCount } = useMemo(() => {
+  const { slots, pendingCount, candidates, postProcessProblems } = useMemo(() => {
+    const problems: string[] = [];
     const candidates = sources.flatMap((source) => {
       const result = resultsMap[source.id];
       // 查詢失敗不等同成功回傳空集合：這個來源這次沒有可信資料，整批跳過，
@@ -137,7 +142,15 @@ export function useGenericGroupSlots(
       // 完全沒有 result（還沒掛載完成）才跳過；有 result 就照它目前的 data 走。
       if (!result) return [];
       const postProcess = source.postProcessId ? opts?.sourcePostProcessors?.[source.postProcessId] : undefined;
-      const rows = postProcess ? postProcess(result.data) : result.data;
+      if (source.postProcessId && !postProcess) {
+        problems.push(`來源「${source.label ?? source.id}」找不到後處理器「${source.postProcessId}」`);
+      }
+      const processed = postProcess ? postProcess(result.data) : result.data;
+      const rows = processed.map((row) => withRowSourceMetadata(row, {
+        sourceId: source.id,
+        sourceLabel: source.label,
+        postProcessId: postProcess ? source.postProcessId : undefined,
+      }));
       return buildCandidatesFromSource({
         source,
         rows,
@@ -154,13 +167,25 @@ export function useGenericGroupSlots(
       arrange: config?.arrangeMode ?? 'priority',
     });
     poolRef.current = result.slots;
-    return result;
+    return { ...result, candidates, postProcessProblems: problems };
     // tick 只用來強制重新跑一次（時間相關的 valid 判斷可能因為時間經過而改變，
     // 資料本身沒變也要重算），不放進任何欄位讀取
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sources, resultsMap, capacity, config, tick, opts?.sourcePostProcessors]);
 
   const templatesBySlot = slots.map((cell) => (cell ? selectTemplate(cell.row, config?.templates) : null));
+  const previewCandidates = candidates
+    .filter((candidate) => candidate.valid)
+    .map((candidate) => ({ row: candidate.row, template: selectTemplate(candidate.row, config?.templates) }));
 
-  return { fetchers, slots, pendingCount, isInitialLoading, templatesBySlot };
+  return {
+    fetchers,
+    slots,
+    pendingCount,
+    isInitialLoading,
+    templatesBySlot,
+    candidates: previewCandidates,
+    sourceStates: resultsMap,
+    postProcessProblems,
+  };
 }

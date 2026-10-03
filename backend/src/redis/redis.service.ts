@@ -39,6 +39,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.ping();
   }
 
+  async listLiveStateKeys(): Promise<string[]> {
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, page] = await this.client.scan(cursor, 'MATCH', 'vtms:*:*', 'COUNT', 200);
+      cursor = next;
+      keys.push(...page.filter((key) => /^vtms:(telemetry|operation|health|health-seen):[^:]+$/.test(key)));
+    } while (cursor !== '0');
+    return [...new Set(keys)].sort();
+  }
+
+  async deleteLiveState(vehicleCodes: string[]): Promise<{ keys: string[]; deleted: number }> {
+    const keys = vehicleCodes.flatMap((code) => [
+      `vtms:telemetry:${code}`,
+      `vtms:operation:${code}`,
+      `vtms:health:${code}`,
+      `vtms:health-seen:${code}`,
+    ]);
+    return { keys, deleted: keys.length ? await this.client.del(...keys) : 0 };
+  }
+
   async setTelemetry(vehicleCode: string, payload: any) {
     // 規格書 §四 Anti-drift 硬性約束：驗證根層必填欄位
     if (!payload.timestamp || !payload.global_pose || !payload.kinematics) {

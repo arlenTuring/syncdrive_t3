@@ -197,6 +197,13 @@ export function useDashboardEditor() {
           return;
         }
         const migrated = remote.map(migratePlane);
+        // 內建來源的修正要成為共用版本；只在內容真的改變時寫回，且遷移只替換
+        // 綁定協議，不碰使用者排好的座標、尺寸、樣式或自訂元件。
+        if (JSON.stringify(migrated) !== JSON.stringify(remote)) {
+          void saveDashboardPlanes(migrated).catch(() => {
+            /* 後端暫時不可用：畫面先使用已遷移版本，下次載入再補寫 */
+          });
+        }
         setPlanes(migrated);
         setActivePlaneId((current) =>
           current && migrated.some((plane) => plane.id === current)

@@ -86,12 +86,11 @@ const zhTW = {
     renamePageHint: '{{name}}（雙擊重新命名）',
     removePage: '移除子頁',
     removePageAria: '移除 {{name}}',
-    appSettings: '應用程式設定',
     renamePageInput: '重新命名子頁',
     attachDashboard: {
       title: '新增子頁面',
       emptyTitle: '還沒有可掛載的儀表板',
-      emptyHint: '請先到「儀表板管理」建立或匯入平面',
+      emptyHint: '請先到「系統基礎模組 → 進階管理模式 → 儀表介面管理」建立或匯入平面',
       selectPlane: '載入儀表板平面',
       pageName: '子頁面名稱',
       pageNamePlaceholder: '例如：班表部署總覽',
@@ -109,6 +108,12 @@ const zhTW = {
   systemFoundation: {
     tabHealth: '系統監測狀態',
     tabSettings: '系統基礎設定',
+    tabAdvanced: '進階管理模式',
+    advanced: {
+      dashboard: '儀表介面管理',
+      data: '資料管理介面',
+      dataPending: '資料管理介面將於下一階段啟用',
+    },
     refreshNow: '立即重新整理',
     liveResources: '即時資源狀態',
     filterThresholds: '監測閾值設定',
@@ -2546,7 +2551,7 @@ const zhTW = {
       editHint: '✂ EDIT · Shift+點擊加選 · Shift/Alt+拖曳框選 · 3px 對齊',
       emptyTitle: '此平面沒有任何畫布元件',
       emptyHint:
-        '可能是本機快取損壞。請使用左上角齒輪「應用程式設定」→「還原兩個圖台範例」，或從清單重新建立平面。',
+        '可能是儀表板資料損壞。請到「系統基礎模組 → 進階管理模式 → 儀表介面管理」重新匯入或建立平面。',
     },
     dataSourcePicker: {
       selectTable: '選取資料表（可選）',
@@ -3381,7 +3386,7 @@ const zhTW = {
       addDatasource: '新增資料來源',
       restoreExamplesTitle: '還原內建範例',
       restoreExamplesBody:
-        '請使用畫面左上角齒輪「應用程式設定」→「還原兩個圖台範例」（儀表板與地圖編輯器一次還原）。',
+        '請到「系統基礎模組 → 進階管理模式 → 儀表介面管理」檢查或重新匯入圖台資料。',
       demoDataTitle: '示範資料',
       seedTitle: '載入示範資料到資料庫',
       seedHint: '寫入 11 台車輛、事件、正線／整備班次卡、運能與整備分佈。需後端運行中。',
@@ -3412,7 +3417,8 @@ const zhTW = {
       addFormTitle: '新增資料來源',
       nameRequired: '名稱 *',
       typeRequired: '類型 *',
-      backendUrlRequired: '後端 URL *',
+      backendUrlOptional: '後端 URL（選填）',
+      backendUrlPlaceholder: '留空表示使用同源後端',
       namePlaceholderMqtt: '我的 MQTT',
       namePlaceholderSql: '我的資料庫',
       typeSql: 'SQL — PostgreSQL（透過後端）',

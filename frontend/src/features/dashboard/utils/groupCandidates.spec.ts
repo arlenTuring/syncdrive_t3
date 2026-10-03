@@ -65,6 +65,22 @@ describe('resolvePriority', () => {
   });
 });
 
+describe('shift business priority rules', () => {
+  const rules = [
+    { id: 'emergency', priority: 1000, conditions: [{ field: 'order_status', operator: 'eq' as const, value: 'FAULTED' }] },
+    { id: 'mainline', priority: 300, conditions: [{ field: 'business_kind', operator: 'eq' as const, value: 'MAINLINE' }] },
+    { id: 'transition', priority: 200, conditions: [{ field: 'business_kind', operator: 'eq' as const, value: 'TRANSITION' }] },
+    { id: 'maintenance', priority: 100, conditions: [{ field: 'business_kind', operator: 'eq' as const, value: 'MAINTENANCE' }] },
+  ];
+
+  it('keeps emergency first, then mainline, transition and maintenance', () => {
+    expect(resolvePriority({ order_status: 'FAULTED', business_kind: 'TRANSITION' }, 'shifts', rules, 0, 0)).toBe(1000);
+    expect(resolvePriority({ business_kind: 'MAINLINE' }, 'shifts', rules, 0, 0)).toBe(300);
+    expect(resolvePriority({ business_kind: 'TRANSITION' }, 'shifts', rules, 0, 0)).toBe(200);
+    expect(resolvePriority({ business_kind: 'MAINTENANCE' }, 'shifts', rules, 0, 0)).toBe(100);
+  });
+});
+
 describe('applyFieldAliases', () => {
   it('新增別名鍵，不覆蓋原始欄位', () => {
     const row = { order_id: 'X1', item_id: 'existing' };

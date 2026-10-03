@@ -1,9 +1,9 @@
-// 資料來源管理 Store（LocalStorage 持久化）
+// 資料來源管理 Store（後端為權威；localStorage 僅供舊資料匯入）
 // 支援兩種類型：
 //   'internal' — 連線到 SyncDrive 後端的 PostgreSQL（透過後端 API 代理）
 //   'rest'     — 直接呼叫 REST API（回傳 JSON Array）
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { expandBuiltinSqlMacros } from '../constants/demoSql';
 import { inferInvalidateTagsFromSql, tagsOverlap } from '../utils/inferInvalidateTagsFromSql';
 
@@ -58,6 +58,7 @@ export interface DataSourceConfig {
   mqttTopic?: string;
   description: string;
   createdAt: number;
+  updatedAt?: number;
 }
 
 const STORAGE_KEY = 'syncdrive_datasources';
@@ -90,33 +91,66 @@ const DEFAULT_MQTT_DATASOURCE: DataSourceConfig = {
   createdAt: 0,
 };
 
-let _cachedSources: DataSourceConfig[] | null = null;
+let _cachedSources: DataSourceConfig[] = [DEFAULT_DATASOURCE, DEFAULT_MQTT_DATASOURCE];
+let refreshPromise: Promise<DataSourceConfig[]> | null = null;
 
 function load(): DataSourceConfig[] {
-  if (_cachedSources) return _cachedSources;
+  return _cachedSources;
+}
+
+function loadLegacy(): DataSourceConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const list: DataSourceConfig[] = raw ? JSON.parse(raw) : [DEFAULT_DATASOURCE];
-    const normalized = list.map((d) => ({
+    if (!raw) return [];
+    const list = JSON.parse(raw) as DataSourceConfig[];
+    return list.map((d) => ({
       ...d,
       backendUrl: d.backendUrl?.replace('//localhost:', '//127.0.0.1:') ?? d.backendUrl,
     }));
-    if (!normalized.some((d) => d.id === DEFAULT_MQTT_DATASOURCE.id)) {
-      _cachedSources = [DEFAULT_DATASOURCE, DEFAULT_MQTT_DATASOURCE, ...normalized.filter((d) => d.id !== DEFAULT_DATASOURCE.id)];
-    } else {
-      _cachedSources = normalized;
-    }
-    return _cachedSources;
   } catch {
-    _cachedSources = [DEFAULT_DATASOURCE, DEFAULT_MQTT_DATASOURCE];
-    return _cachedSources;
+    return [];
   }
 }
 
-function save(list: DataSourceConfig[]) {
-  _cachedSources = null;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+function publish(list: DataSourceConfig[]) {
+  _cachedSources = list;
   window.dispatchEvent(new Event('syncdrive-datasources-changed'));
+}
+
+async function readError(res: Response): Promise<string> {
+  const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+  return Array.isArray(body.message) ? body.message.join('; ') : body.message ?? `HTTP ${res.status}`;
+}
+
+export async function refreshDataSources(): Promise<DataSourceConfig[]> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const res = await fetch('/syncdrive-api/datasource/definitions');
+    if (!res.ok) throw new Error(await readError(res));
+    const list = await res.json() as DataSourceConfig[];
+    publish(list);
+    return list;
+  })().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+// 畫布可能在使用者打開設定視窗前就開始查詢；應用啟動時先取得共用定義。
+if (typeof window !== 'undefined') void refreshDataSources().catch(() => undefined);
+
+async function saveDefinition(config: DataSourceConfig): Promise<DataSourceConfig> {
+  const res = await fetch(`/syncdrive-api/datasource/definitions/${encodeURIComponent(config.id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: config.name,
+      type: config.type,
+      backendUrl: config.backendUrl,
+      mqttTopic: config.mqttTopic,
+      description: config.description,
+    }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<DataSourceConfig>;
 }
 
 export interface MergeDataSourcesResult {
@@ -124,17 +158,18 @@ export interface MergeDataSourcesResult {
 }
 
 /** 匯入樣板時合併資料來源定義 */
-export function mergeTemplateDataSources(
+export async function mergeTemplateDataSources(
   templateSources: DataSourceConfig[],
   options: { overwriteExisting?: boolean } = {},
-): MergeDataSourcesResult {
+): Promise<MergeDataSourcesResult> {
   const warnings: string[] = [];
   const map = new Map(load().map(d => [d.id, d]));
 
   for (const ts of templateSources) {
     const existing = map.get(ts.id);
     if (!existing) {
-      map.set(ts.id, { ...ts });
+      const saved = await saveDefinition(ts);
+      map.set(ts.id, saved);
       warnings.push(`已新增資料來源「${ts.name}」（${ts.id}）`);
       continue;
     }
@@ -145,13 +180,14 @@ export function mergeTemplateDataSources(
         `資料來源「${ts.id}」與樣板不同：本機 ${existing.type} @ ${existing.backendUrl}，樣板 ${ts.type} @ ${ts.backendUrl}`,
       );
       if (options.overwriteExisting) {
-        map.set(ts.id, { ...existing, ...ts, id: ts.id, createdAt: existing.createdAt });
+        const saved = await saveDefinition({ ...existing, ...ts, id: ts.id, createdAt: existing.createdAt });
+        map.set(ts.id, saved);
         warnings.push(`  → 已套用樣板連線設定`);
       }
     }
   }
 
-  save(Array.from(map.values()));
+  publish(Array.from(map.values()));
   return { warnings };
 }
 
@@ -325,37 +361,72 @@ export async function fetchTableSchema(
 
 export function useDataSourceStore() {
   const [dataSources, setDataSources] = useState<DataSourceConfig[]>(load);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const legacySources = typeof localStorage === 'undefined' ? [] : loadLegacy();
 
-  const addDataSource = useCallback((config: Omit<DataSourceConfig, 'id' | 'createdAt'>) => {
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await refreshDataSources();
+      setDataSources(next);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+    const sync = () => setDataSources(load());
+    window.addEventListener('syncdrive-datasources-changed', sync);
+    return () => window.removeEventListener('syncdrive-datasources-changed', sync);
+  }, [reload]);
+
+  const addDataSource = useCallback(async (config: Omit<DataSourceConfig, 'id' | 'createdAt'>) => {
     const newDs: DataSourceConfig = {
       ...config,
       id: `ds-${Date.now()}`,
       createdAt: Date.now(),
     };
-    setDataSources(prev => {
-      const next = [...prev, newDs];
-      save(next);
-      return next;
-    });
-    return newDs;
-  }, []);
+    const saved = await saveDefinition(newDs);
+    await reload();
+    return saved;
+  }, [reload]);
 
-  const updateDataSource = useCallback((id: string, patch: Partial<DataSourceConfig>) => {
-    setDataSources(prev => {
-      const next = prev.map(d => d.id === id ? { ...d, ...patch } : d);
-      save(next);
-      return next;
-    });
-  }, []);
+  const updateDataSource = useCallback(async (id: string, patch: Partial<DataSourceConfig>) => {
+    const current = load().find((d) => d.id === id);
+    if (!current) throw new Error(`找不到資料來源「${id}」`);
+    await saveDefinition({ ...current, ...patch, id });
+    await reload();
+  }, [reload]);
 
-  const deleteDataSource = useCallback((id: string) => {
+  const deleteDataSource = useCallback(async (id: string) => {
     if (id === DEFAULT_DATASOURCE.id || id === DEFAULT_MQTT_DATASOURCE.id) return;
-    setDataSources(prev => {
-      const next = prev.filter(d => d.id !== id);
-      save(next);
-      return next;
-    });
-  }, []);
+    const res = await fetch(`/syncdrive-api/datasource/definitions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await readError(res));
+    await reload();
+  }, [reload]);
 
-  return { dataSources, addDataSource, updateDataSource, deleteDataSource };
+  const importLegacyDataSources = useCallback(async () => {
+    const current = new Map(load().map((item) => [item.id, item]));
+    const conflicts: string[] = [];
+    for (const legacy of loadLegacy()) {
+      const existing = current.get(legacy.id);
+      if (existing) {
+        if (existing.type !== legacy.type || existing.backendUrl !== legacy.backendUrl || existing.mqttTopic !== legacy.mqttTopic) {
+          conflicts.push(`「${legacy.id}」與伺服器設定不同，未覆寫`);
+        }
+        continue;
+      }
+      await saveDefinition(legacy);
+    }
+    if (conflicts.length === 0) localStorage.removeItem(STORAGE_KEY);
+    await reload();
+    return conflicts;
+  }, [reload]);
+
+  return { dataSources, loading, error, legacySources, reload, importLegacyDataSources, addDataSource, updateDataSource, deleteDataSource };
 }

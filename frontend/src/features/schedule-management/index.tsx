@@ -15,7 +15,6 @@ import {
   Activity,
 } from 'lucide-react';
 import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
-import DashboardEditor from '../dashboard';
 import MapEditorApp from '../map-editor';
 import ShiftRecordsApp from '../shift-records';
 import TimeTemplatesApp from '../time-templates';
@@ -52,7 +51,6 @@ type ScheduleManagementAppProps = {
   /** @deprecated 首頁即 VTMS；保留參數以相容舊呼叫 */
   onBackToHome?: () => void;
   initialView?: ShellView;
-  onOpenSettings?: () => void;
 };
 
 function useWorkspaceChrome(
@@ -153,7 +151,6 @@ function useWorkspaceChrome(
 
 export default function ScheduleManagementApp({
   initialView = 'shift-records',
-  onOpenSettings,
 }: ScheduleManagementAppProps) {
   const [view, setView] = useState<string>(initialView);
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
@@ -239,7 +236,6 @@ export default function ScheduleManagementApp({
       <ScheduleModuleSidebar
         activeView={view}
         onViewChange={setView}
-        onOpenSettings={onOpenSettings}
         adminMode={adminMode}
         moduleDashboardPages={modulePages}
         onAddModuleDashboard={setAttachModuleId}
@@ -297,17 +293,14 @@ export default function ScheduleManagementApp({
           </ShellWorkspaceFrame>
         ) : null}
 
-        {view === 'system-foundation' ? (
+        {view === 'system-foundation' || view === 'dashboard' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
             <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.modules.system') })}>
-              <SystemFoundationApp />
+              <SystemFoundationApp
+                initialTab={view === 'dashboard' ? 'advanced' : 'health'}
+                initialAdvancedSection="dashboard"
+              />
             </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'dashboard' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
-            <DashboardEditor />
           </ShellWorkspaceFrame>
         ) : null}
 

@@ -20,11 +20,8 @@ import {
   buildVehicleBehaviorActionRules,
   VEHICLE_BEHAVIOR_ACTION_CATALOG,
 } from '../vehicle-editor/constants/behaviorActionCatalog';
-import { WidgetDataBindingSettings } from './elements/WidgetDataBindingSettings';
-import { WidgetDataLineageCard } from './components/WidgetDataLineageCard';
+import { WidgetDataBindingContext, WidgetDataBindingSettings } from './elements/WidgetDataBindingSettings';
 import { createEmptyAlertRule, coerceAlertRule, getEditorAlertRules } from './utils/alertTrigger';
-import { resolveFreshness, FRESHNESS_POLICY_OPTIONS } from './utils/resolveFreshness';
-import type { FreshnessPolicy } from './types';
 import { newSeriesId, resolveLineChartSeries, syncSeriesToLegacyFields } from './elements/lineChartSeries';
 import * as LucideIcons from 'lucide-react';
 import { 
@@ -33,8 +30,6 @@ import {
   Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, AlertTriangle, CircleOff, Monitor, Bus, Zap, List, Edit3,
   AlignLeft, AlignCenter, AlignRight
 } from 'lucide-react';
-import { DataSourcePicker } from './elements/DataSourcePicker';
-import { DataSourceIdSelect } from './elements/DataSourceIdSelect';
 import { getAvailableMaps, getAvailableMapsAsync } from './elements/mapCanvasStorage';
 import { RouteProgressSettings } from './route-progress/RouteProgressSettings';
 import { TextAlignmentControls } from '../../components/TextAlignmentControls';
@@ -131,101 +126,7 @@ function DataBindingSettings({
   w: WidgetDataBinding; 
   onUpdate: (p: Partial<WidgetDataBinding>) => void 
 }) {
-  const { t } = useTranslation();
-  const [mode, setMode] = React.useState<'sql' | 'mqtt' | 'rest'>(
-    w.mqttDataSourceId ? 'mqtt' : (w.dataUrl ? 'rest' : 'sql')
-  );
-  const policy = (w.freshnessPolicy ?? 'auto') as FreshnessPolicy;
-
-  // T2-C 修正：當選取的 Widget 改變時（例如從 MQTT Widget 切換到 SQL Widget），
-  // 同步更新 mode 狀態，防止頁籤顯示錯誤的資料綁定模式
-  React.useEffect(() => {
-    setMode(w.mqttDataSourceId ? 'mqtt' : (w.dataUrl ? 'rest' : 'sql'));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [w.dataSourceId, w.mqttDataSourceId, w.dataUrl]);
-
-  return (
-    <div className="border border-zinc-800 rounded-lg p-3 space-y-3 bg-zinc-900/50">
-      <div className="flex gap-1 bg-zinc-800 p-0.5 rounded-md">
-        {(['sql', 'mqtt', 'rest'] as const).map(m => (
-          <button key={m} onClick={() => setMode(m)}
-            className={`flex-1 py-1 text-[10px] font-bold rounded uppercase transition-all
-              ${mode === m ? 'bg-cyan-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
-            {m}
-          </button>
-        ))}
-      </div>
-
-      {mode === 'sql' && (
-        <DataSourcePicker
-          dataSourceId={w.dataSourceId ?? ''}
-          sqlQuery={w.sqlQuery ?? ''}
-          onChangeDataSource={id => onUpdate({ dataSourceId: id, mqttDataSourceId: '', dataUrl: '' })}
-          onChangeSqlQuery={q => onUpdate({ sqlQuery: q })}
-        />
-      )}
-
-      {mode === 'mqtt' && (
-        <div className="space-y-2">
-          <DataSourceIdSelect
-            kind="mqtt"
-            value={w.mqttDataSourceId ?? ''}
-            onChange={id => onUpdate({ mqttDataSourceId: id, dataSourceId: '', dataUrl: '' })}
-          />
-          <Field label={t('dashboard.properties.mqttTopic')}>
-            <input value={w.mqttTopic} onChange={e => onUpdate({ mqttTopic: e.target.value })} 
-                   className={inputCls} placeholder="v1/vtms/+/telemetry/update" />
-          </Field>
-          <Field label={t('dashboard.properties.mqttPath')}>
-            <input value={w.mqttValuePath} onChange={e => onUpdate({ mqttValuePath: e.target.value })} 
-                   className={inputCls} placeholder="payload.speed" />
-          </Field>
-        </div>
-      )}
-
-      {mode === 'rest' && (
-        <Field label={t('dashboard.properties.restUrl')}>
-          <input value={w.dataUrl} onChange={e => onUpdate({ dataUrl: e.target.value, dataSourceId: '', mqttDataSourceId: '' })} 
-                 className={inputCls} placeholder="https://api.example.com/data" />
-        </Field>
-      )}
-
-      <Field label={t('dashboard.properties.freshness')}>
-        <select
-          value={policy}
-          onChange={e => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
-          className={inputCls}
-        >
-          {FRESHNESS_POLICY_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>
-              {t(`dashboard.properties.freshnessOpt.${o.value}`)}
-            </option>
-          ))}
-        </select>
-        <p className="text-zinc-500 text-[10px] leading-snug mt-1">
-          {t(`dashboard.properties.freshnessHint.${policy}`)}
-          <span className="block text-zinc-600 mt-0.5">
-            {(() => {
-              const fr = resolveFreshness(w);
-              return t('dashboard.properties.freshnessCurrent', {
-                reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams),
-              });
-            })()}
-          </span>
-        </p>
-        {policy === 'interval' && (
-          <>
-            <NumberInput min={1} value={w.refreshInterval || 15}
-                   onChange={n => onUpdate({ refreshInterval: n })}
-                   className={`${inputCls} mt-1.5`} placeholder={t('dashboard.properties.freshnessIntervalPlaceholder')} />
-            <p className="text-amber-500/80 text-[10px] leading-snug mt-1">
-              {t('dashboard.properties.freshnessPollWarn')}
-            </p>
-          </>
-        )}
-      </Field>
-    </div>
-  );
+  return <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />;
 }
 
 function AlertRulesEditor({
@@ -550,9 +451,6 @@ function TextSettings({
         <SH icon={<Database size={13} />} label={t('dashboard.properties.dataBinding')} color="#a78bfa" />
         <div className="mt-3 space-y-3">
           <DataBindingSettings w={w} onUpdate={onUpdate} />
-          <Field label={t('dashboard.properties.dataFieldName')}>
-            <input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="battery_level" />
-          </Field>
         </div>
       </div>
 
@@ -3279,8 +3177,10 @@ interface Props {
   onEnterEditTabListCell?: (tabId: string, columnId: string) => void;
   /** 雙畫板子畫布：選取中間閘道設定區 */
   dualGateSettingsActive?: boolean;
-  /** 選取元件所在的群組（子畫布或樣板編輯中）；資料來源卡依它說明 {欄位} 從哪裡來 */
+  /** 選取元件所在的群組（子畫布或樣板編輯中）；原數據綁定區塊依它顯示繼承來源 */
   dataContextGroup?: CanvasElementProps | null;
+  dataContextRow?: Record<string, unknown> | null;
+  dataContextStatus?: { loading: boolean; error: string | null; stale: boolean };
 }
 
 export function PropertiesPanel({
@@ -3301,6 +3201,8 @@ export function PropertiesPanel({
   onEnterEditTabListCell,
   dualGateSettingsActive,
   dataContextGroup = null,
+  dataContextRow = null,
+  dataContextStatus = { loading: false, error: null, stale: false },
 }: Props) {
   const { t } = useTranslation();
   const { issueMap } = useBindingHealth();
@@ -3387,7 +3289,12 @@ export function PropertiesPanel({
           </div>
         ) : selectedChild ? (
           <React.Fragment key={selectedChild.id}>
-          <WidgetDataLineageCard widget={selectedChild} group={dataContextGroup ?? editingGroup ?? null} />
+          <WidgetDataBindingContext.Provider value={{
+            widget: selectedChild,
+            group: dataContextGroup ?? editingGroup ?? null,
+            previewRow: dataContextRow,
+            ...dataContextStatus,
+          }}>
           {(() => {
             const props = { w: selectedChild, onUpdate: onUpdateChild, onDelete: onDeleteChild };
             switch (selectedChild.type) {
@@ -3438,6 +3345,7 @@ export function PropertiesPanel({
                 );
             }
           })()}
+          </WidgetDataBindingContext.Provider>
           </React.Fragment>
         ) : editingTabListColumn ? (
           <p className="text-zinc-500 text-xs leading-relaxed px-1 py-6 text-center">
