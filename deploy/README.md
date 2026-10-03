@@ -89,6 +89,22 @@ cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
 
 接上 git 之後就不要再用 `push.sh`：rsync 會讓工作目錄跟 git 紀錄不一致。
 
+### 從 Mac 操作 34（`deploy/vm.sh`）
+
+日常操作集中在這一支，預設目標同上（34）：
+
+```bash
+./deploy/vm.sh sync              # 拉 GitHub 最新 main → 重建部署 → 升級儀表板資料（= git-sync.sh）
+./deploy/vm.sh update            # 在 VM 上 git pull → 重建部署
+./deploy/vm.sh restart           # 重啟前端＋後端（不重建、不換版本），之後跑健康檢查
+./deploy/vm.sh restart backend   # 只重啟後端；也可 web／postgres／redis／mosquitto／all
+./deploy/vm.sh status            # 目前版本、最後健康版本、容器狀態
+./deploy/vm.sh logs [服務] [-f]  # 看 log（預設後端）
+./deploy/vm.sh health            # 健康檢查
+./deploy/vm.sh rollback          # 回到上一個健康版本
+./deploy/vm.sh ssh               # 登入 VM
+```
+
 在沒有原始碼的機器上跑 `deploy.sh` 會直接停下並告訴你改用安裝包——安裝包刻意
 不含原始碼，正式機不該保留原始碼，也不該在上面建置。
 
