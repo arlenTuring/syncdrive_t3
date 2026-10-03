@@ -10,6 +10,7 @@
 #   ./deploy/vm.sh status              目前版本、最後健康版本、各容器狀態
 #   ./deploy/vm.sh logs [服務] [-f]    看 log（預設後端，最近 200 行；-f 持續追）
 #   ./deploy/vm.sh health              跑完整健康檢查
+#   ./deploy/vm.sh check               檢查儀表板存的查詢是不是新版、訂單筆數
 #   ./deploy/vm.sh rollback            回到上一個通過健康檢查的版本
 #   ./deploy/vm.sh ssh                 直接登入 VM
 #
@@ -46,7 +47,7 @@ container_of() {
   esac
 }
 
-usage() { sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'; }
 
 cmd="${1:-}"
 if [ $# -gt 0 ]; then shift; fi
@@ -99,6 +100,18 @@ case "$cmd" in
 
   health)
     on_vm "sudo ./deploy/healthcheck.sh"
+    ;;
+
+  check)
+    # uses_schedule 應該全部是 f：t 代表那個來源還是舊的「從班表拼卡片」查詢
+    on_vm "sudo docker exec -i syncdrive_postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\"' <<'SQL'
+SELECT p.name AS plane, e->>'label' AS element, s->>'id' AS source,
+       (s->>'sqlQuery') LIKE '%operation_shifts%' AS uses_schedule
+FROM dashboard_planes p,
+     jsonb_array_elements(p.elements) e,
+     jsonb_array_elements(COALESCE(e->'genericGroup'->'sources', '[]'::jsonb)) s;
+SELECT count(*) AS operation_orders FROM operation_orders;
+SQL"
     ;;
 
   rollback)

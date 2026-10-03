@@ -91,6 +91,8 @@ cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
 
 ### 從 Mac 操作 34（`deploy/vm.sh`）
 
+日常操作的簡明版見 [`操作說明-34.md`](操作說明-34.md)。
+
 日常操作集中在這一支，預設目標同上（34）：
 
 ```bash
@@ -101,6 +103,7 @@ cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
 ./deploy/vm.sh status            # 目前版本、最後健康版本、容器狀態
 ./deploy/vm.sh logs [服務] [-f]  # 看 log（預設後端）
 ./deploy/vm.sh health            # 健康檢查
+./deploy/vm.sh check             # 儀表板存的查詢是否為新版、訂單筆數
 ./deploy/vm.sh rollback          # 回到上一個健康版本
 ./deploy/vm.sh ssh               # 登入 VM
 ```
