@@ -74,7 +74,7 @@ fi
 
 TAG="$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
 PREVIOUS="$(cat "$LAST_GOOD" 2>/dev/null || echo '')"
-log "部署版本 $TAG（上一個成功版本：${PREVIOUS:-無}）"
+log "部署版本 ${TAG}（上一個成功版本：${PREVIOUS:-無}）"
 
 # ── 建置 ────────────────────────────────────────────────────
 # 先建完再換。建置失敗時舊的服務原封不動還在跑。

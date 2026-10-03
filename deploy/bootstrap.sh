@@ -101,7 +101,7 @@ if [ -z "$(read_env MQTT_PUBLIC_HOST)" ]; then
   DETECTED_IP="$(curl -fsS -m 3 https://ifconfig.me 2>/dev/null || true)"
   if [ -n "$DETECTED_IP" ]; then
     set_env MQTT_PUBLIC_HOST "$DETECTED_IP"
-    log "MQTT_PUBLIC_HOST 未設定，已自動偵測並填入：$DETECTED_IP（如非對外位址請手動修正 deploy/.env）"
+    log "MQTT_PUBLIC_HOST 未設定，已自動偵測並填入：${DETECTED_IP}（如非對外位址請手動修正 deploy/.env）"
   else
     log "警告：MQTT_PUBLIC_HOST 未設定且自動偵測失敗，回應中的 mqtt.host 將是 127.0.0.1，廠商連不上。請手動設定 deploy/.env 後重啟 backend"
   fi
@@ -116,9 +116,9 @@ make_htpasswd() {  # make_htpasswd <檔案> <使用者變數> <密碼變數> <�
   if [ -f "$file" ]; then
     log "$label 帳密檔已存在，保留不動"
     if [ "$user_key" = "EXTERNAL_AUTH_USER" ] && [ -z "$(read_env "$pass_key")" ]; then
-      log "警告：$file 已存在但 deploy/.env 沒有 $pass_key——這是舊版留下的缺口"\
+      log "警告：$file 已存在但 deploy/.env 沒有 ${pass_key}——這是舊版留下的缺口"\
 "（該功能是後來才加的）。POST /syncdrive-api/auth/token 會回 503。"\
-"請把當初產生 $file 時印出的密碼手動填進 deploy/.env 的 $user_key／$pass_key，"\
+"請把當初產生 $file 時印出的密碼手動填進 deploy/.env 的 ${user_key}／${pass_key}，"\
 "或改兩邊密碼一起換發後重啟 backend。"
     fi
     return
@@ -235,7 +235,7 @@ elif [ "$ALLOW_BUILD" = true ]; then
   warn "在這台機器建置——會拉取 base image 與 npm 套件，裝出來的內容取決於當下的 registry"
   $COMPOSE up -d --build
 else
-  die "找不到映像（deploy/images/*.tar 不存在，本機也沒有 :$IMAGE_TAG_VALUE）。
+  die "找不到映像（deploy/images/*.tar 不存在，本機也沒有 :${IMAGE_TAG_VALUE}）。
    正常安裝請使用 pack-offline.sh 產出的安裝包。
    若這台就是打包機、確實要在此建置，請改跑：sudo ./deploy/bootstrap.sh --build"
 fi

@@ -107,7 +107,7 @@ sudo git config --system --get-all safe.directory 2>/dev/null | grep -qx "\$DIR"
   || sudo git config --system --add safe.directory "\$DIR"
 
 if [ ! -d .git ]; then
-  echo "==> 第一次：把 \$DIR 轉成 git 工作目錄（\$REPO）"
+  echo "==> 第一次：把 \$DIR 轉成 git 工作目錄（\${REPO}）"
   git init -q
   git remote add origin "\$REPO"
 else
@@ -130,7 +130,7 @@ fi
 EOF
 
 if [ "$MODE" = gcloud ]; then
-  log "目標：gcloud $INSTANCE（${GCLOUD_ARGS[*]}）"
+  log "目標：gcloud ${INSTANCE}（${GCLOUD_ARGS[*]}）"
 else
   log "目標：$(cat "$TARGET_FILE" 2>/dev/null)"
 fi

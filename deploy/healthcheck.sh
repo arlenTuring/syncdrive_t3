@@ -91,13 +91,13 @@ check() {
   fi
 }
 
-echo "內部（$INTERNAL）"
+echo "內部（${INTERNAL}）"
 check "前端首頁"            "$INTERNAL/"                                        200
 check "內部 API：班表清單"   "$INTERNAL/syncdrive-api/operation-shift/list"      200
 check "內部 Swagger"        "$INTERNAL/api/docs"                                200
 check "文件站"              "$INTERNAL/docs/"                                   200
 
-echo "對外（$EXTERNAL）"
+echo "對外（${EXTERNAL}）"
 check "對外入口頁"          "$EXTERNAL/"                                        200
 check "對外文件站"          "$EXTERNAL/docs/"                                   200
 check "對外 Swagger"        "$EXTERNAL/api/docs/public"                         200

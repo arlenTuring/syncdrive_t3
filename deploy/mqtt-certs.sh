@@ -194,13 +194,13 @@ if [ -f server.crt ]; then
 fi
 
 if [ ! -f server.crt ] || [ ! -f server.key ]; then
-  log "產生伺服器憑證（$HOST）"
+  log "產生伺服器憑證（${HOST}）"
   make_server
 elif [ "$resign_all" = 1 ]; then
   log "改由新根簽發伺服器憑證"
   make_server
 elif [ "$host_changed" = 1 ]; then
-  log "主機位址已變更為 $HOST，重簽伺服器憑證"
+  log "主機位址已變更為 ${HOST}，重簽伺服器憑證"
   make_server
 elif expiring server.crt "$SERVER_RENEW_AT"; then
   log "伺服器憑證剩不到 $SERVER_RENEW_AT 天，續簽"
@@ -261,7 +261,7 @@ if [ -f ca-next.crt ]; then
   note "接班根     $(enddate ca-next.crt)（公布中，尚未啟用）"
 fi
 note "中介 CA    $(enddate client-ca.crt)"
-note "伺服器     $(enddate server.crt)（$HOST）"
+note "伺服器     $(enddate server.crt)（${HOST}）"
 note "車輛憑證   由 POST /syncdrive-api/auth/token 即時簽發，效期＝該次 ttl_minutes"
 # 用 glob 數，不用 ls——set -o pipefail 之下目錄是空的時 ls 會讓整條管線回非零，
 # 而 set -e 就在這裡把整支腳本結束掉，摘要印到一半、退出碼 2。

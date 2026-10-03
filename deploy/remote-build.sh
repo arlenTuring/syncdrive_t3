@@ -60,7 +60,7 @@ log "3/6 建置並打包 $TAG"
 remote_run "cd $REMOTE_DIR && sudo ./deploy/pack-offline.sh $TAG" \
   || die "打包失敗"
 
-# 建置產出的是 :$TAG，但既有的 deploy/.env 可能還指著別的標籤（例如初次安裝的
+# 建置產出的是 :${TAG}，但既有的 deploy/.env 可能還指著別的標籤（例如初次安裝的
 # latest）。不同步的話 bootstrap 會撈到舊映像裝上去——服務起得來、但跑的是上一版，
 # 而且看起來一切正常（2026-08-26 實測：Basic Auth 因此靜靜地失效）。
 log "4/6 對齊 IMAGE_TAG 並安裝驗收"
@@ -77,7 +77,7 @@ remote_run "cd $REMOTE_DIR && for c in syncdrive_backend syncdrive_web; do \
     running=\$(sudo docker inspect --format '{{.Config.Image}}' \$c 2>/dev/null); \
     echo \"  \$c → \$running\"; \
     case \"\$running\" in *:$TAG) ;; *) echo \"    ✗ 預期 :$TAG\"; exit 1 ;; esac; \
-  done" || die "跑起來的不是 $TAG——服務可能還在舊映像上，原始碼保留在遠端供除錯"
+  done" || die "跑起來的不是 ${TAG}——服務可能還在舊映像上，原始碼保留在遠端供除錯"
 
 log "6/6 清除原始碼與建置快取"
 # build cache 裡有原始碼副本，只刪目錄是不夠的
