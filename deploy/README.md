@@ -70,15 +70,16 @@ sudo ./deploy/bootstrap.sh --build
 ### 用 git 更新 VM（取代 push.sh）
 
 程式碼在 GitHub（`arlenTuring/syncdrive_t3`，公開，VM 用 HTTPS 拉不需要金鑰）。在**本機**
-（已登入 gcloud 或能 ssh 到 VM 的那台）跑：
+（已登入 gcloud 的那台）跑：
 
 ```bash
-./deploy/git-sync.sh --gcloud <instance> <zone> [project] --api http://<VM 位址>
-./deploy/git-sync.sh user@host --api http://<VM 位址>      # 一般 ssh
+./deploy/git-sync.sh                                        # 預設：34.80.84.224（gcloud syncdrive-t3 / asia-east1-a）
+./deploy/git-sync.sh --gcloud <instance> <zone> [project] --api http://<VM 位址>   # 別台 GCP VM
+./deploy/git-sync.sh user@host --api http://<VM 位址>                             # 一般 ssh
 ```
 
 第一次會把 VM 上的 `/opt/syncdrive_t3` 轉成 git 工作目錄，切到 GitHub 的 `main`，
-然後部署；`--api` 會接著升級儀表板裡存的舊系統查詢（先試跑再寫入，寫入前自動備份）。
+然後部署，接著升級儀表板裡存的舊系統查詢：先試跑再寫入，寫入前自動備份（預設目標會自動做，其他目標要加 `--api`）。
 `deploy/.env`、`deploy/.state`、`mosquitto/certs`、`backend/logs` 都在 `.gitignore`
 裡，切換時不會被動到。之後每次更新再跑同一支即可，或直接在 VM 上：
 
