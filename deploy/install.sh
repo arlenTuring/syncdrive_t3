@@ -32,7 +32,7 @@ for arg in "$@"; do
     --build)   ALLOW_BUILD=true ;;
     --yes|-y)  ASSUME_YES=true ;;
     -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "未知參數：$arg（--help 看用法）" >&2; exit 2 ;;
+    *) echo "未知參數：${arg}（--help 看用法）" >&2; exit 2 ;;
   esac
 done
 

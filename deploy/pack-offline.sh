@@ -34,7 +34,7 @@ if [ -z "$TAG" ]; then
   TAG="${TAG:-manual}"
 fi
 HOST_ARCH="$(docker version --format '{{.Server.Arch}}' 2>/dev/null || uname -m)"
-log "打包版本 $TAG（本機架構 $HOST_ARCH）"
+log "打包版本 ${TAG}（本機架構 ${HOST_ARCH}）"
 case "$HOST_ARCH" in
   amd64|x86_64) ;;
   *) printf '\033[1;33m警告：\033[0m 目前架構是 %s。若目標機器是 amd64，這個包在那邊起不來。\n' "$HOST_ARCH" ;;
@@ -68,7 +68,7 @@ printf '     %s\n' "${THIRD_PARTY[@]}"
 for image in "${THIRD_PARTY[@]}"; do
   docker image inspect "$image" >/dev/null 2>&1 || {
     log "拉取 $image"
-    docker pull "$image" || die "拉不到 $image（這一步需要外網）"
+    docker pull "$image" || die "拉不到 ${image}（這一步需要外網）"
   }
 done
 

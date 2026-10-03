@@ -34,7 +34,7 @@ else
   command -v psql >/dev/null 2>&1 || die "使用外部資料庫時需要本機有 psql"
   DB_HOST="$(grep '^DB_HOST=' "$ENV_FILE" | cut -d= -f2)"
   DB_PASSWORD="$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2)"
-  log "匯入資料表（外部資料庫 $DB_HOST）"
+  log "匯入資料表（外部資料庫 ${DB_HOST}）"
   PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -q < "$SEED_DIR/seed.dump"
 fi
 
