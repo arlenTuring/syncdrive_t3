@@ -7,6 +7,9 @@
  *
  * 可重複執行：第二次 changedPlanes=0。
  * 用法：npx tsx scripts/upgrade-dashboard-real-data.ts [http://127.0.0.1:3000] [--dry-run]
+ *
+ * 部署機的內部 API 在 nginx 帳密後面：設環境變數 DASHBOARD_API_AUTH="帳號:密碼" 就會帶上
+ * Basic 認證（deploy/git-sync.sh 會自動從 VM 的 deploy/.env 讀出來帶，不寫進任何檔案）。
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -18,7 +21,13 @@ import type { DashboardPlane } from '../src/features/dashboard/types.ts';
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const apiBase = (args.find((arg) => !arg.startsWith('--')) ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
-const response = await fetch(`${apiBase}/syncdrive-api/dashboard/planes`);
+const basicAuth = process.env.DASHBOARD_API_AUTH
+  ? { Authorization: `Basic ${Buffer.from(process.env.DASHBOARD_API_AUTH).toString('base64')}` }
+  : {};
+const response = await fetch(`${apiBase}/syncdrive-api/dashboard/planes`, { headers: basicAuth });
+if (response.status === 401) {
+  throw new Error('讀取畫布失敗：HTTP 401，這個位址需要帳密。請設定 DASHBOARD_API_AUTH="帳號:密碼"（git-sync.sh 會自動帶）');
+}
 if (!response.ok) throw new Error(`讀取畫布失敗：HTTP ${response.status}`);
 const planes = await response.json() as Array<{
   planeId: string; name: string; width: number; height: number; viewportMode?: string;
@@ -60,7 +69,7 @@ for (const plane of planes) {
   if (dryRun) { changedPlanes += 1; continue; }
   const save = await fetch(`${apiBase}/syncdrive-api/dashboard/planes/${encodeURIComponent(plane.planeId)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...basicAuth },
     body: JSON.stringify({ ...plane, elements: queries.plane.elements, expectedVersion: plane.version ?? null }),
   });
   if (!save.ok) throw new Error(`更新畫布 ${plane.planeId} 失敗：HTTP ${save.status}`);
