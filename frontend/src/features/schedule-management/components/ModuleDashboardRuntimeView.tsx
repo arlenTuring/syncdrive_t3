@@ -8,11 +8,11 @@ import { FormatPainterProvider } from '../../dashboard/context/FormatPainterCont
 import { PlaneWorkspace } from '../../dashboard/PlaneWorkspace';
 import type { DashboardPlane } from '../../dashboard/types';
 import { VariableProvider } from '../../dashboard/VariableContext';
-import { patchDashboardRuntimeFixes } from '../../dashboard/utils/migrateVehicleMonitorProtocol';
-import {
-  findStoredDashboardPlane,
-  refreshDashboardPlanesCache,
-} from '../utils/moduleDashboardPages';
+import { migratePlane } from '../../dashboard/utils/migrateDashboardPlane';
+import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
+import { DASHBOARD_PLANES_TAG, fetchDashboardPlanes } from '../../dashboard/api/dashboardPlanesApi';
+import { DASHBOARD_PLANES_STORAGE_KEY } from '../../../lib/canvasCacheReset';
+import { findStoredDashboardPlane } from '../utils/moduleDashboardPages';
 
 type ModuleDashboardRuntimeViewProps = {
   planeId: string;
@@ -31,45 +31,60 @@ export function ModuleDashboardRuntimeView({
   const { t } = useTranslation();
 
   /**
-   * 先查本機快取，查不到再問後端。
+   * 版面以後端為準，每次進來都向後端拿；版面被別人存檔（或遷移腳本更新）時，後端會發
+   * table:dashboard_planes 失效通知，這裡跟著重抓。
    *
-   * 版面是後端資產，本機只是快取——乾淨的瀏覽器（或清過快取的）第一次點進來時
-   * 快取一定是空的。少了這一段補抓，畫面會直接說「平面可能已被刪除」，但它其實
-   * 好端端地在資料庫裡，而使用者被指去做一件不該做的事：重新新增子頁。
+   * 本機快取只在後端連不上時頂著用。原本是「有快取就直接用、不再問後端」：快取裡如果
+   * 是舊版面（例如整備來源還是舊的班表查詢），執行畫面就一直照舊查詢長出卡片。
    */
-  const cached = findStoredDashboardPlane(planeId);
   const [fetched, setFetched] = useState<{
     planeId: string;
     plane: DashboardPlane | null;
+    failed: boolean;
   } | null>(null);
-
-  const storedPlane = cached ?? (fetched?.planeId === planeId ? fetched.plane : null);
-  const resolving = !cached && fetched?.planeId !== planeId;
-  /**
-   * 跟儀表板編輯器載入時套同一組執行期修正（例如舊版整備分佈換成新元件）。
-   * 少了這一步，編輯器裡看到的是新版、模組子頁卻還在畫舊的那一份。
-   * cached 每次 render 都是新物件，用版面身分與更新時間當相依。
-   */
-  const storedKey = storedPlane ? `${storedPlane.id}:${storedPlane.updatedAt}:${storedPlane.elements.length}` : '';
-  const plane = useMemo(
-    () => (storedPlane ? patchDashboardRuntimeFixes(storedPlane) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storedKey],
-  );
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
-    if (cached) return undefined;
     let cancelled = false;
-    void refreshDashboardPlanesCache().then((planes) => {
-      if (cancelled) return;
-      setFetched({ planeId, plane: planes.find((item) => item.id === planeId) ?? null });
-    });
+    void fetchDashboardPlanes()
+      .then((planes) => {
+        if (cancelled) return;
+        try {
+          if (planes.length > 0) window.localStorage.setItem(DASHBOARD_PLANES_STORAGE_KEY, JSON.stringify(planes));
+        } catch {
+          /* 快取寫不進去不影響顯示 */
+        }
+        setFetched({ planeId, plane: planes.find((item) => item.id === planeId) ?? null, failed: false });
+      })
+      .catch(() => {
+        if (!cancelled) setFetched({ planeId, plane: null, failed: true });
+      });
     return () => {
       cancelled = true;
     };
-    // cached 是每次 render 新建的物件，用布林值當相依才不會讓 effect 反覆重跑
+  }, [planeId, reloadNonce]);
+
+  useEffect(() => subscribeDatasourceInvalidation((payload) => {
+    if (payload.tags.includes(DASHBOARD_PLANES_TAG)) setReloadNonce((value) => value + 1);
+  }), []);
+
+  const current = fetched?.planeId === planeId ? fetched : null;
+  const storedPlane = current
+    ? (current.failed ? findStoredDashboardPlane(planeId) : current.plane)
+    : null;
+  const resolving = !current;
+  /**
+   * 跟儀表板編輯器載入時套同一組遷移（含泛用群組內部來源的系統查詢升級）。
+   * 少了這一步，編輯器裡看到的是新版、模組子頁卻還在畫舊的那一份。
+   */
+  const storedKey = storedPlane
+    ? `${storedPlane.id}:${storedPlane.serverVersion ?? ''}:${storedPlane.updatedAt}:${storedPlane.elements.length}`
+    : '';
+  const plane = useMemo(
+    () => (storedPlane ? migratePlane(storedPlane) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planeId, Boolean(cached)]);
+    [storedKey],
+  );
 
   if (resolving) {
     return (

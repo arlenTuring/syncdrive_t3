@@ -30,6 +30,9 @@ type DashboardPlaneRow = {
   updatedAt?: number | null;
 };
 
+/** 後端存檔版面後發出的失效標籤（backend dashboard-plane.service.ts DASHBOARD_PLANES_TAG） */
+export const DASHBOARD_PLANES_TAG = 'table:dashboard_planes';
+
 export type ModuleDashboardPageRow = {
   /** 送出時放前端的頁面識別碼；後端存進 pageKey，不是 uuid 主鍵 */
   id: string;
@@ -64,6 +67,7 @@ function toPlane(row: DashboardPlaneRow): DashboardPlane {
     elements: Array.isArray(row.elements) ? (row.elements as DashboardPlane['elements']) : [],
     createdAt: row.createdAt ?? Date.now(),
     updatedAt: row.updatedAt ?? Date.now(),
+    ...(typeof row.version === 'number' ? { serverVersion: row.version } : {}),
   } as DashboardPlane;
 }
 
@@ -95,6 +99,24 @@ export async function saveDashboardPlanes(
     body: JSON.stringify({ items: planes.map(toRow) }),
   });
   if (!res.ok) throw new Error(`圖台版面儲存失敗（${res.status}）`);
+}
+
+/**
+ * 只存一張版面（其他版面不受影響）。帶讀到的版本做樂觀鎖：伺服器上的版本已經不同就回
+ * 409，代表讀取之後有人存過，這次不覆蓋。
+ */
+export async function saveDashboardPlane(plane: DashboardPlane): Promise<DashboardPlane> {
+  const res = await fetch(`${backendUrl()}/${PLANES}/${encodeURIComponent(plane.id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...toRow(plane),
+      ...(typeof plane.serverVersion === 'number' ? { expectedVersion: plane.serverVersion } : {}),
+    }),
+  });
+  if (res.status === 409) throw new Error(`版面「${plane.name}」已被其他人更新，請重新載入`);
+  if (!res.ok) throw new Error(`版面「${plane.name}」儲存失敗（${res.status}）`);
+  return toPlane((await res.json()) as DashboardPlaneRow);
 }
 
 export async function fetchModuleDashboardPages(): Promise<ModuleDashboardPageRow[]> {

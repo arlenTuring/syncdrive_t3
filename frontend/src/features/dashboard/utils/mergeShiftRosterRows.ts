@@ -1,11 +1,14 @@
 import { SHIFT_TRIP_CODE_PATTERN } from '../constants/vtmsVehiclePool';
 import { mergeOperationMqttShiftRow } from './mergeOperationMqttShiftRow';
-import { buildMainlineRowFromMqtt } from './mainlineTaskModel';
 
-function tripSortKey(tripCode: string): number {
-  const m = /^[DU](\d{2})(\d{2})$/i.exec(tripCode.trim());
-  if (!m) return 0;
-  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+/**
+ * 這一列目前有套用有效的車端回報（只用來在畫面上標示、驗收；不會出現在樣板欄位裡）。
+ * 回報過期後重算，列上就沒有這個標記。
+ */
+export const ROW_LIVE_REPORT = Symbol('rowLiveReport');
+
+export function hasLiveReport(row: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(row && (row as Record<symbol, unknown>)[ROW_LIVE_REPORT]);
 }
 
 function isActiveMainlineMqtt(payload: Record<string, unknown>): boolean {
@@ -16,119 +19,52 @@ function isActiveMainlineMqtt(payload: Record<string, unknown>): boolean {
   return true;
 }
 
+/**
+ * SQL 名冊列＋車端即時回報。
+ *
+ * <h3>SQL 決定卡片存不存在，MQTT 只更新同一張單的欄位</h3>
+ * - 對應只看單號：回報的 order_id ＝ 名冊列的 shift_key（沒有就用 order_id）。
+ * - 原本還有「同一台車有回報、單號對不上時，把那台車的名冊列換成回報那一張」——上一班
+ *   的回報會被套到下一班的卡片上，SQL 已經刪掉的單也會被回報「借屍還魂」。已拿掉。
+ * - 名冊沒有的單（只有 MQTT）不新增卡片。
+ * - 回報是否還有效由車隊 hub 決定（過期、重置前、retain 舊快照都已經不在 hub 裡）。
+ */
 function mergeRosterFromMqtt(
   sqlRows: Record<string, unknown>[],
   mqttByVehicle: Map<string, Record<string, unknown>>,
   isActive: (p: Record<string, unknown>) => boolean,
-  buildMinimal: (p: Record<string, unknown>) => Record<string, unknown>,
-  /**
-   * 車輛回報的單號在 SQL 名冊裡找不到時，要不要只憑 MQTT 生一列出來。
-   *
-   * 整備卡要（格位的增減本來就只有車端知道）；正線卡不要——正線卡靠 SQL 帶站序，
-   * 只有 MQTT 的話拿不到這一班停哪些站，硬生出來的那一列會是「新的班次代號配上
-   * 上一班的站序」，畫面上就是下一站寫著 s2w_d_end、軌道卻畫著另一條路線。
-   */
-  allowMqttOnlyRows: boolean,
 ): Record<string, unknown>[] {
-  const sqlByKey = new Map<string, Record<string, unknown>>();
-  const sqlByVehicle = new Map<string, Record<string, unknown>>();
-  for (const row of sqlRows) {
-    const key = String(row.shift_key ?? row.order_id ?? '');
-    if (key) sqlByKey.set(key, row);
-    const vehicleCode = String(row.vehicle_code ?? '').trim().toUpperCase();
-    if (vehicleCode) sqlByVehicle.set(vehicleCode, row);
-  }
-
-  const seenOrder = new Set<string>();
-  const mqttRows: Record<string, unknown>[] = [];
-  const mqttVehicleCodes = new Set<string>();
-  const mqttByKey = new Map<string, Record<string, unknown>>();
-  const mqttByVehicleRow = new Map<string, Record<string, unknown>>();
-
+  const liveByOrder = new Map<string, Record<string, unknown>>();
   for (const payload of mqttByVehicle.values()) {
     if (!isActive(payload)) continue;
-    const orderId = String(payload.order_id ?? '');
-    if (!orderId || seenOrder.has(orderId)) continue;
-    seenOrder.add(orderId);
-    const vehicleCode = String(payload.vehicle_code ?? '').trim().toUpperCase();
-    if (vehicleCode) mqttVehicleCodes.add(vehicleCode);
-    const sameOrder = sqlByKey.get(orderId);
-    const base = allowMqttOnlyRows
-      ? sameOrder
-        ?? (vehicleCode ? sqlByVehicle.get(vehicleCode) : undefined)
-        ?? buildMinimal(payload)
-      : sameOrder;
-    if (!base) continue;
-    const merged = mergeOperationMqttShiftRow(base, payload);
-    mqttRows.push(merged);
-    mqttByKey.set(orderId, merged);
-    if (vehicleCode) mqttByVehicleRow.set(vehicleCode, merged);
+    const orderId = String(payload.order_id ?? '').trim();
+    if (orderId && !liveByOrder.has(orderId)) liveByOrder.set(orderId, payload);
   }
+  if (liveByOrder.size === 0) return sqlRows;
 
-  if (mqttRows.length === 0) return sqlRows;
-
-  const merged: Record<string, unknown>[] = [];
-  const usedKeys = new Set<string>();
-  /*
-   * 一台車同時只會執行一張單，所以同一列即時資料只能出現一次。
-   *
-   * SQL 可能同時回這台車的兩張單（剛結束的那張還在寬限期內、新的那張已經開始），
-   * 兩張都會被換成同一列即時資料——畫面上就是同一個班次代號的卡片出現兩張。
-   * 已經放過的那一列就不再放，多出來的那張舊單直接不列。
-   */
-  const emittedLive = new Set<Record<string, unknown>>();
-
-  for (const sqlRow of sqlRows) {
-    const key = String(sqlRow.shift_key ?? sqlRow.order_id ?? '');
-    const vehicleCode = String(sqlRow.vehicle_code ?? '').trim().toUpperCase();
-    if (vehicleCode && mqttVehicleCodes.has(vehicleCode)) {
-      const live = mqttByKey.get(key) ?? mqttByVehicleRow.get(vehicleCode);
-      if (live) {
-        if (emittedLive.has(live)) continue;
-        emittedLive.add(live);
-        merged.push(live);
-        usedKeys.add(String(live.shift_key ?? live.order_id ?? key));
-      } else {
-        merged.push(sqlRow);
-        if (key) usedKeys.add(key);
-      }
-      continue;
-    }
-    merged.push(sqlRow);
-    if (key) usedKeys.add(key);
-  }
-
-  for (const row of mqttRows) {
-    const key = String(row.shift_key ?? row.order_id ?? '');
-    if (key && usedKeys.has(key)) continue;
-    merged.push(row);
-  }
-
-  return merged.sort(
-    (a, b) => tripSortKey(String(a.trip_code ?? '')) - tripSortKey(String(b.trip_code ?? '')),
-  );
+  // 順序也由 SQL 決定：回報出現或過期時，卡片不會因為重新排序而跳位
+  return sqlRows.map((sqlRow) => {
+    const key = String(sqlRow.shift_key ?? sqlRow.order_id ?? '').trim();
+    const payload = key ? liveByOrder.get(key) : undefined;
+    return payload
+      ? Object.assign(mergeOperationMqttShiftRow(sqlRow, payload), { [ROW_LIVE_REPORT]: true })
+      : sqlRow;
+  });
 }
 
-/** 正線名冊：MQTT 有活躍班次時立即顯示，SQL 僅補 route_stations 等靜態欄位 */
+/** 正線名冊：SQL 列決定有哪些卡；同一張單有有效回報時用回報更新欄位 */
 export function mergeMainlineShiftRoster(
   sqlRows: Record<string, unknown>[],
   mqttByVehicle: Map<string, Record<string, unknown>>,
 ): Record<string, unknown>[] {
-  return mergeRosterFromMqtt(
-    sqlRows,
-    mqttByVehicle,
-    isActiveMainlineMqtt,
-    buildMainlineRowFromMqtt,
-    false,
-  );
+  return mergeRosterFromMqtt(sqlRows, mqttByVehicle, isActiveMainlineMqtt);
 }
 
-/** 整備名冊：MQTT 觸發槽位更新（正線執勤車輛不列入整備卡） */
+/** 整備名冊：原樣使用 SQL 列（整備單沒有逐站回報可合併） */
 export function mergeMaintenanceShiftRoster(
   sqlRows: Record<string, unknown>[],
   _mqttByVehicle: Map<string, Record<string, unknown>>,
 ): Record<string, unknown>[] {
-  // 整備卡是部署班表時間線的呈現；MQTT operation/update 僅是執行回報，不能新增、
-  // 移除或改寫班表卡的標籤。SQL 每 10 秒依目前時間重算進度即可。
+  // 卡片只來自整備訂單（operation_orders）；MQTT 不能新增、移除或改寫整備卡。
   return sqlRows;
 }

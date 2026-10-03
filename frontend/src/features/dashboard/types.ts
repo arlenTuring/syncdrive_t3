@@ -1332,6 +1332,8 @@ export interface DashboardPlane {
   elements: CanvasElementProps[];
   createdAt: number;
   updatedAt: number;
+  /** 後端資料列版本（讀取時帶回；單張更新時做樂觀鎖）。前端不自己遞增。 */
+  serverVersion?: number;
 }
 
 // ─── Widget 預設值工廠 ─────────────────────────────────────────────

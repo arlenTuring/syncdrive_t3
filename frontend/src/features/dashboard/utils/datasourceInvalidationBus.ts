@@ -1,5 +1,5 @@
 import { acquireSocket } from '../elements/socketManager';
-import { DEFAULT_DATASOURCE } from '../store/useDataSourceStore';
+import { DEFAULT_DATASOURCE, clearDatasourceQueryCacheForTags } from '../store/useDataSourceStore';
 
 export type DatasourceInvalidatePayload = {
   tags: string[];
@@ -18,6 +18,8 @@ function ensureSocketSubscription(): void {
   const socket = acquireSocket(url);
   socket.on('datasource/invalidate', (payload: DatasourceInvalidatePayload) => {
     if (!payload?.tags?.length) return;
+    // 先作廢共用快取與進行中的查詢，各元件接著重查時才不會拿到失效前的結果
+    clearDatasourceQueryCacheForTags(payload.tags);
     listeners.forEach((fn) => fn(payload));
   });
   socketHooked = true;

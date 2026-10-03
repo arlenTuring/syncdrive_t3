@@ -41,7 +41,7 @@ export class DashboardPlaneController {
   @ApiOperation({ summary: '新增或更新單一圖台版面（不刪除其他版面）' })
   async savePlane(
     @Param('planeId') planeId: string,
-    @Body() body: Omit<DashboardPlanePayload, 'planeId'>,
+    @Body() body: Omit<DashboardPlanePayload, 'planeId'> & { expectedVersion?: number | null },
   ) {
     return this.service.savePlane({ ...body, planeId });
   }

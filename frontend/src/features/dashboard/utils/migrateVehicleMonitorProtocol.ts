@@ -2,8 +2,6 @@ import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget, Stat
 import { createWidget } from '../types';
 import {
   VEHICLE_STATUS_ROW_SQL,
-  MAINLINE_SHIFTS_SQL,
-  MAINTENANCE_SHIFTS_SQL,
   MAINLINE_FLEET_STATUS_SQL,
   VEHICLE_DISTRIBUTION_INVALIDATE_TAGS,
   VEHICLE_DISTRIBUTION_URL,
@@ -21,6 +19,7 @@ import {
 import { migrateChildWidgetGenerics } from './migrateWidgetGenerics';
 import { patchEventDrivenSqlRefresh } from './patchEventDrivenSqlRefresh';
 import { inferInvalidateTagsFromSql } from './inferInvalidateTagsFromSql';
+import { systemQueryOrKeep } from './systemQueries';
 
 const DS_INTERNAL = 'default-internal';
 
@@ -263,9 +262,11 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
     ...plane,
     elements: plane.elements.map((el) => {
       if (el.label === '正線班次' && el.isGroup) {
+        // 只換系統原文；使用者自己改過的查詢保留（見 systemQueries.ts）
+        const mainlineSql = systemQueryOrKeep(el.sqlQuery, 'mainline-shifts');
         return {
           ...el,
-          sqlQuery: MAINLINE_SHIFTS_SQL,
+          sqlQuery: mainlineSql,
           refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
           genericGroup: {
             enabled: true,
@@ -273,7 +274,7 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
               id: 'shift-roster',
               label: '正線與過渡班次',
               dataSourceId: el.dataSourceId,
-              sqlQuery: MAINLINE_SHIFTS_SQL,
+              sqlQuery: mainlineSql,
               refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
               refreshMode: 'event',
               invalidateTags: ['table:operation_orders', 'domain:mainline_shifts'],
@@ -295,7 +296,7 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
       if (el.label === '整備班表' && el.isGroup) {
         return {
           ...el,
-          sqlQuery: MAINTENANCE_SHIFTS_SQL,
+          sqlQuery: systemQueryOrKeep(el.sqlQuery, 'maintenance-shifts'),
           refreshInterval: SHIFT_ROSTER_REFRESH_INTERVAL,
           children: patchMaintenanceCardTemplateDefaults(el.children ?? []),
         };

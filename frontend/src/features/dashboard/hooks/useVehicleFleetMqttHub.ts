@@ -6,6 +6,15 @@ import { VTMS_DEBUG_VEHICLES, VTMS_VEHICLE_POOL } from '../constants/vtmsVehicle
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import type { VtmsStreamKind } from '../utils/vtmsTopic';
 import { vtmsRowKeyForStream } from '../utils/vtmsMqttRowKey';
+import { isFleetEntryExpired, judgeFleetMessage } from '../utils/fleetMqttValidity';
+
+const STREAMS = ['telemetry', 'operation', 'health'] as const;
+
+/** 多久檢查一次過期（期限 5 秒，每秒看一次就夠：最慢 6 秒內移除） */
+const FLEET_EXPIRY_SWEEP_MS = 1_000;
+
+/** 後端完整重置測試資料後廣播（data-admin live-data-reset.service.ts） */
+type LiveStateResetPayload = { vehicleCodes?: string[]; at?: number };
 
 const DS_MQTT = 'default-mqtt';
 
@@ -71,6 +80,20 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
     operation: new Map(),
     health: new Map(),
   });
+  /** 每台車每個串流最後一次「有效收到」的時間（本機時鐘）；過期判斷看這個，不看連線 */
+  const receivedAtRef = useRef<Record<VtmsStreamKind, Map<string, number>>>({
+    telemetry: new Map(),
+    operation: new Map(),
+    health: new Map(),
+  });
+  /** 上一次收下的訊息時間戳：一樣的就是 retain 重送 */
+  const lastTimestampRef = useRef<Record<VtmsStreamKind, Map<string, number>>>({
+    telemetry: new Map(),
+    operation: new Map(),
+    health: new Map(),
+  });
+  /** 每台車最近一次被重置的時間（後端廣播的 at）；早於它的訊息都是舊的 */
+  const resetAtRef = useRef<Map<string, number>>(new Map());
   const flushRafRef = useRef(0);
   const lastFlushAtRef = useRef(0);
   const dirtyRef = useRef(false);
@@ -170,8 +193,60 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
       hubRef.current = { ...hubRef.current, connected: false, tick: hubRef.current.tick + 1 };
       setHub(hubRef.current);
     };
+    /*
+     * 過期淘汰：沒有新訊息也要移除。被移除的串流換一個新的 Map——訂閱端（班次卡合併）
+     * 依 Map 身分決定要不要重算，原地刪除它不會知道。
+     */
+    const sweepExpired = () => {
+      const now = Date.now();
+      let changed = false;
+      const next = { ...hubRef.current };
+      for (const stream of STREAMS) {
+        const target = hubRef.current[stream];
+        const expired = [...target.keys()].filter((code) => isFleetEntryExpired(receivedAtRef.current[stream].get(code), now));
+        if (expired.length === 0) continue;
+        const fresh = new Map(target);
+        for (const code of expired) {
+          fresh.delete(code);
+          rowKeyRef.current[stream].delete(code);
+          receivedAtRef.current[stream].delete(code);
+        }
+        next[stream] = fresh;
+        changed = true;
+      }
+      if (!changed) return;
+      next.tick = hubRef.current.tick + 1;
+      hubRef.current = next;
+      setHub(next);
+    };
+    const sweepTimer = window.setInterval(sweepExpired, FLEET_EXPIRY_SWEEP_MS);
+
+    /** 後端重置測試資料：所選車輛的即時資料、待處理訊息、去重紀錄全部清掉 */
+    const onLiveStateReset = (payload: LiveStateResetPayload) => {
+      const codes = (payload?.vehicleCodes ?? []).map((code) => String(code).toUpperCase());
+      if (codes.length === 0) return;
+      const at = Number(payload.at) || Date.now();
+      const next = { ...hubRef.current };
+      for (const stream of STREAMS) {
+        const fresh = new Map(hubRef.current[stream]);
+        for (const code of codes) {
+          fresh.delete(code);
+          pendingRef.current[stream].delete(code);
+          rowKeyRef.current[stream].delete(code);
+          receivedAtRef.current[stream].delete(code);
+          lastTimestampRef.current[stream].delete(code);
+        }
+        next[stream] = fresh;
+      }
+      for (const code of codes) resetAtRef.current.set(code, at);
+      next.tick = hubRef.current.tick + 1;
+      hubRef.current = next;
+      setHub(next);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('live-state/reset', onLiveStateReset);
     if (socket.connected) onConnect();
 
     for (const vehicleCode of [...VTMS_VEHICLE_POOL, ...VTMS_DEBUG_VEHICLES]) {
@@ -183,6 +258,17 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
           if (!payload || typeof payload !== 'object') return;
           const row = payload as Record<string, unknown>;
           const code = String(row.vehicle_code ?? vehicleCode).toUpperCase();
+          const receivedAt = Date.now();
+          const verdict = judgeFleetMessage({
+            payload: row,
+            receivedAt,
+            resetAt: resetAtRef.current.get(code) ?? 0,
+            lastTimestamp: lastTimestampRef.current[stream].get(code) ?? null,
+          });
+          // 重置前的、retain 補送的舊快照、重送的同一則：不收，也不刷新有效時間
+          if (!verdict.accept) return;
+          receivedAtRef.current[stream].set(code, receivedAt);
+          if (verdict.timestamp !== null) lastTimestampRef.current[stream].set(code, verdict.timestamp);
           // 收到就記：下面的去重會丟掉內容沒變的遙測（停站的車），但那仍然是「有收到」
           if (stream === 'telemetry') markVehicleSeen(code);
           pendingRef.current[stream].set(code, row);
@@ -198,8 +284,10 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
         cancelAnimationFrame(flushRafRef.current);
         flushRafRef.current = 0;
       }
+      window.clearInterval(sweepTimer);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('live-state/reset', onLiveStateReset);
       for (const { eventName, handler } of handlers) {
         socket.off(eventName, handler);
       }

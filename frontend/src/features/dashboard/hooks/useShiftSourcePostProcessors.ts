@@ -6,7 +6,7 @@ export const POST_PROCESSOR_DEFINITIONS = [
   {
     id: 'mainline-mqtt-merge',
     label: '正線即時車況合併',
-    description: '依車號以 MQTT operation/update 覆寫下一站、剩餘時間與行程進度。',
+    description: '只在 MQTT operation/update 的 order_id 與 SQL 列的單號相同時，覆寫下一站、剩餘時間與行程進度；不依車號對應、不新增列。',
     mqtt: {
       // 與 useVehicleFleetMqttHub 的實際訂閱一致；這是後處理輸入，不會複製到子元件。
       dataSourceId: 'default-mqtt',

@@ -126,12 +126,22 @@ export function useMqttData(opts: {
       }));
     };
     socket.on(eventName, onMessage);
+    // 後端重置測試資料：主題裡帶到被重置的車號，就把手上的舊訊息丟掉（不留到下一則來）
+    const onLiveStateReset = (payload: { vehicleCodes?: string[] }) => {
+      const codes = (payload?.vehicleCodes ?? []).map((code) => String(code).toUpperCase());
+      const topicUpper = finalTopic.toUpperCase();
+      if (codes.some((code) => topicUpper.split('/').includes(code))) {
+        setState(s => ({ ...s, data: null }));
+      }
+    };
+    socket.on('live-state/reset', onLiveStateReset);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
       socket.off(eventName, onMessage);
+      socket.off('live-state/reset', onLiveStateReset);
       releaseSocket(ds.backendUrl);
       socketRef.current = null;
     };

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+
+/** 版面存檔的失效標籤（前端 useDashboardEditor 收到就重新讀取版面） */
+export const DASHBOARD_PLANES_TAG = 'table:dashboard_planes';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -54,7 +58,13 @@ export class DashboardPlaneService {
     private readonly planes: Repository<DashboardPlane>,
     @InjectRepository(ModuleDashboardPage)
     private readonly pages: Repository<ModuleDashboardPage>,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
+
+  /** 版面存檔後通知所有開著的頁面重新讀取（其他帳號、其他瀏覽器才看得到同一份） */
+  private notifyPlanesChanged(reason: string): void {
+    this.invalidation?.emit([DASHBOARD_PLANES_TAG], reason);
+  }
 
   async listPlanes(): Promise<DashboardPlane[]> {
     return this.planes.find({ order: { createdAt: 'ASC' } });
@@ -67,11 +77,17 @@ export class DashboardPlaneService {
   }
 
   /** 單份 upsert；資料升級或樣板匯入不得為了改一份版面刪掉其他版面。 */
-  async savePlane(item: DashboardPlanePayload): Promise<DashboardPlane> {
+  async savePlane(item: DashboardPlanePayload & { expectedVersion?: number | null }): Promise<DashboardPlane> {
     const key = item.planeId?.trim();
     if (!key) throw new NotFoundException('缺少圖台版面 ID');
     const now = Date.now();
     const prior = await this.planes.findOne({ where: { planeId: key } });
+    // 樂觀鎖：送出時依據的版本跟資料庫不同，代表讀取之後有人存過，不覆蓋
+    if (item.expectedVersion != null && prior && prior.version !== item.expectedVersion) {
+      throw new ConflictException(
+        `版面 ${key} 已被更新（目前版本 ${prior.version}，送出時依據 ${item.expectedVersion}），請重新讀取後再存`,
+      );
+    }
     const row = prior ?? this.planes.create({ planeId: key, createdAt: now });
     row.name = item.name ?? key;
     row.width = item.width ?? 1920;
@@ -82,7 +98,9 @@ export class DashboardPlaneService {
     row.version = prior ? (prior.version ?? 0) + 1 : 1;
     row.updatedBy = item.updatedBy ?? undefined!;
     row.updatedAt = now;
-    return this.planes.save(row);
+    const saved = await this.planes.save(row);
+    this.notifyPlanesChanged('dashboard_plane_saved');
+    return saved;
   }
 
   /**
@@ -130,6 +148,7 @@ export class DashboardPlaneService {
     const removable = all.filter((row) => !keep.includes(row.planeId));
     if (removable.length > 0) await this.planes.remove(removable);
 
+    this.notifyPlanesChanged('dashboard_planes_replaced');
     return this.listPlanes();
   }
 

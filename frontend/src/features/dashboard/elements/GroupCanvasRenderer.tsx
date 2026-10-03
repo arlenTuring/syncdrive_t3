@@ -18,6 +18,7 @@ import { useShiftSourcePostProcessors } from '../hooks/useShiftSourcePostProcess
 import { useOperationMqttShiftOverlay } from '../hooks/useOperationMqttShiftOverlay';
 import { useShiftFleetMqttMap } from '../context/ShiftFleetMqttContext';
 import {
+  hasLiveReport,
   mergeMainlineShiftRoster,
   mergeMaintenanceShiftRoster,
 } from '../utils/mergeShiftRosterRows';
@@ -659,9 +660,13 @@ function GenericSlotsGroupView({
    */
   const sourcePostProcessors = useShiftSourcePostProcessors();
 
-  const { fetchers, slots, pendingCount, isInitialLoading, templatesBySlot } = useGenericGroupSlots(config, capacity, {
+  const { fetchers, slots, pendingCount, isInitialLoading, templatesBySlot, sourceStates } = useGenericGroupSlots(config, capacity, {
     sourcePostProcessors,
   });
+  // 查詢失敗跟「查無資料」分開顯示：失敗時不能讓人以為是沒有訂單
+  const sourceError = (config?.sources ?? [])
+    .map((source) => sourceStates[source.id]?.error)
+    .find((error): error is string => Boolean(error));
 
   const occupiedCount = slots.filter(Boolean).length;
   // stretch：欄數＝實際筆數（撐滿、無空格）；blank：欄數固定＝容量（資料不足時留空格）
@@ -687,6 +692,15 @@ function GenericSlotsGroupView({
     if (occupiedCount > 0) hasShownDataRef.current = true;
   }, [occupiedCount]);
 
+  if (isPreviewMode && !isEditMode) {
+    // 執行畫面不顯示範本卡：沒有接資料來源就是沒有資料
+    return (
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-600" data-group-empty="no-source">
+        尚無資料
+      </div>
+    );
+  }
+
   if (isPreviewMode) {
     // 編輯模式下未接資料來源：顯示第一套樣板（或 children 備援）當預覽範本
     return (
@@ -707,14 +721,18 @@ function GenericSlotsGroupView({
   return (
     <>
       {fetchers}
-      <div className="relative w-full h-full overflow-hidden" style={{ padding: `${padY}px ${padX}px` }}>
+      <div className="relative w-full h-full overflow-hidden" data-generic-group={element.id} style={{ padding: `${padY}px ${padX}px` }}>
         {isInitialLoading && occupiedCount === 0 ? (
           <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-500">
             <span className="animate-pulse">載入資料…</span>
           </div>
         ) : occupiedCount === 0 ? (
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-600">
-            尚無資料
+          <div
+            className={`relative flex h-full w-full items-center justify-center overflow-hidden text-xs ${sourceError ? 'text-rose-400' : 'text-zinc-600'}`}
+            title={sourceError}
+            data-group-empty={sourceError ? 'error' : 'empty'}
+          >
+            {sourceError ? '資料讀取失敗' : '尚無資料'}
           </div>
         ) : (
           <div className="relative" style={{ width: '100%', height: tplH }}>
@@ -722,6 +740,7 @@ function GenericSlotsGroupView({
               <div
                 key={cell.uid}
                 data-slot-uid={cell.uid}
+                data-row-origin={hasLiveReport(cell.row) ? 'sql+mqtt' : 'sql'}
                 style={{
                   position: 'absolute',
                   left: i * (tplW + gapX),
@@ -749,6 +768,15 @@ function GenericSlotsGroupView({
                 />
               </div>
             ))}
+          </div>
+        )}
+        {sourceError && occupiedCount > 0 && (
+          <div
+            className="absolute top-1 right-1 rounded px-2 py-0.5 text-[10px] text-rose-300"
+            style={{ background: 'rgba(15,23,42,0.75)', pointerEvents: 'none' }}
+            title={sourceError}
+          >
+            資料讀取失敗
           </div>
         )}
         {showPendingCount && pendingCount > 0 && (
@@ -883,7 +911,8 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
     return dataRows;
   }, [isShiftRoster, isPreviewMode, element.label, dataRows, fleetMqtt]);
   const isEmpty = hasDataSource && !loading && mergedRows.length === 0;
-  const rows: (Record<string, unknown> | null)[] = isPreviewMode ? [null] : mergedRows;
+  // 範本卡（row=null）只在編輯器出現；執行畫面沒有來源就是空的
+  const rows: (Record<string, unknown> | null)[] = isPreviewMode && isEditMode ? [null] : mergedRows;
 
   const gateRows = gateSameAsMain ? data : (gate?.sqlQuery?.trim() ? gateQuery.data : data);
   const gateRowCount = gateRows.length;
