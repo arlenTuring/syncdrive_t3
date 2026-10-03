@@ -15,7 +15,7 @@
 #   --branch <name>   跟哪一支（預設 main）
 #   --api <url>       升級儀表板的後端位址（預設 DEFAULT_API；指定別台時要自己給）
 #   --no-api          不升級儀表板資料
-#   --no-deploy       只接上 git、切到最新版，不重建服務
+#   --no-deploy       只接上 git、切到最新版，不重建服務（搭配預設的儀表板升級，可單獨重跑那一步）
 #
 # 第一次與之後都跑同一支：第一次會把目錄轉成 git 工作目錄，之後就是 pull ＋ 部署。
 #
@@ -144,6 +144,21 @@ fi
 
 [ "$NO_API" = true ] && API_BASE=""
 if [ -n "$API_BASE" ]; then
+  # 內部 API 在 nginx 帳密後面（跟 healthcheck.sh 用同一組 WEB_AUTH_*）。從 VM 的
+  # deploy/.env 讀出來，只放在這個行程的環境變數裡交給升級腳本，不寫檔、不印出。
+  if [ -z "${DASHBOARD_API_AUTH:-}" ]; then
+    log "從 VM 讀取內部 API 帳密（不會顯示）"
+    creds="$(remote "sudo grep -E '^WEB_AUTH_(USER|PASSWORD)=' $REMOTE_DIR/deploy/.env" 2>/dev/null | tr -d '\r' || true)"
+    web_user="$(printf '%s\n' "$creds" | sed -n 's/^WEB_AUTH_USER=//p' | head -1)"
+    web_pass="$(printf '%s\n' "$creds" | sed -n 's/^WEB_AUTH_PASSWORD=//p' | head -1)"
+    if [ -n "$web_pass" ]; then
+      DASHBOARD_API_AUTH="${web_user:-syncdrive}:${web_pass}"
+      export DASHBOARD_API_AUTH
+    else
+      log "VM 的 deploy/.env 沒有 WEB_AUTH_PASSWORD，不帶帳密"
+    fi
+    unset creds web_user web_pass
+  fi
   log "升級儀表板裡存的舊系統查詢：先試跑"
   (cd "$ROOT/frontend" && npx tsx scripts/upgrade-dashboard-real-data.ts "$API_BASE" --dry-run)
   log "正式寫入"
