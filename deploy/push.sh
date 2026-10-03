@@ -6,8 +6,9 @@
 #   ./deploy/push.sh user@1.2.3.4          # 指定目標並記住
 #   ./deploy/push.sh --gcloud instance zone project
 #
-# 為什麼用 rsync 而不是在 VM 上 git pull：目前這個倉庫沒有遠端。等有了私有
-# Git 遠端之後，改用 deploy.sh --pull 會更乾淨，這支就可以退役。
+# 倉庫已經在 GitHub 上：改用 ./deploy/git-sync.sh，VM 之後直接 git pull。
+# 已經接上 git 的 VM 不要再用這支——rsync 會讓工作目錄跟 git 紀錄不一致，
+# 下一次 git pull 就可能因為「本機有修改」而停下。
 
 set -euo pipefail
 

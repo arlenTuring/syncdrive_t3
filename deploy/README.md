@@ -67,6 +67,27 @@ sudo ./deploy/bootstrap.sh --build
 先建置、再切換、然後驗收，**不通過就自動回滾**。手動部署最常見的失敗不是建置
 錯誤，而是換上去之後才發現不通、而舊的已經停掉了。
 
+### 用 git 更新 VM（取代 push.sh）
+
+程式碼在 GitHub（`arlenTuring/syncdrive_t3`，公開，VM 用 HTTPS 拉不需要金鑰）。在**本機**
+（已登入 gcloud 或能 ssh 到 VM 的那台）跑：
+
+```bash
+./deploy/git-sync.sh --gcloud <instance> <zone> [project] --api http://<VM 位址>
+./deploy/git-sync.sh user@host --api http://<VM 位址>      # 一般 ssh
+```
+
+第一次會把 VM 上的 `/opt/syncdrive_t3` 轉成 git 工作目錄，切到 GitHub 的 `main`，
+然後部署；`--api` 會接著升級儀表板裡存的舊系統查詢（先試跑再寫入，寫入前自動備份）。
+`deploy/.env`、`deploy/.state`、`mosquitto/certs`、`backend/logs` 都在 `.gitignore`
+裡，切換時不會被動到。之後每次更新再跑同一支即可，或直接在 VM 上：
+
+```bash
+cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
+```
+
+接上 git 之後就不要再用 `push.sh`：rsync 會讓工作目錄跟 git 紀錄不一致。
+
 在沒有原始碼的機器上跑 `deploy.sh` 會直接停下並告訴你改用安裝包——安裝包刻意
 不含原始碼，正式機不該保留原始碼，也不該在上面建置。
 

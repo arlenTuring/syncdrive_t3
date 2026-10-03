@@ -63,7 +63,13 @@ fi
 # ── 取得程式碼 ──────────────────────────────────────────────
 if [ "$PULL" = true ]; then
   log "git pull"
-  git pull --ff-only
+  # 這支通常用 sudo 跑；用 root 拉會讓 .git 裡多出 root 的檔案，下次登入的使用者
+  # 自己 pull 就失敗。有 SUDO_USER 時以那位使用者的身分拉。
+  if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    sudo -u "$SUDO_USER" git pull --ff-only
+  else
+    git pull --ff-only
+  fi
 fi
 
 TAG="$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
