@@ -398,16 +398,54 @@ export class OperationShiftService {
   } | null> {
     const deployed = await this.getDeployedShift();
     if (!deployed) return null;
+    return { ...deployed, trips: this.expandAllTrips(deployed.body) };
+  }
 
-    const range = parseTimeRangeQuery({});
+  /**
+   * <strong>指定</strong>班表並展開成班次（模擬器依班表 ID 載入用）。
+   *
+   * 找不到就丟 NotFound，不退回部署中、最新發布或其他草稿——呼叫端選了哪一份，就只能
+   * 拿到那一份。展開與 {@link getDeployedTrips} 走同一支，結果跟正式調度展開的一致。
+   */
+  async getShiftTrips(id: string): Promise<{
+    shiftId: string;
+    shiftName: string;
+    trips: TimetableTripDto[];
+    body: Record<string, unknown>;
+    row: OperationShift;
+  }> {
+    const row = await this.getShiftById(id);
+    const body = row.body ?? {};
     return {
-      ...deployed,
-      trips: expandTimetableTrips({
-        body: deployed.body,
-        range,
-        passengerOnly: false,
-      }),
+      shiftId: row.id,
+      shiftName: row.name,
+      trips: this.bodyHasPlan(body) ? this.expandAllTrips(body) : [],
+      body,
+      row,
     };
+  }
+
+  /** 班表內容是否有排班結果（模擬前置檢查用；與發布、部署的判斷相同） */
+  hasSchedulePlan(body: Record<string, unknown>): boolean {
+    return this.bodyHasPlan(body);
+  }
+
+  /** 發布前的阻擋檢查；有阻擋原因時回傳訊息，沒有回傳 null（不丟例外） */
+  publishBlockReason(body: Record<string, unknown>): string | null {
+    try {
+      this.assertPublishSafe(body);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  private expandAllTrips(body: Record<string, unknown>): TimetableTripDto[] {
+    return expandTimetableTrips({
+      body,
+      range: parseTimeRangeQuery({}),
+      passengerOnly: false,
+    });
   }
 
   /**

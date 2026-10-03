@@ -173,7 +173,49 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   } | null> {
     const deployed = await this.operationShiftService.getDeployedTrips();
     if (!deployed) return null;
+    return this.buildPlan(deployed, reference);
+  }
 
+  /**
+   * <strong>指定</strong>班表的今日完整計畫（模擬器依班表 ID 載入用）。
+   *
+   * 跟 {@link planToday} 走同一支 {@link buildPlan}：同樣的班次展開、空車移動、整備任務、
+   * 車輛指派與補齊端點，只是來源換成呼叫端指定的那一份——不看它是不是部署中。
+   * 找不到班表就丟 NotFound，不退回其他班表。純讀取，不下訂單、不改班表狀態。
+   */
+  async planForShift(shiftId: string, reference = Date.now()) {
+    const source = await this.operationShiftService.getShiftTrips(shiftId);
+    const plan = await this.buildPlan(source, reference);
+    return {
+      ...plan,
+      row: source.row,
+      body: source.body,
+      tripsInSchedule: source.trips,
+    };
+  }
+
+  /** 班表的發布阻擋原因（模擬前置檢查用，不丟例外） */
+  shiftPublishBlockReason(body: Record<string, unknown>): string | null {
+    return this.operationShiftService.publishBlockReason(body);
+  }
+
+  /** 班表內容 → 今日待下訂單。planToday 與 planForShift 共用，演算法只有這一份。 */
+  private async buildPlan(
+    deployed: {
+      shiftId: string;
+      shiftName: string;
+      trips: Awaited<
+        ReturnType<OperationShiftService['getShiftTrips']>
+      >['trips'];
+      body: Record<string, unknown>;
+    },
+    reference: number,
+  ): Promise<{
+    shiftId: string;
+    shiftName: string;
+    planned: PlannedDispatch[];
+    skipped: Array<{ tripCode: string; reason: string }>;
+  }> {
     const fleet = await this.loadFleet();
     const taskTypes = dispatchConfig.taskTypes;
 
