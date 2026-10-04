@@ -569,6 +569,22 @@ export class OrderService {
     }
 
     if (order.status === targetStatus) return order; // HTTP 回應遺失後可安全重試。
+    /*
+     * 中心端已請求取消的單：不能再開始（PROCESSING），取消結案（FAULTED）之後也不能被改回
+     * 執行中或完成——不然車端遲到的回報會把已中止的任務「復活」。執行中剛好正常跑完
+     * （PROCESSING → END）仍照實接受：那是真的完成，不改成中止。
+     */
+    const cancelRequested = Boolean((order.payload as Record<string, unknown> | null)?.cancel_requested_at);
+    if (cancelRequested && (
+      targetStatus === OrderStatus.PROCESSING
+      || (order.status === OrderStatus.FAULTED && targetStatus === OrderStatus.END)
+    )) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ORDER_CANCELLED',
+        message: `訂單已由中心端取消，不能改為 '${targetStatus}'`,
+      });
+    }
     const allowedNextStatuses = VALID_TRANSITIONS[order.status];
     if (!allowedNextStatuses.includes(targetStatus)) {
       throw new BadRequestException({ statusCode: 400, code: 'INVALID_ORDER_TRANSITION', message: `Invalid state transition: '${order.status}' → '${targetStatus}'.` });
@@ -578,6 +594,10 @@ export class OrderService {
     order.status = targetStatus;
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
       order.completedAt = String(now);
+      if (targetStatus === OrderStatus.FAULTED && cancelRequested) {
+        // 協議用 FAULTED 結案取消；記下原因，介面與統計跟真正故障分開
+        order.payload = { ...((order.payload ?? {}) as Record<string, unknown>), closed_reason: 'cancelled_by_center' };
+      }
       // 延誤＝實際結束晚於計畫結束的整分鐘數（不到一分鐘算準點）。班次中心的「延誤班次」
       // 與班次運行紀錄的準點／延誤篩選都讀這個欄位；先前只有示範模擬會寫它。
       const plannedEnd = Number(order.plannedEnd);

@@ -495,3 +495,49 @@ describe('OrderService.createOrder 模擬器重播單（不覆寫、重試不重
     await expect(service.createOrder(body({ plan_run_id: 'run2' }))).rejects.toThrow('內容不同');
   });
 });
+
+describe('OrderService.updateOrderStatus 中心端取消後', () => {
+  let service: OrderService;
+  const orderRepo = { findOne: jest.fn(), save: jest.fn((o) => Promise.resolve(o)) };
+  beforeEach(async () => {
+    const noop = {} as never;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: noop },
+        { provide: getRepositoryToken(OrderEvent), useValue: noop },
+        { provide: OrderMqttPublisher, useValue: noop },
+        { provide: OrderRouteService, useValue: noop },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: noop },
+      ],
+    }).compile();
+    service = module.get(OrderService);
+  });
+  const cancelled = (status: OrderStatus) =>
+    ({ id: 'SIM-1', vehicleCode: 'PMS09', status, payload: { cancel_requested_at: 1 } }) as unknown as OperationOrder;
+
+  it('已取消的單不能開始執行', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PENDING));
+    await expect(service.updateOrderStatus('SIM-1', 'PROCESSING')).rejects.toMatchObject({ response: { code: 'ORDER_CANCELLED' } });
+  });
+
+  it('取消結案後，遲到的完成回報不能把它改回 END', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.FAULTED));
+    await expect(service.updateOrderStatus('SIM-1', 'END')).rejects.toMatchObject({ response: { code: 'ORDER_CANCELLED' } });
+  });
+
+  it('取消結案記下原因；重複回報 FAULTED 冪等', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PROCESSING));
+    const saved = await service.updateOrderStatus('SIM-1', 'FAULTED');
+    expect((saved.payload as Record<string, unknown>).closed_reason).toBe('cancelled_by_center');
+    orderRepo.findOne.mockResolvedValue(saved);
+    await expect(service.updateOrderStatus('SIM-1', 'FAULTED')).resolves.toBe(saved);
+  });
+
+  it('執行中剛好正常完成：照實接受 END', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PROCESSING));
+    expect((await service.updateOrderStatus('SIM-1', 'END')).status).toBe(OrderStatus.END);
+  });
+});
