@@ -136,6 +136,8 @@ try {
   console.log('車輛徽章：', status.map((r) => `${r.vehicle_code}:${r.line_kind ?? '-'}/${r.badge_label ?? '-'}`).join('、'));
 
   check('載客 → 正線卡', keys(mainline).includes('SIM-T-pax') && mainline.find((r) => r.shift_key === 'SIM-T-pax')?.business_kind === 'MAINLINE');
+  check('過渡與待命列的樣板欄位是 mainline（正線卡樣板），不會落到整備卡樣板',
+    ['SIM-T-move', 'SIM-T-standby'].every((k) => mainline.find((r) => r.shift_key === k)?.line_kind === 'mainline'));
   check('出廠移動 → 過渡卡，標籤「過渡」', mainline.find((r) => r.shift_key === 'SIM-T-move')?.direction_label === '過渡');
   check('待命 → 過渡卡（不是整備）', mainline.find((r) => r.shift_key === 'SIM-T-standby')?.business_kind === 'TRANSITION' && !keys(maint).includes('SIM-T-standby'));
   check('充電 → 整備卡「充電」', maint.find((r) => r.shift_key === 'SIM-T-charge')?.maint_type_label === '充電');

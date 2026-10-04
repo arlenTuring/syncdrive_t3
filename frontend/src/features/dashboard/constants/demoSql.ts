@@ -873,7 +873,9 @@ SELECT
     WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'
     ELSE '#51A2FF'
   END AS icon_bg_color,
-  LOWER(o.business_kind) AS line_kind,
+  -- 卡片樣板依 line_kind 選：這份名冊的每一張（正線、過渡、人工測試）都用正線卡，過渡靠 direction_label 顯示「過渡」。
+  -- 寫成 'transition' 會對不上任何樣板條件，落到預設的整備卡。業務分類看 business_kind。
+  'mainline' AS line_kind,
   o.business_kind,
   CASE o.business_kind WHEN 'MAINLINE' THEN 300 WHEN 'TRANSITION' THEN 200 ELSE 100 END
     + COALESCE(o.priority_level, 0) AS display_priority
