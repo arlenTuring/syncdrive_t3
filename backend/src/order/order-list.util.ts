@@ -28,7 +28,14 @@ export type ShiftRecordListItem = {
   payload: Record<string, unknown> | null;
 };
 
-const SHIFT_TRIP_PATTERN = /^[DU]\d{4}$/i;
+/**
+ * 舊示範正線的路線（訂單記錄的 route_id）→ 路線顯示。看的是訂單上的路線，不是班次代號開頭。
+ * 新訂單的路線名稱與站序在 payload.route_name／stations。
+ */
+const MAINLINE_ROUTE_LABELS: Readonly<Record<string, string>> = {
+  'ROUTE-MAINLINE-UP': 'S2W→T3→N2W',
+  'ROUTE-MAINLINE-DOWN': 'N2W→T3→S2W',
+};
 
 export function resolveExecutionStatus(order: OperationOrder): {
   key: ExecutionStatusKey;
@@ -56,13 +63,6 @@ export function resolveExecutionStatus(order: OperationOrder): {
   return { key: 'pending', label: '待發' };
 }
 
-export function mainlineRouteLabel(tripCode: string): string {
-  const code = tripCode.trim().toUpperCase();
-  if (code.startsWith('U')) return 'S2W→T3→N2W';
-  if (code.startsWith('D')) return 'N2W→T3→S2W';
-  return '—';
-}
-
 export function buildRouteLabel(order: OperationOrder): string {
   const lineKind = String(order.lineKind ?? '').toUpperCase();
   if (lineKind === 'MAINTENANCE') {
@@ -74,9 +74,6 @@ export function buildRouteLabel(order: OperationOrder): string {
       || '—';
     return `S2W→${slot}`;
   }
-  if (SHIFT_TRIP_PATTERN.test(order.tripCode ?? '')) {
-    return mainlineRouteLabel(order.tripCode);
-  }
   const routeName = String(order.payload?.route_name ?? '').trim();
   if (routeName) return routeName;
   const stations = Array.isArray(order.payload?.stations) ? order.payload.stations : [];
@@ -84,20 +81,7 @@ export function buildRouteLabel(order: OperationOrder): string {
     .map((station: Record<string, unknown>) => String(station.station_name ?? station.station_id ?? '').trim())
     .filter(Boolean);
   if (stationNames.length > 1) return stationNames.join('→');
-  return '—';
-}
-
-function tripScheduleTimes(tripCode: string): { startMs: number; endMs: number } | null {
-  const m = SHIFT_TRIP_PATTERN.exec(tripCode.trim());
-  if (!m) return null;
-  const hour = parseInt(tripCode.slice(1, 3), 10);
-  const minute = parseInt(tripCode.slice(3, 5), 10);
-  if (hour > 23 || minute > 59) return null;
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(hour, minute, 0, 0);
-  const legMs = 6 * 60_000;
-  return { startMs: start.getTime(), endMs: start.getTime() + legMs };
+  return MAINLINE_ROUTE_LABELS[String(order.routeId ?? '')] ?? '—';
 }
 
 export function formatHmsFromMs(ms: string | number | null | undefined): string | null {
@@ -111,20 +95,15 @@ export function formatHmsFromMs(ms: string | number | null | undefined): string 
   return `${hh}:${mm}:${ss}`;
 }
 
+/** 計畫發車時刻只看訂單的 planned_start；沒有就是沒有，不從班次代號推 */
 export function resolveDepartTime(order: OperationOrder): string | null {
-  const fromPlanned = formatHmsFromMs(order.plannedStart);
-  if (fromPlanned) return fromPlanned;
-  const schedule = tripScheduleTimes(order.tripCode ?? '');
-  if (!schedule) return null;
-  return formatHmsFromMs(schedule.startMs);
+  return formatHmsFromMs(order.plannedStart);
 }
 
 export function resolveEndTime(order: OperationOrder): string | null {
   if (order.status !== OrderStatus.END) return null;
   const fromPlanned = formatHmsFromMs(order.plannedEnd);
   if (fromPlanned) return fromPlanned;
-  const schedule = tripScheduleTimes(order.tripCode ?? '');
-  if (schedule) return formatHmsFromMs(schedule.endMs);
   if (order.plannedStart) {
     return formatHmsFromMs(Number(order.plannedStart) + 6 * 60_000);
   }
@@ -161,7 +140,6 @@ export function matchesTab(order: OperationOrder, tab: ShiftTab): boolean {
   if (tab === 'maintenance') {
     return lineKind === 'MAINTENANCE';
   }
-  if (lineKind === 'MAINTENANCE') return false;
-  if (lineKind === 'MAINLINE' || lineKind === 'TRANSITION' || lineKind === 'TEST') return true;
-  return SHIFT_TRIP_PATTERN.test(order.tripCode ?? '');
+  // 分類不明的單兩個分頁都不列（跟 listShiftRecords 的 SQL 一致），不拿班次代號猜
+  return lineKind === 'MAINLINE' || lineKind === 'TRANSITION' || lineKind === 'TEST';
 }

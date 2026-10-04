@@ -71,3 +71,23 @@ export function orderBusinessKind(order: {
   if (!lineKind) return classifyTask(kind, taskType);
   return null;
 }
+
+/**
+ * 同一套規則的 SQL 版本（{@link orderBusinessKind}）；儀表板的 ORDER_BUSINESS_KIND_SQL 是同一段，
+ * 兩邊要一起改。不看 trip_code。
+ */
+export function orderBusinessKindSql(o: string): string {
+  // 整備子類型比 task_type 具體（舊版整備單的 task_type 一律是 'maintenance'）
+  const taskType = `COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), NULLIF(${o}.payload->>'task_type', ''))`;
+  return `CASE
+      WHEN ${o}.line_kind IN ('MAINLINE', 'TRANSITION', 'MAINTENANCE') THEN ${o}.line_kind
+      WHEN COALESCE(${o}.line_kind, '') = ''
+        OR (${o}.line_kind = 'TEST' AND ${o}.payload->>'source' = 'plan_replay') THEN
+        CASE
+          WHEN ${o}.payload->>'kind' = 'passenger' OR ${taskType} = 'passenger' THEN 'MAINLINE'
+          WHEN ${o}.payload->>'kind' = 'movement' OR ${taskType} IN ('dispatch', 'standby', 'idle') THEN 'TRANSITION'
+          WHEN ${o}.payload->>'kind' = 'maintenance' AND ${taskType} IS NOT NULL THEN 'MAINTENANCE'
+        END
+      WHEN ${o}.line_kind = 'TEST' THEN 'TEST'
+    END`;
+}

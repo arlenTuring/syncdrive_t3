@@ -15,6 +15,7 @@ export class MqttService {
   private readonly logger = new Logger(MqttService.name);
   private telemetryPersistDisabled = false;
   private readonly operationSyncCache = new Map<string, { at: number; key: string }>();
+  private readonly operationDiagnosedAt = new Map<string, number>();
   private lastVehiclePositionInvalidationAt = 0;
   private lastOrderLifecycleInvalidationAt = 0;
   /** 各車上一次判定的所在設施（無則空字串）；換格或離格時才通知整備分佈重查 */
@@ -203,15 +204,22 @@ export class MqttService {
     return !/^PMS\d{2}$/i.test(vehicleCode);
   }
 
-  /** MQTT operation/update → 增量更新訂單（單一路徑，委派 OrderService） */
+  /**
+   * MQTT operation/update → 增量更新訂單（單一路徑，委派 OrderService）。
+   *
+   * 只用車端回報的 order_id 對應訂單：不從 trip_code／badge_label 拼單號、不看班次代號格式。
+   * 待命時協議本來就不帶 order_id，那是正常；帶了班次或任務狀態卻沒有 order_id，記一筆診斷。
+   */
   async syncOperationOrderFromLive(vehicleCode: string, payload: Record<string, unknown>) {
-    const tripCode =
-      this.nonEmptyString(payload?.trip_code)
-      ?? (this.isShiftTripCode(payload?.badge_label) ? this.nonEmptyString(payload?.badge_label) : null);
-    if (!tripCode) return;
-
-    const orderId = this.nonEmptyString(payload?.order_id)
-      ?? this.deriveOrderId(tripCode, payload?.timestamp);
+    const orderId = this.nonEmptyString(payload?.order_id);
+    if (!orderId) {
+      const status = String(payload?.order_status ?? '').toUpperCase();
+      if (this.nonEmptyString(payload?.trip_code) || status === 'PENDING' || status === 'PROCESSING') {
+        this.diagnoseOperation(vehicleCode, 'missing_order_id', payload);
+      }
+      return;
+    }
+    const tripCode = this.nonEmptyString(payload?.trip_code);
     const leg = payload.current_leg as {
       target_station_id?: string;
       eta_seconds?: number;
@@ -219,6 +227,7 @@ export class MqttService {
     const syncKey = JSON.stringify({
       orderId,
       tripCode,
+      phase: payload.vehicle_phase ?? null,
       legTarget: leg?.target_station_id ?? null,
       eta: typeof leg?.eta_seconds === 'number'
         ? Math.round(leg.eta_seconds / 5) * 5
@@ -238,12 +247,14 @@ export class MqttService {
       // line_kind／route_id 不再由這裡猜測：訂單建立時中心端已經寫死
       // order.lineKind／order.routeId，applyOperationMqttUpdate 會直接信任
       // 既有訂單記錄，不需要在進來的路上先幫車端補值。
-      const order = await this.orderService.applyOperationMqttUpdate(vehicleCode, {
+      const { order, outcome } = await this.orderService.applyOperationMqttUpdateWithOutcome(vehicleCode, {
         ...payload,
         order_id: orderId,
-        trip_code: tripCode,
         vehicle_code: vehicleCode,
       });
+      if (outcome === 'missing_order_id' || outcome === 'unknown_order' || outcome === 'vehicle_mismatch' || outcome === 'stale') {
+        this.diagnoseOperation(vehicleCode, outcome, payload, order?.vehicleCode);
+      }
       /*
        * 訂單的 leg_eta_max／segment 由中心端依班表計算。寫庫後通知事件型 SQL
        * 元件重讀一次；卡片之後仍由 1 Hz MQTT 倒數平滑更新，不必輪詢資料庫。
@@ -279,18 +290,28 @@ export class MqttService {
     }
   }
 
-  private isShiftTripCode(raw: unknown): boolean {
-    return typeof raw === 'string' && /^[DU]\d{4}$/i.test(raw.trim());
-  }
-
-  private deriveOrderId(tripCode: string, departMs?: unknown): string {
-    const base = typeof departMs === 'number' && Number.isFinite(departMs)
-      ? new Date(departMs)
-      : new Date();
-    const yy = String(base.getFullYear()).slice(2);
-    const mm = String(base.getMonth() + 1).padStart(2, '0');
-    const dd = String(base.getDate()).padStart(2, '0');
-    return `${yy}${mm}${dd}-${tripCode.trim().toUpperCase()}`;
+  /**
+   * operation/update 沒有套用到訂單的原因（同一台車同一種原因一分鐘記一次，避免 1 Hz 洗版）。
+   * 不寫庫、不建卡，只讓維運看得到哪台車回報了對不上的東西。
+   */
+  private diagnoseOperation(
+    vehicleCode: string,
+    reason: 'missing_order_id' | 'unknown_order' | 'vehicle_mismatch' | 'stale',
+    payload: Record<string, unknown>,
+    assignedVehicle?: string,
+  ): void {
+    const key = `${vehicleCode}:${reason}`;
+    const now = Date.now();
+    if (now - (this.operationDiagnosedAt.get(key) ?? 0) < 60_000) return;
+    this.operationDiagnosedAt.set(key, now);
+    const ref = `order_id=${String(payload?.order_id ?? '—')} trip_code=${String(payload?.trip_code ?? '—')}`;
+    const message = {
+      missing_order_id: `${vehicleCode} 回報任務進度但沒有 order_id（${ref}），不套用到任何訂單`,
+      unknown_order: `${vehicleCode} 回報的訂單不存在（${ref}），不建立訂單`,
+      vehicle_mismatch: `${vehicleCode} 回報的訂單指派給 ${assignedVehicle ?? '其他車'}（${ref}），不套用`,
+      stale: `${vehicleCode} 的進度回報比上一則舊（${ref}），已略過`,
+    }[reason];
+    this.logger.warn(`[operation/update] ${message}`);
   }
 
   private nonEmptyString(raw: unknown): string | null {

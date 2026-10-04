@@ -19,6 +19,7 @@ import { OrderEvent } from '../database/entities/order-event.entity';
 import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
+import { orderBusinessKindSql } from './order-business-kind';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { MapService } from '../map/map.service';
 import {
@@ -82,6 +83,24 @@ export type MaintenanceOrderLifecycleSnapshot = {
   segmentIndex: number;
   routeProgress: number;
 };
+
+/**
+ * 一則 operation/update 套用到訂單的結果（給 MQTT 端記診斷用）。
+ * 只有 progress_applied、pending_refreshed、faulted 會寫庫。
+ */
+/** 後端內建示範（demo-simulation）自己建的單；示範的對帳只能動這種單 */
+export const BACKEND_DEMO_SOURCE = 'backend_demo';
+
+export type OperationMqttOutcome =
+  | 'missing_order_id'
+  | 'unknown_order'
+  | 'vehicle_mismatch'
+  | 'stale'
+  | 'duplicate'
+  | 'pending_refreshed'
+  | 'not_processing'
+  | 'faulted'
+  | 'progress_applied';
 
 export type OperationMqttPayload = {
   order_id?: string;
@@ -158,11 +177,9 @@ export class OrderService {
       throw new BadRequestException('order_id, vehicle_code, trip_code are required.');
     }
 
-    const routeId = data.route_id
-      ?? this.orderRouteService.routeIdForTripCode(data.trip_code)
-      ?? undefined;
-    const lineKind = data.line_kind
-      ?? (routeId ? 'MAINLINE' : undefined);
+    // 路線與業務分類只用呼叫端明確給的值；班次代號只是名稱，不拿來推路線或分類
+    const routeId = data.route_id ?? undefined;
+    const lineKind = data.line_kind ?? undefined;
 
     const order = this.orderRepository.create({
       id: data.order_id,
@@ -317,12 +334,12 @@ export class OrderService {
 
     const qb = this.orderRepository.createQueryBuilder('o');
 
+    // 分頁跟 matchesTab 同一套業務分類（order-business-kind.ts），不看班次代號
+    const businessKind = orderBusinessKindSql('o');
     if (tab === 'maintenance') {
-      qb.andWhere(`o.line_kind = 'MAINTENANCE'`);
+      qb.andWhere(`${businessKind} = 'MAINTENANCE'`);
     } else {
-      qb.andWhere(
-        `(o.line_kind = 'MAINLINE' OR (COALESCE(o.line_kind, '') <> 'MAINTENANCE' AND o.trip_code ~ '^[DU][0-9]{4}$'))`,
-      );
+      qb.andWhere(`${businessKind} IN ('MAINLINE', 'TRANSITION', 'TEST')`);
     }
 
     const vehicle = String(query.vehicle_code ?? '').trim().toUpperCase();
@@ -341,11 +358,12 @@ export class OrderService {
           OR COALESCE(o.maint_station, '') ILIKE :kw
           OR COALESCE(o.payload->>'yard_slot_id', '') ILIKE :kw
           OR (
-            CASE
-              WHEN o.trip_code ~ '^[Uu]' THEN 'S2W→T3→N2W'
-              WHEN o.trip_code ~ '^[Dd]' THEN 'N2W→T3→S2W'
+            -- 與 order-list.util buildRouteLabel 一致：看訂單記錄的路線，不看班次代號開頭
+            COALESCE(NULLIF(o.payload->>'route_name', ''), CASE o.route_id
+              WHEN 'ROUTE-MAINLINE-UP' THEN 'S2W→T3→N2W'
+              WHEN 'ROUTE-MAINLINE-DOWN' THEN 'N2W→T3→S2W'
               ELSE ''
-            END
+            END)
           ) ILIKE :kw
           OR (
             o.line_kind = 'MAINTENANCE'
@@ -691,71 +709,65 @@ export class OrderService {
   }
 
   /**
-   * MQTT operation/update：僅更新已存在訂單的任務進度與輕量 payload。
-   * 訂單契約狀態（PENDING/PROCESSING/END）須經 REST API 變更。
+   * 車端 operation/update（MQTT）→ 既有訂單的執行進度。
+   *
+   * <h3>MQTT 不改訂單狀態，也不建立訂單</h3>
+   * 協議規定訂單狀態只由 REST updateOrderProgress 變更（見 document/對外介接/車端介接說明書.md §二、§5.2），
+   * 所以這裡：
+   * - 只用訂單 ID 對應既有訂單；沒有 order_id、找不到訂單、回報的車不是指派的車，一律不寫，
+   *   回傳診斷原因，不替不存在的訂單造一張卡。
+   * - 不管班次代號長什麼樣（D1234、NT0000、其他），都不會把 PENDING 改成 PROCESSING：
+   *   開始執行只認車端的 REST 回報。待發中的單只刷新下一站與 ETA。
+   * - 終態（END、FAULTED）的單不再寫進度；比上次回報還舊、或同一刻重送的訊息直接略過。
+   * - 業務分類、路線、計畫時刻、班次代號都以中心端下單時的記錄為準，不用班次名稱推。
    */
   async applyOperationMqttUpdate(
     vehicleCode: string,
     payload: OperationMqttPayload,
   ): Promise<OperationOrder | null> {
-    const tripCode = this.nonEmpty(payload.trip_code);
-    const orderId = this.nonEmpty(payload.order_id);
-    if (!tripCode || !orderId) return null;
+    const outcome = await this.applyOperationMqttUpdateWithOutcome(vehicleCode, payload);
+    return outcome.order;
+  }
 
-    let order = await this.orderRepository.findOne({ where: { id: orderId } });
-    if (!order) {
-      return null;
+  async applyOperationMqttUpdateWithOutcome(
+    vehicleCode: string,
+    payload: OperationMqttPayload,
+  ): Promise<{ order: OperationOrder | null; outcome: OperationMqttOutcome }> {
+    const orderId = this.nonEmpty(payload.order_id);
+    if (!orderId) return { order: null, outcome: 'missing_order_id' };
+
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    if (!order) return { order: null, outcome: 'unknown_order' };
+    if (order.vehicleCode !== vehicleCode) {
+      return { order: null, outcome: 'vehicle_mismatch' };
     }
 
-    // line_kind／route_id 在派單當下已經寫進訂單記錄（見 dispatch-engine.service.ts），
-    // 一律信任既有訂單，不再依賴車端回報或用 trip_code 前綴猜——車端回報錯了會讓分類
-    // 跑掉（例如整備訂單被標成正線，資料庫裡就再也找不到那筆整備紀錄）。
-    // payload.line_kind／payload.route_id 只在舊車端／模擬器仍會送、且訂單本身缺記錄
-    // 時才退回去用，屬相容性 fallback，非必要欄位。
-    const routeId = order.routeId
-      ?? this.nonEmpty(payload.route_id)
-      ?? this.orderRouteService.routeIdForTripCode(tripCode);
-    const lineKind = order.lineKind
-      ?? this.nonEmpty(payload.line_kind)
-      ?? (routeId ? 'MAINLINE' : null);
-    if (!lineKind) return null;
+    const prevPayload = (order.payload ?? {}) as Record<string, unknown>;
+    const reportedAt = typeof payload.timestamp === 'number' && Number.isFinite(payload.timestamp)
+      ? payload.timestamp
+      : null;
+    // 只跟上一則車端 MQTT 的時間比（同一個時鐘）；updated_at 也會被 REST 動作回報用伺服器時間寫，不能拿來比
+    const lastReportedAt = typeof prevPayload.last_operation_report_at === 'number'
+      ? prevPayload.last_operation_report_at
+      : null;
+    if (reportedAt != null && lastReportedAt != null && reportedAt <= lastReportedAt) {
+      return { order, outcome: reportedAt === lastReportedAt ? 'duplicate' : 'stale' };
+    }
 
     const vehiclePhase = String(payload.vehicle_phase ?? '').toUpperCase();
-    const isAwaitingDeparture =
-      vehiclePhase === 'AWAITING_DEPARTURE'
-      || String(payload.order_status ?? '').toUpperCase() === 'PENDING';
-
-    if (
-      order.status === OrderStatus.PENDING
-      && lineKind === 'MAINLINE'
-      && this.isShiftTripCode(tripCode)
-      && isAwaitingDeparture
-    ) {
-      return this.applyPendingMainlineOperationRefresh(
-        order,
-        vehicleCode,
-        payload,
-        routeId,
-        tripCode,
-      );
+    if (order.status === OrderStatus.PENDING) {
+      // 待發：只刷新顯示用的下一站與 ETA；車端報什麼 phase 都不算開始
+      return { order: await this.applyPendingOperationRefresh(order, payload), outcome: 'pending_refreshed' };
     }
-
-    if (
-      order.status === OrderStatus.PENDING
-      && lineKind === 'MAINLINE'
-      && this.isShiftTripCode(tripCode)
-      && (vehiclePhase === 'TRANSITING' || vehiclePhase === 'DWELLING' || vehiclePhase === 'DOCKING')
-    ) {
-      order = await this.updateOrderStatus(orderId, 'PROCESSING');
-    }
-
     if (order.status !== OrderStatus.PROCESSING) {
-      return order;
+      return { order, outcome: 'not_processing' };
     }
 
-    const phase = vehiclePhase;
-    if (phase === 'FAULTED') {
-      return this.applyFaultToOrder(order, 'VEHICLE_PHASE_FAULTED', payload);
+    // 路線只用訂單自己的記錄；舊訂單沒記錄時才看車端回報，不從班次代號推
+    const routeId = order.routeId ?? this.nonEmpty(payload.route_id);
+
+    if (vehiclePhase === 'FAULTED') {
+      return { order: await this.applyFaultToOrder(order, 'VEHICLE_PHASE_FAULTED', payload), outcome: 'faulted' };
     }
 
     if (Array.isArray(payload.task_group) && payload.task_group.length > 0) {
@@ -775,7 +787,6 @@ export class OrderService {
       ? Math.max(0, Math.round(currentLeg.eta_seconds))
       : null;
 
-    const prevPayload = (order.payload ?? {}) as Record<string, unknown>;
     const legEtaMax: Record<string, number> = {
       ...((prevPayload.leg_eta_max as Record<string, number> | undefined) ?? {}),
     };
@@ -832,25 +843,9 @@ export class OrderService {
 
     const operationAction = deriveOperationActionFromTaskGroup(payload.task_group);
 
-    order.tripCode = tripCode;
-    order.vehicleCode = vehicleCode;
     order.routeId = routeId ?? undefined;
-    order.lineKind = lineKind;
     order.nextStation = nextStation ?? order.nextStation;
-    // 計畫時刻由中心端決定，車端回報不得覆蓋。
-    //
-    // tripTimesFromCode 是<strong>沒有計畫時刻時的推測</strong>：它從 D/U 班次代號
-    // 反推發車時刻，代號不符格式時直接回「現在」。無條件套用的話，1 Hz 的進度回報
-    // 會把 plannedStart 一路推成當下時刻——計畫時刻等於實際時刻，誤點永遠是零。
-    if (!order.plannedStart || !order.plannedEnd) {
-      const times = this.tripTimesFromCode(
-        tripCode,
-        lineKind === 'MAINLINE' ? 6 : 30,
-        payload.timestamp,
-      );
-      order.plannedStart ||= String(times.plannedStart);
-      order.plannedEnd ||= String(times.plannedEnd);
-    }
+    // 計畫時刻由中心端決定，車端回報不得覆蓋；沒有計畫時刻的舊單就維持沒有，不拿班次代號推。
     order.etaRemain = etaSec != null
       ? this.formatSecondsMmSs(etaSec)
       : this.formatEtaMmSs(routeProgress, 6);
@@ -870,9 +865,10 @@ export class OrderService {
       route_progress: routeProgress,
       operation_action: operationAction,
       updated_at: payload.timestamp ?? Date.now(),
+      ...(reportedAt != null ? { last_operation_report_at: reportedAt } : {}),
     };
 
-    return this.orderRepository.save(order);
+    return { order: await this.orderRepository.save(order), outcome: 'progress_applied' };
   }
 
   /** 示範／排班：中心端建立正線訂單並 MQTT assign（REST 契約） */
@@ -895,6 +891,7 @@ export class OrderService {
     });
     for (const stale of staleOrders) {
       if (stale.id === orderId) continue;
+      if ((stale.payload as Record<string, unknown> | null)?.source !== BACKEND_DEMO_SOURCE) continue;
       stale.status = OrderStatus.END;
       stale.completedAt = String(Date.now());
       await this.orderRepository.save(stale);
@@ -907,6 +904,7 @@ export class OrderService {
       route_id: routeId,
       line_kind: 'MAINLINE',
       priority_level: 50,
+      payload: { source: BACKEND_DEMO_SOURCE },
     }, { initialStatus: OrderStatus.PENDING });
   }
 
@@ -920,6 +918,10 @@ export class OrderService {
     const existing = await this.orderRepository.findOne({ where: { id: orderId } });
     if (existing) {
       if (existing.status === OrderStatus.PROCESSING || existing.status === OrderStatus.FAULTED) {
+        return existing;
+      }
+      // 不是示範建的單（正式調度、模擬器重播）：示範不能改它的車、班次與分類
+      if ((existing.payload as Record<string, unknown> | null)?.source !== BACKEND_DEMO_SOURCE) {
         return existing;
       }
       existing.vehicleCode = vehicleCode;
@@ -944,6 +946,7 @@ export class OrderService {
       line_kind: 'MAINLINE',
       priority_level: 50,
       payload: {
+        source: BACKEND_DEMO_SOURCE,
         segment_index: 0,
         segment_remain_pct: 100,
         route_progress: 0,
@@ -1016,7 +1019,8 @@ export class OrderService {
 
     let ended = 0;
     for (const order of openOrders) {
-      if (!this.isShiftTripCode(order.tripCode)) continue;
+      // 只收示範自己建的單；正式調度、模擬器重播的單不能因為班次代號長得像就被結束
+      if ((order.payload as Record<string, unknown> | null)?.source !== BACKEND_DEMO_SOURCE) continue;
       if (activeOrderIds.has(order.id)) continue;
       order.status = OrderStatus.END;
       order.completedAt = String(Date.now());
@@ -1111,17 +1115,13 @@ export class OrderService {
     return this.orderRepository.save(created);
   }
 
-  private isShiftTripCode(raw: unknown): boolean {
-    return typeof raw === 'string' && /^[DU]\d{4}$/i.test(raw.trim());
-  }
-
-  /** 待發班次：僅刷新 current_leg／ETA，不升級為 PROCESSING */
-  private async applyPendingMainlineOperationRefresh(
+  /**
+   * 待發的單：只刷新下一站與 ETA，不升級為 PROCESSING、不改分類與班次代號。
+   * 任何業務分類、任何班次代號都一樣——開始執行只認車端 REST 回報。
+   */
+  private async applyPendingOperationRefresh(
     order: OperationOrder,
-    vehicleCode: string,
     payload: OperationMqttPayload,
-    routeId: string | null,
-    tripCode: string,
   ): Promise<OperationOrder> {
     const currentLeg = typeof payload.current_leg === 'object' ? payload.current_leg : null;
     const legTarget = this.nonEmpty(currentLeg?.target_station_id);
@@ -1151,10 +1151,6 @@ export class OrderService {
       }
     }
 
-    order.tripCode = tripCode;
-    order.vehicleCode = vehicleCode;
-    order.routeId = order.routeId ?? routeId ?? undefined;
-    order.lineKind = 'MAINLINE';
     if (legTarget) {
       order.nextStation = legTarget;
     }
@@ -1171,6 +1167,7 @@ export class OrderService {
       segment_index: 0,
       segment_remain_pct: 100,
       updated_at: payload.timestamp ?? Date.now(),
+      ...(typeof payload.timestamp === 'number' ? { last_operation_report_at: payload.timestamp } : {}),
     };
     return this.orderRepository.save(order);
   }
@@ -1229,20 +1226,6 @@ export class OrderService {
     if (typeof arriveAt !== 'number' || typeof departAt !== 'number') return null;
     const seconds = Math.round((arriveAt - departAt) / 1000);
     return seconds > 0 ? seconds : null;
-  }
-
-  private tripTimesFromCode(
-    tripCode: string,
-    legMinutes: number,
-    timestamp?: unknown,
-  ): { plannedStart: number; plannedEnd: number } {
-    const base = typeof timestamp === 'number' && Number.isFinite(timestamp) ? timestamp : Date.now();
-    const match = tripCode.match(/^[DU](\d{2})(\d{2})$/);
-    if (!match) return { plannedStart: base, plannedEnd: base + legMinutes * 60_000 };
-    const start = new Date(base);
-    start.setHours(parseInt(match[1], 10), parseInt(match[2], 10), 0, 0);
-    if (start.getTime() > base + 12 * 60 * 60_000) start.setDate(start.getDate() - 1);
-    return { plannedStart: start.getTime(), plannedEnd: start.getTime() + legMinutes * 60_000 };
   }
 
   private computeRouteProgressFromLeg(

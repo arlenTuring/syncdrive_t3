@@ -32,13 +32,6 @@ export class OrderRouteService {
     private readonly actionStateRepo: Repository<OrderActionState>,
   ) {}
 
-  routeIdForTripCode(tripCode: string): string | null {
-    const code = tripCode.trim().toUpperCase();
-    if (code.startsWith('D')) return 'ROUTE-MAINLINE-DOWN';
-    if (code.startsWith('U')) return 'ROUTE-MAINLINE-UP';
-    return null;
-  }
-
   async getRouteStations(routeId: string): Promise<OperationRouteStation[]> {
     return this.stationRepo.find({
       where: { routeId },

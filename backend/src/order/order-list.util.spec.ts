@@ -14,6 +14,7 @@ describe('order-list.util', () => {
     tripCode: 'U1030',
     vehicleCode: 'PMS05',
     lineKind: 'MAINLINE',
+    routeId: 'ROUTE-MAINLINE-UP',
     status: OrderStatus.PROCESSING,
     delayMinutes: 0,
     plannedStart: String(new Date('2026-06-24T10:30:00').getTime()),
@@ -72,13 +73,33 @@ describe('order-list.util', () => {
     expect(resolveEndTime(baseOrder as never)).toBeNull();
   });
 
-  it('depart falls back to trip code schedule', () => {
-    const depart = resolveDepartTime({
-      ...baseOrder,
-      tripCode: 'D1133',
-      plannedStart: undefined,
-    } as never);
-    expect(depart).toBe('11:33:00');
+  it('沒有計畫發車時刻就是沒有，不從班次代號推', () => {
+    for (const tripCode of ['D1133', 'NT1133', 'XYZ']) {
+      expect(resolveDepartTime({ ...baseOrder, tripCode, plannedStart: undefined } as never)).toBeNull();
+    }
+  });
+
+  it('同一筆任務換成任何班次代號，分頁、路線、時刻都一樣', () => {
+    const results = ['D1234', 'NT0000', 'U9999', 'ANY-NAME'].map((tripCode) => {
+      const order = { ...baseOrder, tripCode } as never;
+      return {
+        tab: matchesTab(order, 'mainline'),
+        route: buildRouteLabel(order),
+        depart: resolveDepartTime(order),
+      };
+    });
+    for (const result of results) expect(result).toEqual(results[0]);
+  });
+
+  it('分類不明的單不靠 D/U 代號擠進正線分頁', () => {
+    const order = { ...baseOrder, lineKind: null, tripCode: 'D1234', payload: {} } as never;
+    expect(matchesTab(order, 'mainline')).toBe(false);
+    expect(matchesTab(order, 'maintenance')).toBe(false);
+  });
+
+  it('路線看訂單記錄的路線；沒有路線也不看班次代號開頭', () => {
+    expect(buildRouteLabel({ ...baseOrder, routeId: 'ROUTE-MAINLINE-DOWN', tripCode: 'U0830' } as never)).toBe('N2W→T3→S2W');
+    expect(buildRouteLabel({ ...baseOrder, routeId: undefined, tripCode: 'U0830' } as never)).toBe('—');
   });
 });
 
