@@ -467,10 +467,7 @@ WITH active_orders AS (
       WHEN o.planned_start IS NOT NULL THEN
         EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60
         + EXTRACT(MINUTE FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int
-      WHEN o.trip_code ~ '^[DU][0-9]{4}$'
-        AND SUBSTRING(o.trip_code, 2, 2)::int BETWEEN 0 AND 23
-        AND SUBSTRING(o.trip_code, 4, 2)::int BETWEEN 0 AND 59
-        THEN SUBSTRING(o.trip_code, 2, 2)::int * 60 + SUBSTRING(o.trip_code, 4, 2)::int
+      -- 沒有計畫發車時刻就是沒有，不從班次代號推
       ELSE NULL
     END AS trip_start_minutes,
     first_st.station_id AS route_origin,

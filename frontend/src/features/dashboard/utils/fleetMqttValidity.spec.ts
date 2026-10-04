@@ -60,13 +60,22 @@ describe('SQL＋MQTT 合併：SQL 決定卡片，MQTT 只更新同一張單', ()
     assert.equal(row.trip_code, 'D0900');
   });
 
-  it('同一張單：用回報更新欄位，列數不變', () => {
-    const sqlRow = { shift_key: 'ORD-1', order_id: 'ORD-1', vehicle_code: 'PMS01', trip_code: 'D0830', line_kind: 'MAINLINE' };
-    const mqtt = new Map([['PMS01', live('ORD-1', 'PMS01')]]);
+  it('同一張單：用回報更新欄位，列數不變；訂單狀態仍是 SQL 的（MQTT 不改狀態）', () => {
+    const sqlRow = { shift_key: 'ORD-1', order_id: 'ORD-1', vehicle_code: 'PMS01', trip_code: 'D0830', line_kind: 'MAINLINE', order_status: 'PROCESSING' };
+    const mqtt = new Map([['PMS01', { ...live('ORD-1', 'PMS01'), vehicle_phase: 'TRANSITING', current_leg: { eta_seconds: 30 } }]]);
     const rows = mergeMainlineShiftRoster([sqlRow], mqtt);
     assert.equal(rows.length, 1);
     assert.notEqual(rows[0], sqlRow);
-    assert.equal(rows[0].order_status, 'RUNNING');
+    assert.equal(rows[0].order_status, 'PROCESSING');
+  });
+
+  it('套不套回報只看單號，D0830 與 NT0830 一樣', () => {
+    for (const trip of ['D0830', 'NT0830', 'MT-E3-R7-5400']) {
+      const sqlRow = { shift_key: 'ORD-1', order_id: 'ORD-1', vehicle_code: 'PMS01', trip_code: trip, line_kind: 'MAINLINE', order_status: 'PROCESSING' };
+      const mqtt = new Map([['PMS01', { order_id: 'ORD-1', vehicle_code: 'PMS01', trip_code: trip, vehicle_phase: 'TRANSITING' }]]);
+      const [row] = mergeMainlineShiftRoster([sqlRow], mqtt);
+      assert.notEqual(row, sqlRow, `${trip} 的回報要套用`);
+    }
   });
 
   it('SQL 有單、沒有回報：原樣顯示，不補假回報', () => {

@@ -191,7 +191,8 @@ export function enrichMainlineShiftFields(
     // 方向、站序、發車與結束時間都以 SQL 為準；SQL 沒給就留空，不從班次代號推。
   }
 
-  const orderStatus = String(mqttPayload?.order_status ?? next.order_status ?? '').toUpperCase();
+  // 訂單狀態以 SQL（中心端 REST 寫入）為準；車端 MQTT 的 order_status 不採信，SQL 沒給才看
+  const orderStatus = String(next.order_status ?? mqttPayload?.order_status ?? '').toUpperCase();
   const phase = String(mqttPayload?.vehicle_phase ?? '').toUpperCase();
 
   if (phase === 'FAULTED' || orderStatus === 'FAULTED') {

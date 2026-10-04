@@ -11,8 +11,6 @@ const DOCKING_STATION_NAME_RE = /^(N2W|S2W|T3)(上行|下行)?$/i;
  */
 const TRACK_OR_FACILITY_RE = /^([DU]\d{1,2}|E\d+|P[1-4]|H\d+|M\d+|W\d+)$/i;
 
-const MAINLINE_TRIP_RE = /^[DU][0-9]{4}$/i;
-
 /**
  * 正線區段簡碼：N2W、T3上、S2W下 這種。
  *
@@ -47,12 +45,11 @@ function isMainlineLocationContext(sources: {
 }): boolean {
   if (isMaintenanceLocationContext(sources)) return false;
 
+  // 業務分類看 SQL 的 business_kind／line_kind，不看班次代號
   const lineKind = String(
-    sources.operation?.line_kind ?? sources.variables?.line_kind ?? '',
+    sources.variables?.business_kind ?? sources.operation?.line_kind ?? sources.variables?.line_kind ?? '',
   ).toUpperCase();
-  if (lineKind === 'MAINLINE') return true;
-  const trip = String(sources.operation?.trip_code ?? sources.variables?.trip_code ?? '').trim();
-  return MAINLINE_TRIP_RE.test(trip);
+  return lineKind === 'MAINLINE';
 }
 
 function isMainlineAwaitingDeparture(sources: {
