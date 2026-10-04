@@ -76,6 +76,29 @@ export class DispatchController {
     };
   }
 
+  @Get('simulation/runs/:runId')
+  @ApiOperation({
+    summary: '模擬執行進度（依訂單 payload.sim_run_id 追溯）',
+    description:
+      '模擬器建單時在 payload 帶 sim_run_id／sim_shift_id／sim_load_digest，這支依 sim_run_id 回報：' +
+      '已建立訂單數、已開始（非 PENDING）、已完成（END）、異常（FAULTED）、收到車端回報的訂單數與' +
+      '最近車端回報時間。沒有任何車端回報時 state 為 waiting_vehicle_report，不會被當成運行中。' +
+      '`planned` 給了計畫任務數才判斷是否全部結案。純讀取。',
+  })
+  async simulationRun(
+    @Param('runId') runId: string,
+    @Query('planned') planned?: string,
+  ): Promise<Record<string, unknown>> {
+    const count =
+      planned != null && planned !== '' ? Number(planned) : undefined;
+    return this.simulationPlan.runStatus(
+      runId,
+      count !== undefined && Number.isInteger(count) && count >= 0
+        ? count
+        : undefined,
+    );
+  }
+
   @Get('dry-run')
   @ApiOperation({
     summary: '試跑一次檢查',

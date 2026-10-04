@@ -2,6 +2,7 @@ import {
   assessSimulationReadiness,
   contentDigest,
   readShiftMapReference,
+  summarizeSimulationRun,
 } from './dispatch.simulation-plan';
 import type { PlannedDispatch } from './dispatch.plan';
 
@@ -176,5 +177,47 @@ describe('班表引用與版本摘要', () => {
       contentDigest({ b: [1, 2], a: 1 }),
     );
     expect(contentDigest({ a: 1 })).not.toBe(contentDigest({ a: 2 }));
+  });
+});
+
+describe('模擬執行進度', () => {
+  const row = (status: string, reportedAt: number | null = null) => ({
+    status,
+    reportedAt,
+    shiftId: 'SIM-B-1',
+    loadDigest: 'd1',
+  });
+
+  it('沒有訂單', () => {
+    expect(summarizeSimulationRun([]).state).toBe('no_orders');
+  });
+
+  it('已建單但沒有任何車端回報：等待車端回報，不算運行中', () => {
+    const result = summarizeSimulationRun([row('PENDING'), row('PENDING')], 2);
+    expect(result.state).toBe('waiting_vehicle_report');
+    expect(result.orders_created).toBe(2);
+    expect(result.last_vehicle_report_at).toBeNull();
+  });
+
+  it('有車端回報才算運行中，並帶出最近回報時間與來源班表', () => {
+    const result = summarizeSimulationRun(
+      [row('PROCESSING', 1_000), row('PENDING')],
+      2,
+    );
+    expect(result.state).toBe('running');
+    expect(result.started).toBe(1);
+    expect(result.last_vehicle_report_at).toBe(new Date(1_000).toISOString());
+    expect(result.shift_ids).toEqual(['SIM-B-1']);
+  });
+
+  it('全部結案：完成或失敗', () => {
+    expect(
+      summarizeSimulationRun([row('END', 5), row('END', 6)], 2).state,
+    ).toBe('finished');
+    expect(
+      summarizeSimulationRun([row('END', 5), row('FAULTED', 6)], 2).state,
+    ).toBe('failed');
+    // 還有計畫任務沒建單：不能算結案
+    expect(summarizeSimulationRun([row('END', 5)], 2).state).toBe('running');
   });
 });

@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { OperationOrder } from '../database/entities/operation-order.entity';
 import { MapService } from '../map/map.service';
 import {
   operationShiftCreationModeLabel,
@@ -10,6 +13,8 @@ import {
   assessSimulationReadiness,
   contentDigest,
   readShiftMapReference,
+  SIM_PAYLOAD_KEYS,
+  summarizeSimulationRun,
 } from './dispatch.simulation-plan';
 
 /**
@@ -26,7 +31,51 @@ export class SimulationPlanService {
   constructor(
     private readonly engine: DispatchEngineService,
     private readonly mapService: MapService,
+    @InjectRepository(OperationOrder)
+    private readonly orderRepository: Repository<OperationOrder>,
   ) {}
+
+  /**
+   * 一次模擬執行的實際進度：依訂單 payload.sim_run_id 查，只讀。
+   * planned 給了才判斷「全部結案」；沒有車端回報時如實回 waiting_vehicle_report。
+   */
+  async runStatus(runId: string, planned?: number) {
+    const rows = await this.orderRepository
+      .createQueryBuilder('o')
+      .select('o.status', 'status')
+      // 車端回報留下的時間：MQTT／動作回報寫 payload.updated_at，REST 狀態回報寫
+      // payload.actual_started_at（開始）與 completed_at（結案）。中心端取消只寫
+      // cancel_requested_at，不算車端回報。
+      .addSelect(`o.payload->>'updated_at'`, 'reported_at')
+      .addSelect(`o.payload->>'actual_started_at'`, 'started_at')
+      .addSelect('o.completed_at', 'completed_at')
+      .addSelect(`o.payload->>'${SIM_PAYLOAD_KEYS.shiftId}'`, 'shift_id')
+      .addSelect(`o.payload->>'${SIM_PAYLOAD_KEYS.loadDigest}'`, 'load_digest')
+      .where(`o.payload->>'${SIM_PAYLOAD_KEYS.runId}' = :runId`, { runId })
+      .getRawMany<{
+        status: string;
+        reported_at: string | null;
+        started_at: string | null;
+        completed_at: string | null;
+        shift_id: string | null;
+        load_digest: string | null;
+      }>();
+    const summary = summarizeSimulationRun(
+      rows.map((row) => {
+        const times = [row.reported_at, row.started_at, row.completed_at]
+          .map((value) => (value == null ? NaN : Number(value)))
+          .filter((value) => Number.isFinite(value) && value > 0);
+        return {
+          status: row.status,
+          reportedAt: times.length ? Math.max(...times) : null,
+          shiftId: row.shift_id,
+          loadDigest: row.load_digest,
+        };
+      }),
+      planned,
+    );
+    return { run_id: runId, payload_keys: SIM_PAYLOAD_KEYS, ...summary };
+  }
 
   async build(shiftId: string, options: { reference?: number } = {}) {
     const reference = options.reference ?? Date.now();

@@ -231,3 +231,85 @@ export function assessSimulationReadiness(input: {
     missingRoutes,
   };
 }
+
+/**
+ * 模擬執行追溯：模擬器建單時在訂單 payload 帶的欄位（沿用既有 payload，不另建資料表）。
+ *   sim_run_id      本次執行 ID
+ *   sim_shift_id    載入的班表 ID
+ *   sim_load_digest 載入身分（/dispatch/plan/shift/:id 的 identity.load_digest）
+ */
+export const SIM_PAYLOAD_KEYS = {
+  runId: 'sim_run_id',
+  shiftId: 'sim_shift_id',
+  loadDigest: 'sim_load_digest',
+} as const;
+
+export type SimulationRunOrderRow = {
+  status: string;
+  /** 最近一次車端回報時間（payload.updated_at／actual_started_at／completed_at 取最新） */
+  reportedAt: number | null;
+  shiftId: string | null;
+  loadDigest: string | null;
+};
+
+export type SimulationRunState =
+  | 'no_orders'
+  | 'waiting_vehicle_report'
+  | 'running'
+  | 'finished'
+  | 'failed';
+
+/**
+ * 「已建立訂單」不等於「車輛已執行」：沒有任何車端回報時是 waiting_vehicle_report。
+ * planned 有給時，全部結案才算 finished。
+ */
+export function summarizeSimulationRun(
+  rows: SimulationRunOrderRow[],
+  planned?: number,
+) {
+  const byStatus: Record<string, number> = {};
+  for (const row of rows)
+    byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+  const completed = byStatus.END ?? 0;
+  const faulted = byStatus.FAULTED ?? 0;
+  const started = rows.filter((row) => row.status !== 'PENDING').length;
+  const reported = rows.filter((row) => row.reportedAt !== null);
+  const lastReportAt = reported.length
+    ? Math.max(...reported.map((row) => row.reportedAt as number))
+    : null;
+
+  let state: SimulationRunState;
+  if (rows.length === 0) state = 'no_orders';
+  else if (reported.length === 0 && started === 0)
+    state = 'waiting_vehicle_report';
+  else if (
+    planned !== undefined &&
+    completed + faulted >= planned &&
+    rows.length >= planned
+  ) {
+    state = faulted > 0 ? 'failed' : 'finished';
+  } else state = 'running';
+
+  return {
+    state,
+    orders_created: rows.length,
+    planned: planned ?? null,
+    started,
+    completed,
+    faulted,
+    by_status: byStatus,
+    orders_with_vehicle_report: reported.length,
+    last_vehicle_report_at:
+      lastReportAt === null ? null : new Date(lastReportAt).toISOString(),
+    shift_ids: [
+      ...new Set(
+        rows.map((row) => row.shiftId).filter((id): id is string => !!id),
+      ),
+    ],
+    load_digests: [
+      ...new Set(
+        rows.map((row) => row.loadDigest).filter((id): id is string => !!id),
+      ),
+    ],
+  };
+}
