@@ -193,7 +193,13 @@ export function mergeOperationFields(
 ): Record<string, unknown> {
   if (!operation) return telemetryPayload;
   const trip = operation.trip_code ?? operation.tripCode;
-  const leg = operation.current_leg;
+  /*
+   * 營運訊息過期（跟遙測不是同一趟任務，或遙測已經比它新超過門檻）：它的 current_leg 與
+   * vehicle_phase 屬於上一張單，不能拿來判斷「現在在不在路上」——不然上一筆正線的目的地會
+   * 蓋過新的停妥狀態，停好的車被當成還在跑。
+   */
+  const stale = operationIsStale(telemetryPayload, operation);
+  const leg = stale ? undefined : operation.current_leg;
   const doorFields: Record<string, unknown> = {};
   for (const key of OPERATION_DOOR_FIELDS) {
     if (operation[key] !== undefined) doorFields[key] = operation[key];
@@ -205,7 +211,7 @@ export function mergeOperationFields(
     order_id: operation.order_id ?? telemetryPayload.order_id,
     trip_code: trip ?? telemetryPayload.trip_code,
     badge_label: trip ?? operation.badge_label ?? telemetryPayload.badge_label,
-    vehicle_phase: operation.vehicle_phase ?? telemetryPayload.vehicle_phase,
+    vehicle_phase: (stale ? undefined : operation.vehicle_phase) ?? telemetryPayload.vehicle_phase,
     dwelling: operation.dwelling ?? telemetryPayload.dwelling,
     line_kind: operation.line_kind ?? telemetryPayload.line_kind,
     operation_action: operation.operation_action ?? telemetryPayload.operation_action,
@@ -229,6 +235,20 @@ export function mergeOperationFields(
       ? { yard_slot_id: operation.yard_slot_id }
       : {}),
   };
+}
+
+/**
+ * 營運訊息是不是過期：遙測帶的班次代號跟它不同（已經換下一張單），或遙測比它新超過門檻。
+ * 沒有時間戳、遙測沒帶班次就照舊合併（沒有證據說它過期）。
+ */
+export function operationIsStale(
+  telemetry: Record<string, unknown>,
+  operation: Record<string, unknown>,
+): boolean {
+  const telTrip = String(telemetry.trip_code ?? telemetry.tripCode ?? '').trim();
+  const opTrip = String(operation.trip_code ?? operation.tripCode ?? '').trim();
+  if (telTrip && opTrip && telTrip !== opTrip) return true;
+  return operationMarkerIsStale(telemetry, operation);
 }
 
 /** 遙測比營運訊息新超過這麼久：營運訊息裡的格位標記視為過期（毫秒） */

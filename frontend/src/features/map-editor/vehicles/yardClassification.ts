@@ -24,8 +24,13 @@ import { isYardVehiclePayload, parseYardSlotIdFromPayload } from './resolveVehic
  * <ul>
  *   <li>車速 ≥ {@link YARD_MOVING_MPS}：一律不是。開著的車照軌道／分區定位，就算座標在格位範圍裡、
  *       就算帶著格位標記（標記是殘留的）。</li>
- *   <li>正在執行載客任務（current_leg 有目標站）：不是——載客班次不會停進格位。</li>
- *   <li>帶明確標記（yard_slot_id、segment_label 是格位…）且車是停著的：是。</li>
+ *   <li>還在路上：current_leg 的目標距離 > {@link YARD_ARRIVED_M}，或車端回報行駛／對位中（TRANSITING、
+ *       RUNNING、DOCKING）而且還沒停下——不是。進出場、沿軌經過都屬於這一類。</li>
+ *   <li><strong>有目標站不等於在跑正線</strong>：整備、待命做完之前，車端照協議回報的 current_leg
+ *       就是它停著的那個設施節點，距離 0。只看「有沒有目標站」會把停妥作業的車當成載客車
+ *       （2026-10-04 實測：全部停在格位的車都被判成載客、車身被推出格位半個車長）。</li>
+ *   <li>帶明確標記（yard_slot_id、segment_label 是格位…）、車是停著的、而且座標確實在那一格
+ *       （容許 {@link YARD_MARKER_TOLERANCE_M}）：是。標記跟位置對不上就是殘留標記，不吸附。</li>
  *   <li>只有座標落在格位裡：要<strong>停著並連續 {@link YARD_ENTER_DWELL_MS} 毫秒</strong>才算，
  *       一閃而過的低速不算。</li>
  * </ul>
@@ -35,6 +40,13 @@ import { isYardVehiclePayload, parseYardSlotIdFromPayload } from './resolveVehic
 export const YARD_STATIONARY_MPS = 0.5
 export const YARD_MOVING_MPS = 1.0
 export const YARD_ENTER_DWELL_MS = 2000
+/** 離目標還遠於這個距離就是還在路上（公尺） */
+export const YARD_ARRIVED_M = 2
+/** 格位標記與座標對照的容許距離（公尺）：座標在格位外超過這個距離，標記視為殘留 */
+export const YARD_MARKER_TOLERANCE_M = 3
+
+/** 車端回報「行駛中／對位中」的 vehicle_phase（協議：RUNNING 與 TRANSITING 同義） */
+const DRIVING_PHASES = new Set(['TRANSITING', 'RUNNING', 'DOCKING'])
 
 export type YardClassState = {
   /** 座標在格位裡、而且低速，從什麼時候開始（遙測時間，毫秒） */
@@ -51,7 +63,8 @@ export type YardDecision = {
     | 'marker'
     | 'stationary-in-slot'
     | 'moving'
-    | 'passenger-mission'
+    | 'en-route'
+    | 'marker-mismatch'
     | 'not-in-slot'
     | 'settling'
     | 'no-payload'
@@ -60,23 +73,48 @@ export type YardDecision = {
 
 export const EMPTY_YARD_STATE: YardClassState = { stillSinceMs: null, yard: false, slotId: null }
 
-/** 載客任務的訊號：中心端會用 current_leg.target_station_id 對應班表站序 */
-export function hasStationTarget(payload: Record<string, unknown> | undefined): boolean {
+/** current_leg 的目標站（沒有就是 null） */
+export function readLegTarget(payload: Record<string, unknown> | undefined): { stationId: string; distanceM: number | null } | null {
   const leg = payload?.current_leg
-  if (!leg || typeof leg !== 'object') return false
+  if (!leg || typeof leg !== 'object') return null
   const id = (leg as { target_station_id?: unknown }).target_station_id
-  return typeof id === 'string' && id.trim() !== ''
+  if (typeof id !== 'string' || id.trim() === '') return null
+  const distance = Number((leg as { distance_to_target_m?: unknown }).distance_to_target_m)
+  return { stationId: id.trim(), distanceM: Number.isFinite(distance) ? distance : null }
 }
 
 /**
- * payload 上的格位標記還可不可信：開著的車、正在跑載客任務的車帶著標記，那是殘留的。
- * 決定「這台車屬於哪個分區」時用（見 mapMqttIngestPipeline），跟畫面上的判定同一條規則。
+ * 這台車是不是還在路上（往某個目標開、進出場、沿軌經過）。
+ *
+ * 看三件事，任何一件成立就是：車速 ≥ {@link YARD_MOVING_MPS}；current_leg 離目標還遠於
+ * {@link YARD_ARRIVED_M}；車端回報行駛／對位中而且車速不是停著。
+ * 「有目標站」本身不算——停妥作業中的車，目標就是它所在的設施，距離 0。
+ */
+export function isEnRoute(payload: Record<string, unknown> | undefined): boolean {
+  if (!payload) return false
+  const speed = readVehicleSpeedMps(payload)
+  if (speed != null && speed >= YARD_MOVING_MPS) return true
+  const leg = readLegTarget(payload)
+  if (leg && leg.distanceM != null && leg.distanceM > YARD_ARRIVED_M) return true
+  const phase = String(payload.vehicle_phase ?? '').toUpperCase()
+  if (DRIVING_PHASES.has(phase) && !(speed != null && speed < YARD_STATIONARY_MPS)) return true
+  return false
+}
+
+/**
+ * payload 上的格位標記還可不可信：還在路上的車帶著標記，那是殘留的。
+ * 決定「這台車屬於哪個分區」時用（見 mapMqttIngestPipeline），跟畫面上的判定同一條規則
+ * （畫面上另外會對照座標與格位範圍，見 {@link classifyYardVehicle}）。
  */
 export function isYardMarkerTrusted(payload: Record<string, unknown> | undefined): boolean {
   if (!payload || !isYardVehiclePayload(payload)) return false
-  const speed = readVehicleSpeedMps(payload)
-  if (speed != null && speed >= YARD_MOVING_MPS) return false
-  return !hasStationTarget(payload)
+  return !isEnRoute(payload)
+}
+
+function distanceToBoxM(box: YardSlotFieldBox, xM: number, yM: number): number {
+  const dx = Math.max(box.xMinM - xM, 0, xM - box.xMaxM)
+  const dy = Math.max(box.yMinM - yM, 0, yM - box.yMaxM)
+  return Math.hypot(dx, dy)
 }
 
 export function classifyYardVehicle(input: {
@@ -101,14 +139,20 @@ export function classifyYardVehicle(input: {
   if (speed != null && speed >= YARD_MOVING_MPS) {
     return { yard: false, slotId: null, reason: 'moving', state: reset }
   }
-  if (hasStationTarget(payload)) {
-    return { yard: false, slotId: null, reason: 'passenger-mission', state: reset }
+  // 還在路上（往目標開、進出場中）：不是，就算座標剛好落在格位裡
+  if (isEnRoute(payload)) {
+    return { yard: false, slotId: null, reason: 'en-route', state: reset }
   }
 
-  // 明確標記 + 車停著：是
+  // 明確標記 + 車停著 + 座標確實在那一格：是
   if (isYardVehiclePayload(payload)) {
     const slotId = parseYardSlotIdFromPayload(payload) ?? findYardSlotAtFieldMeters(boxes, xM, yM)
     if (slotId && isYardParkableFacilityId(slotId)) {
+      const box = boxes.find((item) => item.slotId === slotId)
+      // 有這一格的範圍才能對照；座標離這一格太遠，標記是殘留的，不吸附過去
+      if (box && distanceToBoxM(box, xM, yM) > YARD_MARKER_TOLERANCE_M) {
+        return { yard: false, slotId: null, reason: 'marker-mismatch', state: reset }
+      }
       return {
         yard: true,
         slotId,
