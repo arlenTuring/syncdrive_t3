@@ -1,5 +1,6 @@
 /**
- * 把資料庫裡版面保存的「系統內建查詢」升級成目前版本（demoSql.ts）。
+ * 把資料庫裡版面保存的「系統內建查詢」升級成目前版本（demoSql.ts），並替班次群組補上
+ * 獨立的「過渡班次卡」樣板（utils/shiftCardTemplates.ts；已經有就不動）。
  *
  * 只換跟系統某一版原文一字不差的 SQL（utils/systemQueries.ts 的完整指紋判斷）；使用者改過的
  * 一律不動、只列出位置。經後端正式的版面儲存 API 寫回（帶 expectedVersion，別人剛存過就失敗、
@@ -13,6 +14,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { upgradeSystemQueries } from '../src/features/dashboard/utils/systemQueries.ts';
+import { ensureTransitionShiftTemplate } from '../src/features/dashboard/utils/shiftCardTemplates.ts';
 import type { DashboardPlane } from '../src/features/dashboard/types.ts';
 
 const base = process.env.BACKEND_URL ?? 'http://127.0.0.1:3000';
@@ -23,12 +25,16 @@ const planes = (await (await fetch(`${base}/syncdrive-api/dashboard/planes`)).js
 let pending = 0;
 for (const stored of planes) {
   const plane = { id: stored.planeId, name: stored.name, elements: stored.elements } as unknown as DashboardPlane;
-  const result = upgradeSystemQueries(plane);
-  console.log(`版面「${stored.name}」（${stored.planeId}，第 ${stored.version} 版）：可升級 ${result.changes.length} 處，對不上不動 ${result.unconfirmed.length} 處`);
-  for (const change of result.changes) console.log(`  ↑ ${change.family}（原為 ${change.fromVersion}）｜${change.location}`);
-  for (const item of result.unconfirmed) console.log(`  ? ${item.family}｜${item.location}`);
-  if (result.changes.length === 0) continue;
-  pending += result.changes.length;
+  const queries = upgradeSystemQueries(plane);
+  const templates = ensureTransitionShiftTemplate(queries.plane);
+  const result = { ...queries, plane: templates.plane };
+  console.log(`版面「${stored.name}」（${stored.planeId}，第 ${stored.version} 版）：可升級 ${queries.changes.length} 處查詢、`
+    + `補上過渡班次卡 ${templates.added} 處，對不上不動 ${queries.unconfirmed.length} 處`);
+  for (const change of queries.changes) console.log(`  ↑ ${change.family}（原為 ${change.fromVersion}）｜${change.location}`);
+  for (const item of queries.unconfirmed) console.log(`  ? ${item.family}｜${item.location}`);
+  const changeCount = queries.changes.length + templates.added;
+  if (changeCount === 0) continue;
+  pending += changeCount;
   if (!apply) continue;
   const backupDir = resolve(import.meta.dirname, '../../backend/logs/dashboard-plane-backups');
   mkdirSync(backupDir, { recursive: true });
