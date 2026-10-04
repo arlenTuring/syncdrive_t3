@@ -181,13 +181,34 @@ export class OrderService {
       status: options?.initialStatus ?? OrderStatus.PENDING,
       createdAt: String(Date.now()),
     });
-    // Manual test submissions must never overwrite a previously accepted order.
+    /*
+     * 不得覆寫既有訂單的兩種單：人工測試單（line_kind=TEST）與模擬器重播單
+     * （payload.source=plan_replay）。模擬器的分類已改成實際業務類型，所以不能再靠
+     * line_kind 判斷——改看來源。
+     *
+     * 重播單的編號＝執行 ID＋任務代號，建單逾時重試時同一張會再送一次：內容相同（同車、
+     * 同任務、同一輪）就回傳原訂單，不再發 assign，車端不會收到兩次；內容不同才是撞號，報錯。
+     */
+    const createOnly = data.line_kind === 'TEST' || data.payload?.source === 'plan_replay';
     let saved: OperationOrder;
-    if (data.line_kind === 'TEST') {
+    if (createOnly) {
       try { await this.orderRepository.insert(order); }
       catch (error) {
-        if ((error as { code?: string }).code === '23505') throw new ConflictException('測試訂單編號已存在，請先查詢原訂單');
-        throw error;
+        if ((error as { code?: string }).code !== '23505') throw error;
+        if (data.payload?.source !== 'plan_replay') {
+          throw new ConflictException('測試訂單編號已存在，請先查詢原訂單');
+        }
+        const existing = await this.orderRepository.findOne({ where: { id: data.order_id } });
+        const existingPayload = (existing?.payload ?? {}) as Record<string, unknown>;
+        if (
+          existing
+          && existing.vehicleCode === data.vehicle_code
+          && existing.tripCode === data.trip_code
+          && existingPayload.plan_run_id === data.payload?.plan_run_id
+        ) {
+          return Object.assign(existing, { duplicate: true }) as OperationOrder;
+        }
+        throw new ConflictException(`重播訂單編號 ${data.order_id} 已存在且內容不同（不是同一輪的同一個任務）`);
       }
       saved = order;
     } else {

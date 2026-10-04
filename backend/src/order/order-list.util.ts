@@ -1,4 +1,5 @@
 import { OperationOrder, OrderStatus } from '../database/entities/operation-order.entity';
+import { orderBusinessKind } from './order-business-kind';
 
 export type ShiftTab = 'mainline' | 'maintenance';
 
@@ -149,7 +150,11 @@ export function toShiftRecordListItem(order: OperationOrder): ShiftRecordListIte
 }
 
 export function matchesTab(order: OperationOrder, tab: ShiftTab): boolean {
-  const lineKind = String(order.lineKind ?? '').toUpperCase();
+  // 業務分類全系統同一套（見 order-business-kind.ts）；舊版模擬器的 TEST 單在這裡換算
+  const lineKind = String(
+    orderBusinessKind({ lineKind: order.lineKind, payload: order.payload as Record<string, unknown> | null })
+      ?? order.lineKind ?? '',
+  ).toUpperCase();
   if (tab === 'maintenance') {
     return lineKind === 'MAINTENANCE';
   }

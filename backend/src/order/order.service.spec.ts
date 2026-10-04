@@ -433,3 +433,65 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     expect(legEtaMax.station_5).toBe(180);
   });
 });
+
+describe('OrderService.createOrder 模擬器重播單（不覆寫、重試不重發）', () => {
+  let service: OrderService;
+  const stored = new Map<string, OperationOrder>();
+  const publishAssign = jest.fn(() => ({ topic: 't' }));
+  const orderRepo = {
+    create: jest.fn((o) => o),
+    insert: jest.fn(async (o: OperationOrder) => {
+      if (stored.has(o.id)) throw Object.assign(new Error('dup'), { code: '23505' });
+      stored.set(o.id, o);
+    }),
+    save: jest.fn(async (o: OperationOrder) => o),
+    findOne: jest.fn(async ({ where }: { where: { id: string } }) => stored.get(where.id) ?? null),
+  };
+
+  beforeEach(async () => {
+    stored.clear();
+    publishAssign.mockClear();
+    orderRepo.save.mockClear();
+    const noop = {} as never;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: noop },
+        { provide: getRepositoryToken(OrderEvent), useValue: noop },
+        { provide: OrderMqttPublisher, useValue: { publishAssign } },
+        { provide: OrderRouteService, useValue: { routeIdForTripCode: () => null } },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: noop },
+      ],
+    }).compile();
+    service = module.get(OrderService);
+  });
+
+  const body = (payload: Record<string, unknown> = {}) => ({
+    order_id: 'SIM-PLAN-run1-MT-D3-R5-0',
+    vehicle_code: 'PMS05',
+    trip_code: 'MT-D3-R5-0',
+    line_kind: 'MAINTENANCE',
+    payload: { source: 'plan_replay', plan_run_id: 'run1', ...payload },
+  });
+
+  it('分類改成 MAINTENANCE 後仍是只新增，不用 save 覆寫', async () => {
+    await service.createOrder(body());
+    expect(orderRepo.insert).toHaveBeenCalled();
+    expect(orderRepo.save).not.toHaveBeenCalled();
+    expect(publishAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it('同一輪同一任務重送：回傳原訂單，不再發 assign', async () => {
+    await service.createOrder(body());
+    const again = await service.createOrder(body());
+    expect((again as OperationOrder & { duplicate?: boolean }).duplicate).toBe(true);
+    expect(publishAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it('同編號但不是同一輪：撞號報錯', async () => {
+    await service.createOrder(body());
+    await expect(service.createOrder(body({ plan_run_id: 'run2' }))).rejects.toThrow('內容不同');
+  });
+});

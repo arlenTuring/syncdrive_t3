@@ -4,6 +4,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DispatchEngineService } from './dispatch-engine.service';
 import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
+import { dispatchOrderFields } from './dispatch-order-kind';
 
 /**
  * 即時調度引擎的內部維運介面。
@@ -140,6 +141,8 @@ function serializePlanned(
           destination_point: item.destination,
           stations: item.stations,
           maintenance: maintenancePayloadFields(item.maintenance),
+          // 下單要用的業務欄位（分類、整備徽章、任務子類型、卡片標籤），跟正式調度同一份
+          order_fields: dispatchOrderFields(item),
         }
       : {}),
   };
