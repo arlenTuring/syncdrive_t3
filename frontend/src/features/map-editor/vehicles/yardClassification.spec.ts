@@ -56,19 +56,53 @@ describe('開著的車：不是場區車，不論座標在不在格位裡、有�
     expect(d.reason).toBe('moving')
   })
 
-  it('正在跑載客任務（有目標站）就算低速也不是', () => {
+  it('往目標開（離目標還遠）：就算低速、帶著標記也不是', () => {
     const d = classifyYardVehicle({
-      payload: payload({ yard_slot_id: 'M1', current_leg: { target_station_id: 't3_u' } }, 0),
+      payload: payload({ yard_slot_id: 'M1', current_leg: { target_station_id: 't3_u', distance_to_target_m: 120 } }, 0.3),
       ...IN_M1,
       boxes: BOXES,
       nowMs: 1000,
     })
     expect(d.yard).toBe(false)
-    expect(d.reason).toBe('passenger-mission')
+    expect(d.reason).toBe('en-route')
+  })
+
+  it('車端回報行駛中、還沒停下：不是', () => {
+    const d = classifyYardVehicle({
+      payload: payload({ yard_slot_id: 'M1', vehicle_phase: 'TRANSITING' }, 0.8),
+      ...IN_M1,
+      boxes: BOXES,
+      nowMs: 1000,
+    })
+    expect(d.reason).toBe('en-route')
   })
 })
 
 describe('停著的車', () => {
+  it('停妥作業中（車端回報目標＝所在設施、距離 0、RUNNING）：用格位定位', () => {
+    // 2026-10-04 實測 PMS09 保養中的資料：有 current_leg、vehicle_phase RUNNING、車速 0
+    const d = classifyYardVehicle({
+      payload: payload({ yard_slot_id: 'M1', vehicle_phase: 'RUNNING', current_leg: { target_station_id: '142', distance_to_target_m: 0, eta_seconds: 0 } }, 0),
+      ...IN_M1,
+      boxes: BOXES,
+      nowMs: 1000,
+    })
+    expect(d.yard).toBe(true)
+    expect(d.reason).toBe('marker')
+    expect(d.slotId).toBe('M1')
+  })
+
+  it('標記跟座標對不上（停在一般站點、帶著殘留標記）：不吸附', () => {
+    const d = classifyYardVehicle({
+      payload: payload({ yard_slot_id: 'M1' }, 0),
+      ...OUTSIDE,
+      boxes: BOXES,
+      nowMs: 1000,
+    })
+    expect(d.yard).toBe(false)
+    expect(d.reason).toBe('marker-mismatch')
+  })
+
   it('帶標記而且停著：立刻是，格位取自標記', () => {
     const d = classifyYardVehicle({
       payload: payload({ yard_slot_id: 'M1' }, 0),
@@ -132,7 +166,9 @@ describe('標記可不可信（決定屬於哪個分區時用）', () => {
   it('停著帶標記：可信；開著或跑載客任務：不可信', () => {
     expect(isYardMarkerTrusted(payload({ yard_slot_id: 'M1' }, 0))).toBe(true)
     expect(isYardMarkerTrusted(payload({ yard_slot_id: 'M1' }, 6))).toBe(false)
-    expect(isYardMarkerTrusted(payload({ yard_slot_id: 'M1', current_leg: { target_station_id: 'x' } }, 0))).toBe(false)
+    expect(isYardMarkerTrusted(payload({ yard_slot_id: 'M1', current_leg: { target_station_id: 'x', distance_to_target_m: 80 } }, 0))).toBe(false)
+    // 停妥作業中：目標就是它所在的設施、距離 0——有目標站不等於在跑正線
+    expect(isYardMarkerTrusted(payload({ yard_slot_id: 'M1', current_leg: { target_station_id: '142', distance_to_target_m: 0 } }, 0))).toBe(true)
     expect(isYardMarkerTrusted(payload({}, 0))).toBe(false)
   })
 })
@@ -153,6 +189,16 @@ describe('營運訊息的格位標記與遙測的時間關係', () => {
   it('遙測自己帶著格位：照用', () => {
     const merged = mergeOperationFields({ timestamp: 13_000, yard_slot_id: 'M2' }, operation)
     expect(merged.yard_slot_id).toBe('M2')
+  })
+
+  it('營運訊息屬於上一張單（班次不同）：它的目標與行駛狀態不合併，不蓋過新的停妥狀態', () => {
+    const merged = mergeOperationFields(
+      { timestamp: 10_000, trip_code: 'MT-M3-R9-0', yard_slot_id: 'M3' },
+      { timestamp: 10_000, trip_code: 'TN0130', vehicle_phase: 'TRANSITING', current_leg: { target_station_id: 't3_u', distance_to_target_m: 300 } },
+    )
+    expect(merged.current_leg).toBeUndefined()
+    expect(merged.vehicle_phase).toBeUndefined()
+    expect(isYardMarkerTrusted(merged)).toBe(true)
   })
 
   it('沒有時間戳就照舊合併（沒有證據說它過期）', () => {

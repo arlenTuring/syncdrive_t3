@@ -828,6 +828,21 @@ export function MapAreaVehicleOverlay({
         );
         const coordLeft = area.layout.xPx + anchorCss.left;
         const coordTop = area.layout.yPx + anchorCss.top;
+        const placementCss = areaPositionToCssTopLeft(placementLocal, { w: 0, h: 0 }, area.layout.hPx);
+        /*
+         * 定位診斷（不影響畫面）：格位判定結果與原因、錨點（後軸）、定位目標點、轉角、車身尺寸。
+         * 驗收與除錯時從 DOM 讀，對照「車身中心有沒有落在格位中心」。
+         */
+        const placementDebugAttrs = {
+          'data-vehicle-id': vehicle.vehicleId,
+          'data-yard': String(preferYard),
+          'data-yard-reason': yardDecision.reason,
+          'data-yard-slot': yardDecision.slotId ?? '',
+          'data-anchor': `${coordLeft.toFixed(1)},${coordTop.toFixed(1)}`,
+          'data-placement': `${(area.layout.xPx + placementCss.left).toFixed(1)},${(area.layout.yPx + placementCss.top).toFixed(1)}`,
+          'data-rotate-deg': containerRotateDeg.toFixed(1),
+          'data-marker': `${markerW.toFixed(1)}x${markerH.toFixed(1)}`,
+        };
         const bgColor = resolveMapVehicleBgColor(vehicle);
         const zIndex = 100 + stackOrder;
 
@@ -971,7 +986,7 @@ export function MapAreaVehicleOverlay({
             vehicleEditSizer != null && vehicleEditSizer.targetKey === vehicleKey;
 
           return (
-            <div key={vehicleKey}>
+            <div key={vehicleKey} {...placementDebugAttrs}>
               {coordLabel}
               {anchorDebug}
               {cellBadge}
@@ -1023,7 +1038,7 @@ export function MapAreaVehicleOverlay({
         }
 
         return (
-          <div key={`${vehicle.areaId}:${vehicle.vehicleId}`}>
+          <div key={`${vehicle.areaId}:${vehicle.vehicleId}`} {...placementDebugAttrs}>
             {coordLabel}
             {anchorDebug}
             {cellBadge}
