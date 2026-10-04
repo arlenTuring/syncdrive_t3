@@ -31,14 +31,14 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
   {
     "family": "mainline-fleet",
     "fingerprint": "1a49ab6dd92da8",
-    "firstSeen": "2026-10-04",
-    "commit": "8d19abd"
+    "firstSeen": "2026-10-05",
+    "commit": "19084a1"
   },
   {
     "family": "mainline-fleet",
     "fingerprint": "0d291eb412da8f",
-    "firstSeen": "2026-10-04",
-    "commit": "1c9d9b9"
+    "firstSeen": "2026-10-05",
+    "commit": "bcced54"
   },
   {
     "family": "mainline-shifts",
@@ -85,14 +85,26 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
   {
     "family": "mainline-shifts",
     "fingerprint": "18b9adbf3d745c",
-    "firstSeen": "2026-10-04",
-    "commit": "8d19abd"
+    "firstSeen": "2026-10-05",
+    "commit": "19084a1"
   },
   {
     "family": "mainline-shifts",
     "fingerprint": "1573a65a8549f3",
-    "firstSeen": "2026-10-04",
-    "commit": "1c9d9b9"
+    "firstSeen": "2026-10-05",
+    "commit": "bcced54"
+  },
+  {
+    "family": "mainline-shifts",
+    "fingerprint": "1d16130413e9bd",
+    "firstSeen": "2026-10-05",
+    "commit": "082a90f"
+  },
+  {
+    "family": "mainline-shifts",
+    "fingerprint": "1106a666980f3f",
+    "firstSeen": "2026-10-05",
+    "commit": "6da2ac7"
   },
   {
     "family": "maintenance-shifts",
@@ -139,14 +151,14 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
   {
     "family": "maintenance-shifts",
     "fingerprint": "1146e58962abac",
-    "firstSeen": "2026-10-04",
-    "commit": "8d19abd"
+    "firstSeen": "2026-10-05",
+    "commit": "19084a1"
   },
   {
     "family": "maintenance-shifts",
     "fingerprint": "1188b5d5a8ae2e",
-    "firstSeen": "2026-10-04",
-    "commit": "1c9d9b9"
+    "firstSeen": "2026-10-05",
+    "commit": "bcced54"
   },
   {
     "family": "vehicle-status",
@@ -199,13 +211,13 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
   {
     "family": "vehicle-status",
     "fingerprint": "04a8d427aa2457",
-    "firstSeen": "2026-10-04",
-    "commit": "8d19abd"
+    "firstSeen": "2026-10-05",
+    "commit": "19084a1"
   },
   {
     "family": "vehicle-status",
     "fingerprint": "03ed2a0509c8c7",
-    "firstSeen": "2026-10-04",
-    "commit": "1c9d9b9"
+    "firstSeen": "2026-10-05",
+    "commit": "bcced54"
   }
 ];
