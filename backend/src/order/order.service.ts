@@ -154,6 +154,32 @@ export class OrderService {
     private readonly mapService: MapService,
   ) {}
 
+  /**
+   * 同一張單的「讀出 → 改 payload → 存回」依序執行。
+   *
+   * 車端 1 Hz 的 MQTT 進度、REST 狀態回報、中心端取消可能同時改同一張單；TypeORM 的 save
+   * 會把整個 payload 寫回，沒排隊的話後存的會蓋掉先存的欄位（實測：MQTT 進度蓋掉了剛寫的
+   * vehicle_progress_at.END；同樣的情況也可能蓋掉 cancel_requested_at）。這裡在本程序內依
+   * 訂單 ID 排隊，進入後一律重新讀取。主系統目前是單一後端程序；若之後多實例部署，要改成
+   * 資料庫層的原子更新或列鎖。
+   */
+  private readonly orderLocks = new Map<string, Promise<void>>();
+
+  private async withOrderLock<T>(orderId: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.orderLocks.get(orderId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    const chained = previous.then(() => current);
+    this.orderLocks.set(orderId, chained);
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.orderLocks.get(orderId) === chained) this.orderLocks.delete(orderId);
+    }
+  }
+
   async createOrder(
     data: {
       order_id: string;
@@ -496,14 +522,18 @@ export class OrderService {
     });
     if (!order) return null;
 
-    // 不寫 vehicle_phase（車端是唯一真值源），也不動 status／completed_at
-    order.payload = {
-      ...(order.payload ?? {}),
-      vehicle_fault: { reported_at: Date.now(), reason: reason ?? 'CRITICAL_EVENT', source: 'event_report' },
-    };
-    const saved = await this.orderRepository.save(order);
-    this.datasourceInvalidation.emitOrderLifecycle(code);
-    return saved;
+    return this.withOrderLock(order.id, async () => {
+      const fresh = await this.orderRepository.findOne({ where: { id: order.id } });
+      if (!fresh || fresh.status !== OrderStatus.PROCESSING) return fresh ?? null;
+      // 不寫 vehicle_phase（車端是唯一真值源），也不動 status／completed_at
+      fresh.payload = {
+        ...(fresh.payload ?? {}),
+        vehicle_fault: { reported_at: Date.now(), reason: reason ?? 'CRITICAL_EVENT', source: 'event_report' },
+      };
+      const saved = await this.orderRepository.save(fresh);
+      this.datasourceInvalidation.emitOrderLifecycle(code);
+      return saved;
+    });
   }
 
   /** 人工復歸：故障訂單恢復為進行中（示範／維運用） */
@@ -577,6 +607,15 @@ export class OrderService {
    *   payload.vehicle_progress_at（車端證據），中心端內部呼叫（示範等）不記。
    */
   async updateOrderStatus(
+    id: string,
+    statusStr: string,
+    options?: { reporter?: 'vehicle' },
+  ): Promise<OperationOrder> {
+    if (!this.nonEmpty(id)) return this.updateOrderStatusLocked(id, statusStr, options);
+    return this.withOrderLock(id, () => this.updateOrderStatusLocked(id, statusStr, options));
+  }
+
+  private async updateOrderStatusLocked(
     id: string,
     statusStr: string,
     options?: { reporter?: 'vehicle' },
@@ -676,6 +715,11 @@ export class OrderService {
    * 車端就收到兩則一樣的通知）。
    */
   async requestCancel(id: string): Promise<OperationOrder> {
+    if (!this.nonEmpty(id)) return this.requestCancelLocked(id);
+    return this.withOrderLock(id, () => this.requestCancelLocked(id));
+  }
+
+  private async requestCancelLocked(id: string): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
 
     if (order.status === OrderStatus.END || order.status === OrderStatus.FAULTED) {
@@ -720,15 +764,17 @@ export class OrderService {
     if (body.actual_end_time != null) row.actualEndTime = String(body.actual_end_time);
     await this.actionStateRepository.save(row);
 
-    const order = await this.getOrderById(row.orderId);
-    const progress = await this.orderRouteService.computeRouteProgress(order.id, order.routeId ?? null);
-    order.payload = {
-      ...(order.payload ?? {}),
-      route_progress: progress,
-      active_action_id: actionId,
-      updated_at: Date.now(),
-    };
-    await this.orderRepository.save(order);
+    await this.withOrderLock(row.orderId, async () => {
+      const order = await this.getOrderById(row.orderId);
+      const progress = await this.orderRouteService.computeRouteProgress(order.id, order.routeId ?? null);
+      order.payload = {
+        ...(order.payload ?? {}),
+        route_progress: progress,
+        active_action_id: actionId,
+        updated_at: Date.now(),
+      };
+      await this.orderRepository.save(order);
+    });
 
     return row;
   }
@@ -760,6 +806,14 @@ export class OrderService {
   ): Promise<{ order: OperationOrder | null; outcome: OperationMqttOutcome; assignedVehicle?: string }> {
     const orderId = this.nonEmpty(payload.order_id);
     if (!orderId) return { order: null, outcome: 'missing_order_id' };
+    return this.withOrderLock(orderId, () => this.applyOperationMqttUpdateLocked(orderId, vehicleCode, payload));
+  }
+
+  private async applyOperationMqttUpdateLocked(
+    orderId: string,
+    vehicleCode: string,
+    payload: OperationMqttPayload,
+  ): Promise<{ order: OperationOrder | null; outcome: OperationMqttOutcome; assignedVehicle?: string }> {
 
     const order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order) return { order: null, outcome: 'unknown_order' };
