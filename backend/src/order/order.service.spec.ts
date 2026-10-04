@@ -622,7 +622,7 @@ describe('訂單生命週期：開始只認 REST，MQTT 只寫既有訂單的進
   }
 
   it.each(['MAINLINE', 'TRANSITION', 'MAINTENANCE'])('%s：D1234、NT0000、其他名稱走完全一樣的流程', async (lineKind) => {
-    const runs = [];
+    const runs: Array<Awaited<ReturnType<typeof lifecycle>>> = [];
     for (const tripCode of ['D1234', 'NT0000', 'MT-D3-R5-0']) runs.push(await lifecycle(tripCode, lineKind));
     for (const run of runs) {
       expect(run.trace).toEqual(['PENDING', 'PROCESSING', 'PROCESSING', 'END', 'END']);
