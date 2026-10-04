@@ -686,7 +686,9 @@ describe('訂單生命週期：開始只認 REST，MQTT 只寫既有訂單的進
 
   it('已取消的單：MQTT 行駛中也不會開始，REST 開始被拒', async () => {
     seed('D1234', 'MAINLINE', OrderStatus.PENDING, { cancel_requested_at: 1 });
-    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('D1234'));
+    const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('D1234'));
+    expect(outcome).toBe('cancel_requested');
+    expect(orderRepo.save).not.toHaveBeenCalled();
     expect(stored.get('ORD-D1234')!.status).toBe(OrderStatus.PENDING);
     await expect(service.updateOrderStatus('ORD-D1234', 'PROCESSING')).rejects.toMatchObject({
       response: { code: 'ORDER_CANCELLED' },

@@ -99,6 +99,7 @@ export type OperationMqttOutcome =
   | 'duplicate'
   | 'pending_refreshed'
   | 'not_processing'
+  | 'cancel_requested'
   | 'faulted'
   | 'progress_applied';
 
@@ -732,14 +733,14 @@ export class OrderService {
   async applyOperationMqttUpdateWithOutcome(
     vehicleCode: string,
     payload: OperationMqttPayload,
-  ): Promise<{ order: OperationOrder | null; outcome: OperationMqttOutcome }> {
+  ): Promise<{ order: OperationOrder | null; outcome: OperationMqttOutcome; assignedVehicle?: string }> {
     const orderId = this.nonEmpty(payload.order_id);
     if (!orderId) return { order: null, outcome: 'missing_order_id' };
 
     const order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order) return { order: null, outcome: 'unknown_order' };
     if (order.vehicleCode !== vehicleCode) {
-      return { order: null, outcome: 'vehicle_mismatch' };
+      return { order: null, outcome: 'vehicle_mismatch', assignedVehicle: order.vehicleCode };
     }
 
     const prevPayload = (order.payload ?? {}) as Record<string, unknown>;
@@ -755,6 +756,10 @@ export class OrderService {
     }
 
     const vehiclePhase = String(payload.vehicle_phase ?? '').toUpperCase();
+    // 中心端已取消、還沒結案的單：等車端用 REST 回報 FAULTED，進度不再寫
+    if (prevPayload.cancel_requested_at) {
+      return { order, outcome: 'cancel_requested' };
+    }
     if (order.status === OrderStatus.PENDING) {
       // 待發：只刷新顯示用的下一站與 ETA；車端報什麼 phase 都不算開始
       return { order: await this.applyPendingOperationRefresh(order, payload), outcome: 'pending_refreshed' };

@@ -247,13 +247,13 @@ export class MqttService {
       // line_kind／route_id 不再由這裡猜測：訂單建立時中心端已經寫死
       // order.lineKind／order.routeId，applyOperationMqttUpdate 會直接信任
       // 既有訂單記錄，不需要在進來的路上先幫車端補值。
-      const { order, outcome } = await this.orderService.applyOperationMqttUpdateWithOutcome(vehicleCode, {
+      const { order, outcome, assignedVehicle } = await this.orderService.applyOperationMqttUpdateWithOutcome(vehicleCode, {
         ...payload,
         order_id: orderId,
         vehicle_code: vehicleCode,
       });
       if (outcome === 'missing_order_id' || outcome === 'unknown_order' || outcome === 'vehicle_mismatch' || outcome === 'stale') {
-        this.diagnoseOperation(vehicleCode, outcome, payload, order?.vehicleCode);
+        this.diagnoseOperation(vehicleCode, outcome, payload, assignedVehicle);
       }
       /*
        * 訂單的 leg_eta_max／segment 由中心端依班表計算。寫庫後通知事件型 SQL
