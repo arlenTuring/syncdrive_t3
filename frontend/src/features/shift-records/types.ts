@@ -4,6 +4,7 @@ export type ExecutionStatusKey =
   | 'pending'
   | 'running'
   | 'delayed'
+  | 'fault_pending'
   | 'faulted'
   | 'completed';
 
@@ -30,6 +31,7 @@ export const EXECUTION_STATUS_OPTIONS: Array<{ value: ExecutionStatusKey | 'all'
   { value: 'pending', label: '待發' },
   { value: 'running', label: '執行中' },
   { value: 'delayed', label: '延誤中' },
+  { value: 'fault_pending', label: '車輛故障（結案待確認）' },
   { value: 'faulted', label: '故障' },
   { value: 'completed', label: '已完成' },
 ];
@@ -72,6 +74,10 @@ export const EXECUTION_TAG_STYLE: Record<ExecutionDisplayKey, StatusTagStyle> = 
   completed: {
     container: 'bg-[rgba(153,161,175,0.2)]',
     dot: 'bg-[#99A1AF]',
+  },
+  fault_pending: {
+    container: 'bg-[rgba(239,68,68,0.2)]',
+    dot: 'bg-[#EF4444]',
   },
   cancelled: {
     container: 'bg-[rgba(153,161,175,0.2)]',

@@ -276,6 +276,7 @@ const zhTW = {
       pending: '待發',
       running: '執行中',
       delayed: '延誤中',
+      fault_pending: '車輛故障（結案待確認）',
       faulted: '故障',
       completed: '已完成',
       cancelled: '已中止（中心端取消）',

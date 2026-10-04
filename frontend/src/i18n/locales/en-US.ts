@@ -284,6 +284,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       pending: 'Pending',
       running: 'Running',
       delayed: 'Delayed',
+      fault_pending: 'Vehicle fault (closure pending)',
       faulted: 'Faulted',
       completed: 'Completed',
       cancelled: 'Aborted (cancelled by centre)',

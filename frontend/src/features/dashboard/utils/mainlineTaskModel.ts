@@ -195,9 +195,15 @@ export function enrichMainlineShiftFields(
   const orderStatus = String(next.order_status ?? mqttPayload?.order_status ?? '').toUpperCase();
   const phase = String(mqttPayload?.vehicle_phase ?? '').toUpperCase();
 
+  // 訂單真的故障結案（REST）：故障卡
+  // 車端回報故障但訂單還沒結案：同樣是警示樣式，但標「故障・待結案」，訂單狀態不改（不假裝已結案）
   if (phase === 'FAULTED' || orderStatus === 'FAULTED') {
-    next.order_status = 'FAULTED';
+    if (orderStatus === 'FAULTED') next.order_status = 'FAULTED';
     Object.assign(next, MAINLINE_FAULTED_STYLE);
+    if (orderStatus !== 'FAULTED') {
+      next.status_label = '故障・待結案';
+      next.fault_pending_close = true;
+    }
     next.station_label = '下一站';
     next.eta_label = '剩餘到站';
     if (!next.icon_bg_color) next.icon_bg_color = '#ef4444';

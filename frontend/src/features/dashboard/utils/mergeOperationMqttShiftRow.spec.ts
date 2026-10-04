@@ -37,4 +37,23 @@ describe('mergeOperationMqttShiftRow', () => {
     );
     assert.equal(String(row.line_kind).toUpperCase(), 'MAINTENANCE');
   });
+
+  it('車輛回報故障、訂單還沒結案：警示樣式標「故障・待結案」，訂單狀態不改成 FAULTED', () => {
+    const row = mergeOperationMqttShiftRow(
+      { shift_key: 'ORD-F', order_id: 'ORD-F', trip_code: 'NT0000', business_kind: 'MAINLINE', line_kind: 'mainline', order_status: 'PROCESSING' },
+      { order_id: 'ORD-F', vehicle_phase: 'FAULTED' },
+    );
+    assert.equal(row.order_status, 'PROCESSING');
+    assert.equal(row.status_label, '故障・待結案');
+    assert.equal(row.is_alert, true);
+  });
+
+  it('訂單已經 REST 故障結案：故障卡', () => {
+    const row = mergeOperationMqttShiftRow(
+      { shift_key: 'ORD-F', order_id: 'ORD-F', trip_code: 'NT0000', business_kind: 'MAINLINE', line_kind: 'mainline', order_status: 'FAULTED' },
+      { order_id: 'ORD-F', vehicle_phase: 'FAULTED' },
+    );
+    assert.equal(row.order_status, 'FAULTED');
+    assert.equal(row.status_label, '故障');
+  });
 });
