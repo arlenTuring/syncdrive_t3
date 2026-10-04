@@ -86,6 +86,19 @@ export type OperationShiftListItem = {
   publish_check_label: string;
   created_at: string;
   updated_at: string;
+  /**
+   * 排班結果的製作時間（ISO）。自動生成取 scheduleOutput.generatedAt，其次
+   * scheduleOutput.plan.generatedAt；舊資料沒有記錄就是 null（畫面顯示「未記錄」），
+   * 不拿現在時間或最後儲存時間補。最後儲存時間是 updated_at，兩者分開。
+   */
+  generated_at: string | null;
+  /** generated_at 取自哪個欄位；null＝未記錄 */
+  generated_at_source:
+    | 'scheduleOutput.generatedAt'
+    | 'scheduleOutput.plan.generatedAt'
+    | null;
+  /** 這個時間的正確稱呼：自動生成的是「生成時間」，手動班表是「建立排班結構時間」 */
+  generated_at_label: string;
 };
 
 export function formatOperationShiftTimestamp(
@@ -132,6 +145,34 @@ function readCreationMode(
   return body.creationMode === 'manual' ? 'manual' : 'parametric';
 }
 
+/** 排班結果的製作時間；兩處都沒有就是 null，不補造 */
+export function readScheduleGeneratedAt(body: Record<string, unknown>): {
+  at: string | null;
+  source: OperationShiftListItem['generated_at_source'];
+} {
+  const output = body.scheduleOutput;
+  if (!output || typeof output !== 'object') return { at: null, source: null };
+  const outer = (output as Record<string, unknown>).generatedAt;
+  if (typeof outer === 'string' && !Number.isNaN(Date.parse(outer))) {
+    return {
+      at: new Date(outer).toISOString(),
+      source: 'scheduleOutput.generatedAt',
+    };
+  }
+  const plan = (output as Record<string, unknown>).plan;
+  const inner =
+    plan && typeof plan === 'object'
+      ? (plan as Record<string, unknown>).generatedAt
+      : undefined;
+  if (typeof inner === 'string' && !Number.isNaN(Date.parse(inner))) {
+    return {
+      at: new Date(inner).toISOString(),
+      source: 'scheduleOutput.plan.generatedAt',
+    };
+  }
+  return { at: null, source: null };
+}
+
 export function toOperationShiftListItem(
   row: OperationShift,
 ): OperationShiftListItem {
@@ -142,6 +183,7 @@ export function toOperationShiftListItem(
   const version = readBodyString(body, 'version');
   const creationMode = readCreationMode(body);
   const publishCheckState = resolveOperationShiftPublishCheckState(body);
+  const generated = readScheduleGeneratedAt(body);
 
   return {
     shift_id: row.id,
@@ -158,5 +200,9 @@ export function toOperationShiftListItem(
     publish_check_label: OPERATION_SHIFT_PUBLISH_CHECK_LABEL[publishCheckState],
     created_at: formatOperationShiftTimestamp(row.createdAt),
     updated_at: formatOperationShiftTimestamp(row.updatedAt),
+    generated_at: generated.at,
+    generated_at_source: generated.source,
+    generated_at_label:
+      creationMode === 'manual' ? '建立排班結構時間' : '生成時間',
   };
 }

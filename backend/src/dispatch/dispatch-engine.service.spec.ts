@@ -661,3 +661,50 @@ describe('整備班次', () => {
     expect(created).toHaveLength(0);
   });
 });
+
+describe('DispatchEngineService.planForShift（模擬器依班表 ID 載入）', () => {
+  it('指定班表與部署中班表走同一套展開：同樣內容得到同樣的任務', async () => {
+    const trips = [trip(9 * 3600, 1, 'D0900'), trip(9 * 3600 + 600, 2, 'D0910')];
+    const { engine, shiftService } = build(trips);
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn().mockResolvedValue({
+      shiftId: 'shift-B',
+      shiftName: '草稿 B',
+      trips,
+      body: {},
+      row: { id: 'shift-B', name: '草稿 B' },
+    });
+
+    const deployed = await engine.planToday(REFERENCE);
+    const chosen = await engine.planForShift('shift-B', REFERENCE);
+
+    expect(chosen.shiftId).toBe('shift-B');
+    expect(chosen.planned.map((item) => [item.tripCode, item.vehicleCode, item.departAt]))
+      .toEqual(deployed!.planned.map((item) => [item.tripCode, item.vehicleCode, item.departAt]));
+    // 讀的是指定那一份，不是部署中的
+    expect((shiftService as Record<string, jest.Mock>).getShiftTrips).toHaveBeenCalledWith('shift-B');
+  });
+
+  it('找不到指定班表就報錯，不退回部署中的班表', async () => {
+    const { engine, shiftService } = build([trip(9 * 3600)]);
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn()
+      .mockRejectedValue(new Error("Operation shift 'missing' not found"));
+
+    await expect(engine.planForShift('missing', REFERENCE)).rejects.toThrow('not found');
+    expect(shiftService.getDeployedTrips).not.toHaveBeenCalled();
+  });
+
+  it('時間線多於車隊：列為略過並寫明原因，不自己編車號', async () => {
+    const trips = [trip(9 * 3600, 1, 'D0900'), trip(9 * 3600, 3, 'D0901')];
+    const { engine, shiftService } = build(trips);
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn().mockResolvedValue({
+      shiftId: 's', shiftName: 's', trips, body: {}, row: { id: 's', name: 's' },
+    });
+
+    const plan = await engine.planForShift('s', REFERENCE);
+
+    expect(plan.planned.map((item) => item.vehicleCode)).toEqual(['PMS01']);
+    expect(plan.skipped).toEqual([
+      { tripCode: 'D0901', reason: '時間線第 3 列沒有對應車輛（車隊只有 2 台）' },
+    ]);
+  });
+});

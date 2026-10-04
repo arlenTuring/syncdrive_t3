@@ -7,6 +7,8 @@ import { OrderModule } from '../order/order.module';
 import { MaintenanceTaskModule } from '../maintenance-task/maintenance-task.module';
 import { DispatchController } from './dispatch.controller';
 import { DispatchEngineService } from './dispatch-engine.service';
+import { SimulationPlanService } from './simulation-plan.service';
+import { MapModule } from '../map/map.module';
 
 @Module({
   imports: [
@@ -14,9 +16,10 @@ import { DispatchEngineService } from './dispatch-engine.service';
     OperationShiftModule,
     OrderModule,
     MaintenanceTaskModule,
+    MapModule,
   ],
   controllers: [DispatchController],
-  providers: [DispatchEngineService],
+  providers: [DispatchEngineService, SimulationPlanService],
   exports: [DispatchEngineService],
 })
 export class DispatchModule {}
