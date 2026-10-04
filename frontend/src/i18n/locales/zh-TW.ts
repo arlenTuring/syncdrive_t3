@@ -278,6 +278,7 @@ const zhTW = {
       delayed: '延誤中',
       faulted: '故障',
       completed: '已完成',
+      cancelled: '已中止（中心端取消）',
     },
     dateRange: {
       aria: '班次時間區間',

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { StatusTag } from '../../../components/StatusTag';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail, type ShiftRecordDetail } from '../api/shiftRecordsApi';
-import { EXECUTION_TAG_STYLE } from '../types';
+import { EXECUTION_TAG_STYLE, executionDisplayKey } from '../types';
 
 type ShiftRecordDetailPageProps = {
   orderId: string;
@@ -104,7 +104,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                 value={
                   <StatusTag
                     label={detail.execution_status_label}
-                    style={EXECUTION_TAG_STYLE[detail.execution_status]}
+                    style={EXECUTION_TAG_STYLE[executionDisplayKey(detail)]}
                   />
                 }
               />

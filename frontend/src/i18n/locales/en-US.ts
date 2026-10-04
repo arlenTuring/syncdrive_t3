@@ -286,6 +286,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       delayed: 'Delayed',
       faulted: 'Faulted',
       completed: 'Completed',
+      cancelled: 'Aborted (cancelled by centre)',
     },
     dateRange: {
       aria: 'Trip time range',
