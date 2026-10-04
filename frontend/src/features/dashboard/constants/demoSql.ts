@@ -35,6 +35,14 @@ function orderBusinessKindSql(o: string): string {
     END`;
 }
 
+/**
+ * 中心端取消後由車端回報 FAULTED 結案的單（payload.cancel_requested_at）：這是操作結束，不是故障，
+ * 不列在卡片與名冊上——不然結束一輪模擬後滿畫面「故障」，還會壓過同一台車正在執行的單。
+ */
+function notCancelledSql(o: string): string {
+  return `NOT (${o}.status = 'FAULTED' AND ${o}.payload ? 'cancel_requested_at')`;
+}
+
 export const EVENT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_events,
@@ -419,6 +427,7 @@ LEFT JOIN LATERAL (
   FROM operation_orders o
   WHERE o.vehicle_code = v.vehicle_code
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    AND ${notCancelledSql('o')}
     AND (
       COALESCE(o.planned_end, o.planned_start + 600000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
       OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
@@ -526,6 +535,7 @@ WITH active_orders AS (
   WHERE ${orderBusinessKindSql('o')} IN ('MAINLINE', 'TRANSITION', 'TEST')
     AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    AND ${notCancelledSql('o')}
     /*
      * 只看今天。
      *
@@ -891,7 +901,7 @@ FROM (
   SELECT
     COUNT(DISTINCT o.vehicle_code) FILTER (WHERE o.status = 'PROCESSING')::int AS processing_count,
     COUNT(DISTINCT o.vehicle_code) FILTER (
-      WHERE o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+      WHERE o.status IN ('PENDING', 'PROCESSING', 'FAULTED') AND ${notCancelledSql('o')}
     )::int AS roster_count
   FROM operation_orders o
   -- 只算載客正線的車（一台車算一次）；過渡、待命、整備與人工測試單都不算
@@ -948,6 +958,7 @@ FROM operation_orders o
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = o.vehicle_code
 WHERE ${orderBusinessKindSql('o')} = 'MAINTENANCE'
   AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+  AND ${notCancelledSql('o')}
   AND (
     COALESCE(o.planned_end, o.planned_start + 1800000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
     OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)

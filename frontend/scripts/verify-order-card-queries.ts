@@ -64,6 +64,11 @@ const rows: Row[] = [
   // 人工測試單：維持 TEST，不算正線營運
   { id: 'TEST-ZZ99-1', vehicle: 'ZZSIM9', line: 'TEST', status: 'PROCESSING', start: now - MIN, end: now + 5 * MIN,
     payload: { source: 'manual_test', kind: 'passenger', updated_at: now } },
+  // 中心端取消、車端回報 FAULTED 結案的單：不是故障，不列；同一台車正在執行的單照常顯示
+  { id: 'SIM-T-cancelled', vehicle: 'ZZSIMB', line: 'TRANSITION', status: 'FAULTED', start: now - 10 * MIN, end: now + 120 * MIN,
+    payload: { source: 'plan_replay', kind: 'maintenance', task_type: 'standby', cancel_requested_at: now - 5 * MIN, updated_at: now } },
+  { id: 'SIM-T-after-cancel', vehicle: 'ZZSIMB', line: 'TRANSITION', status: 'PROCESSING', start: now - MIN, end: now + 60 * MIN,
+    payload: { source: 'plan_replay', kind: 'maintenance', task_type: 'standby', updated_at: now } },
   // 計畫結束已過、仍在執行的長保養：車端剛回報過 → 照樣看得到；十分鐘沒回報 → 視為殘留不列
   { id: 'SIM-T-overrun-live', vehicle: 'ZZSIM8', line: 'MAINTENANCE', status: 'PROCESSING', start: now - 300 * MIN, end: now - 5 * MIN,
     payload: { source: 'plan_replay', kind: 'maintenance', task_type: 'inspection', updated_at: now - MIN }, maint: ['行檢', '#1e1b4b', '#a5b4fc', 'P1'] },
@@ -139,6 +144,8 @@ try {
   check('舊版 TEST 子類型不明 → 不進任何卡', !keys(maint).includes('SIM-T-legacy-unknown') && !keys(mainline).includes('SIM-T-legacy-unknown'));
   check('超過計畫結束但車端剛回報 → 仍可見', keys(maint).includes('SIM-T-overrun-live'));
   check('超過計畫結束且十分鐘沒回報 → 不列', !keys(maint).includes('SIM-T-overrun-stale'));
+  check('中心端取消的 FAULTED 單不列；同車正在執行的單照常顯示',
+    !keys(mainline).includes('SIM-T-cancelled') && keys(mainline).includes('SIM-T-after-cancel'));
   const overlap = keys(mainline).filter((k) => keys(maint).includes(k));
   check('同一張單不會同時出現在正線與整備', overlap.length === 0, overlap.join('、'));
   check('正線營運只算載客正線的車（1 台）', String(fleet[0]?.mainline_fleet_line ?? '').startsWith('正線營運 1 /'), String(fleet[0]?.mainline_fleet_line));

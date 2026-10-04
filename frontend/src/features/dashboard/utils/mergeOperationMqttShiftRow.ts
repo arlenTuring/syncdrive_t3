@@ -9,14 +9,15 @@ function readLeg(payload: Record<string, unknown>) {
 
 function isMainlineContext(base: Record<string, unknown>, mqttPayload: Record<string, unknown> | null): boolean {
   const baseKind = String(base.line_kind ?? '').toUpperCase();
-  if (baseKind === 'MAINLINE') return true;
+  // 過渡（出入廠、待命、暫停）跟正線用同一種卡（顯示「過渡」）；待命單雖然帶格位與整備徽章，也不是整備卡
+  if (baseKind === 'MAINLINE' || baseKind === 'TRANSITION') return true;
   if (baseKind === 'MAINTENANCE') return false;
 
   const trip = String(mqttPayload?.trip_code ?? base.trip_code ?? '').trim();
   if (SHIFT_TRIP_CODE_PATTERN.test(trip)) return true;
 
   const mqttKind = String(mqttPayload?.line_kind ?? '').toUpperCase();
-  if (mqttKind === 'MAINLINE') return true;
+  if (mqttKind === 'MAINLINE' || mqttKind === 'TRANSITION') return true;
   if (mqttKind === 'MAINTENANCE') return false;
 
   return !mqttPayload?.maint_type_label;
