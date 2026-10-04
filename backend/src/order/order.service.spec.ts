@@ -170,15 +170,16 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   });
 
   describe('SSOT：中心端不臆造 vehicle_phase', () => {
-    it('faultActiveOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
+    it('CRITICAL 事件：訂單只標「車輛故障，結案待確認」，不改狀態、不寫 vehicle_phase', async () => {
       orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
-      const result = await service.faultActiveOrderForVehicle(
+      const result = await service.markVehicleFaultOnActiveOrder(
         'PMS05',
         'PATH_BLOCKED',
       );
-      expect(result?.status).toBe(OrderStatus.FAULTED);
+      expect(result?.status).toBe(OrderStatus.PROCESSING);
+      expect(result?.completedAt).toBeFalsy();
       expect(result?.payload).not.toHaveProperty('vehicle_phase');
-      expect(result?.payload).toMatchObject({ fault_reason: 'PATH_BLOCKED' });
+      expect(result?.payload).toMatchObject({ vehicle_fault: { reason: 'PATH_BLOCKED', source: 'event_report' } });
     });
 
     it('recoverFaultedOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
@@ -704,6 +705,47 @@ describe('訂單生命週期：開始只認 REST，MQTT 只寫既有訂單的進
       expect(stored.get('ORD-NT0000')!.status).toBe(status);
       expect(orderRepo.save).not.toHaveBeenCalled();
     }
+  });
+
+  it('車端 REST 回報才記車端證據；中心端內部呼叫不記；重送不改第一次的時間', async () => {
+    seed('NT0000');
+    await service.updateOrderStatus('ORD-NT0000', 'PROCESSING');
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).vehicle_progress_at).toBeUndefined();
+    seed('D1234');
+    await service.updateOrderStatus('ORD-D1234', 'PROCESSING', { reporter: 'vehicle' });
+    const first = ((stored.get('ORD-D1234')!.payload as Record<string, unknown>).vehicle_progress_at as Record<string, number>).PROCESSING;
+    expect(first).toEqual(expect.any(Number));
+    await service.updateOrderStatus('ORD-D1234', 'PROCESSING', { reporter: 'vehicle' });
+    expect(((stored.get('ORD-D1234')!.payload as Record<string, unknown>).vehicle_progress_at as Record<string, number>).PROCESSING).toBe(first);
+  });
+
+  it('MQTT vehicle_phase=FAULTED：不結案，標「車輛故障，結案待確認」；之後車端 REST FAULTED 才結案', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'FAULTED' }));
+    let order = stored.get('ORD-NT0000')!;
+    expect(outcome).toBe('vehicle_fault_reported');
+    expect(order.status).toBe(OrderStatus.PROCESSING);
+    expect((order.payload as Record<string, unknown>).vehicle_fault).toMatchObject({ source: 'operation_update' });
+    await service.updateOrderStatus('ORD-NT0000', 'FAULTED', { reporter: 'vehicle' });
+    order = stored.get('ORD-NT0000')!;
+    expect(order.status).toBe(OrderStatus.FAULTED);
+  });
+
+  it('車端故障後恢復正常 phase：清掉故障標記，可以照常 END', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'FAULTED', timestamp: 10 }));
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'TRANSITING', timestamp: 20 }));
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).vehicle_fault).toBeNull();
+    await service.updateOrderStatus('ORD-NT0000', 'END', { reporter: 'vehicle' });
+    expect(stored.get('ORD-NT0000')!.status).toBe(OrderStatus.END);
+  });
+
+  it('故障待結案時中心端仍可取消', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING, { vehicle_fault: { reported_at: 1 } });
+    const publishCancel = jest.fn();
+    (service as unknown as { orderMqttPublisher: { publishCancel: jest.Mock } }).orderMqttPublisher = { publishCancel };
+    await service.requestCancel('ORD-NT0000');
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).cancel_requested_at).toEqual(expect.any(Number));
   });
 
   it('MQTT 不改班次代號、車輛與業務分類', async () => {

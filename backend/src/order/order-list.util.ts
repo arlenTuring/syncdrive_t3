@@ -7,8 +7,22 @@ export type ExecutionStatusKey =
   | 'pending'
   | 'running'
   | 'delayed'
+  | 'fault_pending'
   | 'faulted'
   | 'completed';
+
+/**
+ * 車輛回報故障、訂單還沒經車端 REST 結案（MQTT vehicle_phase=FAULTED 或 CRITICAL 事件）。
+ * 訂單狀態仍是 PENDING／PROCESSING，畫面不能顯示成正常運行，也不能假裝已結案。
+ */
+export function hasPendingVehicleFault(order: Pick<OperationOrder, 'status' | 'payload'>): boolean {
+  if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PROCESSING) return false;
+  const payload = (order.payload ?? {}) as Record<string, unknown>;
+  return Boolean(payload.vehicle_fault) || String(payload.vehicle_phase ?? '').toUpperCase() === 'FAULTED';
+}
+
+/** 同一個判斷的 SQL 版本（班次運行紀錄篩選用） */
+export const PENDING_VEHICLE_FAULT_SQL = `(o.status IN ('PENDING', 'PROCESSING') AND (COALESCE(o.payload->'vehicle_fault', 'null'::jsonb) <> 'null'::jsonb OR UPPER(COALESCE(o.payload->>'vehicle_phase', '')) = 'FAULTED'))`;
 
 export type ShiftRecordListItem = {
   order_id: string;
@@ -49,6 +63,9 @@ export function resolveExecutionStatus(order: OperationOrder): {
     const payload = (order.payload ?? {}) as Record<string, unknown>;
     if (payload.cancel_requested_at) return { key: 'faulted', label: '已中止（中心端取消）' };
     return { key: 'faulted', label: '故障' };
+  }
+  if (hasPendingVehicleFault(order)) {
+    return { key: 'fault_pending', label: '車輛故障（訂單結案待確認）' };
   }
   if (order.status === OrderStatus.PENDING) {
     return { key: 'pending', label: '待發' };

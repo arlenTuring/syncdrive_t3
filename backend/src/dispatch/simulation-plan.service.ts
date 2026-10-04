@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { OperationOrder } from '../database/entities/operation-order.entity';
 import { MapService } from '../map/map.service';
 import {
   operationShiftCreationModeLabel,
@@ -11,6 +14,10 @@ import {
   contentDigest,
   readShiftMapReference,
 } from './dispatch.simulation-plan';
+import {
+  SIMULATION_RUN_PAYLOAD_KEYS,
+  summarizeSimulationRun,
+} from './dispatch.simulation-run';
 
 /**
  * 模擬器「依班表 ID 載入」用的執行計畫。
@@ -26,7 +33,31 @@ export class SimulationPlanService {
   constructor(
     private readonly engine: DispatchEngineService,
     private readonly mapService: MapService,
+    @InjectRepository(OperationOrder)
+    private readonly orderRepository: Repository<OperationOrder>,
   ) {}
+
+  /**
+   * 一次模擬執行的實際進度（只讀）：依訂單 payload.plan_run_id 查，分類規則見
+   * dispatch.simulation-run.ts。計畫數取自訂單上的 plan_run_total，不接受呼叫端指定。
+   */
+  async runStatus(runId: string) {
+    const rows = await this.orderRepository
+      .createQueryBuilder('o')
+      .where(`o.payload->>'${SIMULATION_RUN_PAYLOAD_KEYS.runId}' = :runId`, { runId })
+      .orderBy('o.planned_start', 'ASC')
+      .getMany();
+    return summarizeSimulationRun(
+      runId,
+      rows.map((o) => ({
+        orderId: o.id,
+        tripCode: o.tripCode,
+        vehicleCode: o.vehicleCode,
+        status: o.status,
+        payload: (o.payload ?? null) as Record<string, unknown> | null,
+      })),
+    );
+  }
 
   async build(shiftId: string, options: { reference?: number } = {}) {
     const reference = options.reference ?? Date.now();

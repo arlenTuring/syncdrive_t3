@@ -383,8 +383,10 @@ export class MqttService {
     this.datasourceInvalidation.emitEventCenter();
     this.logger.warn(`[Security Event] Vehicle ${vehicleCode} reported ${severity} event: ${event_code}`);
 
+    // 嚴重事件：告警與事件中心已在上面寫入／通知；訂單只標「車輛故障，結案待確認」，
+    // 結案由車端用 REST 回報 FAULTED（不由中心端代替車端結案）
     if (severity === 'CRITICAL') {
-      await this.orderService.faultActiveOrderForVehicle(vehicleCode, event_code);
+      await this.orderService.markVehicleFaultOnActiveOrder(vehicleCode, event_code);
     }
   }
 

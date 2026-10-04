@@ -28,7 +28,8 @@ const dataSourceMock = { query: jest.fn().mockResolvedValue([]) };
 
 describe('MqttService', () => {
   let service: MqttService;
-  let orderServiceMock: { applyOperationMqttUpdateWithOutcome: jest.Mock };
+  let orderServiceMock: { applyOperationMqttUpdateWithOutcome: jest.Mock; markVehicleFaultOnActiveOrder: jest.Mock };
+  let securityRepo: { create: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -43,12 +44,14 @@ describe('MqttService', () => {
         order: { id: '260624-D1401', status: 'PROCESSING' },
         outcome: 'progress_applied',
       }),
+      markVehicleFaultOnActiveOrder: jest.fn().mockResolvedValue(null),
     };
+    securityRepo = { create: jest.fn((v) => v), save: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MqttService,
         { provide: getRepositoryToken(CommandLog), useValue: repositoryMock },
-        { provide: getRepositoryToken(SecurityEventLog), useValue: repositoryMock },
+        { provide: getRepositoryToken(SecurityEventLog), useValue: securityRepo },
         { provide: getRepositoryToken(TelemetryLog), useValue: repositoryMock },
         { provide: getRepositoryToken(SlotStatus_), useValue: repositoryMock },
         { provide: OrderService, useValue: orderServiceMock },
@@ -113,6 +116,30 @@ describe('MqttService', () => {
     }
     expect(orderServiceMock.applyOperationMqttUpdateWithOutcome.mock.calls.map((c) => c[1].order_id))
       .toEqual(['ORD-D1401', 'ORD-NT1401']);
+  });
+
+  describe('嚴重事件：告警照常，訂單只標故障待結案', () => {
+    const event = (severity: string) => ({
+      event_id: 'EVT-20261005-0001', event_code: 'PATH_BLOCKED', severity, detail: '路徑受阻', timestamp: 1,
+    });
+
+    it('CRITICAL：寫入告警、通知事件中心，訂單標「車輛故障，結案待確認」（不結案）', async () => {
+      await service.handleEventReport('PMS03', event('CRITICAL'));
+      expect(securityRepo.save).toHaveBeenCalledWith(expect.objectContaining({ vehicleCode: 'PMS03', eventCode: 'PATH_BLOCKED' }));
+      expect(invalidationMock.emitEventCenter).toHaveBeenCalled();
+      expect(orderServiceMock.markVehicleFaultOnActiveOrder).toHaveBeenCalledWith('PMS03', 'PATH_BLOCKED');
+    });
+
+    it('WARNING：只寫告警，不動訂單', async () => {
+      await service.handleEventReport('PMS03', event('WARNING'));
+      expect(securityRepo.save).toHaveBeenCalled();
+      expect(orderServiceMock.markVehicleFaultOnActiveOrder).not.toHaveBeenCalled();
+    });
+
+    it('event_id 不符協議格式：丟棄（模擬器已改成 EVT-YYYYMMDD-NNNN）', async () => {
+      await service.handleEventReport('PMS03', { ...event('CRITICAL'), event_id: 'EVT-1791140000000-ab12cd' });
+      expect(securityRepo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {

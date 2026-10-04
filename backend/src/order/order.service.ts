@@ -24,6 +24,7 @@ import { DatasourceInvalidationService } from '../events/datasource-invalidation
 import { MapService } from '../map/map.service';
 import {
   ExecutionStatusKey,
+  PENDING_VEHICLE_FAULT_SQL,
   ShiftRecordListItem,
   ShiftTab,
   toShiftRecordListItem,
@@ -100,7 +101,7 @@ export type OperationMqttOutcome =
   | 'pending_refreshed'
   | 'not_processing'
   | 'cancel_requested'
-  | 'faulted'
+  | 'vehicle_fault_reported'
   | 'progress_applied';
 
 export type OperationMqttPayload = {
@@ -397,15 +398,18 @@ export class OrderService {
           break;
         case 'running':
           qb.andWhere(
-            'o.status = :st AND COALESCE(o.delay_minutes, 0) = 0',
+            `o.status = :st AND COALESCE(o.delay_minutes, 0) = 0 AND NOT ${PENDING_VEHICLE_FAULT_SQL}`,
             { st: OrderStatus.PROCESSING },
           );
           break;
         case 'delayed':
           qb.andWhere(
-            'o.status = :st AND COALESCE(o.delay_minutes, 0) > 0',
+            `o.status = :st AND COALESCE(o.delay_minutes, 0) > 0 AND NOT ${PENDING_VEHICLE_FAULT_SQL}`,
             { st: OrderStatus.PROCESSING },
           );
+          break;
+        case 'fault_pending':
+          qb.andWhere(PENDING_VEHICLE_FAULT_SQL);
           break;
         case 'faulted':
           qb.andWhere('o.status = :st', { st: OrderStatus.FAULTED });
@@ -472,8 +476,14 @@ export class OrderService {
     };
   }
 
-  /** CRITICAL 安全事件或 vehicle_phase=FAULTED 時，將進行中訂單標記為故障 */
-  async faultActiveOrderForVehicle(
+  /**
+   * CRITICAL 安全事件：在這台車進行中的訂單記下「車輛故障，結案待確認」。
+   *
+   * 不改訂單狀態——訂單生命週期只由車端 REST updateOrderProgress 確認（車端介接說明書 §5.2）。
+   * 告警（security_event_logs）、事件中心通知與車輛故障顯示在 mqtt.service 照常處理；
+   * 這裡只讓訂單畫面不再顯示成正常運行，等車端回報 FAULTED 或復歸後 END。
+   */
+  async markVehicleFaultOnActiveOrder(
     vehicleCode: string,
     reason?: string,
   ): Promise<OperationOrder | null> {
@@ -486,14 +496,10 @@ export class OrderService {
     });
     if (!order) return null;
 
-    // SSOT：中心端僅變更訂單契約狀態 (order.status)，
-    // 不寫入 vehicle_phase（車端為其唯一真值源，此處保留車端最後回報值）。
-    order.status = OrderStatus.FAULTED;
-    order.completedAt = String(Date.now());
+    // 不寫 vehicle_phase（車端是唯一真值源），也不動 status／completed_at
     order.payload = {
       ...(order.payload ?? {}),
-      fault_reason: reason ?? 'CRITICAL_EVENT',
-      faulted_at: Date.now(),
+      vehicle_fault: { reported_at: Date.now(), reason: reason ?? 'CRITICAL_EVENT', source: 'event_report' },
     };
     const saved = await this.orderRepository.save(order);
     this.datasourceInvalidation.emitOrderLifecycle(code);
@@ -509,7 +515,18 @@ export class OrderService {
       where: { vehicleCode: code, status: OrderStatus.FAULTED },
       order: { createdAt: 'DESC' },
     });
-    if (!order) return null;
+    if (!order) {
+      // 現在故障不會替車端結案：示範的人工復歸改成清掉進行中訂單的「車輛故障」標記
+      const active = await this.orderRepository.findOne({
+        where: { vehicleCode: code, status: OrderStatus.PROCESSING },
+        order: { createdAt: 'DESC' },
+      });
+      if (!active || !(active.payload as Record<string, unknown> | null)?.vehicle_fault) return null;
+      active.payload = { ...(active.payload ?? {}), vehicle_fault: null, recovered_at: Date.now() };
+      const cleared = await this.orderRepository.save(active);
+      this.datasourceInvalidation.emitOrderLifecycle(code);
+      return cleared;
+    }
 
     // SSOT：僅復原訂單契約狀態；vehicle_phase 留待車端下次回報更新，中心端不臆測。
     order.status = OrderStatus.PROCESSING;
@@ -523,26 +540,6 @@ export class OrderService {
     };
     const saved = await this.orderRepository.save(order);
     this.datasourceInvalidation.emitOrderLifecycle(code);
-    return saved;
-  }
-
-  private async applyFaultToOrder(
-    order: OperationOrder,
-    reason: string,
-    payload?: OperationMqttPayload,
-  ): Promise<OperationOrder> {
-    // 此路徑由車端 operation/update 回報 vehicle_phase=FAULTED 觸發，
-    // 故 vehicle_phase 僅鏡像車端回報值（不存在則留空），不由中心端臆造。
-    order.status = OrderStatus.FAULTED;
-    order.completedAt = String(Date.now());
-    order.payload = {
-      ...(order.payload ?? {}),
-      vehicle_phase: payload?.vehicle_phase ?? null,
-      fault_reason: reason,
-      faulted_at: Date.now(),
-    };
-    const saved = await this.orderRepository.save(order);
-    this.datasourceInvalidation.emitOrderLifecycle(order.vehicleCode);
     return saved;
   }
 
@@ -575,7 +572,15 @@ export class OrderService {
     await this.authorizeOrder(action.orderId, scope);
   }
 
-  async updateOrderStatus(id: string, statusStr: string): Promise<OperationOrder> {
+  /**
+   * @param options.reporter 'vehicle'＝車端經 REST updateOrderProgress 回報；只有這種會記下
+   *   payload.vehicle_progress_at（車端證據），中心端內部呼叫（示範等）不記。
+   */
+  async updateOrderStatus(
+    id: string,
+    statusStr: string,
+    options?: { reporter?: 'vehicle' },
+  ): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
     const normalizedStatus = this.nonEmpty(statusStr);
     if (!normalizedStatus) {
@@ -587,7 +592,18 @@ export class OrderService {
       throw new BadRequestException({ statusCode: 400, code: 'INVALID_ORDER_STATUS', message: 'status 必須為 PROCESSING、END 或 FAULTED（大寫）' });
     }
 
-    if (order.status === targetStatus) return order; // HTTP 回應遺失後可安全重試。
+    if (order.status === targetStatus) {
+      // HTTP 回應遺失後可安全重試；沒記到車端證據（舊資料）時補記，其他不動
+      if (options?.reporter === 'vehicle') {
+        const payload = (order.payload ?? {}) as Record<string, unknown>;
+        const progress = (payload.vehicle_progress_at ?? {}) as Record<string, number>;
+        if (progress[targetStatus] == null) {
+          order.payload = { ...payload, vehicle_progress_at: { ...progress, [targetStatus]: Date.now() } };
+          return this.orderRepository.save(order);
+        }
+      }
+      return order;
+    }
     /*
      * 中心端已請求取消的單：不能再開始（PROCESSING），取消結案（FAULTED）之後也不能被改回
      * 執行中或完成——不然車端遲到的回報會把已中止的任務「復活」。執行中剛好正常跑完
@@ -611,6 +627,14 @@ export class OrderService {
 
     const now = Date.now();
     order.status = targetStatus;
+    if (options?.reporter === 'vehicle') {
+      // 車端 REST 回報的證據（中心端收到的時間）；追蹤統計的「開始／結案」只認這個
+      const payload = (order.payload ?? {}) as Record<string, unknown>;
+      order.payload = {
+        ...payload,
+        vehicle_progress_at: { ...((payload.vehicle_progress_at ?? {}) as Record<string, number>), [targetStatus]: now },
+      };
+    }
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
       order.completedAt = String(now);
       if (targetStatus === OrderStatus.FAULTED && cancelRequested) {
@@ -771,9 +795,9 @@ export class OrderService {
     // 路線只用訂單自己的記錄；舊訂單沒記錄時才看車端回報，不從班次代號推
     const routeId = order.routeId ?? this.nonEmpty(payload.route_id);
 
-    if (vehiclePhase === 'FAULTED') {
-      return { order: await this.applyFaultToOrder(order, 'VEHICLE_PHASE_FAULTED', payload), outcome: 'faulted' };
-    }
+    // vehicle_phase=FAULTED 不結案：照常寫進度，並標「車輛故障，結案待確認」（vehicle_fault），
+    // 等車端用 REST 回報 FAULTED；車端之後回報正常 phase 就清掉標記
+    const faultMark = this.vehicleFaultMark(prevPayload, vehiclePhase);
 
     if (Array.isArray(payload.task_group) && payload.task_group.length > 0) {
       await this.orderRouteService.applyTaskGroupUpdate(
@@ -871,9 +895,13 @@ export class OrderService {
       operation_action: operationAction,
       updated_at: payload.timestamp ?? Date.now(),
       ...(reportedAt != null ? { last_operation_report_at: reportedAt } : {}),
+      ...faultMark,
     };
 
-    return { order: await this.orderRepository.save(order), outcome: 'progress_applied' };
+    return {
+      order: await this.orderRepository.save(order),
+      outcome: vehiclePhase === 'FAULTED' ? 'vehicle_fault_reported' : 'progress_applied',
+    };
   }
 
   /** 示範／排班：中心端建立正線訂單並 MQTT assign（REST 契約） */
@@ -1121,6 +1149,19 @@ export class OrderService {
   }
 
   /**
+   * 車端 MQTT 的 phase 對「車輛故障，結案待確認」標記的影響：FAULTED 時記下（已有就不覆蓋時間），
+   * 回報其他 phase 表示車端已不在故障中，清掉標記；沒報 phase 就不動。
+   */
+  private vehicleFaultMark(prevPayload: Record<string, unknown>, vehiclePhase: string): Record<string, unknown> {
+    if (vehiclePhase === 'FAULTED') {
+      return prevPayload.vehicle_fault
+        ? {}
+        : { vehicle_fault: { reported_at: Date.now(), reason: 'VEHICLE_PHASE_FAULTED', source: 'operation_update' } };
+    }
+    return vehiclePhase && prevPayload.vehicle_fault ? { vehicle_fault: null } : {};
+  }
+
+  /**
    * 待發的單：只刷新下一站與 ETA，不升級為 PROCESSING、不改分類與班次代號。
    * 任何業務分類、任何班次代號都一樣——開始執行只認車端 REST 回報。
    */
@@ -1173,6 +1214,10 @@ export class OrderService {
       segment_remain_pct: 100,
       updated_at: payload.timestamp ?? Date.now(),
       ...(typeof payload.timestamp === 'number' ? { last_operation_report_at: payload.timestamp } : {}),
+      ...this.vehicleFaultMark(
+        (order.payload ?? {}) as Record<string, unknown>,
+        String(payload.vehicle_phase ?? '').toUpperCase(),
+      ),
     };
     return this.orderRepository.save(order);
   }
