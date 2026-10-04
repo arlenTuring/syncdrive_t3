@@ -5,6 +5,7 @@ import {
   patchDashboardRuntimeFixes,
 } from './migrateVehicleMonitorProtocol';
 import { upgradeSystemQueries } from './systemQueries';
+import { ensureTransitionShiftTemplate } from './shiftCardTemplates';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -94,5 +95,7 @@ export function migratePlane(plane: DashboardPlane): DashboardPlane {
     ? patchDashboardRuntimeFixes(compatible)
     : compatible;
   // 每次都跑：只換「確定是系統舊版原文」的 SQL（含泛用群組內部來源），其他不動；第二次跑不會再變
-  return upgradeSystemQueries(patched).plane;
+  const upgraded = upgradeSystemQueries(patched).plane;
+  // 班次群組補上獨立的過渡班次卡（已經有就不動）
+  return ensureTransitionShiftTemplate(upgraded).plane;
 }
