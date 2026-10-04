@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * 解析 backend/scripts 底下的腳本路徑，<strong>不依賴啟動時的工作目錄</strong>。
@@ -12,11 +13,16 @@ import * as path from 'path';
  * 工作目錄是<strong>啟動方式</strong>的屬性，腳本位置卻是<strong>原始碼結構</strong>的
  * 屬性，兩者本來就不該綁在一起。改成從這個模組自己的位置往回推：
  *
- *   開發（ts-node）  backend/src/common  → ../../scripts  → backend/scripts
- *   編譯後           backend/dist/common → ../../scripts  → backend/scripts
+ *   開發（ts-node）  backend/src/common      → ../../scripts    → backend/scripts
+ *   編譯後           backend/dist/src/common → ../../../scripts → backend/scripts
  *
  * 兩種情況都落在同一個地方，跟從哪裡啟動無關。
  */
 export function backendScriptPath(...segments: string[]): string {
-  return path.join(__dirname, '..', '..', 'scripts', ...segments);
+  const developmentScripts = path.resolve(__dirname, '..', '..', 'scripts');
+  const scriptsDirectory = fs.existsSync(developmentScripts)
+    ? developmentScripts
+    : path.resolve(__dirname, '..', '..', '..', 'scripts');
+
+  return path.join(scriptsDirectory, ...segments);
 }
