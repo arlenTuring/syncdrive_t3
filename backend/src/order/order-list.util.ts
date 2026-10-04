@@ -38,6 +38,9 @@ export function resolveExecutionStatus(order: OperationOrder): {
     return { key: 'completed', label: '已完成' };
   }
   if (order.status === OrderStatus.FAULTED) {
+    // 中心端取消後車端照協議回報 FAULTED：是操作結束，不是車輛故障（篩選仍歸在 faulted）
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    if (payload.cancel_requested_at) return { key: 'faulted', label: '已中止（中心端取消）' };
     return { key: 'faulted', label: '故障' };
   }
   if (order.status === OrderStatus.PENDING) {
