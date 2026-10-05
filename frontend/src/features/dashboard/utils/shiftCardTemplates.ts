@@ -20,6 +20,18 @@ export const TRANSITION_TEMPLATE_NAME = '過渡班次卡';
 export const TRANSITION_LABEL_BG = '#6D28D9';
 export const TRANSITION_LABEL_COLOR = '#FFFFFF';
 
+/** 過渡卡標題：短名稱（display_code），提示保留完整任務代號與訂單 ID */
+export const TRANSITION_TITLE_CONTENT = '{display_code}';
+export const TRANSITION_TITLE_TOOLTIP = '{trip_code}｜{shift_key}';
+
+function isTripCodeTitle(child: ChildWidget): boolean {
+  return child.type === 'text' && (child as { content?: string }).content?.trim() === '{trip_code}';
+}
+
+function asTransitionTitle(child: ChildWidget): ChildWidget {
+  return { ...child, content: TRANSITION_TITLE_CONTENT, tooltip: TRANSITION_TITLE_TOOLTIP } as ChildWidget;
+}
+
 function isDirectionBadge(child: ChildWidget): child is StatusBadgeWidget {
   return child.type === 'status-badge' && (child as StatusBadgeWidget).valueField === '{direction_label}';
 }
@@ -33,6 +45,7 @@ export function buildTransitionTemplate(mainline: GroupTemplateDef): GroupTempla
     conditions: [{ field: 'business_kind', operator: 'eq', value: 'TRANSITION' }],
     children: mainline.children.map((child) => {
       const copy = { ...child, id: `${child.id}-tr` } as ChildWidget;
+      if (isTripCodeTitle(copy)) return asTransitionTitle(copy);
       if (!isDirectionBadge(copy)) return copy;
       const badge = { ...copy } as StatusBadgeWidget;
       delete badge.variableBgKey;
@@ -47,11 +60,28 @@ export function buildTransitionTemplate(mainline: GroupTemplateDef): GroupTempla
   };
 }
 
+/**
+ * 既有的過渡卡（2026-10-05 之前建的）標題還綁 {trip_code}：只改「正好是系統原本那個綁定」的標題，
+ * 使用者改過的內容不動。可以重複執行。
+ */
+function withTransitionTitle(el: CanvasElementProps): CanvasElementProps {
+  const group = el.genericGroup;
+  const templates = group?.templates;
+  if (!group || !templates?.length) return el;
+  let changed = false;
+  const next = templates.map((tpl) => {
+    if (tpl.id !== TRANSITION_TEMPLATE_ID || !tpl.children.some(isTripCodeTitle)) return tpl;
+    changed = true;
+    return { ...tpl, children: tpl.children.map((c) => (isTripCodeTitle(c) ? asTransitionTitle(c) : c)) };
+  });
+  return changed ? { ...el, genericGroup: { ...group, templates: next } } : el;
+}
+
 function withTransitionTemplate(el: CanvasElementProps): CanvasElementProps {
   const group = el.genericGroup;
   const templates = group?.templates;
   if (!group || !templates?.length) return el;
-  if (templates.some((tpl) => tpl.id === TRANSITION_TEMPLATE_ID)) return el;
+  if (templates.some((tpl) => tpl.id === TRANSITION_TEMPLATE_ID)) return withTransitionTitle(el);
   const mainlineIndex = templates.findIndex((tpl) => tpl.id === 'tpl-mainline');
   if (mainlineIndex < 0) return el;
   const next = [...templates];

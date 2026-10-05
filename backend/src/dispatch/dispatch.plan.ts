@@ -54,6 +54,12 @@ export type PlannedDispatch = {
   destination: DispatchPoint | null;
   /** 完整站序，含各站計畫時刻。空車移動為空陣列。 */
   stations: DispatchStation[];
+  /**
+   * 過渡任務的用途與設施（卡片短名稱用：出廠 E3、入廠 D2、待命 D3、暫停 D1）。
+   * 來自班表卡的結構化欄位（空車移動的方向、整備卡的任務類型），不看卡片文字或任務代號。
+   */
+  transitionPurpose?: 'yard_exit' | 'yard_entry' | 'standby' | 'hold' | null;
+  transitionFacility?: string | null;
 };
 
 /**
@@ -300,6 +306,9 @@ export function planYardMoves(args: {
       cardLabel: move.label || '調度',
       routeCode: null,
       routeName: move.label,
+      transitionPurpose: move.direction === 'exit' ? 'yard_exit' : 'yard_entry',
+      // 設施那一端：出廠是起點、入廠是終點（讓站移動只記了設施端，也在這裡）
+      transitionFacility: (move.direction === 'exit' ? move.origin : move.destination)?.name ?? null,
       departAt,
       arriveAt,
       origin: move.origin ? { ...move.origin, arriveAt: null, departAt } : null,
@@ -381,6 +390,9 @@ export function planYardTasks(args: {
       cardLabel: task.cardLabel,
       routeCode: null,
       routeName: task.cardLabel,
+      // 待命、暫停（含暫停放、提早進廠等待）是過渡；其他整備任務沒有過渡用途
+      transitionPurpose: task.taskType === 'standby' ? 'standby' : task.taskType === 'idle' ? 'hold' : null,
+      transitionFacility: task.yardSlotId,
       departAt,
       arriveAt,
       origin: { ...point, arriveAt: null, departAt },

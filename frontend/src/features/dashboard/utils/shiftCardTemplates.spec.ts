@@ -35,7 +35,10 @@ describe('ensureTransitionShiftTemplate', () => {
     assert.equal(badge.defaultLabel, '過渡');
     assert.equal(badge.variableBgKey, undefined);
     assert.equal(templates[0].children[1].id, 'b-tr', '子元件換新 ID，不跟正線卡共用');
-    assert.equal((templates[0].children[1] as unknown as { content: string }).content, '{trip_code}', '資料綁定保留');
+    const title = templates[0].children[1] as unknown as { content: string; tooltip: string };
+    assert.equal(title.content, '{display_code}', '過渡卡標題用短名稱');
+    assert.equal(title.tooltip, '{trip_code}｜{shift_key}', '完整識別碼放在提示');
+    assert.equal((templates[1].children[1] as unknown as { content: string }).content, '{trip_code}', '正線卡標題不變');
     // 正線、整備樣板原封不動
     assert.deepEqual(templates[1], mainline);
     assert.deepEqual(templates[2], maintenance);
@@ -63,5 +66,19 @@ describe('ensureTransitionShiftTemplate', () => {
     const p = plane();
     p.elements[0].genericGroup!.templates = [maintenance] as never;
     assert.equal(ensureTransitionShiftTemplate(p).added, 0);
+  });
+
+  it('既有過渡卡標題還是 {trip_code}：改成短名稱；使用者自訂的標題不動', () => {
+    const old = {
+      ...mainline, id: TRANSITION_TEMPLATE_ID,
+      children: [{ id: 'x', type: 'text', content: '{trip_code}' }, { id: 'y', type: 'text', content: '自訂 {trip_code}' }],
+    };
+    const p = { ...plane(), elements: [{ id: 'g', label: '群組', genericGroup: { enabled: true, sources: [{ id: 's' }], templates: [old, mainline, maintenance] } }] } as unknown as DashboardPlane;
+    const { plane: next, added } = ensureTransitionShiftTemplate(p);
+    assert.equal(added, 1);
+    const children = next.elements[0].genericGroup!.templates![0].children as unknown as Array<{ content: string }>;
+    assert.equal(children[0].content, '{display_code}');
+    assert.equal(children[1].content, '自訂 {trip_code}');
+    assert.equal(ensureTransitionShiftTemplate(next).added, 0, '第二次不再變');
   });
 });

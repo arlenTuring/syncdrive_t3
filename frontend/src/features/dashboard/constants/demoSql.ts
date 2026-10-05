@@ -600,6 +600,18 @@ SELECT
   o.order_id AS shift_key,
   o.vehicle_code,
   o.trip_code,
+  -- 卡片標題：過渡單用「用途＋設施」短名稱（出廠 E3、入廠 D2、待命 D3、暫停 D1），來自下單時存的
+  -- transition_label；舊單沒有就照結構化的任務子類型推待命／暫停，其他一律中性的「過渡」，不從代號猜。
+  -- trip_code 原樣保留（詳情、紀錄、MQTT 對應都用它）
+  CASE
+    WHEN o.business_kind <> 'TRANSITION' THEN o.trip_code
+    WHEN NULLIF(TRIM(o.payload->>'transition_label'), '') IS NOT NULL THEN TRIM(o.payload->>'transition_label')
+    WHEN COALESCE(NULLIF(o.payload->>'maintenance_task_type', ''), o.payload->>'task_type') = 'standby'
+      THEN TRIM(CONCAT('待命 ', COALESCE(NULLIF(o.payload->>'yard_slot_id', ''), o.maint_station, '')))
+    WHEN COALESCE(NULLIF(o.payload->>'maintenance_task_type', ''), o.payload->>'task_type') = 'idle'
+      THEN TRIM(CONCAT('暫停 ', COALESCE(NULLIF(o.payload->>'yard_slot_id', ''), o.maint_station, '')))
+    ELSE '過渡'
+  END AS display_code,
   CONCAT(o.trip_code, ' ', COALESCE(o.display_name, o.vehicle_code)) AS trip_header,
   CASE WHEN o.business_kind = 'TRANSITION' THEN '過渡' ELSE o.card_label END AS direction_label,
   '#2B7FFF' AS direction_pill_bg,
