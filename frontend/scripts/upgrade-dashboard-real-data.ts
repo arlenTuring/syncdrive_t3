@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import type { CanvasElementProps, ChildWidget } from '../src/features/dashboard/types.ts';
 import { mapAllChildArrays } from '../src/features/dashboard/template/childArrayVariants.ts';
 import { upgradeSystemQueries } from '../src/features/dashboard/utils/systemQueries.ts';
+import { switchEventCarouselKey } from '../src/features/dashboard/utils/migrateDashboardPlane.ts';
 import type { DashboardPlane } from '../src/features/dashboard/types.ts';
 
 const args = process.argv.slice(2);
@@ -61,6 +62,11 @@ for (const plane of planes) {
   const queries = upgradeSystemQueries({
     id: plane.planeId, name: plane.name, width: plane.width, height: plane.height, elements, createdAt: 0, updatedAt: 0,
   } as DashboardPlane);
+  // 事件輪播換成新版清單 SQL 之後，slot key 改用唯一的 event_key（event_id 不同車、不同日會重複）
+  const keyed = switchEventCarouselKey(queries.plane);
+  const keyChanges = keyed.elements.filter((el, i) => el.slotKeyField !== queries.plane.elements[i]?.slotKeyField);
+  for (const el of keyChanges) console.log(`事件輪播 slot key 改用 event_key：版面「${plane.name}」 › 元件「${el.label ?? el.id}」（${el.id}）`);
+  if (keyChanges.length) planeChanged = true;
   for (const change of queries.changes) console.log(`更新系統查詢：${change.location}（${change.family}，原為 ${change.fromVersion} 版）`);
   for (const item of queries.unconfirmed) console.log(`未更新（像${item.family}但無法確認是系統原文，請人工確認）：${item.location}`);
   changedQueries += queries.changes.length;
@@ -70,7 +76,7 @@ for (const plane of planes) {
   const save = await fetch(`${apiBase}/syncdrive-api/dashboard/planes/${encodeURIComponent(plane.planeId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...basicAuth },
-    body: JSON.stringify({ ...plane, elements: queries.plane.elements, expectedVersion: plane.version ?? null }),
+    body: JSON.stringify({ ...plane, elements: keyed.elements, expectedVersion: plane.version ?? null }),
   });
   if (!save.ok) throw new Error(`更新畫布 ${plane.planeId} 失敗：HTTP ${save.status}`);
   changedPlanes += 1;

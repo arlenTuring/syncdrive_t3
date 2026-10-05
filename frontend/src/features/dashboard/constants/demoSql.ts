@@ -93,6 +93,9 @@ LIMIT 1 OFFSET GREATEST(0, COALESCE({${indexVar}}, 0)::int)
 
 export const EVENT_CENTER_LIST_SQL = `
 SELECT
+  -- event_key：中心端內部識別，事件輪播用它當每一列的 key。event_id 是車端原值，不同車、
+  -- 不同日可以相同（協議是每日重置的流水號），不能當 key
+  id::text AS event_key,
   event_id,
   COALESCE(category_label, '未分類') AS category,
   vehicle_code,

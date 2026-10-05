@@ -6,6 +6,7 @@ import {
 } from './migrateVehicleMonitorProtocol';
 import { upgradeSystemQueries } from './systemQueries';
 import { ensureTransitionShiftTemplate } from './shiftCardTemplates';
+import { EVENT_CENTER_LIST_SQL } from '../constants/demoSql';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -97,5 +98,22 @@ export function migratePlane(plane: DashboardPlane): DashboardPlane {
   // 每次都跑：只換「確定是系統舊版原文」的 SQL（含泛用群組內部來源），其他不動；第二次跑不會再變
   const upgraded = upgradeSystemQueries(patched).plane;
   // 班次群組補上獨立的過渡班次卡（已經有就不動）
-  return ensureTransitionShiftTemplate(upgraded).plane;
+  return switchEventCarouselKey(ensureTransitionShiftTemplate(upgraded).plane);
+}
+
+/**
+ * 事件輪播的 slot key 從 event_id 改成 event_key（2026-10-05）。
+ *
+ * event_id 是車端原值，不同車、不同日可以相同；拿它當 key，兩台車撞號時輪播的列會互相頂替。
+ * 只改「SQL 已經是目前系統版本（有 event_key 欄位）」而且 key 還是 event_id 的元件；
+ * 使用者自己改過的查詢沒有 event_key，維持原樣。
+ */
+export function switchEventCarouselKey(plane: DashboardPlane): DashboardPlane {
+  let changed = false;
+  const elements = (plane.elements ?? []).map((el) => {
+    if (el.slotKeyField !== 'event_id' || el.sqlQuery !== EVENT_CENTER_LIST_SQL) return el;
+    changed = true;
+    return { ...el, slotKeyField: 'event_key' };
+  });
+  return changed ? { ...plane, elements } : plane;
 }

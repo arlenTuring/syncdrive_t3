@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CommandLog } from '../database/entities/command-log.entity';
-import { SecurityEventLog, EventCode, Severity } from '../database/entities/security-event-log.entity';
+import { SecurityEventLog, EventCode, Severity, securityEventDedupKey } from '../database/entities/security-event-log.entity';
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
 import { SlotStatus_ } from '../database/entities/slot-status.entity';
 import { OrderService } from '../order/order.service';
@@ -365,21 +365,38 @@ export class MqttService {
       return;
     }
 
-    // 5. 儲存車端上報的安全事件
+    // 5. 儲存車端上報的安全事件（去重規則見 securityEventDedupKey）
+    //    原本 event_id 是主鍵、用 save 寫入：兩台車撞號時後到的會「更新」掉另一台車的告警。
+    const dedupKey = securityEventDedupKey(vehicleCode, event_id, timestamp);
+    const sameId = await this.securityEventLogRepository.find({
+      where: { vehicleCode, eventId: event_id },
+      select: ['id', 'dedupKey'],
+    });
+    if (sameId.some((row) => row.dedupKey === dedupKey)) {
+      // QoS 1 重送、延遲到達的同一則：不重複新增，也不重複觸發後續處置
+      this.logger.debug(`[Event Report] duplicate ${event_id} from ${vehicleCode}, ignored`);
+      return;
+    }
+    if (sameId.length > 0) {
+      this.logger.warn(
+        `[Event Report] ${vehicleCode} 重複使用 event_id ${event_id}（timestamp 不同，可能是車端重啟後流水號從頭算），當成不同事件保存`,
+      );
+    }
     const displayMessage = this.resolveEventDisplayMessage(event_code, detail);
-    const newEvent = this.securityEventLogRepository.create({
+    const inserted = await this.insertSecurityEvent({
       eventId: event_id,
+      dedupKey,
       vehicleCode,
       eventCode: event_code as EventCode,
       severity,
       location,
       detail,
       ...(displayMessage ? { displayMessage } : {}),
-      params: payload.params,
-      createdAt: timestamp || (new Date().getTime()).toString()
+      params: sameId.length > 0 ? { ...(payload.params ?? {}), event_id_reused: true } : payload.params,
+      createdAt: timestamp || (new Date().getTime()).toString(),
+      receivedAt: String(Date.now()),
     });
-
-    await this.securityEventLogRepository.save(newEvent);
+    if (!inserted) return; // 同時到達的重送：另一筆已經寫入並處理
     this.datasourceInvalidation.emitEventCenter();
     this.logger.warn(`[Security Event] Vehicle ${vehicleCode} reported ${severity} event: ${event_code}`);
 
@@ -387,6 +404,20 @@ export class MqttService {
     // 結案由車端用 REST 回報 FAULTED（不由中心端代替車端結案）
     if (severity === 'CRITICAL') {
       await this.orderService.markVehicleFaultOnActiveOrder(vehicleCode, event_code);
+    }
+  }
+
+  /**
+   * 新增一筆告警；去重鍵衝突（同一則同時到達兩次）回 false，不更新既有列。
+   * 一律 insert，不用 save——save 遇到相同主鍵會改成更新別人的資料。
+   */
+  private async insertSecurityEvent(row: Partial<SecurityEventLog>): Promise<boolean> {
+    try {
+      await this.securityEventLogRepository.insert(row);
+      return true;
+    } catch (err) {
+      if ((err as { code?: string })?.code === '23505') return false;
+      throw err;
     }
   }
 
@@ -420,8 +451,10 @@ export class MqttService {
       .map(([name]) => name);
 
     try {
-      const row = this.securityEventLogRepository.create({
+      await this.insertSecurityEvent({
         eventId,
+        dedupKey: securityEventDedupKey(vehicleCode, eventId, ts),
+        receivedAt: String(Date.now()),
         vehicleCode,
         eventCode: EventCode.SYSTEM_HEALTH_DEGRADED,
         severity: Severity.CRITICAL,
@@ -432,9 +465,7 @@ export class MqttService {
         params: { subsystems: payload?.subsystems },
         createdAt: String(ts),
       });
-      await this.securityEventLogRepository.save(row);
     } catch (err) {
-      // 同一秒內重複劣化可能造成 PK 衝突，忽略即可（已有當秒紀錄）
       this.logger.debug(`[Health Degraded] persist skipped for ${vehicleCode}: ${(err as Error)?.message}`);
     }
   }

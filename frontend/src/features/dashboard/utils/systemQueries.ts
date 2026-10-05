@@ -62,6 +62,9 @@ export function classifySql(sql: string | undefined): SqlClassification {
     const family = SYSTEM_QUERY_FAMILIES.find((item) => item.id === known.family);
     if (family) return { kind: 'outdated-system', family, firstSeen: known.firstSeen, commit: known.commit };
   }
+  // 群組子元件的逐列取值（listSqlRowFieldsByIndex 等）把清單 SQL 包在 `) AS __rows` 裡取第幾列：
+  // 這是衍生查詢，不是要被換掉的系統原文，不列進「看起來像但無法確認」
+  if (/\)\s*AS\s+__rows\b/i.test(sql)) return { kind: 'custom' };
   const lookalike = SYSTEM_QUERY_FAMILIES.find((family) => family.markers.every((marker) => marker.test(sql)));
   return lookalike ? { kind: 'unconfirmed', family: lookalike } : { kind: 'custom' };
 }

@@ -29,7 +29,7 @@ const dataSourceMock = { query: jest.fn().mockResolvedValue([]) };
 describe('MqttService', () => {
   let service: MqttService;
   let orderServiceMock: { applyOperationMqttUpdateWithOutcome: jest.Mock; markVehicleFaultOnActiveOrder: jest.Mock };
-  let securityRepo: { create: jest.Mock; save: jest.Mock };
+  let securityRepo: { create: jest.Mock; save: jest.Mock; find: jest.Mock; insert: jest.Mock; rows: Array<Record<string, unknown>> };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -46,7 +46,19 @@ describe('MqttService', () => {
       }),
       markVehicleFaultOnActiveOrder: jest.fn().mockResolvedValue(null),
     };
-    securityRepo = { create: jest.fn((v) => v), save: jest.fn().mockResolvedValue(undefined) };
+    // 假的告警表：照實體的唯一索引（dedup_key）擋重複
+    const rows: Array<Record<string, unknown>> = [];
+    securityRepo = {
+      rows,
+      create: jest.fn((v) => v),
+      save: jest.fn().mockResolvedValue(undefined),
+      find: jest.fn(async ({ where }: { where: { vehicleCode: string; eventId: string } }) =>
+        rows.filter((r) => r.vehicleCode === where.vehicleCode && r.eventId === where.eventId)),
+      insert: jest.fn(async (row: Record<string, unknown>) => {
+        if (rows.some((r) => r.dedupKey === row.dedupKey)) throw Object.assign(new Error('duplicate key'), { code: '23505' });
+        rows.push({ ...row, id: String(rows.length + 1) });
+      }),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MqttService,
@@ -125,20 +137,70 @@ describe('MqttService', () => {
 
     it('CRITICAL：寫入告警、通知事件中心，訂單標「車輛故障，結案待確認」（不結案）', async () => {
       await service.handleEventReport('PMS03', event('CRITICAL'));
-      expect(securityRepo.save).toHaveBeenCalledWith(expect.objectContaining({ vehicleCode: 'PMS03', eventCode: 'PATH_BLOCKED' }));
+      expect(securityRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ vehicleCode: 'PMS03', eventCode: 'PATH_BLOCKED' }));
       expect(invalidationMock.emitEventCenter).toHaveBeenCalled();
       expect(orderServiceMock.markVehicleFaultOnActiveOrder).toHaveBeenCalledWith('PMS03', 'PATH_BLOCKED');
     });
 
     it('WARNING：只寫告警，不動訂單', async () => {
       await service.handleEventReport('PMS03', event('WARNING'));
-      expect(securityRepo.save).toHaveBeenCalled();
+      expect(securityRepo.insert).toHaveBeenCalled();
       expect(orderServiceMock.markVehicleFaultOnActiveOrder).not.toHaveBeenCalled();
     });
 
     it('event_id 不符協議格式：丟棄（模擬器已改成 EVT-YYYYMMDD-NNNN）', async () => {
       await service.handleEventReport('PMS03', { ...event('CRITICAL'), event_id: 'EVT-1791140000000-ab12cd' });
+      expect(securityRepo.insert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('告警去重：車端原始 event_id 保留，車號＋event_id＋車端 timestamp 才是同一則', () => {
+    const report = (vehicle: string, eventId: string, timestamp: number, severity = 'WARNING') =>
+      service.handleEventReport(vehicle, {
+        event_id: eventId, event_code: 'OBSTACLE_DETECTED', severity, detail: 'x', timestamp,
+      });
+
+    it('不同車、相同流水號：各自保存，不互相覆蓋', async () => {
+      await report('PMS01', 'EVT-20261005-0001', 1_000);
+      await report('PMS02', 'EVT-20261005-0001', 1_000);
+      expect(securityRepo.rows.map((r) => [r.vehicleCode, r.eventId])).toEqual([
+        ['PMS01', 'EVT-20261005-0001'],
+        ['PMS02', 'EVT-20261005-0001'],
+      ]);
       expect(securityRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('跨日相同流水號：日期是車端給的，不同日期各自保存（不看中心端接收日期）', async () => {
+      await report('PMS01', 'EVT-20261004-0001', 1_000);
+      await report('PMS01', 'EVT-20261005-0001', 90_000_000);
+      expect(securityRepo.rows).toHaveLength(2);
+    });
+
+    it('同一事件重送（QoS 1）：不重複新增，也不重複觸發處置', async () => {
+      await report('PMS01', 'EVT-20261005-0007', 5_000, 'CRITICAL');
+      await report('PMS01', 'EVT-20261005-0007', 5_000, 'CRITICAL');
+      expect(securityRepo.rows).toHaveLength(1);
+      expect(orderServiceMock.markVehicleFaultOnActiveOrder).toHaveBeenCalledTimes(1);
+      expect(invalidationMock.emitEventCenter).toHaveBeenCalledTimes(1);
+    });
+
+    it('延遲到達：中間夾著其他事件、隔很久才到的重送，仍認得是同一則', async () => {
+      await report('PMS01', 'EVT-20261005-0008', 6_000);
+      await report('PMS01', 'EVT-20261005-0009', 7_000);
+      await report('PMS01', 'EVT-20261005-0008', 6_000);
+      expect(securityRepo.rows.map((r) => r.eventId)).toEqual(['EVT-20261005-0008', 'EVT-20261005-0009']);
+    });
+
+    it('同車同號但 timestamp 不同（車端重啟後流水號從頭算）：保存並標記重複使用', async () => {
+      await report('PMS01', 'EVT-20261005-0001', 1_000);
+      await report('PMS01', 'EVT-20261005-0001', 50_000);
+      expect(securityRepo.rows).toHaveLength(2);
+      expect(securityRepo.rows[1].params).toMatchObject({ event_id_reused: true });
+    });
+
+    it('同時到達的重送：唯一索引擋下，不當成錯誤', async () => {
+      await Promise.all([report('PMS01', 'EVT-20261005-0010', 8_000), report('PMS01', 'EVT-20261005-0010', 8_000)]);
+      expect(securityRepo.rows).toHaveLength(1);
     });
   });
 
