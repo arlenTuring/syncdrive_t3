@@ -5,6 +5,24 @@
  */
 export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: string; firstSeen: string; commit: string }> = [
   {
+    "family": "event-center-list",
+    "fingerprint": "0b0f85305bed74",
+    "firstSeen": "2026-06-25",
+    "commit": "b52b1a6"
+  },
+  {
+    "family": "event-center-list",
+    "fingerprint": "1e742d4822e2b9",
+    "firstSeen": "2026-10-01",
+    "commit": "2129bf4"
+  },
+  {
+    "family": "event-center-list",
+    "fingerprint": "0b67580bbad6d7",
+    "firstSeen": "2026-10-05",
+    "commit": "c628653"
+  },
+  {
     "family": "mainline-fleet",
     "fingerprint": "0c886956767495",
     "firstSeen": "2026-06-25",
