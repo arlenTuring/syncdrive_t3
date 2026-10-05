@@ -139,3 +139,9 @@ INSERT INTO security_event_logs (
     'PMS01',
     true
   );
+
+-- 去重鍵（security_event_logs 2026-10-05 起以 dedup_key 判斷同一則事件，見
+-- security-event-log.entity.ts securityEventDedupKey）：示範列也要有，跟真實事件同一個格式
+UPDATE security_event_logs
+SET dedup_key = vehicle_code || '|' || event_id || '|' || created_at::text
+WHERE event_id LIKE 'DEMO-EVT-%' AND dedup_key IS NULL;
