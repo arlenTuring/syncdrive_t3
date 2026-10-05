@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 
 /** 版面存檔的失效標籤（前端 useDashboardEditor 收到就重新讀取版面） */
@@ -34,7 +34,33 @@ export type DashboardPlanePayload = {
   elements: unknown;
   isTemplate?: boolean | null;
   updatedBy?: string | null;
+  /** 這張儀表板自己的資料設定；沒送（舊版前端）就保留原值，不清空 */
+  dataSettings?: { sourceMap?: Record<string, string> } | null;
 };
+
+const SOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+/** 只接受 { sourceMap: { 來源 ID: 定義 ID } }；其他欄位一律丟掉，避免夾帶帳密或任意資料 */
+export function normalizeDataSettings(
+  value: unknown,
+): { sourceMap: Record<string, string> } | null {
+  if (value == null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new BadRequestException('dataSettings 格式錯誤');
+  }
+  const raw = (value as { sourceMap?: unknown }).sourceMap ?? {};
+  if (typeof raw !== 'object' || Array.isArray(raw) || raw === null) {
+    throw new BadRequestException('dataSettings.sourceMap 格式錯誤');
+  }
+  const sourceMap: Record<string, string> = {};
+  for (const [from, to] of Object.entries(raw as Record<string, unknown>)) {
+    if (!SOURCE_ID.test(from) || typeof to !== 'string' || !SOURCE_ID.test(to)) {
+      throw new BadRequestException(`dataSettings.sourceMap 的 ${from} 不是合法的資料來源 ID`);
+    }
+    if (from !== to) sourceMap[from] = to;
+  }
+  return { sourceMap };
+}
 
 export type ModuleDashboardPagePayload = {
   /** 前端的頁面識別碼；不是 uuid，存進 pageKey 而不是主鍵 */
@@ -94,6 +120,7 @@ export class DashboardPlaneService {
     row.height = item.height ?? 1080;
     row.viewportMode = toViewportMode(item.viewportMode);
     row.elements = item.elements ?? [];
+    if (item.dataSettings !== undefined) row.dataSettings = normalizeDataSettings(item.dataSettings);
     row.isTemplate = item.isTemplate ?? false;
     row.version = prior ? (prior.version ?? 0) + 1 : 1;
     row.updatedBy = item.updatedBy ?? undefined!;
@@ -134,6 +161,7 @@ export class DashboardPlaneService {
       row.height = item.height ?? 1080;
       row.viewportMode = toViewportMode(item.viewportMode);
       row.elements = item.elements ?? [];
+      if (item.dataSettings !== undefined) row.dataSettings = normalizeDataSettings(item.dataSettings);
       row.isTemplate = item.isTemplate ?? false;
       // 版本由伺服器遞增，前端不必自己維護
       row.version = prior ? (prior.version ?? 0) + 1 : 1;

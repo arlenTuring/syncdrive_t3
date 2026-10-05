@@ -4,6 +4,10 @@ import {
   getDataSourceById,
   isDataSourceAllowedForBinding,
 } from '../store/useDataSourceStore';
+import { resolvePlaneSourceId } from '../context/PlaneDataSourceContext';
+
+type Resolve = (id: string) => string;
+const identity: Resolve = (id) => id;
 
 export type BindingIssueReason =
   | 'missing_data_source'
@@ -28,12 +32,15 @@ function needsSqlSource(w: WidgetDataBinding): boolean {
 }
 
 function checkDataSourceId(
-  id: string | undefined,
+  boundId: string | undefined,
   kind: 'sql' | 'mqtt',
   reasons: BindingIssueReason[],
   detailParts: string[],
+  resolve: Resolve = identity,
 ): void {
-  if (!id) return;
+  if (!boundId) return;
+  // 檢查這張儀表板「資料設定」實際選用的那一份
+  const id = resolve(boundId);
   const ds = getDataSourceById(id);
   if (!ds) {
     reasons.push(kind === 'mqtt' ? 'missing_mqtt_source' : 'missing_data_source');
@@ -56,6 +63,7 @@ function issuesFromBinding(
   kind: 'canvas' | 'widget',
   binding: WidgetDataBinding,
   canvasId?: string,
+  resolve: Resolve = identity,
 ): BindingIssue | null {
   const reasons: BindingIssueReason[] = [];
   const detailParts: string[] = [];
@@ -65,14 +73,14 @@ function issuesFromBinding(
     detailParts.push('已設定 SQL 但未指定資料來源');
   }
 
-  checkDataSourceId(binding.dataSourceId, 'sql', reasons, detailParts);
+  checkDataSourceId(binding.dataSourceId, 'sql', reasons, detailParts, resolve);
 
   if (binding.mqttTopic || binding.mqttDataSourceId) {
     if (!binding.mqttDataSourceId) {
       reasons.push('missing_mqtt_source');
       detailParts.push('已設定 MQTT 主題但未指定 MQTT 資料來源');
     } else {
-      checkDataSourceId(binding.mqttDataSourceId, 'mqtt', reasons, detailParts);
+      checkDataSourceId(binding.mqttDataSourceId, 'mqtt', reasons, detailParts, resolve);
     }
   }
 
@@ -135,6 +143,7 @@ function countBindingsForSource(plane: DashboardPlane, sourceId: string): number
 /** 掃描平面內所有資料綁定，回傳靜態問題（不含連線測試） */
 export function collectBindingIssues(plane: DashboardPlane): BindingIssue[] {
   const issues: BindingIssue[] = [];
+  const resolve: Resolve = (id) => resolvePlaneSourceId(plane.dataSettings, id);
 
   for (const el of plane.elements) {
     const canvasBinding: WidgetDataBinding = {
@@ -143,7 +152,7 @@ export function collectBindingIssues(plane: DashboardPlane): BindingIssue[] {
       dataUrl: el.dataUrl,
       refreshInterval: el.refreshInterval,
     };
-    const canvasIssue = issuesFromBinding(el.id, el.label || '畫布', 'canvas', canvasBinding);
+    const canvasIssue = issuesFromBinding(el.id, el.label || '畫布', 'canvas', canvasBinding, undefined, resolve);
     if (canvasIssue) issues.push(canvasIssue);
 
     if (el.displayGate?.dataSourceId || el.displayGate?.sqlQuery) {
@@ -157,6 +166,7 @@ export function collectBindingIssues(plane: DashboardPlane): BindingIssue[] {
           refreshInterval: el.displayGate.refreshInterval,
         },
         el.id,
+        resolve,
       );
       if (gateIssue) issues.push(gateIssue);
     }
@@ -164,7 +174,7 @@ export function collectBindingIssues(plane: DashboardPlane): BindingIssue[] {
     for (const child of getAllGroupChildWidgets(el)) {
       const w = child as ChildWidget & WidgetDataBinding;
       const label = `${el.label} / ${w.type}`;
-      const childIssue = issuesFromBinding(w.id, label, 'widget', w, el.id);
+      const childIssue = issuesFromBinding(w.id, label, 'widget', w, el.id, resolve);
       if (childIssue) issues.push(childIssue);
     }
   }
@@ -201,7 +211,10 @@ export async function collectBindingIssuesWithPing(
   plane: DashboardPlane,
 ): Promise<BindingIssue[]> {
   const base = collectBindingIssues(plane);
-  const sourceIds = collectSourceIdsFromPlane(plane);
+  // 連線測試測的是這張儀表板實際選用的定義
+  const sourceIds = new Set(
+    [...collectSourceIdsFromPlane(plane)].map((id) => resolvePlaneSourceId(plane.dataSettings, id)),
+  );
 
   const pingResults = new Map<string, boolean>();
   await Promise.all(
@@ -215,7 +228,9 @@ export async function collectBindingIssuesWithPing(
 
   const connectionIssues: BindingIssue[] = failedIds.map(id => {
     const ds = getDataSourceById(id);
-    const affected = countBindingsForSource(plane, id);
+    const affected = [...collectSourceIdsFromPlane(plane)]
+      .filter((bound) => resolvePlaneSourceId(plane.dataSettings, bound) === id)
+      .reduce((sum, bound) => sum + countBindingsForSource(plane, bound), 0);
     return {
       refId: `datasource-${id}`,
       refLabel: ds?.name ?? id,

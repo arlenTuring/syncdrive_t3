@@ -8,6 +8,7 @@ import { useDemoSimulationLiveClearEpoch, useDemoSimulationPlayback } from '../c
 import { useVehicleFleetStore } from '../context/VehicleFleetMqttContext';
 import { isVtmsVehicleStreamTopic } from '../utils/vtmsTopic';
 import { createMapMqttIngestPipeline } from './mapMqttIngestPipeline';
+import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
 
 export type MapMqttLiveState = {
   liveById: Record<string, MqttLiveEntry>;
@@ -26,6 +27,8 @@ export type MapMqttLiveState = {
  * - pause / liveClearEpoch：reset pipeline 並清空 React 快照
  */
 export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
+  // 這張儀表板「資料設定」選的 MQTT 連線
+  const mqttSourceId = usePlaneSourceId('default-mqtt');
   const [liveById, setLiveById] = useState<Record<string, MqttLiveEntry>>({});
   const [areaVehicles, setAreaVehicles] = useState<AreaVehicleLive[]>([]);
   const liveClearEpoch = useDemoSimulationLiveClearEpoch();
@@ -91,7 +94,7 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
   useEffect(() => {
     if (areas.length === 0) return undefined;
 
-    const ds = getDataSourceById('default-mqtt');
+    const ds = getDataSourceById(mqttSourceId);
     if (!ds || ds.type !== 'mqtt') return undefined;
 
     const socket = acquireSocket(ds.backendUrl);
@@ -129,7 +132,7 @@ export function useMapMqttLive(areas: MapAreaObject[]): MapMqttLiveState {
       releaseSocket(ds.backendUrl);
       if (statsTimer) clearInterval(statsTimer);
     };
-  }, [areas]);
+  }, [areas, mqttSourceId]);
 
   return { liveById, areaVehicles };
 }

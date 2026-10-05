@@ -424,7 +424,7 @@ export function useDashboardEditor() {
     return newPlane;
   }, [recordHistory]);
 
-  const updatePlane = useCallback((id: string, patch: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode'>>) => {
+  const updatePlane = useCallback((id: string, patch: Partial<Pick<DashboardPlane, 'name' | 'width' | 'height' | 'viewportMode' | 'dataSettings'>>) => {
     setPlanes(prev => {
       const next = prev.map(p => p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p);
       savePlanes(next); return next;

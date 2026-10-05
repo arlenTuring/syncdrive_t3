@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
+import { VTMS_FLEET_HUB_SOURCE_ID } from '../hooks/useVehicleFleetMqttHub';
 import type { Socket } from 'socket.io-client';
 import { acquireSocket, releaseSocket } from './socketManager';
 import { getDataSourceById } from '../store/useDataSourceStore';
@@ -42,7 +44,10 @@ export function useMqttData(opts: {
   mqttTopic?: string;
   mqttValuePath?: string;
 }): MqttState {
-  const { mqttDataSourceId, mqttTopic, mqttValuePath } = opts;
+  const { mqttTopic, mqttValuePath } = opts;
+  // 這張儀表板「資料設定」選的 MQTT 連線；車隊 hub 用的是同一個解析結果（default-mqtt 的對應）
+  const mqttDataSourceId = usePlaneSourceId(opts.mqttDataSourceId);
+  const fleetHubSourceId = usePlaneSourceId(VTMS_FLEET_HUB_SOURCE_ID);
   const [state, setState] = useState<MqttState>({ data: null, connected: false, error: null });
   const socketRef = useRef<Socket | null>(null);
   const paused = useDemoSimulationPaused();
@@ -67,6 +72,7 @@ export function useMqttData(opts: {
 
   const useFleetHub = Boolean(
     mqttDataSourceId
+    && mqttDataSourceId === fleetHubSourceId
     && fleetParsed
     && hasFleetHub,
   );

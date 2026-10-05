@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { X, Database, Plus, Trash2, CheckCircle, AlertCircle, Loader, Edit2, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { DashboardPlane, PlaneDataSettings } from '../types';
+import { PlaneDataSettingsPanel } from './PlaneDataSettingsPanel';
+import { planesUsingDefinition } from '../utils/planeDataSources';
 import {
   useDataSourceStore,
   seedDashboardAll,
@@ -9,9 +12,13 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 
-interface Props { 
-  onClose: () => void; 
+interface Props {
+  onClose: () => void;
   onClearAll: () => void;
+  /** 目前開啟的儀表板：有給就是「資料設定」（本儀表板的來源選擇＋共用連線定義） */
+  plane?: DashboardPlane | null;
+  planes?: DashboardPlane[];
+  onChangePlaneDataSettings?: (settings: PlaneDataSettings) => void;
 }
 
 type PingState = 'idle' | 'loading' | 'ok' | 'error';
@@ -19,7 +26,7 @@ type PingState = 'idle' | 'loading' | 'ok' | 'error';
 const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 text-sm
   focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
-export function SettingsModal({ onClose, onClearAll }: Props) {
+export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChangePlaneDataSettings }: Props) {
   const { t } = useTranslation();
   const {
     dataSources, loading: dataSourcesLoading, error: dataSourcesError, legacySources,
@@ -28,7 +35,7 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [pingStates, setPingStates] = useState<Record<string, PingState>>({});
-  const [activeTab, setActiveTab] = useState<'datasource' | 'general'>('datasource');
+  const [activeTab, setActiveTab] = useState<'plane' | 'datasource' | 'general'>(plane ? 'plane' : 'datasource');
   const [seedState, setSeedState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
 
   const dataSourceSections: {
@@ -66,7 +73,15 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
+            {plane && (
+              <span className="text-sm font-bold text-zinc-100 pr-2 border-r border-zinc-700 -mb-0">
+                資料設定 · {plane.name}
+              </span>
+            )}
+            {plane && onChangePlaneDataSettings && (
+              <button onClick={() => setActiveTab('plane')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'plane' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>本儀表板</button>
+            )}
             <button onClick={() => setActiveTab('datasource')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabDatasource')}</button>
             <button onClick={() => setActiveTab('general')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabGeneral')}</button>
           </div>
@@ -76,7 +91,9 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
-          {activeTab === 'datasource' ? (
+          {activeTab === 'plane' && plane && onChangePlaneDataSettings ? (
+            <PlaneDataSettingsPanel plane={plane} planes={planes} onChange={onChangePlaneDataSettings} />
+          ) : activeTab === 'datasource' ? (
             <>
               <div className="bg-purple-900/20 border border-purple-800/40 rounded-lg px-4 py-3 text-xs text-purple-300 leading-relaxed">
                 {t('dashboard.settings.datasourceIntro')}
@@ -133,6 +150,7 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
                             catch (e) { alert(`刪除失敗：${e instanceof Error ? e.message : String(e)}`); }
                           }}
                           onPing={() => pingDataSource(ds)}
+                          usedBy={planesUsingDefinition(planes, ds.id).map((p) => p.name)}
                         />
                       ))
                     )}
@@ -234,7 +252,7 @@ export function SettingsModal({ onClose, onClearAll }: Props) {
   );
 }
 
-function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, onPing }: {
+function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, onPing, usedBy = [] }: {
   ds: DataSourceConfig;
   pingState: PingState;
   isEditing: boolean;
@@ -242,6 +260,8 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   onSave: (patch: Partial<DataSourceConfig>) => void | Promise<void>;
   onDelete: () => void | Promise<void>;
   onPing: () => void;
+  /** 實際用到這份連線的儀表板（直接綁定或經資料設定對應） */
+  usedBy?: string[];
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({
@@ -283,6 +303,9 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
           <div className="text-zinc-500 text-xs mt-0.5 truncate">
             {ds.type === 'internal' ? ds.backendUrl : ''} {ds.description && `· ${ds.description}`}
           </div>
+          <div className="text-[11px] mt-0.5 text-zinc-500">
+            {usedBy.length > 0 ? `使用中的儀表板：${usedBy.join('、')}` : '目前沒有儀表板使用'}
+          </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {ds.type === 'internal' && (
@@ -312,6 +335,12 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
 
       {isEditing && (
         <div className="border-t border-zinc-700/60 px-4 py-4 space-y-3 bg-zinc-800/50">
+          {usedBy.length > 1 && (
+            <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+              這是共用連線，修改會同時影響 {usedBy.map((n) => `「${n}」`).join('、')}。
+              只想改目前這張儀表板，請到「本儀表板」分頁按「建立本儀表板專用連線」。
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.name')}</label>

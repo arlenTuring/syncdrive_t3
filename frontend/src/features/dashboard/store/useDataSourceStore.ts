@@ -154,6 +154,8 @@ async function saveDefinition(config: DataSourceConfig): Promise<DataSourceConfi
 }
 
 export interface MergeDataSourcesResult {
+  /** 樣板定義 ID → 這次實際使用的定義 ID（內容不同而另建專用定義時才會有） */
+  remap?: Record<string, string>;
   warnings: string[];
 }
 
@@ -163,6 +165,7 @@ export async function mergeTemplateDataSources(
   options: { overwriteExisting?: boolean } = {},
 ): Promise<MergeDataSourcesResult> {
   const warnings: string[] = [];
+  const remap: Record<string, string> = {};
   const map = new Map(load().map(d => [d.id, d]));
 
   for (const ts of templateSources) {
@@ -180,15 +183,19 @@ export async function mergeTemplateDataSources(
         `資料來源「${ts.id}」與樣板不同：本機 ${existing.type} @ ${existing.backendUrl}，樣板 ${ts.type} @ ${ts.backendUrl}`,
       );
       if (options.overwriteExisting) {
-        const saved = await saveDefinition({ ...existing, ...ts, id: ts.id, createdAt: existing.createdAt });
-        map.set(ts.id, saved);
-        warnings.push(`  → 已套用樣板連線設定`);
+        // 不覆寫共用定義（會悄悄改到其他儀表板）：另建一份給這張匯入的儀表板專用
+        let copyId = `${ts.id}-import-${Date.now().toString(36)}`.slice(0, 128);
+        while (map.has(copyId)) copyId = `${copyId}x`.slice(-128);
+        const saved = await saveDefinition({ ...ts, id: copyId, name: `${ts.name}（匯入）`, createdAt: Date.now() });
+        map.set(copyId, saved);
+        remap[ts.id] = copyId;
+        warnings.push(`  → 另建專用連線「${saved.name}」（${copyId}），只有這張匯入的儀表板使用；共用的「${ts.id}」不變`);
       }
     }
   }
 
   publish(Array.from(map.values()));
-  return { warnings };
+  return { warnings, remap };
 }
 
 // ── 純函式 API（供 Widget 資料取得使用）──────────────────────────────
@@ -390,10 +397,11 @@ export function useDataSourceStore() {
     return () => window.removeEventListener('syncdrive-datasources-changed', sync);
   }, [reload]);
 
-  const addDataSource = useCallback(async (config: Omit<DataSourceConfig, 'id' | 'createdAt'>) => {
+  const addDataSource = useCallback(async (config: Omit<DataSourceConfig, 'id' | 'createdAt'> & { id?: string }) => {
     const newDs: DataSourceConfig = {
       ...config,
-      id: `ds-${Date.now()}`,
+      // 指定 ID（例如「本儀表板專用連線」）就用它，否則自動產生
+      id: config.id ?? `ds-${Date.now()}`,
       createdAt: Date.now(),
     };
     const saved = await saveDefinition(newDs);

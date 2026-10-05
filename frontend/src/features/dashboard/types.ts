@@ -1334,6 +1334,15 @@ export interface DashboardPlane {
   updatedAt: number;
   /** 後端資料列版本（讀取時帶回；單張更新時做樂觀鎖）。前端不自己遞增。 */
   serverVersion?: number;
+  /**
+   * 這張儀表板自己的資料設定（存在伺服器 dashboard_planes.data_settings）。
+   * sourceMap：元件引用的資料來源 ID → 這張實際使用的連線定義 ID；沒列到的照元件原本的 ID。
+   */
+  dataSettings?: PlaneDataSettings;
+}
+
+export interface PlaneDataSettings {
+  sourceMap?: Record<string, string>;
 }
 
 // ─── Widget 預設值工廠 ─────────────────────────────────────────────

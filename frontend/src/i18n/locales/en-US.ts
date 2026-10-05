@@ -2491,6 +2491,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     redo: 'Redo',
     redoTitle: 'Redo (⌘/Ctrl+Shift+Z or Ctrl+Y)',
     dataSource: 'Data source',
+    dataSettings: 'Data settings',
     saved: '✓ Saved',
     saveFailed: '❌ Save failed',
     copiedCanvas: 'Copied canvas',
@@ -3431,7 +3432,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       },
     },
     settings: {
-      tabDatasource: 'Data sources',
+      tabDatasource: 'Connections (shared)',
       tabGeneral: 'General',
       datasourceIntro:
         'Data sources are grouped by type. The widget “Data binding” tab only lists matching types: SQL for SQL databases, MQTT for MQTT connections.',
