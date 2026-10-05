@@ -10,6 +10,7 @@ import {
   type MaintenanceDistribution,
   type VehicleDistributionRow,
 } from './maintenance-distribution';
+import { orderBusinessKind } from '../order/order-business-kind';
 
 /**
  * 整備分佈的資料組裝（規則見 maintenance-distribution.ts）。
@@ -99,6 +100,8 @@ export class MaintenanceDistributionService {
       line_kind: string | null;
       kind: string | null;
       task_type: string | null;
+      plan_task_type: string | null;
+      source: string | null;
       card_label: string | null;
     }> = await this.dataSource.query(`
       SELECT DISTINCT ON (vehicle_code)
@@ -106,6 +109,8 @@ export class MaintenanceDistributionService {
         line_kind,
         payload->>'kind' AS kind,
         payload->>'maintenance_task_type' AS task_type,
+        payload->>'task_type' AS plan_task_type,
+        payload->>'source' AS source,
         payload->>'card_label' AS card_label
       FROM operation_orders
       WHERE status = 'PROCESSING'
@@ -117,7 +122,11 @@ export class MaintenanceDistributionService {
     const fleet = fleetRows.map((row) => row.vehicle_code);
     const processingOrders = orders.map((row) => ({
       vehicleCode: row.vehicle_code,
-      lineKind: row.line_kind,
+      // 業務分類全系統同一套（見 order-business-kind.ts）；舊版模擬器的 TEST 單在這裡換算
+      lineKind: orderBusinessKind({
+        lineKind: row.line_kind,
+        payload: { kind: row.kind, task_type: row.plan_task_type, maintenance_task_type: row.task_type, source: row.source },
+      }) ?? row.line_kind,
       kind: row.kind,
       taskType: row.task_type,
       cardLabel: row.card_label,

@@ -1,6 +1,5 @@
 import { enrichMaintenanceShiftFields } from './maintenanceTaskModel';
 import { enrichMainlineShiftFields } from './mainlineTaskModel';
-import { SHIFT_TRIP_CODE_PATTERN } from '../constants/vtmsVehiclePool';
 
 function readLeg(payload: Record<string, unknown>) {
   const leg = payload.current_leg;
@@ -8,15 +7,14 @@ function readLeg(payload: Record<string, unknown>) {
 }
 
 function isMainlineContext(base: Record<string, unknown>, mqttPayload: Record<string, unknown> | null): boolean {
-  const baseKind = String(base.line_kind ?? '').toUpperCase();
-  if (baseKind === 'MAINLINE') return true;
+  // 業務分類看 SQL 的 business_kind，其次 line_kind；不看班次代號長什麼樣
+  const baseKind = String(base.business_kind ?? base.line_kind ?? '').toUpperCase();
+  // 過渡（出入廠、待命、暫停）跟正線用同一種卡（顯示「過渡」）；待命單雖然帶格位與整備徽章，也不是整備卡
+  if (baseKind === 'MAINLINE' || baseKind === 'TRANSITION') return true;
   if (baseKind === 'MAINTENANCE') return false;
 
-  const trip = String(mqttPayload?.trip_code ?? base.trip_code ?? '').trim();
-  if (SHIFT_TRIP_CODE_PATTERN.test(trip)) return true;
-
   const mqttKind = String(mqttPayload?.line_kind ?? '').toUpperCase();
-  if (mqttKind === 'MAINLINE') return true;
+  if (mqttKind === 'MAINLINE' || mqttKind === 'TRANSITION') return true;
   if (mqttKind === 'MAINTENANCE') return false;
 
   return !mqttPayload?.maint_type_label;
@@ -61,8 +59,8 @@ export function mergeOperationMqttShiftRow(
         : undefined;
 
   // 正線 SQL 列優先：避免整備 MQTT retain 把「待發」標籤配上整備綠色
+  // 訂單狀態只用 SQL（REST 寫入）的值，車端 MQTT 的 order_status 不覆蓋
   if (isMainlineContext(base, mqttPayload)) {
-    if (mqttPayload.order_status) base.order_status = mqttPayload.order_status;
     return enrichMainlineShiftFields(base, mqttPayload, legEta);
   }
 
@@ -70,6 +68,5 @@ export function mergeOperationMqttShiftRow(
   if (mqttPayload.maint_type_bg) base.maint_type_bg = mqttPayload.maint_type_bg;
   if (mqttPayload.maint_type_color) base.maint_type_color = mqttPayload.maint_type_color;
   if (mqttPayload.badge_label) base.badge_label = mqttPayload.badge_label;
-  if (mqttPayload.order_status) base.order_status = mqttPayload.order_status;
   return enrichMaintenanceShiftFields(base, mqttPayload, legEta);
 }

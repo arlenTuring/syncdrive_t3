@@ -11,6 +11,38 @@ export function expandBuiltinSqlMacros(sql: string): string {
   return sql.replace(/\$\{DAY_MS\}/g, DAY_MS);
 }
 
+/**
+ * 訂單業務分類（MAINLINE／TRANSITION／MAINTENANCE），與後端 order/order-business-kind.ts 同一套規則：
+ * - line_kind 已是三種之一就照它。
+ * - 舊版模擬器重播單（line_kind='TEST' 且 payload.source='plan_replay'）與沒有 line_kind 的舊資料：
+ *   依 payload 的 kind 與任務子類型換算；待命、暫停、空車移動是過渡，不是整備；子類型不明就是 NULL，不猜。
+ * - 其他 TEST（PMS99 人工測試）維持 'TEST'，不算正線也不算整備。
+ * 卡片、正線營運數、車輛狀態都用這一段，同一張單只會落在一種卡片。
+ */
+function orderBusinessKindSql(o: string): string {
+  // 整備子類型比 task_type 具體（舊版整備單的 task_type 一律是 'maintenance'）
+  const taskType = `COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), NULLIF(${o}.payload->>'task_type', ''))`;
+  return `CASE
+      WHEN ${o}.line_kind IN ('MAINLINE', 'TRANSITION', 'MAINTENANCE') THEN ${o}.line_kind
+      WHEN COALESCE(${o}.line_kind, '') = ''
+        OR (${o}.line_kind = 'TEST' AND ${o}.payload->>'source' = 'plan_replay') THEN
+        CASE
+          WHEN ${o}.payload->>'kind' = 'passenger' OR ${taskType} = 'passenger' THEN 'MAINLINE'
+          WHEN ${o}.payload->>'kind' = 'movement' OR ${taskType} IN ('dispatch', 'standby', 'idle') THEN 'TRANSITION'
+          WHEN ${o}.payload->>'kind' = 'maintenance' AND ${taskType} IS NOT NULL THEN 'MAINTENANCE'
+        END
+      WHEN ${o}.line_kind = 'TEST' THEN 'TEST'
+    END`;
+}
+
+/**
+ * 中心端取消後由車端回報 FAULTED 結案的單（payload.cancel_requested_at）：這是操作結束，不是故障，
+ * 不列在卡片與名冊上——不然結束一輪模擬後滿畫面「故障」，還會壓過同一台車正在執行的單。
+ */
+function notCancelledSql(o: string): string {
+  return `NOT (${o}.status = 'FAULTED' AND ${o}.payload ? 'cancel_requested_at')`;
+}
+
 export const EVENT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_events,
@@ -303,7 +335,7 @@ FROM (
       WHEN EXISTS (
         SELECT 1 FROM operation_orders o
         WHERE o.vehicle_code = v.vehicle_code
-          AND o.line_kind IN ('MAINLINE', 'TEST')
+          AND ${orderBusinessKindSql('o')} IN ('MAINLINE', 'TEST')
           AND o.status = 'PROCESSING'
           AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
           AND COALESCE(o.planned_end, o.planned_start + 600000)
@@ -312,7 +344,7 @@ FROM (
       WHEN EXISTS (
         SELECT 1 FROM operation_orders o
         WHERE o.vehicle_code = v.vehicle_code
-          AND o.line_kind = 'MAINTENANCE'
+          AND ${orderBusinessKindSql('o')} = 'MAINTENANCE'
           AND o.status = 'PROCESSING'
           AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
           AND COALESCE(o.planned_end, o.planned_start + 1800000)
@@ -352,28 +384,28 @@ SELECT
   v.vehicle_code,
   COALESCE(v.display_name, v.vehicle_code) AS vehicle_display,
   active_order.priority_level,
-  active_order.line_kind,
+  active_order.business_kind AS line_kind,
   active_order.status AS order_status,
   active_order.trip_code,
   active_order.maint_type_label,
   active_order.maint_type_bg,
   active_order.maint_type_color,
   CASE
-    WHEN active_order.line_kind = 'MAINLINE' THEN active_order.trip_code
-    WHEN active_order.line_kind = 'MAINTENANCE' THEN active_order.maint_type_label
+    WHEN active_order.business_kind = 'MAINLINE' THEN active_order.trip_code
+    WHEN active_order.business_kind = 'MAINTENANCE' THEN active_order.maint_type_label
     ELSE NULL
   END AS badge_label,
   CASE
-    WHEN active_order.line_kind = 'MAINLINE' THEN 'mainline'
-    WHEN active_order.line_kind = 'MAINTENANCE' THEN 'maintenance'
+    WHEN active_order.business_kind = 'MAINLINE' THEN 'mainline'
+    WHEN active_order.business_kind = 'MAINTENANCE' THEN 'maintenance'
     ELSE NULL
   END AS badge_kind,
   CASE
-    WHEN active_order.line_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_bg, '#422006')
+    WHEN active_order.business_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_bg, '#422006')
     ELSE COALESCE(m.trip_badge_bg, '#7e57c2')
   END AS trip_badge_bg,
   CASE
-    WHEN active_order.line_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_color, '#FD9A00')
+    WHEN active_order.business_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_color, '#FD9A00')
     ELSE COALESCE(m.trip_badge_color, '#f3e8ff')
   END AS trip_badge_color,
   COALESCE(m.badge_outline, '0') AS badge_outline,
@@ -391,10 +423,11 @@ SELECT
 FROM vehicles v
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
 LEFT JOIN LATERAL (
-  SELECT o.*
+  SELECT o.*, ${orderBusinessKindSql('o')} AS business_kind
   FROM operation_orders o
   WHERE o.vehicle_code = v.vehicle_code
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    AND ${notCancelledSql('o')}
     AND (
       COALESCE(o.planned_end, o.planned_start + 600000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
       OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
@@ -429,21 +462,12 @@ WITH active_orders AS (
     o.*,
     v.display_name,
     COALESCE(NULLIF(TRIM(o.payload->>'card_label'), ''), '營運') AS card_label,
-    CASE
-      WHEN COALESCE(o.payload->>'task_type', o.payload->>'kind') = 'passenger'
-        OR o.line_kind = 'MAINLINE' THEN 'MAINLINE'
-      WHEN COALESCE(o.payload->>'task_type', o.payload->>'kind') IN ('dispatch', 'movement', 'standby', 'idle')
-        OR o.line_kind = 'TRANSITION' THEN 'TRANSITION'
-      ELSE 'MAINTENANCE'
-    END AS business_kind,
+    ${orderBusinessKindSql('o')} AS business_kind,
     CASE
       WHEN o.planned_start IS NOT NULL THEN
         EXTRACT(HOUR FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int * 60
         + EXTRACT(MINUTE FROM timezone('Asia/Taipei', to_timestamp(o.planned_start / 1000)))::int
-      WHEN o.trip_code ~ '^[DU][0-9]{4}$'
-        AND SUBSTRING(o.trip_code, 2, 2)::int BETWEEN 0 AND 23
-        AND SUBSTRING(o.trip_code, 4, 2)::int BETWEEN 0 AND 59
-        THEN SUBSTRING(o.trip_code, 2, 2)::int * 60 + SUBSTRING(o.trip_code, 4, 2)::int
+      -- 沒有計畫發車時刻就是沒有，不從班次代號推
       ELSE NULL
     END AS trip_start_minutes,
     first_st.station_id AS route_origin,
@@ -462,11 +486,7 @@ WITH active_orders AS (
       ORDER BY
         CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,
         o.priority_level DESC,
-        CASE
-          WHEN COALESCE(o.payload->>'task_type', o.payload->>'kind') = 'passenger' OR o.line_kind = 'MAINLINE' THEN 0
-          WHEN COALESCE(o.payload->>'task_type', o.payload->>'kind') IN ('dispatch', 'movement', 'standby', 'idle') OR o.line_kind = 'TRANSITION' THEN 1
-          ELSE 2
-        END,
+        CASE ${orderBusinessKindSql('o')} WHEN 'MAINLINE' THEN 0 WHEN 'TRANSITION' THEN 1 ELSE 2 END,
         (
           o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
           AND COALESCE(o.planned_end, o.planned_start + 600000)
@@ -508,12 +528,11 @@ WITH active_orders AS (
     SELECT station_id FROM operation_route_stations
     WHERE route_id = o.route_id ORDER BY sequence_order DESC LIMIT 1
   ) last_st ON true
-  WHERE (
-      o.line_kind IN ('MAINLINE', 'TRANSITION')
-      OR COALESCE(o.payload->>'task_type', o.payload->>'kind') IN ('passenger', 'dispatch', 'movement', 'standby', 'idle')
-    )
+  -- 正線與過渡（人工測試單另列為 TEST，照舊顯示在這裡，但不算正線營運數）；整備單只在整備名冊
+  WHERE ${orderBusinessKindSql('o')} IN ('MAINLINE', 'TRANSITION', 'TEST')
     AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    AND ${notCancelledSql('o')}
     /*
      * 只看今天。
      *
@@ -851,7 +870,9 @@ SELECT
     WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'
     ELSE '#51A2FF'
   END AS icon_bg_color,
-  LOWER(o.business_kind) AS line_kind,
+  -- 卡片樣板依 line_kind 選：這份名冊的每一張（正線、過渡、人工測試）都用正線卡，過渡靠 direction_label 顯示「過渡」。
+  -- 寫成 'transition' 會對不上任何樣板條件，落到預設的整備卡。業務分類看 business_kind。
+  'mainline' AS line_kind,
   o.business_kind,
   CASE o.business_kind WHEN 'MAINLINE' THEN 300 WHEN 'TRANSITION' THEN 200 ELSE 100 END
     + COALESCE(o.priority_level, 0) AS display_priority
@@ -877,12 +898,13 @@ SELECT
   ) AS mainline_fleet_line
 FROM (
   SELECT
-    COUNT(*) FILTER (WHERE o.status = 'PROCESSING')::int AS processing_count,
-    COUNT(*) FILTER (
-      WHERE o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    COUNT(DISTINCT o.vehicle_code) FILTER (WHERE o.status = 'PROCESSING')::int AS processing_count,
+    COUNT(DISTINCT o.vehicle_code) FILTER (
+      WHERE o.status IN ('PENDING', 'PROCESSING', 'FAULTED') AND ${notCancelledSql('o')}
     )::int AS roster_count
   FROM operation_orders o
-  WHERE o.line_kind IN ('MAINLINE', 'TEST')
+  -- 只算載客正線的車（一台車算一次）；過渡、待命、整備與人工測試單都不算
+  WHERE ${orderBusinessKindSql('o')} = 'MAINLINE'
     AND NULLIF(TRIM(o.trip_code), '') IS NOT NULL
     -- 跟班次卡同一套「還在跑」的定義。少了這一條會把歷來每一天沒收乾淨的
     -- PROCESSING 全部算進去，標題列會寫成「正線營運 208 / 415」。
@@ -933,8 +955,9 @@ SELECT
   'maintenance' AS line_kind
 FROM operation_orders o
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = o.vehicle_code
-WHERE o.line_kind = 'MAINTENANCE'
+WHERE ${orderBusinessKindSql('o')} = 'MAINTENANCE'
   AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+  AND ${notCancelledSql('o')}
   AND (
     COALESCE(o.planned_end, o.planned_start + 1800000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
     OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)

@@ -13,6 +13,8 @@ describe('MqttController', () => {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(false),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
+      // 控制器現在先問是否暫停接收（資料管理的重置期間）；測試情境都是正常接收
+      isLiveInputPaused: jest.fn().mockReturnValue(false),
     };
     const telemetryWriteQueue = {
       enqueue: jest.fn(),
@@ -57,6 +59,8 @@ describe('MqttController', () => {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(false),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
+      // 控制器現在先問是否暫停接收（資料管理的重置期間）；測試情境都是正常接收
+      isLiveInputPaused: jest.fn().mockReturnValue(false),
     };
     const telemetryWriteQueue = { enqueue: jest.fn() };
     const controller = new MqttController(
@@ -85,6 +89,8 @@ describe('MqttController', () => {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
       shouldPersistTelemetry: jest.fn().mockReturnValue(true),
       syncOperationOrderFromLive: jest.fn().mockResolvedValue(undefined),
+      // 控制器現在先問是否暫停接收（資料管理的重置期間）；測試情境都是正常接收
+      isLiveInputPaused: jest.fn().mockReturnValue(false),
     };
     const telemetryWriteQueue = { enqueue: jest.fn() };
     const controller = new MqttController(

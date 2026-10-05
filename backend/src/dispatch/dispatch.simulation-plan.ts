@@ -67,9 +67,33 @@ export function readShiftMapReference(body: Record<string, unknown>): {
   return { mapId: fromRef || fromBody || null, selectedRouteIds: routes };
 }
 
-/** 地圖文件裡可以解析的站點 ID（拓樸節點綁的站點＋路線站序） */
+/**
+ * 地圖文件裡可以解析的點位 ID。
+ *
+ * 任務的站序與起訖點會用到四種 ID，車端（模擬器 mapSource.js 也是）都只靠地圖檔解析：
+ * 拓樸節點綁的站點別名、路線站序、區域裡的元件（設施、停靠點、途經點）的 id／代號／
+ * 途經點代號、渡線 portal 的途經點代號。只認前兩種的話，入出場任務的停靠點（096）、
+ * 區域入口途經點（161）、格位設施（149＝E3）都會被誤判成解析不到。
+ */
 export function mapStationIds(doc: SimulationMapDocument): Set<string> {
   const ids = new Set<string>();
+  const add = (value: unknown) => {
+    if (typeof value === 'string' && value) ids.add(value);
+    else if (typeof value === 'number') ids.add(String(value));
+  };
+  for (const area of Array.isArray(doc.areas) ? (doc.areas as unknown[]) : []) {
+    const facilities = asRecord(area)?.facilities;
+    for (const facility of Array.isArray(facilities) ? facilities : []) {
+      const record = asRecord(facility);
+      if (!record) continue;
+      const parameters = asRecord(record.parameters);
+      add(record.id);
+      add(record.customName);
+      add(parameters?.waypointCode);
+      const portals = asRecord(parameters?.trackCrossoverPortals);
+      for (const key of ['a', 'b']) add(asRecord(portals?.[key])?.waypointCode);
+    }
+  }
   const topology = asRecord(doc.pointTopology);
   for (const node of Array.isArray(topology?.nodes)
     ? (topology.nodes as unknown[])
@@ -156,7 +180,8 @@ export function assessSimulationReadiness(input: {
     const checkPoint = (point: { id: string; kind: string } | null) => {
       if (!point?.id) return;
       if (point.kind === 'facility') {
-        if (!input.resolveFacility(point.id))
+        // 設施中心查不到時，地圖上有這個元件（例如停靠點）也算解析得到
+        if (!input.resolveFacility(point.id) && !stations.has(point.id))
           unresolvedFacilities.add(point.id);
       } else if (!stations.has(point.id)) {
         unresolvedStations.add(point.id);

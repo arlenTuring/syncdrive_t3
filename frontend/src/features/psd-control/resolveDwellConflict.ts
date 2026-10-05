@@ -1,4 +1,3 @@
-import { shiftTripScheduleFromCode, tripStartMinutesFromCode } from '../dashboard/constants/vtmsVehiclePool';
 import type { ShiftRecordListItem } from '../shift-records/types';
 
 export type DwellConflict = {
@@ -25,7 +24,8 @@ function hmToMinutes(raw: string | null | undefined): number | null {
 }
 
 function tripStartMinutes(item: ShiftRecordListItem): number | null {
-  return hmToMinutes(item.depart_time) ?? tripStartMinutesFromCode(item.trip_code);
+  // 只看訂單的計畫發車時刻；沒有就不列入，不從班次代號推
+  return hmToMinutes(item.depart_time);
 }
 
 function tripEndMinutes(item: ShiftRecordListItem, start: number): number {
@@ -63,10 +63,7 @@ export function resolveDwellConflict(
   const next = index >= 0 ? ranked[index + 1] : undefined;
   if (!next) return null;
 
-  const schedule = shiftTripScheduleFromCode(next.item.trip_code);
-  const from = formatMinutes(next.start);
-  const to = formatMinutes(next.end);
-  const windowLabel = schedule ? `${schedule.depart_time}-${schedule.end_time}` : `${from}-${to}`;
+  const windowLabel = `${formatMinutes(next.start)}-${formatMinutes(next.end)}`;
 
   return {
     tripCode: next.item.trip_code,

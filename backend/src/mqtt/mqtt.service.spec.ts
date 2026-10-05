@@ -28,7 +28,8 @@ const dataSourceMock = { query: jest.fn().mockResolvedValue([]) };
 
 describe('MqttService', () => {
   let service: MqttService;
-  let orderServiceMock: { applyOperationMqttUpdate: jest.Mock };
+  let orderServiceMock: { applyOperationMqttUpdateWithOutcome: jest.Mock; markVehicleFaultOnActiveOrder: jest.Mock };
+  let securityRepo: { create: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -39,13 +40,18 @@ describe('MqttService', () => {
       save: jest.fn(),
     };
     orderServiceMock = {
-      applyOperationMqttUpdate: jest.fn().mockResolvedValue({ id: '260624-D1401' }),
+      applyOperationMqttUpdateWithOutcome: jest.fn().mockResolvedValue({
+        order: { id: '260624-D1401', status: 'PROCESSING' },
+        outcome: 'progress_applied',
+      }),
+      markVehicleFaultOnActiveOrder: jest.fn().mockResolvedValue(null),
     };
+    securityRepo = { create: jest.fn((v) => v), save: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MqttService,
         { provide: getRepositoryToken(CommandLog), useValue: repositoryMock },
-        { provide: getRepositoryToken(SecurityEventLog), useValue: repositoryMock },
+        { provide: getRepositoryToken(SecurityEventLog), useValue: securityRepo },
         { provide: getRepositoryToken(TelemetryLog), useValue: repositoryMock },
         { provide: getRepositoryToken(SlotStatus_), useValue: repositoryMock },
         { provide: OrderService, useValue: orderServiceMock },
@@ -78,7 +84,7 @@ describe('MqttService', () => {
 
     await service.syncOperationOrderFromLive('PMS03', payload);
 
-    expect(orderServiceMock.applyOperationMqttUpdate).toHaveBeenCalledWith(
+    expect(orderServiceMock.applyOperationMqttUpdateWithOutcome).toHaveBeenCalledWith(
       'PMS03',
       expect.objectContaining({
         order_id: '260624-D1401',
@@ -86,6 +92,54 @@ describe('MqttService', () => {
       }),
     );
     expect(invalidationMock.emitOrderLifecycle).toHaveBeenCalledWith('PMS03');
+  });
+
+  it('沒有 order_id：不從 trip_code／badge_label 拼單號，也不呼叫訂單更新', async () => {
+    for (const trip of ['D1401', 'NT1401']) {
+      await service.syncOperationOrderFromLive('PMS03', {
+        trip_code: trip,
+        badge_label: trip,
+        order_status: 'PROCESSING',
+        timestamp: Date.now(),
+      });
+    }
+    expect(orderServiceMock.applyOperationMqttUpdateWithOutcome).not.toHaveBeenCalled();
+  });
+
+  it('D1401 與 NT1401 同樣只靠 order_id 送進訂單更新', async () => {
+    for (const trip of ['D1401', 'NT1401']) {
+      await service.syncOperationOrderFromLive(`PMS0${trip.length}`, {
+        order_id: `ORD-${trip}`,
+        trip_code: trip,
+        timestamp: Date.now(),
+      });
+    }
+    expect(orderServiceMock.applyOperationMqttUpdateWithOutcome.mock.calls.map((c) => c[1].order_id))
+      .toEqual(['ORD-D1401', 'ORD-NT1401']);
+  });
+
+  describe('嚴重事件：告警照常，訂單只標故障待結案', () => {
+    const event = (severity: string) => ({
+      event_id: 'EVT-20261005-0001', event_code: 'PATH_BLOCKED', severity, detail: '路徑受阻', timestamp: 1,
+    });
+
+    it('CRITICAL：寫入告警、通知事件中心，訂單標「車輛故障，結案待確認」（不結案）', async () => {
+      await service.handleEventReport('PMS03', event('CRITICAL'));
+      expect(securityRepo.save).toHaveBeenCalledWith(expect.objectContaining({ vehicleCode: 'PMS03', eventCode: 'PATH_BLOCKED' }));
+      expect(invalidationMock.emitEventCenter).toHaveBeenCalled();
+      expect(orderServiceMock.markVehicleFaultOnActiveOrder).toHaveBeenCalledWith('PMS03', 'PATH_BLOCKED');
+    });
+
+    it('WARNING：只寫告警，不動訂單', async () => {
+      await service.handleEventReport('PMS03', event('WARNING'));
+      expect(securityRepo.save).toHaveBeenCalled();
+      expect(orderServiceMock.markVehicleFaultOnActiveOrder).not.toHaveBeenCalled();
+    });
+
+    it('event_id 不符協議格式：丟棄（模擬器已改成 EVT-YYYYMMDD-NNNN）', async () => {
+      await service.handleEventReport('PMS03', { ...event('CRITICAL'), event_id: 'EVT-1791140000000-ab12cd' });
+      expect(securityRepo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {

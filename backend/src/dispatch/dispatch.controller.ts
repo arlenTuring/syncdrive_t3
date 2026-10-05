@@ -4,6 +4,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DispatchEngineService } from './dispatch-engine.service';
 import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
+import { dispatchOrderFields } from './dispatch-order-kind';
 
 /**
  * 即時調度引擎的內部維運介面。
@@ -76,6 +77,20 @@ export class DispatchController {
     };
   }
 
+  @Get('simulation/runs/:runId')
+  @ApiOperation({
+    summary: '模擬執行進度（依訂單 payload.plan_run_id 追溯）',
+    description:
+      '模擬器建單時在 payload 帶 plan_run_id／plan_shift_id／plan_load_digest／plan_run_total。' +
+      '每張單只歸一類：已建單未開始、執行中、車輛故障結案待確認、中心端取消待結案、已完成、已中止、故障結案。' +
+      '「開始」只認車端 REST 回報（vehicle_progress_at.PROCESSING），中心端寫的完成時間不算車端證據。' +
+      '本輪計畫數取自訂單上的 plan_run_total；沒建單的計畫項以 not_created 列出（伺服器無法區分未發送與建單失敗）。' +
+      'outcome 只有在所有已建訂單結案、而且建單數等於計畫數時才可能是 all_completed。純讀取。',
+  })
+  async simulationRun(@Param('runId') runId: string): Promise<Record<string, unknown>> {
+    return this.simulationPlan.runStatus(runId);
+  }
+
   @Get('dry-run')
   @ApiOperation({
     summary: '試跑一次檢查',
@@ -140,6 +155,8 @@ function serializePlanned(
           destination_point: item.destination,
           stations: item.stations,
           maintenance: maintenancePayloadFields(item.maintenance),
+          // 下單要用的業務欄位（分類、整備徽章、任務子類型、卡片標籤），跟正式調度同一份
+          order_fields: dispatchOrderFields(item),
         }
       : {}),
   };

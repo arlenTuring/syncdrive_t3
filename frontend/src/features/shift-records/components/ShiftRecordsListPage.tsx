@@ -27,6 +27,7 @@ import {
 import {
   EXECUTION_STATUS_OPTIONS,
   EXECUTION_TAG_STYLE,
+  executionDisplayKey,
   type ExecutionStatusKey,
   type ShiftRecordListItem,
   type ShiftTab,
@@ -355,8 +356,8 @@ export function ShiftRecordsListPage({
                   <td className="py-3 pr-4 font-medium text-zinc-100">{row.trip_code}</td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={t(`shiftRecords.executionStatus.${row.execution_status}`)}
-                      style={EXECUTION_TAG_STYLE[row.execution_status]}
+                      label={t(`shiftRecords.executionStatus.${executionDisplayKey(row)}`)}
+                      style={EXECUTION_TAG_STYLE[executionDisplayKey(row)]}
                     />
                   </td>
                   <td className="py-3 pr-4 text-zinc-300">{row.route_label}</td>

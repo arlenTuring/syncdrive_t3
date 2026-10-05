@@ -122,6 +122,40 @@ describe('模擬計畫的可執行檢查', () => {
     expect(result.missingRoutes).toEqual(['route-x']);
   });
 
+  it('區域元件（停靠點、途經點、格位設施）跟車端一樣以地圖檔解析，不誤判', () => {
+    const result = assessSimulationReadiness({
+      ...base,
+      mapDocument: {
+        ...mapDocument,
+        areas: [
+          {
+            facilities: [
+              { id: '096', type: 'DockingPoint' },
+              { id: '149', type: 'Facility', customName: 'E3' },
+              { id: '170', type: 'Waypoint', parameters: { waypointCode: '161' } },
+              { id: '072', type: 'TrackCrossover', parameters: { trackCrossoverPortals: { a: { waypointCode: 'xo_1_a' } } } },
+            ],
+          },
+        ],
+      },
+      planned: [
+        planned({
+          kind: 'movement',
+          destination: { id: '096', name: '停靠點', kind: 'facility', arriveAt: 1, departAt: null },
+          stations: [
+            { stationId: '161' },
+            { stationId: '149' },
+            { stationId: 'E3' },
+            { stationId: 'xo_1_a' },
+          ] as PlannedDispatch['stations'],
+        }),
+      ],
+    });
+    expect(result.unresolvedStations).toEqual([]);
+    expect(result.unresolvedFacilities).toEqual([]);
+    expect(result.simulatable).toBe(true);
+  });
+
   it('有任務被略過：不能宣稱完整載入', () => {
     const result = assessSimulationReadiness({
       ...base,

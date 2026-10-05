@@ -170,15 +170,16 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
   });
 
   describe('SSOT：中心端不臆造 vehicle_phase', () => {
-    it('faultActiveOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
+    it('CRITICAL 事件：訂單只標「車輛故障，結案待確認」，不改狀態、不寫 vehicle_phase', async () => {
       orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.PROCESSING));
-      const result = await service.faultActiveOrderForVehicle(
+      const result = await service.markVehicleFaultOnActiveOrder(
         'PMS05',
         'PATH_BLOCKED',
       );
-      expect(result?.status).toBe(OrderStatus.FAULTED);
+      expect(result?.status).toBe(OrderStatus.PROCESSING);
+      expect(result?.completedAt).toBeFalsy();
       expect(result?.payload).not.toHaveProperty('vehicle_phase');
-      expect(result?.payload).toMatchObject({ fault_reason: 'PATH_BLOCKED' });
+      expect(result?.payload).toMatchObject({ vehicle_fault: { reason: 'PATH_BLOCKED', source: 'event_report' } });
     });
 
     it('recoverFaultedOrderForVehicle 不寫入 vehicle_phase，只動 status', async () => {
@@ -293,7 +294,6 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
           provide: OrderRouteService,
           useValue: {
             // 新格式的班次代號對不到舊的 D/U 路線表，回 null 才是實際情況
-            routeIdForTripCode: () => null,
             computeRouteProgress: () => Promise.resolve(0),
             computeNextStation: () => Promise.resolve(null),
           },
@@ -362,24 +362,24 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     expect(saved.plannedEnd).toBe('1787724210000');
   });
 
-  it('沒有計畫時刻時才用班次代號推測', async () => {
-    const order = existingOrder();
-    order.plannedStart = undefined;
-    order.plannedEnd = undefined;
-    orderRepo.findOne.mockResolvedValue(order);
+  it('沒有計畫時刻的舊單維持沒有，不拿班次代號或回報時間推', async () => {
+    for (const tripCode of ['D1403', 'NT1403']) {
+      const order = existingOrder();
+      order.tripCode = tripCode;
+      order.plannedStart = undefined;
+      order.plannedEnd = undefined;
+      orderRepo.findOne.mockResolvedValue(order);
 
-    await service.applyOperationMqttUpdate('PMS07', {
-      vehicle_code: 'PMS07',
-      order_id: '260826-NT1403',
-      trip_code: 'NT1403',
-      line_kind: 'MAINLINE',
-      order_status: 'PROCESSING',
-      timestamp: 1787724100000,
-    });
-
-    const calls = orderRepo.save.mock.calls as Array<[OperationOrder]>;
-    const saved = calls[calls.length - 1][0];
-    expect(saved.plannedStart).toBe('1787724100000');
+      const saved = await service.applyOperationMqttUpdate('PMS07', {
+        vehicle_code: 'PMS07',
+        order_id: '260826-NT1403',
+        trip_code: tripCode,
+        order_status: 'PROCESSING',
+        timestamp: 1787724100000,
+      });
+      expect(saved?.plannedStart).toBeUndefined();
+      expect(saved?.plannedEnd).toBeUndefined();
+    }
   });
 
   it('車端完全不送 line_kind/route_id/yard_slot_id 時，整備分類仍以訂單記錄為準', async () => {
@@ -431,5 +431,421 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     const legEtaMax = payload.leg_eta_max as Record<string, number>;
     // (1787724180000 - 1787724000000) / 1000 = 180 秒，非車端回報的任何值
     expect(legEtaMax.station_5).toBe(180);
+  });
+});
+
+describe('OrderService.createOrder 模擬器重播單（不覆寫、重試不重發）', () => {
+  let service: OrderService;
+  const stored = new Map<string, OperationOrder>();
+  const publishAssign = jest.fn(() => ({ topic: 't' }));
+  const orderRepo = {
+    create: jest.fn((o) => o),
+    insert: jest.fn(async (o: OperationOrder) => {
+      if (stored.has(o.id)) throw Object.assign(new Error('dup'), { code: '23505' });
+      stored.set(o.id, o);
+    }),
+    save: jest.fn(async (o: OperationOrder) => o),
+    findOne: jest.fn(async ({ where }: { where: { id: string } }) => stored.get(where.id) ?? null),
+  };
+
+  beforeEach(async () => {
+    stored.clear();
+    publishAssign.mockClear();
+    orderRepo.save.mockClear();
+    const noop = {} as never;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: noop },
+        { provide: getRepositoryToken(OrderEvent), useValue: noop },
+        { provide: OrderMqttPublisher, useValue: { publishAssign } },
+        { provide: OrderRouteService, useValue: {} },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: noop },
+      ],
+    }).compile();
+    service = module.get(OrderService);
+  });
+
+  const body = (payload: Record<string, unknown> = {}) => ({
+    order_id: 'SIM-PLAN-run1-MT-D3-R5-0',
+    vehicle_code: 'PMS05',
+    trip_code: 'MT-D3-R5-0',
+    line_kind: 'MAINTENANCE',
+    payload: { source: 'plan_replay', plan_run_id: 'run1', ...payload },
+  });
+
+  it('分類改成 MAINTENANCE 後仍是只新增，不用 save 覆寫', async () => {
+    await service.createOrder(body());
+    expect(orderRepo.insert).toHaveBeenCalled();
+    expect(orderRepo.save).not.toHaveBeenCalled();
+    expect(publishAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it('同一輪同一任務重送：回傳原訂單，不再發 assign', async () => {
+    await service.createOrder(body());
+    const again = await service.createOrder(body());
+    expect((again as OperationOrder & { duplicate?: boolean }).duplicate).toBe(true);
+    expect(publishAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it('同編號但不是同一輪：撞號報錯', async () => {
+    await service.createOrder(body());
+    await expect(service.createOrder(body({ plan_run_id: 'run2' }))).rejects.toThrow('內容不同');
+  });
+});
+
+describe('OrderService.updateOrderStatus 中心端取消後', () => {
+  let service: OrderService;
+  const orderRepo = { findOne: jest.fn(), save: jest.fn((o) => Promise.resolve(o)) };
+  beforeEach(async () => {
+    const noop = {} as never;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: noop },
+        { provide: getRepositoryToken(OrderEvent), useValue: noop },
+        { provide: OrderMqttPublisher, useValue: noop },
+        { provide: OrderRouteService, useValue: noop },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: noop },
+      ],
+    }).compile();
+    service = module.get(OrderService);
+  });
+  const cancelled = (status: OrderStatus) =>
+    ({ id: 'SIM-1', vehicleCode: 'PMS09', status, payload: { cancel_requested_at: 1 } }) as unknown as OperationOrder;
+
+  it('已取消的單不能開始執行', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PENDING));
+    await expect(service.updateOrderStatus('SIM-1', 'PROCESSING')).rejects.toMatchObject({ response: { code: 'ORDER_CANCELLED' } });
+  });
+
+  it('取消結案後，遲到的完成回報不能把它改回 END', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.FAULTED));
+    await expect(service.updateOrderStatus('SIM-1', 'END')).rejects.toMatchObject({ response: { code: 'ORDER_CANCELLED' } });
+  });
+
+  it('取消結案記下原因；重複回報 FAULTED 冪等', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PROCESSING));
+    const saved = await service.updateOrderStatus('SIM-1', 'FAULTED');
+    expect((saved.payload as Record<string, unknown>).closed_reason).toBe('cancelled_by_center');
+    orderRepo.findOne.mockResolvedValue(saved);
+    await expect(service.updateOrderStatus('SIM-1', 'FAULTED')).resolves.toBe(saved);
+  });
+
+  it('執行中剛好正常完成：照實接受 END', async () => {
+    orderRepo.findOne.mockResolvedValue(cancelled(OrderStatus.PROCESSING));
+    expect((await service.updateOrderStatus('SIM-1', 'END')).status).toBe(OrderStatus.END);
+  });
+});
+
+describe('訂單生命週期：開始只認 REST，MQTT 只寫既有訂單的進度（不看班次代號）', () => {
+  let service: OrderService;
+  const stored = new Map<string, OperationOrder>();
+  const orderRepo = {
+    findOne: jest.fn(async ({ where }: { where: { id: string } }) => stored.get(where.id) ?? null),
+    save: jest.fn(async (o: OperationOrder) => {
+      stored.set(o.id, o);
+      return o;
+    }),
+  };
+
+  beforeEach(async () => {
+    stored.clear();
+    orderRepo.save.mockClear();
+    const noop = {} as never;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: noop },
+        { provide: getRepositoryToken(OrderEvent), useValue: noop },
+        { provide: OrderMqttPublisher, useValue: noop },
+        {
+          provide: OrderRouteService,
+          useValue: {
+            computeRouteProgress: () => Promise.resolve(0),
+            computeNextStation: () => Promise.resolve(null),
+            getRouteStations: () => Promise.resolve([]),
+          },
+        },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: noop },
+      ],
+    }).compile();
+    service = module.get(OrderService);
+  });
+
+  function seed(tripCode: string, lineKind = 'MAINLINE', status = OrderStatus.PENDING, payload: Record<string, unknown> = {}) {
+    const order = {
+      id: `ORD-${tripCode}`,
+      vehicleCode: 'PMS03',
+      tripCode,
+      lineKind,
+      status,
+      plannedStart: '1787724000000',
+      plannedEnd: '1787724360000',
+      payload: { source: 'dispatch_engine', ...payload },
+    } as OperationOrder;
+    stored.set(order.id, order);
+    return order;
+  }
+
+  const report = (tripCode: string, extra: Record<string, unknown> = {}) => ({
+    vehicle_code: 'PMS03',
+    order_id: `ORD-${tripCode}`,
+    trip_code: tripCode,
+    vehicle_phase: 'TRANSITING',
+    order_status: 'PROCESSING',
+    current_leg: { target_station_id: 'station_5', eta_seconds: 60 },
+    timestamp: 1787724100000,
+    ...extra,
+  });
+
+  /** 跑一遍：MQTT 行駛中 → REST 開始 → MQTT 進度 → REST 結束 → 遲到的 MQTT */
+  async function lifecycle(tripCode: string, lineKind: string) {
+    seed(tripCode, lineKind);
+    const trace: string[] = [];
+    const step = async (fn: () => Promise<unknown>) => {
+      await fn();
+      trace.push(String(stored.get(`ORD-${tripCode}`)!.status));
+    };
+    await step(() => service.applyOperationMqttUpdateWithOutcome('PMS03', report(tripCode)));
+    await step(() => service.updateOrderStatus(`ORD-${tripCode}`, 'PROCESSING'));
+    await step(() => service.applyOperationMqttUpdateWithOutcome('PMS03', report(tripCode, { timestamp: 1787724200000 })));
+    await step(() => service.updateOrderStatus(`ORD-${tripCode}`, 'END'));
+    await step(() => service.applyOperationMqttUpdateWithOutcome('PMS03', report(tripCode, { timestamp: 1787724300000 })));
+    const order = stored.get(`ORD-${tripCode}`)!;
+    return { trace, tripCode: order.tripCode, lineKind: order.lineKind, plannedStart: order.plannedStart };
+  }
+
+  it.each(['MAINLINE', 'TRANSITION', 'MAINTENANCE'])('%s：D1234、NT0000、其他名稱走完全一樣的流程', async (lineKind) => {
+    const runs: Array<Awaited<ReturnType<typeof lifecycle>>> = [];
+    for (const tripCode of ['D1234', 'NT0000', 'MT-D3-R5-0']) runs.push(await lifecycle(tripCode, lineKind));
+    for (const run of runs) {
+      expect(run.trace).toEqual(['PENDING', 'PROCESSING', 'PROCESSING', 'END', 'END']);
+      expect(run.lineKind).toBe(lineKind);
+      expect(run.plannedStart).toBe('1787724000000');
+    }
+    expect(runs.map((r) => r.tripCode)).toEqual(['D1234', 'NT0000', 'MT-D3-R5-0']);
+  });
+
+  it('待發中的進度更新（任何 phase）只刷新 ETA，不算開始', async () => {
+    for (const phase of ['AWAITING_DEPARTURE', 'TRANSITING', 'DWELLING', 'DOCKING']) {
+      seed('D1234');
+      const { outcome } = await service.applyOperationMqttUpdateWithOutcome(
+        'PMS03',
+        report('D1234', { vehicle_phase: phase, timestamp: Date.now() }),
+      );
+      const order = stored.get('ORD-D1234')!;
+      expect(outcome).toBe('pending_refreshed');
+      expect(order.status).toBe(OrderStatus.PENDING);
+      expect(order.lineKind).toBe('MAINLINE');
+      expect(order.etaRemain).toBe('01:00');
+    }
+  });
+
+  it('錯車：回報的車不是指派的車，不寫入', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    const { order, outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS09', report('NT0000', { vehicle_code: 'PMS09' }));
+    expect(outcome).toBe('vehicle_mismatch');
+    expect(order).toBeNull();
+    expect(orderRepo.save).not.toHaveBeenCalled();
+    expect(stored.get('ORD-NT0000')!.vehicleCode).toBe('PMS03');
+  });
+
+  it('未知訂單：不建立訂單', async () => {
+    const { order, outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NOPE'));
+    expect(outcome).toBe('unknown_order');
+    expect(order).toBeNull();
+    expect(stored.size).toBe(0);
+  });
+
+  it('沒有 order_id：不從班次代號拼單號', async () => {
+    seed('D1234', 'MAINLINE', OrderStatus.PROCESSING);
+    const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('D1234', { order_id: undefined }));
+    expect(outcome).toBe('missing_order_id');
+    expect(orderRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('重複訊息與延遲訊息：不覆蓋較新的進度', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', {
+      timestamp: 2000, current_leg: { target_station_id: 'station_7', eta_seconds: 10 },
+    }));
+    const dup = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { timestamp: 2000 }));
+    const late = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { timestamp: 1000 }));
+    expect(dup.outcome).toBe('duplicate');
+    expect(late.outcome).toBe('stale');
+    const payload = stored.get('ORD-NT0000')!.payload as Record<string, unknown>;
+    expect((payload.current_leg as Record<string, unknown>).target_station_id).toBe('station_7');
+    expect(orderRepo.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('已取消的單：MQTT 行駛中也不會開始，REST 開始被拒', async () => {
+    seed('D1234', 'MAINLINE', OrderStatus.PENDING, { cancel_requested_at: 1 });
+    const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('D1234'));
+    expect(outcome).toBe('cancel_requested');
+    expect(orderRepo.save).not.toHaveBeenCalled();
+    expect(stored.get('ORD-D1234')!.status).toBe(OrderStatus.PENDING);
+    await expect(service.updateOrderStatus('ORD-D1234', 'PROCESSING')).rejects.toMatchObject({
+      response: { code: 'ORDER_CANCELLED' },
+    });
+  });
+
+  it('已結束、已故障的單：遲到的 MQTT 不寫進度、不改狀態', async () => {
+    for (const status of [OrderStatus.END, OrderStatus.FAULTED]) {
+      orderRepo.save.mockClear();
+      seed('NT0000', 'MAINLINE', status);
+      const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { timestamp: Date.now() }));
+      expect(outcome).toBe('not_processing');
+      expect(stored.get('ORD-NT0000')!.status).toBe(status);
+      expect(orderRepo.save).not.toHaveBeenCalled();
+    }
+  });
+
+  it('車端 REST 回報才記車端證據；中心端內部呼叫不記；重送不改第一次的時間', async () => {
+    seed('NT0000');
+    await service.updateOrderStatus('ORD-NT0000', 'PROCESSING');
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).vehicle_progress_at).toBeUndefined();
+    seed('D1234');
+    await service.updateOrderStatus('ORD-D1234', 'PROCESSING', { reporter: 'vehicle' });
+    const first = ((stored.get('ORD-D1234')!.payload as Record<string, unknown>).vehicle_progress_at as Record<string, number>).PROCESSING;
+    expect(first).toEqual(expect.any(Number));
+    await service.updateOrderStatus('ORD-D1234', 'PROCESSING', { reporter: 'vehicle' });
+    expect(((stored.get('ORD-D1234')!.payload as Record<string, unknown>).vehicle_progress_at as Record<string, number>).PROCESSING).toBe(first);
+  });
+
+  it('MQTT vehicle_phase=FAULTED：不結案，標「車輛故障，結案待確認」；之後車端 REST FAULTED 才結案', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    const { outcome } = await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'FAULTED' }));
+    let order = stored.get('ORD-NT0000')!;
+    expect(outcome).toBe('vehicle_fault_reported');
+    expect(order.status).toBe(OrderStatus.PROCESSING);
+    expect((order.payload as Record<string, unknown>).vehicle_fault).toMatchObject({ source: 'operation_update' });
+    await service.updateOrderStatus('ORD-NT0000', 'FAULTED', { reporter: 'vehicle' });
+    order = stored.get('ORD-NT0000')!;
+    expect(order.status).toBe(OrderStatus.FAULTED);
+  });
+
+  it('車端故障後恢復正常 phase：清掉故障標記，可以照常 END', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING);
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'FAULTED', timestamp: 10 }));
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', { vehicle_phase: 'TRANSITING', timestamp: 20 }));
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).vehicle_fault).toBeNull();
+    await service.updateOrderStatus('ORD-NT0000', 'END', { reporter: 'vehicle' });
+    expect(stored.get('ORD-NT0000')!.status).toBe(OrderStatus.END);
+  });
+
+  it('故障待結案時中心端仍可取消', async () => {
+    seed('NT0000', 'MAINLINE', OrderStatus.PROCESSING, { vehicle_fault: { reported_at: 1 } });
+    const publishCancel = jest.fn();
+    (service as unknown as { orderMqttPublisher: { publishCancel: jest.Mock } }).orderMqttPublisher = { publishCancel };
+    await service.requestCancel('ORD-NT0000');
+    expect((stored.get('ORD-NT0000')!.payload as Record<string, unknown>).cancel_requested_at).toEqual(expect.any(Number));
+  });
+
+  it('MQTT 不改班次代號、車輛與業務分類', async () => {
+    seed('NT0000', 'TRANSITION', OrderStatus.PROCESSING);
+    await service.applyOperationMqttUpdateWithOutcome('PMS03', report('NT0000', {
+      trip_code: 'D9999', line_kind: 'MAINLINE', route_id: 'ROUTE-MAINLINE-DOWN',
+    }));
+    const order = stored.get('ORD-NT0000')!;
+    expect(order.tripCode).toBe('NT0000');
+    expect(order.lineKind).toBe('TRANSITION');
+  });
+});
+
+describe('createOrder：路線與分類只用明確給的值', () => {
+  it('D/U 班次代號不會自動變成正線、也不會補路線', async () => {
+    const saved: OperationOrder[] = [];
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        {
+          provide: getRepositoryToken(OperationOrder),
+          useValue: { create: (o: OperationOrder) => o, save: async (o: OperationOrder) => { saved.push(o); return o; } },
+        },
+        { provide: getRepositoryToken(OrderActionState), useValue: {} },
+        { provide: getRepositoryToken(OrderEvent), useValue: {} },
+        { provide: OrderMqttPublisher, useValue: { publishAssign: () => ({}) } },
+        { provide: OrderRouteService, useValue: { materializeActionStates: jest.fn() } },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: {} },
+      ],
+    }).compile();
+    const service = module.get(OrderService);
+    await service.createOrder({ order_id: 'A', vehicle_code: 'PMS01', trip_code: 'D1234' });
+    expect(saved[0].lineKind).toBeUndefined();
+    expect(saved[0].routeId).toBeUndefined();
+  });
+});
+
+describe('同一張單同時被 MQTT 進度與 REST 回報寫入', () => {
+  it('不會互相蓋掉 payload（vehicle_progress_at、cancel_requested_at 都留著）', async () => {
+    const db = new Map<string, OperationOrder>();
+    const clone = (o: OperationOrder) => JSON.parse(JSON.stringify(o)) as OperationOrder;
+    const tick = () => new Promise((r) => setTimeout(r, 5));
+    const orderRepo = {
+      findOne: jest.fn(async ({ where }: { where: { id: string } }) => {
+        await tick();
+        const o = db.get(where.id);
+        return o ? clone(o) : null;
+      }),
+      save: jest.fn(async (o: OperationOrder) => {
+        await tick();
+        db.set(o.id, clone(o));
+        return o;
+      }),
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(OrderActionState), useValue: {} },
+        { provide: getRepositoryToken(OrderEvent), useValue: {} },
+        { provide: OrderMqttPublisher, useValue: { publishCancel: jest.fn() } },
+        {
+          provide: OrderRouteService,
+          useValue: {
+            computeRouteProgress: () => Promise.resolve(0),
+            computeNextStation: () => Promise.resolve(null),
+            getRouteStations: () => Promise.resolve([]),
+          },
+        },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: {} },
+      ],
+    }).compile();
+    const service = module.get(OrderService);
+    db.set('ORD-1', {
+      id: 'ORD-1', vehicleCode: 'PMS04', tripCode: 'NT0401', lineKind: 'MAINLINE',
+      status: OrderStatus.PROCESSING, payload: { source: 'plan_replay' },
+    } as OperationOrder);
+
+    await Promise.all([
+      service.applyOperationMqttUpdateWithOutcome('PMS04', {
+        order_id: 'ORD-1', vehicle_phase: 'TRANSITING', timestamp: 100,
+        current_leg: { target_station_id: 'station_5', eta_seconds: 10 },
+      }),
+      service.updateOrderStatus('ORD-1', 'END', { reporter: 'vehicle' }),
+    ]);
+    let order = db.get('ORD-1')!;
+    expect(order.status).toBe(OrderStatus.END);
+    expect((order.payload as Record<string, unknown>).vehicle_progress_at).toMatchObject({ END: expect.any(Number) });
+
+    db.set('ORD-2', {
+      id: 'ORD-2', vehicleCode: 'PMS04', tripCode: 'NT0402', lineKind: 'MAINLINE',
+      status: OrderStatus.PROCESSING, payload: {},
+    } as OperationOrder);
+    await Promise.all([
+      service.requestCancel('ORD-2'),
+      service.applyOperationMqttUpdateWithOutcome('PMS04', { order_id: 'ORD-2', vehicle_phase: 'TRANSITING', timestamp: 200 }),
+    ]);
+    order = db.get('ORD-2')!;
+    expect((order.payload as Record<string, unknown>).cancel_requested_at).toEqual(expect.any(Number));
   });
 });

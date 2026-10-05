@@ -22,9 +22,9 @@ import {
 } from './dispatch.plan';
 import { extractYardMoves } from './dispatch.yard-moves';
 import { extractYardTasks } from './dispatch.yard-tasks';
-import { buildChargingLookup, maintenancePayloadFields } from './dispatch.charging';
+import { buildChargingLookup } from './dispatch.charging';
 import { MaintenanceTaskService } from '../maintenance-task/maintenance-task.service';
-import { businessLineKind } from './dispatch-order-kind';
+import { dispatchOrderFields } from './dispatch-order-kind';
 
 /**
  * 即時調度引擎。
@@ -435,34 +435,24 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     shiftId: string,
     shiftName: string,
   ): Promise<void> {
+    const fields = dispatchOrderFields(item);
     await this.orderService.createOrder({
       order_id: item.orderId,
       vehicle_code: item.vehicleCode,
       trip_code: item.tripCode,
       // 業務分類與資料來源分開：載客、空車過渡、整備各自保留結構化用途。
-      line_kind: businessLineKind(item),
-      ...(item.maintenance
-        ? {
-            maint_type_label: item.maintenance.typeLabel,
-            maint_type_bg: item.maintenance.typeBg,
-            maint_type_color: item.maintenance.typeColor,
-            maint_station: item.maintenance.yardSlotId,
-          }
-        : {}),
+      line_kind: fields.line_kind,
+      maint_type_label: fields.maint_type_label,
+      maint_type_bg: fields.maint_type_bg,
+      maint_type_color: fields.maint_type_color,
+      maint_station: fields.maint_station,
       planned_start: item.departAt,
       planned_end: item.arriveAt,
       payload: {
         source: 'dispatch_engine',
-        kind: item.kind,
-        // 整備分佈的 SQL 讀 payload->>'yard_slot_id' 判斷哪一格被佔著
-        ...maintenancePayloadFields(item.maintenance),
+        ...fields.payload,
         shift_id: shiftId,
         shift_name: shiftName,
-        timeline_row: item.timelineRow,
-        task_type: item.taskType,
-        card_label: item.cardLabel,
-        route_code: item.routeCode,
-        route_name: item.routeName,
         planned_depart_at: item.departAt,
         planned_arrive_at: item.arriveAt,
         origin: item.origin && {

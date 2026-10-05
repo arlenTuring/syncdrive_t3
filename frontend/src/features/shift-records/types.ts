@@ -4,6 +4,7 @@ export type ExecutionStatusKey =
   | 'pending'
   | 'running'
   | 'delayed'
+  | 'fault_pending'
   | 'faulted'
   | 'completed';
 
@@ -30,16 +31,30 @@ export const EXECUTION_STATUS_OPTIONS: Array<{ value: ExecutionStatusKey | 'all'
   { value: 'pending', label: '待發' },
   { value: 'running', label: '執行中' },
   { value: 'delayed', label: '延誤中' },
+  { value: 'fault_pending', label: '車輛故障（結案待確認）' },
   { value: 'faulted', label: '故障' },
   { value: 'completed', label: '已完成' },
 ];
+
+/**
+ * 畫面上顯示的執行狀態。中心端取消後車端照協議回報 FAULTED 結案的單是「已中止」，
+ * 不是車輛故障——篩選仍歸在 faulted（後端 execution_status 不變），只是文字與顏色分開。
+ */
+export type ExecutionDisplayKey = ExecutionStatusKey | 'cancelled';
+
+export function executionDisplayKey(row: {
+  execution_status: ExecutionStatusKey;
+  payload?: Record<string, unknown> | null;
+}): ExecutionDisplayKey {
+  return row.execution_status === 'faulted' && row.payload?.cancel_requested_at ? 'cancelled' : row.execution_status;
+}
 
 export type StatusTagStyle = {
   container: string;
   dot: string;
 };
 
-export const EXECUTION_TAG_STYLE: Record<ExecutionStatusKey, StatusTagStyle> = {
+export const EXECUTION_TAG_STYLE: Record<ExecutionDisplayKey, StatusTagStyle> = {
   pending: {
     container: 'bg-[rgba(153,161,175,0.2)]',
     dot: 'bg-[#99A1AF]',
@@ -57,6 +72,14 @@ export const EXECUTION_TAG_STYLE: Record<ExecutionStatusKey, StatusTagStyle> = {
     dot: 'bg-[#EF4444]',
   },
   completed: {
+    container: 'bg-[rgba(153,161,175,0.2)]',
+    dot: 'bg-[#99A1AF]',
+  },
+  fault_pending: {
+    container: 'bg-[rgba(239,68,68,0.2)]',
+    dot: 'bg-[#EF4444]',
+  },
+  cancelled: {
     container: 'bg-[rgba(153,161,175,0.2)]',
     dot: 'bg-[#99A1AF]',
   },

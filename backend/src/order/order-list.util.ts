@@ -1,4 +1,5 @@
 import { OperationOrder, OrderStatus } from '../database/entities/operation-order.entity';
+import { orderBusinessKind } from './order-business-kind';
 
 export type ShiftTab = 'mainline' | 'maintenance';
 
@@ -6,8 +7,22 @@ export type ExecutionStatusKey =
   | 'pending'
   | 'running'
   | 'delayed'
+  | 'fault_pending'
   | 'faulted'
   | 'completed';
+
+/**
+ * 車輛回報故障、訂單還沒經車端 REST 結案（MQTT vehicle_phase=FAULTED 或 CRITICAL 事件）。
+ * 訂單狀態仍是 PENDING／PROCESSING，畫面不能顯示成正常運行，也不能假裝已結案。
+ */
+export function hasPendingVehicleFault(order: Pick<OperationOrder, 'status' | 'payload'>): boolean {
+  if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PROCESSING) return false;
+  const payload = (order.payload ?? {}) as Record<string, unknown>;
+  return Boolean(payload.vehicle_fault) || String(payload.vehicle_phase ?? '').toUpperCase() === 'FAULTED';
+}
+
+/** 同一個判斷的 SQL 版本（班次運行紀錄篩選用） */
+export const PENDING_VEHICLE_FAULT_SQL = `(o.status IN ('PENDING', 'PROCESSING') AND (COALESCE(o.payload->'vehicle_fault', 'null'::jsonb) <> 'null'::jsonb OR UPPER(COALESCE(o.payload->>'vehicle_phase', '')) = 'FAULTED'))`;
 
 export type ShiftRecordListItem = {
   order_id: string;
@@ -27,7 +42,14 @@ export type ShiftRecordListItem = {
   payload: Record<string, unknown> | null;
 };
 
-const SHIFT_TRIP_PATTERN = /^[DU]\d{4}$/i;
+/**
+ * 舊示範正線的路線（訂單記錄的 route_id）→ 路線顯示。看的是訂單上的路線，不是班次代號開頭。
+ * 新訂單的路線名稱與站序在 payload.route_name／stations。
+ */
+const MAINLINE_ROUTE_LABELS: Readonly<Record<string, string>> = {
+  'ROUTE-MAINLINE-UP': 'S2W→T3→N2W',
+  'ROUTE-MAINLINE-DOWN': 'N2W→T3→S2W',
+};
 
 export function resolveExecutionStatus(order: OperationOrder): {
   key: ExecutionStatusKey;
@@ -37,7 +59,13 @@ export function resolveExecutionStatus(order: OperationOrder): {
     return { key: 'completed', label: '已完成' };
   }
   if (order.status === OrderStatus.FAULTED) {
+    // 中心端取消後車端照協議回報 FAULTED：是操作結束，不是車輛故障（篩選仍歸在 faulted）
+    const payload = (order.payload ?? {}) as Record<string, unknown>;
+    if (payload.cancel_requested_at) return { key: 'faulted', label: '已中止（中心端取消）' };
     return { key: 'faulted', label: '故障' };
+  }
+  if (hasPendingVehicleFault(order)) {
+    return { key: 'fault_pending', label: '車輛故障（訂單結案待確認）' };
   }
   if (order.status === OrderStatus.PENDING) {
     return { key: 'pending', label: '待發' };
@@ -52,13 +80,6 @@ export function resolveExecutionStatus(order: OperationOrder): {
   return { key: 'pending', label: '待發' };
 }
 
-export function mainlineRouteLabel(tripCode: string): string {
-  const code = tripCode.trim().toUpperCase();
-  if (code.startsWith('U')) return 'S2W→T3→N2W';
-  if (code.startsWith('D')) return 'N2W→T3→S2W';
-  return '—';
-}
-
 export function buildRouteLabel(order: OperationOrder): string {
   const lineKind = String(order.lineKind ?? '').toUpperCase();
   if (lineKind === 'MAINTENANCE') {
@@ -70,9 +91,6 @@ export function buildRouteLabel(order: OperationOrder): string {
       || '—';
     return `S2W→${slot}`;
   }
-  if (SHIFT_TRIP_PATTERN.test(order.tripCode ?? '')) {
-    return mainlineRouteLabel(order.tripCode);
-  }
   const routeName = String(order.payload?.route_name ?? '').trim();
   if (routeName) return routeName;
   const stations = Array.isArray(order.payload?.stations) ? order.payload.stations : [];
@@ -80,20 +98,7 @@ export function buildRouteLabel(order: OperationOrder): string {
     .map((station: Record<string, unknown>) => String(station.station_name ?? station.station_id ?? '').trim())
     .filter(Boolean);
   if (stationNames.length > 1) return stationNames.join('→');
-  return '—';
-}
-
-function tripScheduleTimes(tripCode: string): { startMs: number; endMs: number } | null {
-  const m = SHIFT_TRIP_PATTERN.exec(tripCode.trim());
-  if (!m) return null;
-  const hour = parseInt(tripCode.slice(1, 3), 10);
-  const minute = parseInt(tripCode.slice(3, 5), 10);
-  if (hour > 23 || minute > 59) return null;
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(hour, minute, 0, 0);
-  const legMs = 6 * 60_000;
-  return { startMs: start.getTime(), endMs: start.getTime() + legMs };
+  return MAINLINE_ROUTE_LABELS[String(order.routeId ?? '')] ?? '—';
 }
 
 export function formatHmsFromMs(ms: string | number | null | undefined): string | null {
@@ -107,20 +112,15 @@ export function formatHmsFromMs(ms: string | number | null | undefined): string 
   return `${hh}:${mm}:${ss}`;
 }
 
+/** 計畫發車時刻只看訂單的 planned_start；沒有就是沒有，不從班次代號推 */
 export function resolveDepartTime(order: OperationOrder): string | null {
-  const fromPlanned = formatHmsFromMs(order.plannedStart);
-  if (fromPlanned) return fromPlanned;
-  const schedule = tripScheduleTimes(order.tripCode ?? '');
-  if (!schedule) return null;
-  return formatHmsFromMs(schedule.startMs);
+  return formatHmsFromMs(order.plannedStart);
 }
 
 export function resolveEndTime(order: OperationOrder): string | null {
   if (order.status !== OrderStatus.END) return null;
   const fromPlanned = formatHmsFromMs(order.plannedEnd);
   if (fromPlanned) return fromPlanned;
-  const schedule = tripScheduleTimes(order.tripCode ?? '');
-  if (schedule) return formatHmsFromMs(schedule.endMs);
   if (order.plannedStart) {
     return formatHmsFromMs(Number(order.plannedStart) + 6 * 60_000);
   }
@@ -149,11 +149,14 @@ export function toShiftRecordListItem(order: OperationOrder): ShiftRecordListIte
 }
 
 export function matchesTab(order: OperationOrder, tab: ShiftTab): boolean {
-  const lineKind = String(order.lineKind ?? '').toUpperCase();
+  // 業務分類全系統同一套（見 order-business-kind.ts）；舊版模擬器的 TEST 單在這裡換算
+  const lineKind = String(
+    orderBusinessKind({ lineKind: order.lineKind, payload: order.payload as Record<string, unknown> | null })
+      ?? order.lineKind ?? '',
+  ).toUpperCase();
   if (tab === 'maintenance') {
     return lineKind === 'MAINTENANCE';
   }
-  if (lineKind === 'MAINTENANCE') return false;
-  if (lineKind === 'MAINLINE' || lineKind === 'TRANSITION' || lineKind === 'TEST') return true;
-  return SHIFT_TRIP_PATTERN.test(order.tripCode ?? '');
+  // 分類不明的單兩個分頁都不列（跟 listShiftRecords 的 SQL 一致），不拿班次代號猜
+  return lineKind === 'MAINLINE' || lineKind === 'TRANSITION' || lineKind === 'TEST';
 }

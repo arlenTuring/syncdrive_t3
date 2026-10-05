@@ -60,7 +60,6 @@ export type DrivingCapabilityModel = {
   events: TimelineEvent[];
 };
 
-const MAINLINE_TRIP = /^[DU]\d{4}$/i;
 const EVENT_KINDS = new Set<TimelineEventKind>(['alert']);
 const KIND_SET = new Set<TimelineEventKind>([
   'enter',
@@ -77,17 +76,6 @@ const KIND_SET = new Set<TimelineEventKind>([
   'repair',
   'parking',
 ]);
-
-function parseTripScheduleMs(tripCode: string): number | null {
-  const m = MAINLINE_TRIP.exec(tripCode.trim());
-  if (!m) return null;
-  const hour = parseInt(tripCode.slice(1, 3), 10);
-  const minute = parseInt(tripCode.slice(3, 5), 10);
-  if (hour > 23 || minute > 59) return null;
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.getTime();
-}
 
 function formatHms(ms: number): string {
   const d = new Date(ms);
@@ -150,7 +138,6 @@ function resolveRangeMs(
   const plannedEndRaw =
     parseEpoch(detail.planned_end) ?? parseEpoch(detail.payload?.planned_end);
   const completed = parseEpoch(detail.completed_at);
-  const scheduleStart = parseTripScheduleMs(detail.trip_code);
 
   let startMs: number;
   let endMs: number;
@@ -179,7 +166,8 @@ function resolveRangeMs(
       endMs = Math.max(endMs, completed);
     }
   } else {
-    startMs = plannedStartRaw ?? scheduleStart ?? Date.now();
+    // 沒有計畫時刻的舊單用現在當畫面範圍起點，不從班次代號推發車時刻
+    startMs = plannedStartRaw ?? Date.now();
     endMs =
       (plannedEndRaw != null && plannedEndRaw > startMs ? plannedEndRaw : null)
       ?? startMs + DEFAULT_LEG_MS;
@@ -194,21 +182,26 @@ function resolveRangeMs(
   };
 }
 
-function routeEndpoints(routeLabel: string, tripCode: string): string {
-  const parts = routeLabel.split('→').map((s) => s.trim()).filter(Boolean);
+function routeParts(routeLabel: string): string[] {
+  return routeLabel.split('→').map((s) => s.trim()).filter(Boolean);
+}
+
+/** 起訖站只看訂單的路線（route_label），不看班次代號開頭 */
+function routeEndpoints(routeLabel: string): string {
+  const parts = routeParts(routeLabel);
   if (parts.length >= 2) {
     return `${parts[0]}站 ➔ ${parts[parts.length - 1]}站`;
   }
-  const code = tripCode.trim().toUpperCase();
-  if (code.startsWith('U')) return 'S2W站 ➔ N2W站';
-  if (code.startsWith('D')) return 'N2W站 ➔ S2W站';
   return routeLabel || '—';
 }
 
-function directionLabel(tripCode: string): string {
-  const code = tripCode.trim().toUpperCase();
-  if (code.startsWith('U')) return '上行路線';
-  if (code.startsWith('D')) return '下行路線';
+/** 上下行看路線起訖（S2W→N2W 上行、N2W→S2W 下行）；看不出來就只寫「路線」 */
+function directionLabel(routeLabel: string): string {
+  const parts = routeParts(routeLabel);
+  const from = parts[0]?.replace(/(上行|下行).*$/, '');
+  const to = parts[parts.length - 1]?.replace(/(上行|下行).*$/, '');
+  if (from === 'S2W' && to === 'N2W') return '上行路線';
+  if (from === 'N2W' && to === 'S2W') return '下行路線';
   return '路線';
 }
 
@@ -424,8 +417,8 @@ export function buildDrivingCapabilityModel(detail: ShiftRecordDetail): DrivingC
 
   return {
     tripCode: detail.trip_code,
-    routeEndpoints: routeEndpoints(detail.route_label, detail.trip_code),
-    directionLabel: directionLabel(detail.trip_code),
+    routeEndpoints: routeEndpoints(detail.route_label),
+    directionLabel: directionLabel(detail.route_label),
     timeRangeLabel: `${formatHms(startMs + RANGE_PAD_MS)} - ${formatHms(endMs - RANGE_PAD_MS)}`,
     durationMinutes: minutes,
     plannedDurationHms: formatDurationHms(durationMs),

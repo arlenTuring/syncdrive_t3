@@ -201,7 +201,7 @@ export class OrderController {
     @Req() req: Request,
   ) {
     await this.orderService.authorizeOrder(id, (req as Request & { vehicleScope?: string[] }).vehicleScope);
-    const result = await this.orderService.updateOrderStatus(id, status);
+    const result = await this.orderService.updateOrderStatus(id, status, { reporter: 'vehicle' });
 
     await this.auditService.write({
       sourceIp: req.ip,

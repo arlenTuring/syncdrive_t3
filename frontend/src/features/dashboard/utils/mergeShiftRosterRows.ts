@@ -1,4 +1,3 @@
-import { SHIFT_TRIP_CODE_PATTERN } from '../constants/vtmsVehiclePool';
 import { mergeOperationMqttShiftRow } from './mergeOperationMqttShiftRow';
 
 /**
@@ -11,9 +10,9 @@ export function hasLiveReport(row: Record<string, unknown> | null | undefined): 
   return Boolean(row && (row as Record<symbol, unknown>)[ROW_LIVE_REPORT]);
 }
 
+/** 有單號、沒結束的回報才套用；不看班次代號格式（對應只靠單號） */
 function isActiveMainlineMqtt(payload: Record<string, unknown>): boolean {
-  const trip = String(payload.trip_code ?? '').trim();
-  if (!SHIFT_TRIP_CODE_PATTERN.test(trip)) return false;
+  if (!String(payload.order_id ?? '').trim()) return false;
   const status = String(payload.order_status ?? '').toUpperCase();
   if (status === 'END' || status === 'ENDED' || status === 'CANCELLED') return false;
   return true;
