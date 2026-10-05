@@ -767,7 +767,7 @@ describe('createOrder：路線與分類只用明確給的值', () => {
         OrderService,
         {
           provide: getRepositoryToken(OperationOrder),
-          useValue: { create: (o: OperationOrder) => o, save: async (o: OperationOrder) => { saved.push(o); return o; } },
+          useValue: { create: (o: OperationOrder) => o, findOne: async () => null, save: async (o: OperationOrder) => { saved.push(o); return o; } },
         },
         { provide: getRepositoryToken(OrderActionState), useValue: {} },
         { provide: getRepositoryToken(OrderEvent), useValue: {} },
@@ -847,5 +847,115 @@ describe('同一張單同時被 MQTT 進度與 REST 回報寫入', () => {
     ]);
     order = db.get('ORD-2')!;
     expect((order.payload as Record<string, unknown>).cancel_requested_at).toEqual(expect.any(Number));
+  });
+});
+
+describe('建單不能覆寫已開始、已結案或已取消的單', () => {
+  async function serviceWith(existing: OperationOrder | null) {
+    const saved: OperationOrder[] = [];
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        {
+          provide: getRepositoryToken(OperationOrder),
+          useValue: { create: (o: OperationOrder) => o, findOne: async () => existing, save: async (o: OperationOrder) => { saved.push(o); return o; } },
+        },
+        { provide: getRepositoryToken(OrderActionState), useValue: {} },
+        { provide: getRepositoryToken(OrderEvent), useValue: {} },
+        { provide: OrderMqttPublisher, useValue: { publishAssign: () => ({}) } },
+        { provide: OrderRouteService, useValue: { materializeActionStates: jest.fn() } },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: {} },
+      ],
+    }).compile();
+    return { service: module.get(OrderService), saved };
+  }
+  const body = { order_id: 'ORD-1', vehicle_code: 'PMS01', trip_code: 'NT0000', line_kind: 'MAINLINE' };
+
+  it.each([OrderStatus.PROCESSING, OrderStatus.END, OrderStatus.FAULTED])('既有單是 %s：拒絕，不改狀態', async (status) => {
+    const { service, saved } = await serviceWith({ id: 'ORD-1', status, payload: {} } as OperationOrder);
+    await expect(service.createOrder(body)).rejects.toMatchObject({ response: { code: 'ORDER_NOT_OVERWRITABLE' } });
+    expect(saved).toHaveLength(0);
+  });
+
+  it('既有單是待發但中心端已取消：拒絕', async () => {
+    const { service, saved } = await serviceWith({ id: 'ORD-1', status: OrderStatus.PENDING, payload: { cancel_requested_at: 1 } } as OperationOrder);
+    await expect(service.createOrder(body)).rejects.toMatchObject({ response: { code: 'ORDER_NOT_OVERWRITABLE' } });
+    expect(saved).toHaveLength(0);
+  });
+
+  it('還沒開始的待發單：照舊可以更新內容', async () => {
+    const { service, saved } = await serviceWith({ id: 'ORD-1', status: OrderStatus.PENDING, payload: {} } as OperationOrder);
+    await service.createOrder(body);
+    expect(saved).toHaveLength(1);
+  });
+});
+
+describe('並行的開始、取消、結束、遲到訊息不會把訂單恢復成錯誤狀態', () => {
+  async function setup() {
+    const db = new Map<string, OperationOrder>();
+    const clone = (o: OperationOrder) => JSON.parse(JSON.stringify(o)) as OperationOrder;
+    const tick = () => new Promise((r) => setTimeout(r, Math.random() * 6));
+    const repo = {
+      create: (o: OperationOrder) => o,
+      findOne: jest.fn(async ({ where }: { where: { id: string } }) => { await tick(); const o = db.get(where.id); return o ? clone(o) : null; }),
+      save: jest.fn(async (o: OperationOrder) => { await tick(); db.set(o.id, clone(o)); return o; }),
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: getRepositoryToken(OperationOrder), useValue: repo },
+        { provide: getRepositoryToken(OrderActionState), useValue: {} },
+        { provide: getRepositoryToken(OrderEvent), useValue: {} },
+        { provide: OrderMqttPublisher, useValue: { publishCancel: jest.fn(), publishAssign: () => ({}) } },
+        { provide: OrderRouteService, useValue: { computeRouteProgress: () => Promise.resolve(0), computeNextStation: () => Promise.resolve(null), getRouteStations: () => Promise.resolve([]), materializeActionStates: jest.fn() } },
+        { provide: DatasourceInvalidationService, useValue: invalidationMock },
+        { provide: MapService, useValue: {} },
+      ],
+    }).compile();
+    const seed = (status: OrderStatus, payload: Record<string, unknown> = {}) =>
+      db.set('ORD-C', { id: 'ORD-C', vehicleCode: 'PMS01', tripCode: 'NT0000', lineKind: 'MAINLINE', status, payload } as OperationOrder);
+    return { service: module.get(OrderService), db, seed };
+  }
+  const settle = (p: Promise<unknown>) => p.then(() => 'ok', (e) => (e as { response?: { code?: string } }).response?.code ?? 'error');
+
+  it('開始與取消同時到：取消一定留著；若先開始，取消照樣生效；若先取消，開始被拒', async () => {
+    for (let i = 0; i < 20; i += 1) {
+      const { service, db, seed } = await setup();
+      seed(OrderStatus.PENDING);
+      await Promise.all([settle(service.updateOrderStatus('ORD-C', 'PROCESSING', { reporter: 'vehicle' })), settle(service.requestCancel('ORD-C'))]);
+      const o = db.get('ORD-C')!;
+      expect((o.payload as Record<string, unknown>).cancel_requested_at).toEqual(expect.any(Number));
+      expect([OrderStatus.PENDING, OrderStatus.PROCESSING]).toContain(o.status);
+    }
+  });
+
+  it('結束與遲到的 MQTT 進度同時到：停在 END，不會被改回執行中', async () => {
+    for (let i = 0; i < 20; i += 1) {
+      const { service, db, seed } = await setup();
+      seed(OrderStatus.PROCESSING, { last_operation_report_at: 100 });
+      await Promise.all([
+        settle(service.updateOrderStatus('ORD-C', 'END', { reporter: 'vehicle' })),
+        settle(service.applyOperationMqttUpdateWithOutcome('PMS01', { order_id: 'ORD-C', vehicle_phase: 'TRANSITING', timestamp: 90 })),
+        settle(service.applyOperationMqttUpdateWithOutcome('PMS01', { order_id: 'ORD-C', vehicle_phase: 'FAULTED', timestamp: 200 })),
+      ]);
+      const o = db.get('ORD-C')!;
+      expect(o.status).toBe(OrderStatus.END);
+      expect((o.payload as Record<string, unknown>).vehicle_progress_at).toMatchObject({ END: expect.any(Number) });
+    }
+  });
+
+  it('重送建單與開始同時到：不會把已開始的單改回待發', async () => {
+    for (let i = 0; i < 20; i += 1) {
+      const { service, db, seed } = await setup();
+      seed(OrderStatus.PENDING);
+      await Promise.all([
+        settle(service.updateOrderStatus('ORD-C', 'PROCESSING', { reporter: 'vehicle' })),
+        settle(service.createOrder({ order_id: 'ORD-C', vehicle_code: 'PMS01', trip_code: 'NT0000', line_kind: 'MAINLINE' }, { skipAssign: true })),
+      ]);
+      const o = db.get('ORD-C')!;
+      // 開始先到：建單被拒；建單先到：覆寫的是待發單，之後開始照常生效
+      expect(o.status).toBe(OrderStatus.PROCESSING);
+    }
   });
 });

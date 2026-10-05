@@ -257,7 +257,23 @@ export class OrderService {
       }
       saved = order;
     } else {
-      saved = await this.orderRepository.save(order);
+      // 同編號的單已經存在時，save 會整筆覆寫（連狀態都改回 PENDING）。只允許覆寫還沒開始、
+      // 也沒被取消的待發單；已開始、已結案或已取消的一律拒絕——不然重送一次建單就能把
+      // 執行中或已結束的單「復活」。跟狀態回報、取消走同一個排隊，進入後重新讀取。
+      saved = await this.withOrderLock(data.order_id, async () => {
+        const existing = await this.orderRepository.findOne({ where: { id: data.order_id } });
+        if (existing) {
+          const existingPayload = (existing.payload ?? {}) as Record<string, unknown>;
+          if (existing.status !== OrderStatus.PENDING || existingPayload.cancel_requested_at) {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'ORDER_NOT_OVERWRITABLE',
+              message: `訂單 ${data.order_id} 已是 ${existing.status}${existingPayload.cancel_requested_at ? '（中心端已取消）' : ''}，不能用建單覆寫`,
+            });
+          }
+        }
+        return this.orderRepository.save(order);
+      });
     }
 
     if (routeId) {
