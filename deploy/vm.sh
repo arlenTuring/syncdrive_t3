@@ -13,6 +13,7 @@
 #   ./deploy/vm.sh check               檢查儀表板存的查詢是不是新版、訂單筆數
 #   ./deploy/vm.sh rollback            回到上一個通過健康檢查的版本
 #   ./deploy/vm.sh ssh                 直接登入 VM
+#   ./deploy/vm.sh map [mapId]         把本機改好的圖資送上 34（預設送本機使用中那一張；不用 git、不用重建）
 #
 # 目標預設是 34（gcloud instance syncdrive-t3、zone asia-east1-a），跟 git-sync.sh 同一組；
 # 換機器時改下面兩行，或用環境變數 SYNC_INSTANCE／SYNC_ZONE 臨時覆蓋。
@@ -47,7 +48,7 @@ container_of() {
   esac
 }
 
-usage() { sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; }
 
 cmd="${1:-}"
 if [ $# -gt 0 ]; then shift; fi
@@ -55,6 +56,11 @@ if [ $# -gt 0 ]; then shift; fi
 case "$cmd" in
   sync)
     exec "$ROOT/deploy/git-sync.sh" "$@"
+    ;;
+
+  map)
+    # 圖資存在後端的 data volume 裡，不在 git 原始碼樹；只能走 API 送進執行中的後端，見 map-push.sh
+    exec "$ROOT/deploy/map-push.sh" --gcloud "$INSTANCE" "$ZONE" "${SYNC_PROJECT:-}" "${1:-}"
     ;;
 
   update)
