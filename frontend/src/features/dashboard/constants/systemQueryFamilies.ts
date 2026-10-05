@@ -32,6 +32,12 @@ export const SYSTEM_QUERY_FAMILIES: SystemQueryFamily[] = [
     markers: [/\bbadge_label\b/, /\bsegment_label\b/, /\bdemo_speed\b/],
   },
   {
+    id: 'event-center-list',
+    constantName: 'EVENT_CENTER_LIST_SQL',
+    label: '事件中心清單',
+    markers: [/\bsecurity_event_logs\b/, /\bstatus_label\b/, /\bevent_time\b/],
+  },
+  {
     id: 'mainline-fleet',
     constantName: 'MAINLINE_FLEET_STATUS_SQL',
     label: '正線營運車數',

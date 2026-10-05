@@ -1256,7 +1256,7 @@ const elements: CanvasElementProps[] = [
     isGroup: true,
     groupRepeatMode: 'scroll',
     groupScrollInterval: 4,
-    slotKeyField: 'event_id',
+    slotKeyField: 'event_key',
     dataSourceId: DS,
     sqlQuery: EVENT_CENTER_LIST_SQL,
     refreshInterval: 0,
