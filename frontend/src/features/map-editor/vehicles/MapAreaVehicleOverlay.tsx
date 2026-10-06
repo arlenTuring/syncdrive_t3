@@ -82,6 +82,9 @@ import { collectYardSlotFieldBoxes } from '../utils/yardFacilitySlots';
 import { withCrossBranchTracks } from '../utils/crossBranches';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { classifyYardVehicle, type YardDecision } from './yardClassification';
+import { decideYardExitStage, type YardExitLatch, type YardExitStage } from './yardExitStaging';
+import { useOrderTaskMeta } from '../../dashboard/elements/useOrderRouteStations';
+import { resolveFacilityAreaPosition, resolveFacilityAreaSize } from '../utils/facilityAreaCoords';
 import type { MapPlannedRoute } from '../types/mapFile';
 import {
   buildRouteCorridors,
@@ -352,6 +355,12 @@ export function MapAreaVehicleOverlay({
    * 下行線旁邊，畫面上是好幾台車疊在線上。
    */
   const yardStateRef = useRef<Map<string, { key: string; decision: YardDecision }>>(new Map());
+  /*
+   * 出廠車：任務開始後、還沒接上道路前，畫在所屬分區出入口（規則見 yardExitStaging.ts）。
+   * 任務用途取訂單的結構化欄位；每張單接上道路後就不再回到出入口。
+   */
+  const orderTaskMeta = useOrderTaskMeta(vehicles);
+  const exitLatchRef = useRef<Map<string, YardExitLatch>>(new Map());
   const yardDecisionOf = useCallback(
     (vehicle: AreaVehicleLive): YardDecision => {
       // 同一筆資料在一次 render 裡會被問好幾次；只推進一次狀態
@@ -577,12 +586,69 @@ export function MapAreaVehicleOverlay({
   const displayW = Math.max(4, vehicleDisplayWidthPx);
   const displayH = Math.max(2, vehicleDisplayHeightPx);
 
+  /*
+   * 出廠呈現先整批算：同一個出入口有幾台、各排第幾——多車時排成一列並標序號，只是呈現，
+   * 不代表實際間距。
+   */
+  const exitStages = new Map<string, { stage: YardExitStage; placement: VehiclePlacementAcrossAreas; index: number; count: number }>();
+  {
+    const perEntrance = new Map<string, Array<{ vehicleId: string; stage: YardExitStage }>>();
+    for (const vehicle of vehicles) {
+      const orderId = readOrderId(vehicle.payload);
+      const raw = resolveCachedPlacement(vehicle, trackNetwork);
+      const { stage, latch } = decideYardExitStage({
+        orderId,
+        meta: orderId ? orderTaskMeta[orderId] : undefined,
+        payload: vehicle.payload as Record<string, unknown> | undefined,
+        xM: vehicle.xM,
+        yM: vehicle.yM,
+        onRoadTrack: raw?.placement.source === 'generated',
+        facilities: areas.flatMap((a) => a.facilities ?? []),
+        previous: exitLatchRef.current.get(vehicle.vehicleId),
+      });
+      if (latch) exitLatchRef.current.set(vehicle.vehicleId, latch);
+      else exitLatchRef.current.delete(vehicle.vehicleId);
+      if (!stage) continue;
+      const list = perEntrance.get(stage.entrance.id) ?? [];
+      list.push({ vehicleId: vehicle.vehicleId, stage });
+      perEntrance.set(stage.entrance.id, list);
+    }
+    for (const [entranceId, list] of perEntrance) {
+      const area = areas.find((a) => (a.facilities ?? []).some((f) => f.id === entranceId));
+      const entrance = area?.facilities.find((f) => f.id === entranceId);
+      if (!area || !entrance) continue;
+      const pos = resolveFacilityAreaPosition(entrance, area.domain, area.layout);
+      const size = resolveFacilityAreaSize(entrance, area.domain, area.layout);
+      const ordered = [...list].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
+      ordered.forEach((item, index) => {
+        const horizontal = size.w >= size.h;
+        const t = (index + 1) / (ordered.length + 1);
+        exitStages.set(item.vehicleId, {
+          stage: item.stage,
+          index,
+          count: ordered.length,
+          placement: {
+            area,
+            placement: {
+              areaLocalX: horizontal ? pos.x + size.w * t : pos.x + size.w / 2,
+              areaLocalY: horizontal ? pos.y + size.h / 2 : pos.y + size.h * t,
+              trackId: entrance.id,
+              score: 1,
+              source: 'zone',
+            },
+          },
+        });
+      });
+    }
+  }
+
   return (
     <div className="pointer-events-none absolute inset-0 z-[2000]" aria-hidden>
       {vehicles.map((vehicle) => {
         const yardDecision = yardDecisionOf(vehicle);
-        const preferYard = yardDecision.yard;
-        const placement = resolveCachedPlacement(vehicle, trackNetwork);
+        const exitStage = exitStages.get(vehicle.vehicleId);
+        const preferYard = yardDecision.yard && !exitStage;
+        const placement = exitStage?.placement ?? resolveCachedPlacement(vehicle, trackNetwork);
         if (!placement) return null;
         const { area, stackOrder } = {
           area: placement.area,
@@ -913,10 +979,29 @@ export function MapAreaVehicleOverlay({
          * 百分比取自同一份判位結果與它判給的那一條軌道（不用補間中的軌道），格位停車、場區
          * 移動沒有對應軌道就不畫——不補 0%，也不拿最近的軌道充數。
          */
-        let cellBadge: ReactElement | null = null;
+        let cellBadge: ReactElement | null = exitStage ? (
+          <div
+            key={`${vehicle.areaId}:${vehicle.vehicleId}:exit`}
+            className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
+            title="出廠任務已開始、還在場內：畫在所屬分區出入口（不代表實際位置與間距）"
+            style={{
+              left: badgeCenterX,
+              top: badgeTopY,
+              zIndex: zIndex + 1,
+              backgroundColor: '#78350F',
+              color: '#FDE68A',
+              fontSize: 11,
+              transform: 'translate(-50%, -100%)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {exitStage.stage.label}
+            {exitStage.count > 1 ? `（${exitStage.index + 1}/${exitStage.count}）` : ''}
+          </div>
+        ) : null;
         const fixTrackId = placement.placement.trackId;
         const fixFacility = network ? area.facilities.find((f) => f.id === fixTrackId) : undefined;
-        if (!preferYard && network && fixFacility && roofConfig.enabled && Number.isFinite(network.alongFrac)) {
+        if (!exitStage && !preferYard && network && fixFacility && roofConfig.enabled && Number.isFinite(network.alongFrac)) {
           const realPath = getTrackGenPaths(fixFacility.parameters)?.real;
           const defaultReversed = realPath ? trackAlongIsReversed(fixFacility.parameters, realPath) : false;
           const passage = passageProgress(

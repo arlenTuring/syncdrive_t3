@@ -1745,7 +1745,7 @@ const enUS: DeepStringify<typeof zhTW> = {
           hint: 'Facility (large block) — charging / parking / maintenance bay; set purpose in properties',
         },
         zoneEntrance: {
-          label: 'Zone entrance',
+          label: 'Zone gateway',
           hint: 'Dashed box; track end faces can join to it; vehicles entering teleport to linked zones; configure zone names and field ranges',
         },
         zonePartition: {
