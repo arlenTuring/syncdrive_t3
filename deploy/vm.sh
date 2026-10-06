@@ -2,8 +2,11 @@
 #
 # 在 Mac（已登入 gcloud 的那台）操作部署機 34 的總控。
 #
-#   ./deploy/vm.sh sync                同步：VM 拉 GitHub 最新 main → 重建部署 → 升級儀表板資料
-#   ./deploy/vm.sh sync --no-deploy    只拉程式碼＋升級儀表板資料，不重建（git-sync.sh 的參數都可以接在後面）
+#   ./deploy/vm.sh syncall             全部同步：先 synccode，再 syncdata
+#   ./deploy/vm.sh synccode            程式碼：VM 拉 GitHub 最新 main → 重建部署 → 升級儀表板查詢（舊名 sync 照用）
+#   ./deploy/vm.sh synccode --no-deploy  只拉程式碼＋升級儀表板查詢，不重建（git-sync.sh 的參數都可以接在後面）
+#   ./deploy/vm.sh syncdata            人為資料：把本機的地圖、儀表板、班表清單等整份送上去（先備份再替換）
+#   ./deploy/vm.sh syncdata --dry-run  只在本機匯出、列出會送什麼；另有 --no-maps、--restore [備份]、--list-backups
 #   ./deploy/vm.sh update              在 VM 上 git pull → 重建部署（不碰儀表板資料）
 #   ./deploy/vm.sh restart             重啟前端＋後端（不重建、不換版本）
 #   ./deploy/vm.sh restart backend     只重啟後端；也可以 web／postgres／redis／mosquitto／all
@@ -48,14 +51,25 @@ container_of() {
   esac
 }
 
-usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; }
 
 cmd="${1:-}"
 if [ $# -gt 0 ]; then shift; fi
 
 case "$cmd" in
-  sync)
+  synccode|sync)
     exec "$ROOT/deploy/git-sync.sh" "$@"
+    ;;
+
+  syncdata)
+    # 地圖、儀表板、班表清單這些是人在本機做出來的，不在 git 裡；送什麼、不送什麼見 data-sync.sh
+    exec "$ROOT/deploy/data-sync.sh" "$@"
+    ;;
+
+  syncall)
+    # 先程式碼再資料：部署機的資料表欄位要先跟上本機，資料才倒得進去
+    "$ROOT/deploy/git-sync.sh"
+    exec "$ROOT/deploy/data-sync.sh" "$@"
     ;;
 
   map)

@@ -96,7 +96,9 @@ cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
 日常操作集中在這一支，預設目標同上（34）：
 
 ```bash
-./deploy/vm.sh sync              # 拉 GitHub 最新 main → 重建部署 → 升級儀表板資料（= git-sync.sh）
+./deploy/vm.sh syncall           # 全部：synccode 再 syncdata
+./deploy/vm.sh synccode          # 程式碼：拉 GitHub 最新 main → 重建部署 → 升級儀表板查詢（= git-sync.sh；舊名 sync）
+./deploy/vm.sh syncdata          # 人為資料：本機的地圖、儀表板、班表清單等整份送上去（= data-sync.sh）
 ./deploy/vm.sh update            # 在 VM 上 git pull → 重建部署
 ./deploy/vm.sh restart           # 重啟前端＋後端（不重建、不換版本），之後跑健康檢查
 ./deploy/vm.sh restart backend   # 只重啟後端；也可 web／postgres／redis／mosquitto／all
@@ -107,6 +109,17 @@ cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
 ./deploy/vm.sh rollback          # 回到上一個健康版本
 ./deploy/vm.sh ssh               # 登入 VM
 ```
+
+`syncdata` 送的是人在本機做出來、不在 git 裡的資料：儀表板（含模組頁面、資料來源設定）、
+班表清單、時間模板、維護任務、路線與站點動作、格位、車輛與車型、媒體庫、系統基礎模組設定，
+以及 `backend/data/published-maps` 的每一張地圖和「使用中」設定。清單在 `data-snapshot.sh`。
+
+- 以本機為準**整份替換**；本機沒有資料的表略過，34 那張表保留原樣。
+- 不送執行痕跡與機器自己的東西：訂單、遙測、稽核、每日計畫採用紀錄、營運時鐘、協力廠商 API 金鑰、帳號。
+- 替換前在 34 備份到 `deploy/.state/data-backups/<時間>/`（保留 10 份）；資料表在同一個交易裡換，
+  失敗就整批不生效。倒回：`./deploy/vm.sh syncdata --restore [時間]`，列出：`--list-backups`。
+- 34 的資料表欄位比本機舊時會失敗：先 `synccode`，或直接 `syncall`。
+- 先看會送什麼：`./deploy/vm.sh syncdata --dry-run`（不連線）。
 
 在沒有原始碼的機器上跑 `deploy.sh` 會直接停下並告訴你改用安裝包——安裝包刻意
 不含原始碼，正式機不該保留原始碼，也不該在上面建置。
