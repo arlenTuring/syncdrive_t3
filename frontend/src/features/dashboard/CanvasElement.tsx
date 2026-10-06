@@ -1058,6 +1058,7 @@ const color =  {
     'vehicle-container': '#f59e0b',
     'tab-list': '#8b5cf6',
     'shift-list': '#8b5cf6',
+    'station-eta': '#34d399',
   }[child.type] || '#94a3b8';
   const label = {
     text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB',
@@ -1072,6 +1073,7 @@ const color =  {
     'vehicle-container': 'VEH',
     'tab-list': 'TABS',
     'shift-list': 'SHIFTS',
+    'station-eta': 'ETA',
   }[child.type] || 'WIDGET';
 
   const rotationDeg = child.rotationDeg ?? 0;

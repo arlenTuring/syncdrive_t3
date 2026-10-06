@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { MqttModule } from './mqtt/mqtt.module';
 import { RedisModule } from './redis/redis.module';
 import { EventsModule } from './events/events.module';
+import { OperatingDayModule } from './operating-day/operating-day.module';
 import { PartnerApiKey } from './database/entities/partner-api-key.entity';
 import { PartnerAccessModule } from './partner-access/partner-access.module';
 import { Vehicle } from './database/entities/vehicle.entity';
@@ -143,6 +144,7 @@ import { DataAdminModule } from './data-admin/data-admin.module';
     MqttModule,
     RedisModule,
     EventsModule,
+    OperatingDayModule,
     OrderModule,
     CommandModule,
     VehicleModule,

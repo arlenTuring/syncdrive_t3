@@ -15,6 +15,8 @@ export const DS_TAGS = {
   CAPACITY_TREND: 'domain:capacity_trend',
   SECURITY_EVENTS: 'table:security_event_log',
   SLOT_STATUS: 'table:slot_status',
+  /** 營運時鐘換段（開始重播、暫停、繼續、改倍速、結束）；畫面重抓時鐘並重算倒數 */
+  OPERATING_CLOCK: 'domain:operating_clock',
 } as const;
 
 export type DatasourceInvalidatePayload = {

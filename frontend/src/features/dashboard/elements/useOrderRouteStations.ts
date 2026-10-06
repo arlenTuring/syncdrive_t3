@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
+import type { OrderTaskMeta } from '../../map-editor/vehicles/yardExitStaging';
 import { fetchShiftRecordDetail } from '../../shift-records/api/shiftRecordsApi';
 
 /**
@@ -10,6 +11,9 @@ import { fetchShiftRecordDetail } from '../../shift-records/api/shiftRecordsApi'
  * 就記成空，判位退回沒有路徑的做法，不會反覆重試。
  */
 const cache = new Map<string, readonly string[]>();
+/** 同一次查詢順便記下任務的結構化用途（出廠／入廠…），圖台的出廠呈現用 */
+const metaCache = new Map<string, OrderTaskMeta>();
+const listeners = new Set<() => void>();
 const inflight = new Set<string>();
 const MAX_CACHE = 300;
 
@@ -41,6 +45,13 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
             .map((s) => (typeof s?.station_id === 'string' ? s.station_id : ''))
             .filter(Boolean);
           cache.set(id, stations);
+          const payload = (detail.payload ?? {}) as Record<string, unknown>;
+          const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+          metaCache.set(id, {
+            transitionPurpose: str(payload.transition_purpose),
+            transitionFacility: str(payload.transition_facility),
+            yardSlotId: str(payload.yard_slot_id),
+          });
         })
         .catch(() => {
           cache.set(id, []);
@@ -49,9 +60,13 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
           inflight.delete(id);
           if (cache.size > MAX_CACHE) {
             const oldest = cache.keys().next().value;
-            if (oldest !== undefined) cache.delete(oldest);
+            if (oldest !== undefined) {
+              cache.delete(oldest);
+              metaCache.delete(oldest);
+            }
           }
           if (!cancelled) setVersion((n) => n + 1);
+          listeners.forEach((fn) => fn());
         });
     }
     return () => {
@@ -69,4 +84,30 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version]);
+}
+
+/**
+ * 每台車目前這張任務的結構化用途（transition_purpose 等）。跟站序共用同一次查詢與快取；
+ * 查詢由 useOrderRouteStations 發，這裡只讀（同一個畫面兩者都會掛）。
+ */
+export function useOrderTaskMeta(vehicles: readonly AreaVehicleLive[]): Record<string, OrderTaskMeta> {
+  useOrderRouteStations(vehicles);
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const fn = () => setVersion((n) => n + 1);
+    listeners.add(fn);
+    return () => {
+      listeners.delete(fn);
+    };
+  }, []);
+  const ids = vehicles.map(orderIdOf).filter((id): id is string => !!id).sort().join('|');
+  return useMemo(() => {
+    const out: Record<string, OrderTaskMeta> = {};
+    for (const id of ids.split('|')) {
+      const meta = id ? metaCache.get(id) : undefined;
+      if (meta) out[id] = meta;
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids, version]);
 }

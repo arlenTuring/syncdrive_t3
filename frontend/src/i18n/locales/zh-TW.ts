@@ -1731,12 +1731,12 @@ const zhTW = {
           hint: '設施（大型區塊）— 充電格／停車格／維修格等；用途請在屬性填寫',
         },
         zoneEntrance: {
-          label: '分區入口',
-          hint: '虛線方塊；可與各式軌道端面接合；車輛進入後傳送到連結分區；可設定多個分區名稱與場域範圍',
+          label: '分區出入口',
+          hint: '虛線方塊；場內車輛由此進出（出廠、入廠）；可與各式軌道端面接合；可設定多個分區名稱與場域範圍。改名不改變接合道路的行車方向',
         },
         zonePartition: {
           label: '分區',
-          hint: '場域範圍由分區入口綁定；可容納設施，設施場域座標相對此分區範圍換算',
+          hint: '場域範圍由分區出入口綁定；可容納設施，設施場域座標相對此分區範圍換算',
         },
         light: {
           label: '紅綠燈',
@@ -1797,7 +1797,7 @@ const zhTW = {
       zoneEntrance: {
         title: '分區連結',
         hint:
-          '從場上既有分區選擇連結；已連結的分區不會再出現在選單。變更名稱／場域範圍會同步到該分區。軌道端面可接合至此入口外框。車輛進入後可傳送到連結分區（模擬層之後接）。',
+          '從場上既有分區選擇連結；已連結的分區不會再出現在選單。變更名稱／場域範圍會同步到該分區。軌道端面可接合至此出入口外框。車輛進入後可傳送到連結分區（模擬層之後接）。',
         empty: '尚未連結分區',
         add: '加入分區',
         linkLabel: '分區 {{index}}',
@@ -1826,7 +1826,7 @@ const zhTW = {
       zonePartition: {
         title: '分區',
         hint:
-          '場域範圍由分區入口綁定，與本圖元在地圖上的位置無關。可將其他設施設為隸屬此分區。',
+          '場域範圍由分區出入口綁定，與本圖元在地圖上的位置無關。可將其他設施設為隸屬此分區。',
         hintShort: '場域範圍由入口綁定，與圖台位置無關',
         synced: '已同步',
         unbound: '未綁定',
@@ -3244,6 +3244,7 @@ const zhTW = {
         image: { label: '圖片', description: '外部圖片 URL' },
         colorBlock: { label: '色塊', description: '純色背景色塊（底層）' },
         clock: { label: '時鐘', description: '即時系統時鐘' },
+        'station-eta': { label: '到站／出發', description: 'N2W／S2W／T3 等站點幾分幾秒到站、出發（營運時間）' },
         emptyState: { label: '空狀態', description: '查詢 0 筆時佔位' },
         alertBanner: { label: '資料警示', description: '資料觸發才顯示（編輯時可見）' },
         lineChart: { label: '折線圖', description: 'API 資料折線圖' },

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -21,6 +22,7 @@ import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
 import { orderBusinessKindSql } from './order-business-kind';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { OperatingClockService } from '../operating-day/operating-clock.service';
 import { MapService } from '../map/map.service';
 import {
   ExecutionStatusKey,
@@ -152,7 +154,13 @@ export class OrderService {
     private readonly orderRouteService: OrderRouteService,
     private readonly datasourceInvalidation: DatasourceInvalidationService,
     private readonly mapService: MapService,
+    @Optional() private readonly operatingClock?: OperatingClockService,
   ) {}
+
+  /** 實際時刻 → 營運時刻（沒有時鐘服務時，例如單元測試，就是實際時間） */
+  private toOperating(realTs: number): number {
+    return this.operatingClock ? this.operatingClock.toOperating(realTs) : realTs;
+  }
 
   /**
    * 同一張單的「讀出 → 改 payload → 存回」依序執行。
@@ -690,25 +698,29 @@ export class OrderService {
         vehicle_progress_at: { ...((payload.vehicle_progress_at ?? {}) as Record<string, number>), [targetStatus]: now },
       };
     }
+    // 營運時刻（operating-day.ts）：計畫時刻、延誤、班次中心都在營運時間上比；實際時刻另外保留
+    const operatingNow = this.toOperating(now);
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
       order.completedAt = String(now);
+      order.payload = { ...((order.payload ?? {}) as Record<string, unknown>), op_completed_at: operatingNow };
       if (targetStatus === OrderStatus.FAULTED && cancelRequested) {
         // 協議用 FAULTED 結案取消；記下原因，介面與統計跟真正故障分開
         order.payload = { ...((order.payload ?? {}) as Record<string, unknown>), closed_reason: 'cancelled_by_center' };
       }
-      // 延誤＝實際結束晚於計畫結束的整分鐘數（不到一分鐘算準點）。班次中心的「延誤班次」
+      // 延誤＝結束晚於計畫結束的整分鐘數（不到一分鐘算準點），以營運時間比。班次中心的「延誤班次」
       // 與班次運行紀錄的準點／延誤篩選都讀這個欄位；先前只有示範模擬會寫它。
       const plannedEnd = Number(order.plannedEnd);
       if (targetStatus === OrderStatus.END && Number.isFinite(plannedEnd) && plannedEnd > 0) {
-        order.delayMinutes = Math.max(0, Math.floor((now - plannedEnd) / 60_000));
+        order.delayMinutes = Math.max(0, Math.floor((operatingNow - plannedEnd) / 60_000));
       }
     } else if (targetStatus === OrderStatus.PROCESSING) {
       // bigint 欄位清空須用 null，不可用空字串
       order.completedAt = null;
-      // 實際發車時刻：運能趨勢的「即時數值」照實際發車算，不照計畫。故障復歸不覆寫。
+      // 發車時刻：運能趨勢的「即時數值」照實際發車算，不照計畫。故障復歸不覆寫。
+      // actual_started_at 是收到的實際時刻；op_started_at 是同一刻的營運時刻
       const payload = (order.payload ?? {}) as Record<string, unknown>;
       if (payload.actual_started_at == null) {
-        order.payload = { ...payload, actual_started_at: now };
+        order.payload = { ...payload, actual_started_at: now, op_started_at: operatingNow };
       }
     }
     const saved = await this.orderRepository.save(order);

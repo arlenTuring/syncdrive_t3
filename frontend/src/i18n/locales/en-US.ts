@@ -1745,7 +1745,7 @@ const enUS: DeepStringify<typeof zhTW> = {
           hint: 'Facility (large block) — charging / parking / maintenance bay; set purpose in properties',
         },
         zoneEntrance: {
-          label: 'Zone entrance',
+          label: 'Zone gateway',
           hint: 'Dashed box; track end faces can join to it; vehicles entering teleport to linked zones; configure zone names and field ranges',
         },
         zonePartition: {
@@ -3291,6 +3291,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         image: { label: 'Image', description: 'External image URL' },
         colorBlock: { label: 'Color block', description: 'Solid background block' },
         clock: { label: 'Clock', description: 'Live system clock' },
+        'station-eta': { label: 'Arrivals / departures', description: 'Countdown to the next arrivals and departures at a station (operating time)' },
         emptyState: { label: 'Empty state', description: 'Placeholder when query returns 0 rows' },
         alertBanner: {
           label: 'Data alert',

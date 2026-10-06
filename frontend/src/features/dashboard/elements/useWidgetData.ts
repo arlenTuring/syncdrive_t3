@@ -6,6 +6,7 @@ import { expandBuiltinSqlMacros } from '../constants/demoSql';
 import { subscribeDatasourceInvalidation } from '../utils/datasourceInvalidationBus';
 import { inferInvalidateTagsFromSql, tagsOverlap } from '../utils/inferInvalidateTagsFromSql';
 import { resolveFreshness } from '../utils/resolveFreshness';
+import { useOperatingClock } from '../utils/operatingClock';
 import type { WidgetDataBinding } from '../types';
 
 export interface WidgetFetchState {
@@ -73,6 +74,16 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
   const resolveSource = usePlaneSourceResolver();
   const dataSourceId = opts.dataSourceId ? resolveSource(opts.dataSourceId) : opts.dataSourceId;
   const restSourceId = resolveSource('default-internal');
+  /*
+   * 跟營運時間比的查詢（operating_now_ms()、班次中心、ETA）：加速重播時營運時間走得快，
+   * 30 秒的補查等於營運一個半小時。改成「營運 30 秒左右」補查一次，最快 1 秒。
+   */
+  const operatingClock = useOperatingClock();
+  const usesOperatingTime = /operating_(now_ms|day_start_ms|day)\s*\(/i.test(sqlQuery ?? '')
+    || /operation-metrics|\/eta\b|vehicle-eta/i.test(dataUrl ?? '');
+  const operatingRefreshSec = usesOperatingTime && operatingClock.advancing
+    ? Math.max(1, Math.round(30 / Math.max(1, operatingClock.rate)))
+    : undefined;
   const [state, setState] = useState<WidgetFetchState>({ data: [], loading: false, error: null });
   const lastGoodData = useRef<Record<string, unknown>[]>([]);
   const [dataSourceRevision, setDataSourceRevision] = useState(0);
@@ -219,11 +230,14 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     setState((s) => ({ ...s, loading: true, error: null }));
     void fetchData();
 
-    const timerIntervalSec = refreshMode === 'poll'
+    let timerIntervalSec = refreshMode === 'poll'
       ? refreshInterval
       : refreshMode === 'event'
         ? (refreshInterval && refreshInterval > 0 ? refreshInterval : EVENT_FALLBACK_INTERVAL_SEC)
         : undefined;
+    if (operatingRefreshSec) {
+      timerIntervalSec = Math.min(timerIntervalSec ?? operatingRefreshSec, operatingRefreshSec);
+    }
     if (timerIntervalSec && timerIntervalSec > 0) {
       timer = setInterval(() => void fetchData(true), timerIntervalSec * 1000);
     }
@@ -258,7 +272,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [dataSourceId, restSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags, dataSourceRevision]);
+  }, [dataSourceId, restSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags, dataSourceRevision, operatingRefreshSec]);
 
   return state;
 }

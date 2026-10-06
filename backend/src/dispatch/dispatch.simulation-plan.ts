@@ -256,3 +256,35 @@ export function assessSimulationReadiness(input: {
     missingRoutes,
   };
 }
+
+/**
+ * 展開後計畫的版本摘要。只看每一筆在當天的相對時刻與內容，不看是哪一天——同一份班表
+ * 展開到不同營運日，摘要相同。模擬器載入身分（identity.plan_digest）、每日計畫採用紀錄、
+ * 訂單 payload.plan_digest 都用這一支，三者才對得起來。
+ */
+export function planDigestOf(planned: PlannedDispatch[]): string {
+  return contentDigest(planned.map(planIdentityOf));
+}
+
+function planIdentityOf(item: PlannedDispatch) {
+  const dayStart = new Date(item.departAt);
+  dayStart.setHours(0, 0, 0, 0);
+  const base = dayStart.getTime();
+  return {
+    tripCode: item.tripCode,
+    kind: item.kind,
+    taskType: item.taskType,
+    vehicleCode: item.vehicleCode,
+    timelineRow: item.timelineRow,
+    routeCode: item.routeCode,
+    depart: (item.departAt - base) / 1000,
+    arrive: (item.arriveAt - base) / 1000,
+    origin: item.origin?.id ?? null,
+    destination: item.destination?.id ?? null,
+    stations: item.stations.map((station) => [
+      station.stationId,
+      station.dwellSeconds,
+    ]),
+    maintenance: item.maintenance?.yardSlotId ?? null,
+  };
+}

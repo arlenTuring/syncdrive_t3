@@ -1,7 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { maintenancePayloadFields } from './dispatch.charging';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { DispatchEngineService } from './dispatch-engine.service';
+import { DailyPlanVersionMismatch, DispatchEngineService } from './dispatch-engine.service';
+import { describeSwitch, type DailyPlanAdoption } from './daily-plan';
+import { isOperatingDay, operatingDayOf } from '../operating-day/operating-day';
+import { OperatingClockService } from '../operating-day/operating-clock.service';
 import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
@@ -18,7 +21,110 @@ export class DispatchController {
   constructor(
     private readonly engine: DispatchEngineService,
     private readonly simulationPlan: SimulationPlanService,
+    private readonly operatingClock: OperatingClockService,
   ) {}
+
+  @Get('daily-plan')
+  @ApiOperation({
+    summary: '某營運日採用的每日計畫',
+    description:
+      '班次中心的統計範圍。day 省略為目前營運日。當天沒有採用紀錄時採用部署中的班表並記下；' +
+      '過去的日子沒有紀錄就回 adopted=false，不拿現在的班表回填。',
+  })
+  async dailyPlan(@Query('day') day?: string): Promise<Record<string, unknown>> {
+    const target = day ?? this.operatingClock.operatingDay();
+    if (!isOperatingDay(target)) throw new BadRequestException('day 格式為 YYYY-MM-DD');
+    const adoption = await this.engine.ensureDailyPlan(target);
+    if (!adoption) return { adopted: false, operating_day: target, message: '尚未部署每日計畫' };
+    return { adopted: true, ...summarizeAdoption(adoption), history: adoption.history };
+  }
+
+  @Post('daily-plan/adopt')
+  @ApiOperation({
+    summary: '部署每日計畫（明確切換該營運日採用的班表）',
+    description:
+      '模擬器「部署並開始」、維運手動切換用。operating_day 省略為目前營運日。expected_plan_digest 有給時，' +
+      '班表目前展開的版本必須相同（載入後被改過就回 409）。回傳切換結果：前後版本與載客班次數；' +
+      '舊版本的訂單保留，但不計入新版本的完成數。',
+  })
+  async adoptDailyPlan(@Body() body: {
+    shift_id?: string;
+    operating_day?: string;
+    expected_plan_digest?: string;
+    load_digest?: string;
+    via?: string;
+    adopted_by?: string;
+  }): Promise<Record<string, unknown>> {
+    const shiftId = typeof body?.shift_id === 'string' ? body.shift_id.trim() : '';
+    if (!shiftId) throw new BadRequestException('需要 shift_id');
+    const day = body.operating_day ?? this.operatingClock.operatingDay();
+    if (!isOperatingDay(day)) throw new BadRequestException('operating_day 格式為 YYYY-MM-DD');
+    const via = body.via === 'simulator' ? 'simulator' : body.via === 'deploy' ? 'deploy' : 'manual';
+    try {
+      const { previous, adoption } = await this.engine.adoptDailyPlan({
+        shiftId,
+        day,
+        via,
+        by: body.adopted_by ?? null,
+        expectedPlanDigest: body.expected_plan_digest ?? null,
+        loadDigest: body.load_digest ?? null,
+      });
+      return { ...summarizeAdoption(adoption), switch: describeSwitch(previous, adoption) };
+    } catch (error) {
+      if (error instanceof DailyPlanVersionMismatch) {
+        throw new ConflictException({ code: 'PLAN_VERSION_CHANGED', message: error.message, expected: error.expected, actual: error.actual });
+      }
+      throw error;
+    }
+  }
+
+  @Get('operating-clock')
+  @ApiOperation({
+    summary: '營運時鐘',
+    description:
+      '目前營運日、營運時刻、倍速、是否暫停／中斷。正式營運時營運時間＝實際時間；加速重播時由執行端推進。' +
+      '儀表板的班次狀態、延誤、ETA、倒數都以這個時鐘為準。',
+  })
+  operatingClockSnapshot(): Record<string, unknown> {
+    return this.operatingClock.snapshot();
+  }
+
+  @Post('operating-clock')
+  @ApiOperation({
+    summary: '推進營運時鐘（執行端用）',
+    description:
+      'mode=replay 時帶 run_id、operating_day、operating_now（此刻的營運時刻，毫秒）、rate（1～180）、paused、ended、lag_ms；' +
+      '執行中要定期回報（心跳），超過 15 秒沒消息畫面會標示中斷。mode=realtime 回到實際時間。',
+  })
+  async updateOperatingClock(@Body() body: {
+    mode?: string;
+    run_id?: string;
+    operating_day?: string;
+    operating_now?: number;
+    rate?: number;
+    paused?: boolean;
+    ended?: boolean;
+    lag_ms?: number;
+  }): Promise<Record<string, unknown>> {
+    if (body?.mode !== 'replay' && body?.mode !== 'realtime') throw new BadRequestException('mode 需為 replay 或 realtime');
+    if (body.mode === 'replay' && body.operating_day != null && !isOperatingDay(body.operating_day)) {
+      throw new BadRequestException('operating_day 格式為 YYYY-MM-DD');
+    }
+    try {
+      return await this.operatingClock.update({
+        mode: body.mode,
+        runId: body.run_id ?? null,
+        operatingDay: body.operating_day ?? (Number.isFinite(Number(body.operating_now)) ? operatingDayOf(Number(body.operating_now)) : null),
+        operatingNow: body.operating_now,
+        rate: body.rate,
+        paused: body.paused,
+        ended: body.ended,
+        lagMs: body.lag_ms,
+      });
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+  }
 
   @Get('status')
   @ApiOperation({
@@ -159,5 +265,21 @@ function serializePlanned(
           order_fields: dispatchOrderFields(item),
         }
       : {}),
+  };
+}
+
+function summarizeAdoption(adoption: DailyPlanAdoption): Record<string, unknown> {
+  return {
+    operating_day: adoption.operating_day,
+    shift_id: adoption.shift_id,
+    shift_name: adoption.shift_name,
+    shift_version: adoption.shift_version,
+    plan_digest: adoption.plan_digest,
+    load_digest: adoption.load_digest,
+    passenger_trips: adoption.passenger_trips.length,
+    counts: adoption.counts,
+    adopted_at: adoption.adopted_at,
+    adopted_via: adoption.adopted_via,
+    adopted_by: adoption.adopted_by,
   };
 }

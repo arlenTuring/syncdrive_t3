@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OperationOrder } from '../database/entities/operation-order.entity';
 import { MapService } from '../map/map.service';
+import { localMidnight, operatingDayOf } from '../operating-day/operating-day';
 import {
   operationShiftCreationModeLabel,
   readScheduleGeneratedAt,
@@ -12,6 +13,7 @@ import type { PlannedDispatch } from './dispatch.plan';
 import {
   assessSimulationReadiness,
   contentDigest,
+  planDigestOf,
   readShiftMapReference,
 } from './dispatch.simulation-plan';
 import {
@@ -119,7 +121,7 @@ export class SimulationPlanService {
       plan: asRecord(body.scheduleOutput)?.plan ?? null,
     });
     const mapDigest = mapDocument ? contentDigest(mapDocument) : null;
-    const planDigest = contentDigest(plan.planned.map(planIdentityOf));
+    const planDigest = planDigestOf(plan.planned);
 
     return {
       shift: {
@@ -182,6 +184,8 @@ export class SimulationPlanService {
         /** 三者合一：模擬器以此判斷「載入的」與「要啟動的」是不是同一份 */
         load_digest: contentDigest({ shiftDigest, mapDigest, planDigest }),
         reference_day: new Date(reference).toISOString(),
+        /** 計畫展開到哪個營運日；模擬器部署每日計畫、訂單 operating_day 都用它 */
+        operating_day: operatingDayOf(localMidnight(reference)),
       },
       planned: plan.planned,
       mapDocument,
@@ -222,25 +226,3 @@ function countBy<T>(
 }
 
 /** 計畫身分只看會影響執行的欄位（時刻用當日相對秒，換日不算換版） */
-function planIdentityOf(item: PlannedDispatch) {
-  const dayStart = new Date(item.departAt);
-  dayStart.setHours(0, 0, 0, 0);
-  const base = dayStart.getTime();
-  return {
-    tripCode: item.tripCode,
-    kind: item.kind,
-    taskType: item.taskType,
-    vehicleCode: item.vehicleCode,
-    timelineRow: item.timelineRow,
-    routeCode: item.routeCode,
-    depart: (item.departAt - base) / 1000,
-    arrive: (item.arriveAt - base) / 1000,
-    origin: item.origin?.id ?? null,
-    destination: item.destination?.id ?? null,
-    stations: item.stations.map((station) => [
-      station.stationId,
-      station.dwellSeconds,
-    ]),
-    maintenance: item.maintenance?.yardSlotId ?? null,
-  };
-}

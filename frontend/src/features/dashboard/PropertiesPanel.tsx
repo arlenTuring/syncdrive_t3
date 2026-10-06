@@ -1,12 +1,16 @@
 import { NumberInput } from '../../components/NumberInput'
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { usePlaneSourceResolver } from './context/PlaneDataSourceContext';
+import { getDataSourceById } from './store/useDataSourceStore';
+import { resolvePlaneRestUrl } from './elements/useWidgetData';
+import { stationEtaUrl, stationEvents } from './elements/StationEtaWidget';
 import { useTranslation } from 'react-i18next';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
   LineChartWidget, LineChartSeriesConfig, LineChartEventLabelStyle, ChartAxisBandConfig, ChartAxisBandColorRule, ChartAxisConfig, ChartAxisUnit, ChartViewportMode, DatabaseWidget, GaugeWidget, SlotGridWidget, MaintenanceDistributionWidget, ColorRule, WidgetDataBinding,
   ColorBlockWidget, StatusBadgeWidget, StatusBadgeRule,
-  StatCardWidget, ProgressBarWidget, ClockWidget, EmptyStateWidget, SegmentBarWidget, SegmentBarColorRule, BarChartWidget, MapCanvasWidget,
+  StatCardWidget, ProgressBarWidget, ClockWidget, StationEtaWidget, EmptyStateWidget, SegmentBarWidget, SegmentBarColorRule, BarChartWidget, MapCanvasWidget,
   AlertBannerWidget, AlertRule, AlertTriggerMode, AlertDisplayMode,
   UnitTelemetryCardWidget,
   VehicleContainerWidget,
@@ -2217,6 +2221,61 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
     </div>
   );
 }
+/** 屬性框一行 ↔ 一個停靠點設定：「站點ID=名稱=到站／出發／到站出發」 */
+function stationLine(s: StationEtaWidget['stations'][number]): string {
+  const events = stationEvents(s);
+  const mode = events.includes('arrive') && events.includes('depart') ? '到站出發' : events.includes('depart') ? '出發' : '到站';
+  return `${s.stationId}=${s.label}=${mode}`;
+}
+function parseStationLine(line: string): StationEtaWidget['stations'][number] {
+  const [id = '', label = '', mode = ''] = line.split('=').map((part) => part.trim());
+  const events: Array<'arrive' | 'depart'> = [];
+  if (/到站|arrive/i.test(mode) || !mode) events.push('arrive');
+  if (/出發|depart/i.test(mode)) events.push('depart');
+  return { stationId: id, label: label || id, events };
+}
+/** 站點到站／出發清單：站點用真實 ID，每列的方向／停靠點名稱另外填；顯示真正採用的資料來源 */
+function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; onUpdate: (p: Partial<StationEtaWidget>) => void; onDelete: () => void }) {
+  const resolveSource = usePlaneSourceResolver();
+  const backendUrl = getDataSourceById(resolveSource('default-internal'))?.backendUrl;
+  const effectiveUrl = resolvePlaneRestUrl(stationEtaUrl(w), backendUrl);
+  const [stationsText, setStationsText] = useState(() => w.stations.map(stationLine).join('\n'));
+  useEffect(() => {
+    setStationsText(w.stations.map(stationLine).join('\n'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [w.id]);
+  const commitStations = (text: string) => {
+    const stations = text.split('\n').map((line) => line.trim()).filter(Boolean).map(parseStationLine).filter((s) => s.stationId);
+    onUpdate({ stations });
+  };
+  return (
+    <div className="space-y-4">
+      <SH icon={<Clock size={13} />} label="到站／出發" color="#34d399" />
+      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <Field label="停靠點（每行：站點ID=方向／停靠點名稱=到站、出發或到站出發）">
+        <textarea
+          value={stationsText}
+          rows={4}
+          onChange={e => setStationsText(e.target.value)}
+          onBlur={e => commitStations(e.target.value)}
+          className={`${inputCls} font-mono`}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="最多幾筆"><NumberInput value={w.limit} onChange={n => onUpdate({ limit: Math.max(1, Math.min(10, n)) })} className={inputCls} /></Field>
+        <Field label="字級"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+      </div>
+      <Field label="資料端點（登入端內部 API）"><input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={`${inputCls} font-mono`} /></Field>
+      <div className="rounded border border-zinc-700 bg-zinc-900/60 p-2 text-[10px] leading-relaxed text-zinc-400">
+        <div className="text-zinc-300">實際採用的來源</div>
+        <div className="break-all font-mono text-emerald-300">{effectiveUrl || '（未設定站點）'}</div>
+        <div>每日計畫站序＋車端即時回報，時間為營運時間；重查：訂單開始／結束、車換路段、營運時鐘、每日計畫切換（{(w.invalidateTags ?? []).join('、') || '無'}）</div>
+      </div>
+      <PositionFields widget={w as any} onUpdate={onUpdate as any} />
+      <DeleteBtn onDelete={onDelete} />
+    </div>
+  );
+}
 function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpdate: (p: Partial<BarChartWidget>) => void; onDelete: () => void }) {
   const { t } = useTranslation();
   return (
@@ -3314,6 +3373,7 @@ export function PropertiesPanel({
               case 'progress-bar':   return <ProgressBarSettings {...props as any} />;
               case 'segment-bar':    return <SegmentBarSettings {...props as any} />;
               case 'clock':          return <ClockSettings {...props as any} />;
+              case 'station-eta':    return <StationEtaSettings {...props as any} />;
               case 'empty-state':    return <EmptyStateSettings {...props as any} />;
               case 'map-canvas':     return <MapCanvasSettings {...props as any} />;
               case 'unit-telemetry-card': return <UnitTelemetrySettings {...props as any} />;

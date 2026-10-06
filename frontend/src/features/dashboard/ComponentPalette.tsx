@@ -44,6 +44,7 @@ const PALETTE_ITEMS: PaletteItemDef[] = [
   { type: 'image', i18nKey: 'image', icon: <Image size={18} />, color: '#10b981', category: 'layout' },
   { type: 'color-block', i18nKey: 'colorBlock', icon: <Square size={18} />, color: '#64748b', category: 'layout' },
   { type: 'clock', i18nKey: 'clock', icon: <Clock size={18} />, color: '#a3e635', category: 'layout' },
+  { type: 'station-eta', i18nKey: 'station-eta', icon: <Clock size={18} />, color: '#34d399', category: 'layout' },
   { type: 'empty-state', i18nKey: 'emptyState', icon: <CircleOff size={18} />, color: '#94a3b8', category: 'layout' },
   { type: 'alert-banner', i18nKey: 'alertBanner', icon: <AlertTriangle size={18} />, color: '#f97316', category: 'layout' },
   { type: 'line-chart', i18nKey: 'lineChart', icon: <TrendingUp size={18} />, color: '#06b6d4', category: 'chart' },
