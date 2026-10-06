@@ -9,6 +9,7 @@ import { RouteProgressWidgetView } from './RouteProgressWidget';
 import { ColorBlockWidgetView }  from './ColorBlockWidget';
 import { StatusBadgeWidgetView } from './StatusBadgeWidget';
 import { StatCardWidgetView }    from './StatCardWidget';
+import { StationEtaWidgetView } from './StationEtaWidget';
 import { ProgressBarWidgetView } from './ProgressBarWidget';
 import { ClockWidgetView }       from './ClockWidget';
 import { EmptyStateWidgetView }  from './EmptyStateWidget';
@@ -43,6 +44,7 @@ export function WidgetRenderer({
     case 'color-block':    return <ColorBlockWidgetView widget={widget} />;
     case 'status-badge':   return <StatusBadgeWidgetView widget={widget} />;
     case 'stat-card':      return <StatCardWidgetView widget={widget} />;
+    case 'station-eta':    return <StationEtaWidgetView widget={widget} />;
     case 'progress-bar':   return <ProgressBarWidgetView widget={widget} />;
     case 'clock':          return <ClockWidgetView widget={widget} />;
     case 'empty-state':    return <EmptyStateWidgetView widget={widget} />;

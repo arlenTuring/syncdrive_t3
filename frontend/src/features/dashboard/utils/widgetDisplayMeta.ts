@@ -24,6 +24,7 @@ const WIDGET_TYPE_LABELS: Record<WidgetType, string> = {
   'vehicle-container': '載具樣板',
   'tab-list': 'Tab 清單',
   'shift-list': '班表清單',
+  'station-eta': '站點到站',
 };
 
 export function getWidgetTypeLabel(type: WidgetType): string {
