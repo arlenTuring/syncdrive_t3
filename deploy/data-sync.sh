@@ -200,6 +200,6 @@ sudo rm -rf \$W
 echo '==> 重啟後端（讓快取的班表、路線、格位重新載入）'
 sudo docker restart syncdrive_backend >/dev/null && sleep 10
 cd $REMOTE_DIR && sudo ./deploy/healthcheck.sh
-echo \"    覆蓋前的備份：\$stamp（倒回：./deploy/vm.sh syncdata --restore \$stamp）\""
+echo \"    覆蓋前的備份：\${stamp}（倒回：./deploy/vm.sh syncdata --restore \${stamp}）\""
 
 log "完成"

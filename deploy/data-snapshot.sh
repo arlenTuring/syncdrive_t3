@@ -60,18 +60,18 @@ for spec in "${SPECS[@]}"; do
   where="${spec#*|}"
   exists="$(psql_in <<<"SELECT to_regclass('public.$table') IS NOT NULL;")"
   if [ "$exists" != t ]; then
-    echo "-- $table：這台沒有這張表，略過"
+    echo "-- ${table}：這台沒有這張表，略過"
     continue
   fi
   count="$(psql_in <<<"SELECT count(*) FROM public.$table $where;")"
   if [ "$SKIP_EMPTY" = true ] && [ "$count" = 0 ]; then
-    echo "-- $table：沒有資料，略過（對方保留原樣）"
+    echo "-- ${table}：沒有資料，略過（對方保留原樣）"
     continue
   fi
   cols="$(psql_in <<<"SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position)
                        FROM information_schema.columns
                        WHERE table_schema = 'public' AND table_name = '$table';")"
-  echo "-- $table：$count 筆"
+  echo "-- ${table}：$count 筆"
   echo "DELETE FROM public.$table $where;"
   echo "COPY public.$table ($cols) FROM stdin;"
   psql_in <<<"COPY (SELECT $cols FROM public.$table $where) TO STDOUT;"
