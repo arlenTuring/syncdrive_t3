@@ -9,7 +9,7 @@ import { OperationMetricsService } from './operation-metrics.service';
 export class OperationMetricsController {
   constructor(private readonly operationMetricsService: OperationMetricsService) {}
 
-  /** 班次中心：總共／完成／延誤班次、達成率、剩餘班次 */
+  /** 班次中心：目前營運日採用的每日計畫——總共／完成／延誤班次、達成率、剩餘班次、未達成原因 */
   @Get('shift-center')
   async getShiftCenter() {
     return this.operationMetricsService.getShiftCenter();

@@ -1,5 +1,4 @@
 import {
-  buildShiftCenterSummary,
   formatHeadway,
   mergeDepartureLeads,
   nextSegment,
@@ -69,27 +68,5 @@ describe('operation-metrics', () => {
     expect(formatHeadway(null)).toBe('—');
   });
 
-  it('班次中心：完成＝END；延誤＝晚結束、故障、進行中已超過計畫結束', () => {
-    const now = 1_000_000_000;
-    const summary = buildShiftCenterSummary({
-      shiftName: '班表',
-      plannedTrips: 10,
-      orders: [
-        { status: 'END', plannedEnd: now - 600_000, delayMinutes: 0 },
-        { status: 'END', plannedEnd: now - 600_000, delayMinutes: 2 },
-        { status: 'FAULTED', plannedEnd: now, delayMinutes: 0 },
-        { status: 'PROCESSING', plannedEnd: now - 120_000, delayMinutes: 0 },
-        { status: 'PROCESSING', plannedEnd: now + 120_000, delayMinutes: 0 },
-      ],
-      now,
-    });
-    expect(summary).toMatchObject({
-      total_shifts: 10,
-      completed_shifts: 2,
-      delayed_shifts: 3,
-      achievement_pct: 20,
-      remaining_shifts: 8,
-      remaining_line: '剩餘8班次',
-    });
-  });
+
 });

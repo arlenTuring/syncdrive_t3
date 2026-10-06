@@ -3,9 +3,15 @@ import { DataSource } from 'typeorm';
 import { MaintenanceDistributionService } from '../facility/maintenance-distribution.service';
 import { OperationShiftService } from '../operation-shift/operation-shift.service';
 import { TimeTemplateService } from '../time-template/time-template.service';
+import { DispatchEngineService } from '../dispatch/dispatch-engine.service';
 import {
-  buildShiftCenterSummary,
-  countPlannedPassengerTrips,
+  noPlanSummary,
+  summarizeDailyPlan,
+  type ShiftCenterSummary,
+} from '../dispatch/daily-plan';
+import { OperatingClockService } from '../operating-day/operating-clock.service';
+import { operatingDayStart } from '../operating-day/operating-day';
+import {
   DAY_MINUTES,
   formatClock,
   formatHeadway,
@@ -18,7 +24,6 @@ import {
   segmentAt,
   templateSegments,
   type DepartureLead,
-  type ShiftCenterSummary,
 } from './operation-metrics';
 
 const DAY_MS = DAY_MINUTES * 60_000;
@@ -48,37 +53,58 @@ export class OperationMetricsService {
     private readonly timeTemplateService: TimeTemplateService,
     private readonly maintenanceDistributionService: MaintenanceDistributionService,
     private readonly dataSource: DataSource,
+    private readonly engine: DispatchEngineService,
+    private readonly clock: OperatingClockService,
   ) {}
 
-  /** 班次中心：部署班表今天的正線班次，完成／延誤／達成率 */
-  async getShiftCenter(now = Date.now()): Promise<ShiftCenterSummary> {
-    const shift = await this.operationShiftService.getDeployedShift();
-    if (!shift) {
-      return buildShiftCenterSummary({ shiftName: null, plannedTrips: 0, orders: [], now });
-    }
-    const dayStart = taipeiDayStart(now);
-    const rows: Array<{ status: string; planned_end: string | null; delay_minutes: number | null }> = await this.dataSource.query(
-      `SELECT status::text AS status, planned_end, delay_minutes
+  /**
+   * 班次中心：目前營運日採用的每日計畫（dispatch/daily-plan.ts）。
+   *
+   * 分母是計畫裡的載客班次，完成數依計畫班次去重；訂單只認 payload 上的每日計畫關聯
+   * （operating_day、plan_shift_id、plan_digest、plan_trip_code），不看資料來源或執行 ID。
+   * 查詢失敗直接丟出（畫面顯示錯誤），不回零。
+   */
+  async getShiftCenter(): Promise<ShiftCenterSummary> {
+    const operatingNow = this.clock.now();
+    const day = this.clock.operatingDay();
+    const adoption = await this.engine.ensureDailyPlan(day);
+    if (!adoption) return noPlanSummary(day, operatingNow);
+    const rows: Array<{
+      order_id: string;
+      trip_code: string;
+      status: string;
+      plan_digest: string | null;
+      closed_reason: string | null;
+      completed_at: string | null;
+    }> = await this.dataSource.query(
+      `SELECT order_id,
+              COALESCE(payload->>'plan_trip_code', trip_code) AS trip_code,
+              status::text AS status,
+              payload->>'plan_digest' AS plan_digest,
+              payload->>'closed_reason' AS closed_reason,
+              COALESCE((payload->>'op_completed_at')::bigint, completed_at::bigint) AS completed_at
        FROM operation_orders
-       WHERE line_kind = 'MAINLINE'
-         AND payload->>'shift_id' = $1
-         AND planned_start >= $2 AND planned_start < $3`,
-      [shift.shiftId, dayStart, dayStart + DAY_MS],
+       WHERE payload->>'operating_day' = $1
+         AND payload->>'plan_shift_id' = $2
+       ORDER BY created_at ASC`,
+      [day, adoption.shift_id],
     );
-    return buildShiftCenterSummary({
-      shiftName: shift.shiftName,
-      plannedTrips: countPlannedPassengerTrips(shift.body),
-      orders: rows.map((row) => ({
+    return summarizeDailyPlan(
+      adoption,
+      rows.map((row) => ({
+        orderId: row.order_id,
+        tripCode: row.trip_code,
         status: row.status,
-        plannedEnd: row.planned_end != null ? Number(row.planned_end) : null,
-        delayMinutes: row.delay_minutes,
+        planDigest: row.plan_digest,
+        closedReason: row.closed_reason,
+        completedAt: row.completed_at != null ? Number(row.completed_at) : null,
       })),
-      now,
-    });
+      operatingNow,
+    );
   }
 
   /** 運能趨勢上方四個數值 */
-  async getCapacitySummary(now = Date.now()) {
+  async getCapacitySummary(now = this.clock.now()) {
     const ctx = await this.loadCapacityContext(now);
     const nowSecond = Math.round((now - ctx.dayStart) / 1000);
     const nowMinute = nowSecond / 60;
@@ -101,7 +127,7 @@ export class OperationMetricsService {
   }
 
   /** 運能趨勢圖：計畫（班表發車）與實際（訂單實際發車）pphpd，過去 2 小時到未來 4 小時 */
-  async getCapacityTrend(now = Date.now()) {
+  async getCapacityTrend(now = this.clock.now()) {
     const ctx = await this.loadCapacityContext(now);
     const nowMinute = (now - ctx.dayStart) / 60_000;
     const firstBucket = Math.floor((nowMinute - TREND_PAST_MINUTES) / TREND_BUCKET_MINUTES) * TREND_BUCKET_MINUTES;
@@ -139,8 +165,11 @@ export class OperationMetricsService {
     plannedLeads: DepartureLead[];
     actualLeads: DepartureLead[];
   }> {
-    const dayStart = taipeiDayStart(now);
-    const shift = await this.operationShiftService.getDeployedShift();
+    // 營運日與班表都取每日計畫（跟班次中心同一份），時間是營運時間
+    const day = this.clock.operatingDay();
+    const dayStart = operatingDayStart(day) ?? taipeiDayStart(now);
+    const adoption = await this.engine.ensureDailyPlan(day);
+    const shift = adoption ? await this.adoptedShift(adoption.shift_id) : null;
     const body = shift?.body ?? {};
 
     let templateBody: Record<string, unknown> | null = null;
@@ -166,13 +195,13 @@ export class OperationMetricsService {
         `SELECT vehicle_code,
                 payload->>'route_code' AS route_code,
                 route_id,
-                COALESCE((payload->>'actual_started_at')::bigint, planned_start) AS started_at
+                COALESCE((payload->>'op_started_at')::bigint, (payload->>'actual_started_at')::bigint, planned_start) AS started_at
          FROM operation_orders
          WHERE line_kind = 'MAINLINE'
-           AND payload->>'shift_id' = $1
-           AND status IN ('PROCESSING', 'END')
-           AND COALESCE((payload->>'actual_started_at')::bigint, planned_start) >= $2`,
-        [shift.shiftId, dayStart - DAY_MS],
+           AND payload->>'plan_shift_id' = $1
+           AND payload->>'operating_day' = $2
+           AND status IN ('PROCESSING', 'END')`,
+        [shift.shiftId, day],
       );
       const routeIdByCode = new Map(routes.filter((route) => route.routeCode).map((route) => [route.routeCode!, route.routeId] as const));
       const directionByRoute = new Map(routes.map((route) => [route.routeId, route.directionKey] as const));
@@ -190,5 +219,18 @@ export class OperationMetricsService {
     }
 
     return { body, dayStart, vehicleCapacity, segments: templateSegments(templateBody), plannedLeads, actualLeads };
+  }
+
+  /** 每日計畫的班表內容：跟部署中是同一份就用它的快取，否則讀那一份 */
+  private async adoptedShift(shiftId: string): Promise<{ shiftId: string; body: Record<string, unknown> } | null> {
+    const deployed = await this.operationShiftService.getDeployedShift();
+    if (deployed?.shiftId === shiftId) return deployed;
+    try {
+      const row = await this.operationShiftService.getShiftTrips(shiftId);
+      return { shiftId: row.shiftId, body: row.body };
+    } catch (err) {
+      this.logger.warn(`讀不到每日計畫的班表 ${shiftId}：${(err as Error).message}`);
+      return null;
+    }
   }
 }

@@ -340,18 +340,18 @@ FROM (
         WHERE o.vehicle_code = v.vehicle_code
           AND ${orderBusinessKindSql('o')} IN ('MAINLINE', 'TEST')
           AND o.status = 'PROCESSING'
-          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+          AND o.planned_start <= operating_now_ms()
           AND COALESCE(o.planned_end, o.planned_start + 600000)
-              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+              >= operating_now_ms() - 60000
       ) THEN 'IN_SERVICE'
       WHEN EXISTS (
         SELECT 1 FROM operation_orders o
         WHERE o.vehicle_code = v.vehicle_code
           AND ${orderBusinessKindSql('o')} = 'MAINTENANCE'
           AND o.status = 'PROCESSING'
-          AND o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+          AND o.planned_start <= operating_now_ms()
           AND COALESCE(o.planned_end, o.planned_start + 1800000)
-              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+              >= operating_now_ms() - 60000
       ) THEN 'MAINTENANCE'
       WHEN EXISTS (
         SELECT 1 FROM slot_statuses ss
@@ -432,7 +432,7 @@ LEFT JOIN LATERAL (
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     AND ${notCancelledSql('o')}
     AND (
-      COALESCE(o.planned_end, o.planned_start + 600000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+      COALESCE(o.planned_end, o.planned_start + 600000) >= operating_now_ms() - 60000
       OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
     )
   ORDER BY CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END, o.priority_level DESC, o.planned_start
@@ -491,9 +491,9 @@ WITH active_orders AS (
         o.priority_level DESC,
         CASE ${orderBusinessKindSql('o')} WHEN 'MAINLINE' THEN 0 WHEN 'TRANSITION' THEN 1 ELSE 2 END,
         (
-          o.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+          o.planned_start <= operating_now_ms()
           AND COALESCE(o.planned_end, o.planned_start + 600000)
-              >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+              >= operating_now_ms()
         ) DESC,
         o.planned_start
     ) AS vehicle_rank,
@@ -504,7 +504,7 @@ WITH active_orders AS (
     (
       o.status = 'PROCESSING'
       AND o.planned_end IS NOT NULL
-      AND o.planned_end < (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 15000
+      AND o.planned_end < operating_now_ms() - 15000
     ) AS is_overdue,
     /* 同一台車有下一班已經到點、只是被這班佔住 */
     EXISTS (
@@ -512,9 +512,9 @@ WITH active_orders AS (
       WHERE nx.vehicle_code = o.vehicle_code
         AND nx.order_id <> o.order_id
         AND nx.status = 'PENDING'
-        AND nx.planned_start <= (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+        AND nx.planned_start <= operating_now_ms()
         AND COALESCE(nx.planned_end, nx.planned_start + 600000)
-            >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+            >= operating_now_ms() - 60000
     ) AS next_due_waiting
   FROM operation_orders o
   JOIN vehicles v ON v.vehicle_code = o.vehicle_code
@@ -537,18 +537,22 @@ WITH active_orders AS (
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     AND ${notCancelledSql('o')}
     /*
-     * 只看今天。
+     * 只看目前的營運日。
      *
      * 少了這一條，同一個班次代號會把每一天的那一筆都撈出來——實測 TS1217 一次回
      * 十九列（8/29 到 9/16 各一），畫面上看起來像重複的卡片。而且排序從最早的
      * 00:00 開始，正在跑的 13:20 那幾班反而看不到。
+     *
+     * 歸屬看訂單上的 operating_day（次日凌晨的班次仍屬原營運日）；舊訂單沒有這個欄位才看計畫發車時刻。
      */
-    AND o.planned_start >= (
-      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())))) * 1000
-    )::bigint
-    AND o.planned_start < (
-      EXTRACT(EPOCH FROM timezone('Asia/Taipei', date_trunc('day', timezone('Asia/Taipei', now())) + interval '1 day')) * 1000
-    )::bigint
+    AND (
+      o.payload->>'operating_day' = operating_day()
+      OR (
+        o.payload->>'operating_day' IS NULL
+        AND o.planned_start >= operating_day_start_ms()
+        AND o.planned_start < operating_day_start_ms() + 86400000
+      )
+    )
     /*
      * 只留還沒跑完的。
      *
@@ -565,7 +569,7 @@ WITH active_orders AS (
      */
     AND (
       COALESCE(o.planned_end, o.planned_start + 600000)
-        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+        >= operating_now_ms() - 60000
       OR (
         o.status = 'PROCESSING'
         AND COALESCE((o.payload->>'updated_at')::bigint, 0)
@@ -924,12 +928,12 @@ FROM (
     -- 跟班次卡同一套「還在跑」的定義。少了這一條會把歷來每一天沒收乾淨的
     -- PROCESSING 全部算進去，標題列會寫成「正線營運 208 / 415」。
     AND COALESCE(o.planned_end, o.planned_start + 600000)
-        >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+        >= operating_now_ms() - 60000
     AND (
       o.status <> 'PENDING'
       OR o.planned_start BETWEEN
-        (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
-        AND (EXTRACT(EPOCH FROM now()) * 1000)::bigint + 90000
+        operating_now_ms() - 60000
+        AND operating_now_ms() + 90000
     )
 ) s
 `.trim();
@@ -974,7 +978,7 @@ WHERE ${orderBusinessKindSql('o')} = 'MAINTENANCE'
   AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
   AND ${notCancelledSql('o')}
   AND (
-    COALESCE(o.planned_end, o.planned_start + 1800000) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 60000
+    COALESCE(o.planned_end, o.planned_start + 1800000) >= operating_now_ms() - 60000
     OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
   )
 ORDER BY CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END, o.planned_start

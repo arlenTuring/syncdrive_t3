@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ClockWidget } from '../types';
+import { useOperatingClock } from '../utils/operatingClock';
 
 function formatDate(date: Date, fmt: string): string {
   const y = date.getFullYear();
@@ -10,13 +11,28 @@ function formatDate(date: Date, fmt: string): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * 時鐘顯示營運時間：正式營運就是實際時間；執行端加速重播時顯示重播到的營運時刻，
+ * 並註明營運日、倍速與狀態，看的人才知道畫面是每日計畫的哪個時點。
+ */
 export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
-  const [now, setNow] = useState(new Date());
+  const clock = useOperatingClock();
+  const replay = clock.snapshot?.mode === 'replay' ? clock.snapshot : null;
+  const [now, setNow] = useState(() => new Date(clock.operatingNow()));
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    setNow(new Date(clock.operatingNow()));
+    // 加速時一秒跳好幾分鐘，更新密一點才看得出在走
+    const step = replay && clock.advancing ? 200 : 1000;
+    const timer = setInterval(() => setNow(new Date(clock.operatingNow())), step);
     return () => clearInterval(timer);
-  }, []);
+  }, [clock, replay]);
+
+  const replayNote = replay
+    ? `營運日 ${replay.operating_day}｜${replay.rate}× 重播${
+      replay.ended ? '（已結束）' : replay.stale ? '（執行端中斷）' : replay.paused ? '（暫停）' : ''
+    }${replay.lag_ms > 1000 && !replay.ended ? `｜執行落後 ${Math.round(replay.lag_ms / 1000)} 秒` : ''}`
+    : null;
 
   const h = now.getHours();
   const m = now.getMinutes();
@@ -64,6 +80,19 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
           letterSpacing: '0.05em',
         }}>
           {dateStr}
+        </div>
+      )}
+      {replayNote && (
+        <div
+          title="營運時間由執行端推進；班次狀態、延誤、ETA、倒數都以此為準"
+          style={{
+            fontSize: Math.max(10, Math.round((widget.dateFontSize || 12) * 0.85)),
+            color: '#FBBF24',
+            fontFamily: widget.fontFamily || 'monospace',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {replayNote}
         </div>
       )}
     </div>

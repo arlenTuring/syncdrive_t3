@@ -25,6 +25,17 @@ import { extractYardTasks } from './dispatch.yard-tasks';
 import { buildChargingLookup } from './dispatch.charging';
 import { MaintenanceTaskService } from '../maintenance-task/maintenance-task.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
+import { planDigestOf } from './dispatch.simulation-plan';
+import { DailyPlanStore } from './daily-plan.store';
+import {
+  buildAdoption,
+  DAILY_PLAN_PAYLOAD_KEYS,
+  type DailyPlanAdoption,
+  type DailyPlanAdoptionVia,
+} from './daily-plan';
+import { operatingDayOf, operatingDayReference } from '../operating-day/operating-day';
+
+type ShiftSource = Awaited<ReturnType<OperationShiftService['getShiftTrips']>>;
 
 /**
  * 即時調度引擎。
@@ -93,6 +104,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly vehicleRepository: Repository<Vehicle>,
     @InjectRepository(OperationOrder)
     private readonly orderRepository: Repository<OperationOrder>,
+    private readonly dailyPlans: DailyPlanStore,
   ) {}
 
   /**
@@ -164,16 +176,136 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       .sort((a, b) => a.localeCompare(b));
   }
 
-  /** 今日全部待下訂單（不管有沒有下過） */
+  /**
+   * 今日全部待下訂單（不管有沒有下過）。
+   *
+   * 來源是<strong>該營運日採用的每日計畫</strong>（daily-plan.ts）：正式部署、模擬器部署都會建立
+   * 採用紀錄；沒有紀錄時採用部署中的班表並記下來。這樣調度發的單與班次中心統計的永遠是同一份。
+   */
   async planToday(reference = Date.now()): Promise<{
     shiftId: string;
     shiftName: string;
     planned: PlannedDispatch[];
     skipped: Array<{ tripCode: string; reason: string }>;
+    operatingDay: string;
+    planDigest: string;
+    /** 採用紀錄的版本；跟 planDigest 不同代表班表在採用後被改過 */
+    adoptedDigest: string;
   } | null> {
-    const deployed = await this.operationShiftService.getDeployedTrips();
-    if (!deployed) return null;
-    return this.buildPlan(deployed, reference);
+    const day = operatingDayOf(localMidnight(reference));
+    const resolved = await this.resolveDailySource(day, { allowAuto: true });
+    if (!resolved) return null;
+    const source = await resolved.load();
+    const plan = await this.buildPlan(source, reference);
+    const planDigest = planDigestOf(plan.planned);
+    let adoption = resolved.adoption;
+    if (resolved.adoptVia) {
+      adoption = await this.saveAdoption(day, source, plan, planDigest, resolved.adoption, resolved.adoptVia);
+    }
+    return { ...plan, operatingDay: day, planDigest, adoptedDigest: adoption!.plan_digest };
+  }
+
+  /**
+   * 某營運日採用的每日計畫；需要時（今天還沒有紀錄、或之後有新的正式部署）先建立。
+   * 只有當天會自動採用部署中的班表——過去的日子沒有紀錄就是沒有，不拿現在的班表回填。
+   */
+  async ensureDailyPlan(day: string): Promise<DailyPlanAdoption | null> {
+    const allowAuto = day === operatingDayOf(Date.now());
+    const resolved = await this.resolveDailySource(day, { allowAuto });
+    if (!resolved) return null;
+    if (!resolved.adoptVia) return resolved.adoption;
+    const reference = operatingDayReference(day) ?? Date.now();
+    const source = await resolved.load();
+    const plan = await this.buildPlan(source, reference);
+    return this.saveAdoption(day, source, plan, planDigestOf(plan.planned), resolved.adoption, resolved.adoptVia);
+  }
+
+  /**
+   * 明確採用某份班表為某營運日的每日計畫（模擬器「部署並開始」、維運手動切換）。
+   * expectedPlanDigest 有給就要一致：呼叫端載入後班表又被改過，就不能把另一個版本當成它載入的那份。
+   */
+  async adoptDailyPlan(args: {
+    shiftId: string;
+    day: string;
+    via: DailyPlanAdoptionVia;
+    by?: string | null;
+    expectedPlanDigest?: string | null;
+    loadDigest?: string | null;
+  }): Promise<{ previous: DailyPlanAdoption | null; adoption: DailyPlanAdoption }> {
+    const reference = operatingDayReference(args.day);
+    if (reference == null) throw new Error(`營運日格式不對：${args.day}`);
+    const source = await this.operationShiftService.getShiftTrips(args.shiftId);
+    const plan = await this.buildPlan(source, reference);
+    const planDigest = planDigestOf(plan.planned);
+    if (args.expectedPlanDigest && args.expectedPlanDigest !== planDigest) {
+      throw new DailyPlanVersionMismatch(args.expectedPlanDigest, planDigest);
+    }
+    const previous = await this.dailyPlans.get(args.day);
+    const adoption = await this.saveAdoption(
+      args.day, source, plan, planDigest, previous, args.via, args.by ?? null, args.loadDigest ?? null,
+    );
+    return { previous, adoption };
+  }
+
+  private async saveAdoption(
+    day: string,
+    source: Pick<ShiftSource, 'shiftId' | 'shiftName' | 'trips' | 'body'> & { row?: ShiftSource['row'] },
+    plan: { planned: PlannedDispatch[]; skipped: Array<{ tripCode: string; reason: string }> },
+    planDigest: string,
+    previous: DailyPlanAdoption | null,
+    via: DailyPlanAdoptionVia,
+    by: string | null = null,
+    loadDigest: string | null = null,
+  ): Promise<DailyPlanAdoption> {
+    const version = typeof source.body.version === 'string' && source.body.version.trim() ? source.body.version.trim() : null;
+    const updatedAt = source.row ? Number(source.row.updatedAt) : NaN;
+    const adoption = buildAdoption({
+      operatingDay: day,
+      shift: { id: source.shiftId, name: source.shiftName, version, updatedAt: Number.isFinite(updatedAt) ? updatedAt : null },
+      planDigest,
+      loadDigest,
+      planned: plan.planned,
+      scheduleTrips: source.trips,
+      skipped: plan.skipped.length,
+      via,
+      by,
+      now: Date.now(),
+      previous,
+    });
+    await this.dailyPlans.save(adoption);
+    if (!previous || previous.plan_digest !== adoption.plan_digest || previous.shift_id !== adoption.shift_id) {
+      this.logger.log(`${day} 每日計畫採用「${adoption.shift_name}」（${adoption.passenger_trips.length} 班載客，${via}）`);
+    }
+    return adoption;
+  }
+
+  /**
+   * 該營運日要用哪份班表。
+   *
+   * 正式部署（usage_status＝in_use）晚於採用紀錄，或還沒有紀錄時，改採部署中的那份——部署本身就是
+   * 明確的動作。其餘照採用紀錄（例如模擬器部署的班表），不因為部署中是另一份就被換掉。
+   */
+  private async resolveDailySource(day: string, options: { allowAuto: boolean }): Promise<{
+    adoption: DailyPlanAdoption | null;
+    adoptVia: DailyPlanAdoptionVia | null;
+    load: () => Promise<ShiftSource | (Omit<ShiftSource, 'row'> & { row?: undefined })>;
+  } | null> {
+    const adoption = await this.dailyPlans.get(day);
+    const deployed = options.allowAuto ? await this.operationShiftService.getDeployedShift() : null;
+    const deployedAt = Number((deployed?.body.deployment as { deployedAt?: unknown } | undefined)?.deployedAt) || 0;
+    const loadDeployed = async () => {
+      const trips = await this.operationShiftService.getDeployedTrips();
+      if (!trips) throw new Error('部署中的班表已不存在');
+      return trips;
+    };
+    if (deployed && (!adoption || (adoption.shift_id !== deployed.shiftId && deployedAt > adoption.adopted_at))) {
+      return { adoption, adoptVia: adoption ? 'deploy' : 'auto_deployed', load: loadDeployed };
+    }
+    if (!adoption) return null;
+    const load = deployed && adoption.shift_id === deployed.shiftId
+      ? loadDeployed
+      : () => this.operationShiftService.getShiftTrips(adoption.shift_id);
+    return { adoption, adoptVia: null, load };
   }
 
   /**
@@ -384,7 +516,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
       try {
-        await this.issueOrder(item, plan.shiftId, plan.shiftName);
+        await this.issueOrder(item, plan);
         this.issued.add(item.orderId);
         issued.push(item);
       } catch (error) {
@@ -432,9 +564,9 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    */
   private async issueOrder(
     item: PlannedDispatch,
-    shiftId: string,
-    shiftName: string,
+    plan: { shiftId: string; shiftName: string; operatingDay: string; planDigest: string },
   ): Promise<void> {
+    const { shiftId, shiftName } = plan;
     const fields = dispatchOrderFields(item);
     await this.orderService.createOrder({
       order_id: item.orderId,
@@ -453,6 +585,11 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         ...fields.payload,
         shift_id: shiftId,
         shift_name: shiftName,
+        // 每日計畫關聯（daily-plan.ts）：模擬器下的單寫同一組欄位，班次中心只看這組
+        [DAILY_PLAN_PAYLOAD_KEYS.operatingDay]: plan.operatingDay,
+        [DAILY_PLAN_PAYLOAD_KEYS.shiftId]: shiftId,
+        [DAILY_PLAN_PAYLOAD_KEYS.planDigest]: plan.planDigest,
+        [DAILY_PLAN_PAYLOAD_KEYS.tripCode]: item.tripCode,
         planned_depart_at: item.departAt,
         planned_arrive_at: item.arriveAt,
         origin: item.origin && {
@@ -529,5 +666,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       })),
       recently_issued: this.recentlyIssued.slice(0, 10),
     };
+  }
+}
+
+/** 呼叫端載入的計畫版本跟班表目前展開的不同 */
+export class DailyPlanVersionMismatch extends Error {
+  constructor(readonly expected: string, readonly actual: string) {
+    super(`班表內容已在載入後變更（載入時 ${expected}，目前 ${actual}），請重新載入後再部署`);
   }
 }

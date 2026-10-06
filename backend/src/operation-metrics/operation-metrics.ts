@@ -4,10 +4,9 @@
  *
  * 全部從部署中的班表與當天的訂單算，不讀示範表：
  *
+ * 班次中心的規則在 dispatch/daily-plan.ts（營運日＋採用的每日計畫）。
+ *
  * <table>
- *   <tr><td>總共班次</td><td>部署班表的正線班次數</td></tr>
- *   <tr><td>完成／延誤</td><td>當天這份班表的正線訂單：END 為完成；結束晚於計畫一分鐘以上、
- *       故障結案、或進行中但已超過計畫結束，都算延誤</td></tr>
  *   <tr><td>目標數值</td><td>時間模板此刻時段的運量（pphpd）</td></tr>
  *   <tr><td>計畫運能</td><td>班表的發車換算 pphpd</td></tr>
  *   <tr><td>即時數值</td><td>實際發車（訂單開始執行的時刻）換算 pphpd</td></tr>
@@ -198,20 +197,6 @@ export function plannedLeadsFromShift(body: Record<string, unknown>, routes: Rou
   return leads;
 }
 
-export function countPlannedPassengerTrips(body: Record<string, unknown>): number {
-  const timelines = asRecord(asRecord(body.scheduleOutput)?.plan)?.timelines;
-  if (!Array.isArray(timelines)) return 0;
-  let count = 0;
-  for (const raw of timelines) {
-    const blocks = asRecord(raw)?.blocks;
-    if (!Array.isArray(blocks)) continue;
-    for (const item of blocks) {
-      if (asRecord(item)?.taskType === 'passenger') count += 1;
-    }
-  }
-  return count;
-}
-
 /** 一台車投入營運一小時、每個服務方向可多開幾趟 → pphpd（用班表偏好的交路一圈秒數） */
 export function perVehiclePphpd(body: Record<string, unknown>, vehicleCapacity: number): number {
   const anchors = asRecord(body.throughAnchors);
@@ -222,43 +207,6 @@ export function perVehiclePphpd(body: Record<string, unknown>, vehicleCapacity: 
   const cycleSeconds = Number(preferred?.avgCycleSeconds);
   if (!Number.isFinite(cycleSeconds) || cycleSeconds <= 0 || vehicleCapacity <= 0) return 0;
   return (vehicleCapacity * 3600) / cycleSeconds;
-}
-
-export type ShiftCenterSummary = {
-  total_shifts: number;
-  completed_shifts: number;
-  delayed_shifts: number;
-  achievement_pct: number;
-  achievement_line: string;
-  remaining_shifts: number;
-  remaining_line: string;
-  shift_name: string | null;
-};
-
-export function buildShiftCenterSummary(args: {
-  shiftName: string | null;
-  plannedTrips: number;
-  orders: Array<{ status: string; plannedEnd: number | null; delayMinutes: number | null }>;
-  now: number;
-}): ShiftCenterSummary {
-  const completed = args.orders.filter((order) => order.status === 'END').length;
-  const delayed = args.orders.filter((order) =>
-    (order.status === 'END' && (order.delayMinutes ?? 0) > 0)
-    || order.status === 'FAULTED'
-    || (order.status === 'PROCESSING' && order.plannedEnd != null && args.now > order.plannedEnd + 60_000)).length;
-  const total = Math.max(args.plannedTrips, completed);
-  const pct = total > 0 ? Math.round((100 * completed) / total) : 0;
-  const remaining = Math.max(0, total - completed);
-  return {
-    total_shifts: total,
-    completed_shifts: completed,
-    delayed_shifts: delayed,
-    achievement_pct: pct,
-    achievement_line: `達成了 ${pct}%`,
-    remaining_shifts: remaining,
-    remaining_line: pct >= 100 ? '' : `剩餘${remaining}班次`,
-    shift_name: args.shiftName,
-  };
 }
 
 /** 班距秒數 → 「MM:SS」；沒有設定時回「—」 */

@@ -86,6 +86,7 @@ function build(
 ) {
   const created: CreatedOrder[] = [];
   const shiftService = {
+    getDeployedShift: jest.fn().mockResolvedValue({ shiftId: 'shift-1', shiftName: '模擬正線', body }),
     getDeployedTrips: jest.fn().mockResolvedValue({
       shiftId: 'shift-1',
       shiftName: '模擬正線',
@@ -130,14 +131,23 @@ function build(
   const maintenanceTaskService = {
     getTaskDetail: jest.fn().mockRejectedValue(new Error('not used')),
   };
+  const adoptions = new Map<string, unknown>();
+  const dailyPlans = {
+    get: jest.fn().mockImplementation((day: string) => Promise.resolve(adoptions.get(day) ?? null)),
+    save: jest.fn().mockImplementation((adoption: { operating_day: string }) => {
+      adoptions.set(adoption.operating_day, adoption);
+      return Promise.resolve();
+    }),
+  };
   const engine = new DispatchEngineService(
     shiftService as never,
     orderService as never,
     maintenanceTaskService as never,
     vehicleRepository as never,
     orderRepository as never,
+    dailyPlans as never,
   );
-  return { engine, created, orderService, shiftService, orderRepository };
+  return { engine, created, orderService, shiftService, orderRepository, dailyPlans };
 }
 
 describe('DispatchEngineService.tick', () => {
@@ -151,6 +161,24 @@ describe('DispatchEngineService.tick', () => {
     const due = await engine.tick({ now: REFERENCE });
     expect(due.issued).toHaveLength(1);
     expect(created).toHaveLength(1);
+  });
+
+  it('下的單帶每日計畫關聯；當天沒有採用紀錄時採用部署中的班表並記下', async () => {
+    const { engine, created, dailyPlans } = build([trip(12 * 3600 + 60)]);
+    await engine.tick({ now: REFERENCE });
+    const payload = created[0]!.payload as unknown as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      operating_day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      plan_shift_id: 'shift-1',
+      plan_trip_code: created[0]!.trip_code,
+      plan_digest: expect.any(String),
+    });
+    expect(dailyPlans.save).toHaveBeenCalledTimes(1);
+    const adoption = dailyPlans.save.mock.calls[0]![0] as { plan_digest: string; adopted_via: string; operating_day: string };
+    expect(adoption).toMatchObject({ plan_digest: payload.plan_digest, adopted_via: 'auto_deployed', operating_day: payload.operating_day });
+    // 第二次不再重建紀錄
+    await engine.tick({ now: REFERENCE + 5_000 });
+    expect(dailyPlans.save).toHaveBeenCalledTimes(1);
   });
 
   it('同一支程序不會重複下同一張訂單', async () => {
