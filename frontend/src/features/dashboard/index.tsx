@@ -27,6 +27,7 @@ import { notifyCloseCanvasChildList } from './utils/canvasChildList';
 import { VariableProvider } from './VariableContext';
 import { DemoSimulationProvider } from './context/DemoSimulationContext';
 import { VehicleFleetMqttProvider } from './context/VehicleFleetMqttContext';
+import { PlaneDataSourceProvider } from './context/PlaneDataSourceContext';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 import {
   buildGroupPreviewVariables,
@@ -642,18 +643,13 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   if (view === 'list') {
     return (
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
-        <header className="z-20 flex h-14 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-6">
-          {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <div className="flex items-center gap-2.5 text-lg font-bold text-cyan-400">
-            <LayoutGrid size={20} />
-            <span>{t('dashboard.title')}</span>
+        {/* 列表上方原本有一整條「儀表板管理」標題＋齒輪，跟外層頁籤重複，已拿掉；
+            資料設定改在單張儀表板的編輯器工具列（屬於那一張）。獨立開啟時保留返回首頁。 */}
+        {onBackToHome && (
+          <div className="z-20 flex h-12 shrink-0 items-center border-b border-zinc-800 bg-zinc-900 px-6">
+            <BackToHomeButton onClick={onBackToHome} />
           </div>
-          <div className="flex-1" />
-          <button onClick={() => setShowSettings(true)}
-            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
-            <Settings size={20} />
-          </button>
-        </header>
+        )}
 
         <DashboardList 
           planes={planes} 
@@ -682,9 +678,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
         {showNewDialog && (
           <NewPlaneDialog onConfirm={handleCreatePlane} onCancel={() => setShowNewDialog(false)} />
-        )}
-        {showSettings && (
-          <SettingsModal onClose={() => setShowSettings(false)} onClearAll={clearAllData} />
         )}
       </div>
     );
@@ -1100,6 +1093,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   // ─── 編輯器視圖 ───
   return (
     <DemoSimulationProvider>
+    {/* 這張儀表板自己的資料設定：SQL／MQTT／REST 與車隊 hub 都照它解析來源 */}
+    <PlaneDataSourceProvider plane={activePlane}>
     <VehicleFleetMqttProvider>
     <BindingHealthProvider
       plane={activePlane ?? displayPlane}
@@ -1356,7 +1351,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         <button onClick={() => setShowSettings(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700
                      text-zinc-400 text-xs hover:border-purple-600 hover:text-purple-400 transition-colors">
-          <Settings size={13} /> {t('dashboard.dataSource')}
+          <Settings size={13} /> {t('dashboard.dataSettings')}
         </button>
 
         {/* 剪貼簿狀態提示 */}
@@ -1743,9 +1738,14 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
       {/* 設定 Modal */}
       {showSettings && (
-        <SettingsModal 
-          onClose={() => setShowSettings(false)} 
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
           onClearAll={clearAllData}
+          plane={activePlane}
+          planes={planes}
+          onChangePlaneDataSettings={
+            activePlane ? (dataSettings) => updatePlane(activePlane.id, { dataSettings }) : undefined
+          }
         />
       )}
 
@@ -1772,6 +1772,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     </FormatPainterProvider>
     </BindingHealthProvider>
     </VehicleFleetMqttProvider>
+    </PlaneDataSourceProvider>
     </DemoSimulationProvider>
   );
 }

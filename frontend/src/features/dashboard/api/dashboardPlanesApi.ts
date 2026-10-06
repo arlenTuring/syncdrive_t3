@@ -24,6 +24,7 @@ type DashboardPlaneRow = {
   height: number;
   viewportMode?: string | null;
   elements?: unknown;
+  dataSettings?: { sourceMap?: Record<string, string> } | null;
   isTemplate?: boolean | null;
   version?: number | null;
   createdAt?: number | null;
@@ -65,6 +66,7 @@ function toPlane(row: DashboardPlaneRow): DashboardPlane {
     viewportMode:
       row.viewportMode === 'fit-width' ? 'fit-width' : 'fixed-scale',
     elements: Array.isArray(row.elements) ? (row.elements as DashboardPlane['elements']) : [],
+    ...(row.dataSettings?.sourceMap ? { dataSettings: { sourceMap: { ...row.dataSettings.sourceMap } } } : {}),
     createdAt: row.createdAt ?? Date.now(),
     updatedAt: row.updatedAt ?? Date.now(),
     ...(typeof row.version === 'number' ? { serverVersion: row.version } : {}),
@@ -79,6 +81,8 @@ function toRow(plane: DashboardPlane): DashboardPlaneRow {
     height: plane.height,
     viewportMode: plane.viewportMode ?? 'fixed-scale',
     elements: plane.elements ?? [],
+    // 一律送出（沒有就是空的），讓「清掉選擇」也能存回伺服器
+    dataSettings: { sourceMap: { ...(plane.dataSettings?.sourceMap ?? {}) } },
   };
 }
 

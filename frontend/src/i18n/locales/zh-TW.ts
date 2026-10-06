@@ -2457,6 +2457,7 @@ const zhTW = {
     redo: '重做',
     redoTitle: '重做 (⌘/Ctrl+Shift+Z 或 Ctrl+Y)',
     dataSource: '資料來源',
+    dataSettings: '資料設定',
     saved: '✓ 已儲存',
     saveFailed: '❌ 儲存失敗',
     copiedCanvas: '已複製 畫布',
@@ -3374,7 +3375,7 @@ const zhTW = {
       },
     },
     settings: {
-      tabDatasource: '資料來源',
+      tabDatasource: '連線定義（共用）',
       tabGeneral: '一般設定',
       datasourceIntro:
         '資料來源依類型分類管理。元件的「數據綁定」分頁只會列出對應類型：SQL 僅能選 SQL 資料庫，MQTT 僅能選 MQTT 連線。',

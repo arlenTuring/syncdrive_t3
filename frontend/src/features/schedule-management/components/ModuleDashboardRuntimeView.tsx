@@ -8,6 +8,7 @@ import { FormatPainterProvider } from '../../dashboard/context/FormatPainterCont
 import { PlaneWorkspace } from '../../dashboard/PlaneWorkspace';
 import type { DashboardPlane } from '../../dashboard/types';
 import { VariableProvider } from '../../dashboard/VariableContext';
+import { PlaneDataSourceProvider } from '../../dashboard/context/PlaneDataSourceContext';
 import { migratePlane } from '../../dashboard/utils/migrateDashboardPlane';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { DASHBOARD_PLANES_TAG, fetchDashboardPlanes } from '../../dashboard/api/dashboardPlanesApi';
@@ -113,6 +114,7 @@ export function ModuleDashboardRuntimeView({
 
   return (
     <DemoSimulationProvider>
+      <PlaneDataSourceProvider plane={plane}>
       <VehicleFleetMqttProvider>
         <BindingHealthProvider plane={plane} enabled>
           <FormatPainterProvider
@@ -151,6 +153,7 @@ export function ModuleDashboardRuntimeView({
           </FormatPainterProvider>
         </BindingHealthProvider>
       </VehicleFleetMqttProvider>
+      </PlaneDataSourceProvider>
     </DemoSimulationProvider>
   );
 }

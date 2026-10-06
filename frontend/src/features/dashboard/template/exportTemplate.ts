@@ -15,7 +15,7 @@ function collectBindingFromWidget(w: WidgetDataBinding, ids: Set<string>, mqttId
   if (w.mqttDataSourceId) mqttIds.add(w.mqttDataSourceId);
 }
 
-function collectFromPlane(plane: DashboardPlane) {
+export function collectFromPlane(plane: DashboardPlane) {
   const dataSourceIds = new Set<string>();
   const mqttIds = new Set<string>();
 
@@ -41,13 +41,31 @@ function collectFromPlane(plane: DashboardPlane) {
   return { dataSourceIds, mqttIds: mqttIds };
 }
 
+/** 網址裡夾帶的帳密（http://user:pass@host）不匯出 */
+export function stripUrlCredentials(url: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.username && !parsed.password) return url;
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.toString().replace(/\/$/, url.endsWith('/') ? '/' : '');
+  } catch {
+    return url.replace(/\/\/[^/@]*@/, '//');
+  }
+}
+
 function pickReferencedDataSources(
   dataSourceIds: Set<string>,
   mqttIds: Set<string>,
+  sourceMap: Record<string, string> = {},
 ): DataSourceConfig[] {
   const all = getDataSources();
-  const needed = new Set([...dataSourceIds, ...mqttIds]);
-  return all.filter(ds => needed.has(ds.id));
+  // 元件引用的，加上這張儀表板「資料設定」實際選用的（車隊 hub 的 default-mqtt 也算）
+  const needed = new Set([...dataSourceIds, ...mqttIds, ...Object.values(sourceMap)]);
+  return all
+    .filter(ds => needed.has(ds.id))
+    .map(ds => ({ ...ds, backendUrl: stripUrlCredentials(ds.backendUrl) }));
 }
 
 /** 將目前平面匯出為可部署的樣板 JSON */
@@ -56,7 +74,7 @@ export function buildDashboardTemplate(
   meta?: Partial<DashboardTemplateFile['meta']>,
 ): DashboardTemplateFile {
   const { dataSourceIds, mqttIds } = collectFromPlane(plane);
-  const dataSources = pickReferencedDataSources(dataSourceIds, mqttIds);
+  const dataSources = pickReferencedDataSources(dataSourceIds, mqttIds, plane.dataSettings?.sourceMap);
 
   const { id: _id, createdAt: _c, updatedAt: _u, ...planeBody } = plane;
 

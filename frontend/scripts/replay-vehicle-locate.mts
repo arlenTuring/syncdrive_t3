@@ -35,6 +35,7 @@ import {
 import { buildRouteCorridors, readTargetStationId } from '../src/features/map-editor/vehicles/routeCorridor'
 import { readVehicleHeadingRad } from '../src/features/map-editor/vehicles/readVehicleHeading'
 import { TRACK_HALF_WIDTH_M } from '../src/features/map-editor/vehicles/quantisedTrackCell'
+import { withCrossBranchTracks } from '../src/features/map-editor/utils/crossBranches'
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -64,7 +65,11 @@ const rawMap = JSON.parse(readFileSync(mapPath, 'utf-8')) as { mapDocument?: unk
 const inner = (rawMap.mapDocument ?? rawMap) as Record<string, unknown>
 const parsedMap = parseMapFileJson(inner)
 const loaded = parsedMap.areas
-const areas = repairTrackRefFieldBoundsInAreas(backfillTrackGenSpansInAreas(loaded).areas).areas
+// 跟圖台（MapAreaVehicleOverlay）一樣把交叉軌道換成各分支再定位；不拆的話，D35/U35 這種上下行合成
+// 一塊的只剩一條中心線，走另一條車道的車會被誤判成不在軌道上，重播結果就跟畫面對不上
+const areas = withCrossBranchTracks(
+  repairTrackRefFieldBoundsInAreas(backfillTrackGenSpansInAreas(loaded).areas).areas,
+)
 const network = buildTrackNetwork(areas)
 const yardBoxes = collectYardSlotFieldBoxes(areas)
 // 訂單路線走廊：--no-corridor 關掉，拿同一批資料比對有沒有這條旁證的差別

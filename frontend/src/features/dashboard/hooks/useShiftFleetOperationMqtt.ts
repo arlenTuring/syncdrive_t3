@@ -4,6 +4,8 @@ import { getDataSourceById } from '../store/useDataSourceStore';
 import { VTMS_VEHICLE_POOL } from '../constants/vtmsVehiclePool';
 import { useDemoSimulationPaused } from '../context/DemoSimulationPlaybackContext';
 
+import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
+
 const DS_MQTT = 'default-mqtt';
 
 function operationRowKey(row: Record<string, unknown>): string {
@@ -32,6 +34,8 @@ function operationRowKey(row: Record<string, unknown>): string {
  * 名冊槽位由 MQTT 即時增刪，不依 SQL 15s 輪詢。
  */
 export function useShiftFleetOperationMqtt(enabled: boolean): Map<string, Record<string, unknown>> {
+  // 這張儀表板「資料設定」選的 MQTT 連線
+  const sourceId = usePlaneSourceId(DS_MQTT);
   const paused = useDemoSimulationPaused();
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
@@ -42,19 +46,24 @@ export function useShiftFleetOperationMqtt(enabled: boolean): Map<string, Record
   const rowKeyRef = useRef<Map<string, string>>(new Map());
   const flushRafRef = useRef(0);
 
+  const lastSourceRef = useRef(sourceId);
   useEffect(() => {
-    if (!enabled) {
+    // 換了連線：先丟掉上一個連線收到的資料，不混進這張儀表板
+    const sourceChanged = lastSourceRef.current !== sourceId;
+    lastSourceRef.current = sourceId;
+    if (!enabled || sourceChanged) {
       pendingRef.current = new Map();
       rowKeyRef.current = new Map();
       if (flushRafRef.current) {
         cancelAnimationFrame(flushRafRef.current);
         flushRafRef.current = 0;
       }
+      byVehicleRef.current = new Map();
       setByVehicle(new Map());
-      return;
+      if (!enabled) return;
     }
 
-    const ds = getDataSourceById(DS_MQTT);
+    const ds = getDataSourceById(sourceId);
     if (!ds || ds.type !== 'mqtt') return;
 
     const socket = acquireSocket(ds.backendUrl);
@@ -105,7 +114,7 @@ export function useShiftFleetOperationMqtt(enabled: boolean): Map<string, Record
       }
       releaseSocket(ds.backendUrl);
     };
-  }, [enabled]);
+  }, [enabled, sourceId]);
 
   return byVehicle;
 }

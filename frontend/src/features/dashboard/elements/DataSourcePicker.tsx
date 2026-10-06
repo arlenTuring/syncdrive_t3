@@ -9,6 +9,7 @@ import {
 } from '../store/useDataSourceStore';
 import { DataSourceIdSelect } from './DataSourceIdSelect';
 import { useVariables, interpolateVariables } from '../VariableContext';
+import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
 
 interface Props {
   dataSourceId: string;
@@ -22,8 +23,10 @@ interface Props {
 const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
   focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
-export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, onChangeSqlQuery, onColumnsDetected }: Props) {
+export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChangeDataSource, onChangeSqlQuery, onColumnsDetected }: Props) {
   const { t } = useTranslation();
+  // 元件綁的是 boundSourceId；查資料表、欄位、預覽都用這張儀表板「資料設定」實際選的連線
+  const dataSourceId = usePlaneSourceId(boundSourceId);
   const dataSources = getDataSourcesForBinding('sql');
   const variables = useVariables();
 
@@ -94,7 +97,7 @@ export function DataSourcePicker({ dataSourceId, sqlQuery, onChangeDataSource, o
     <div className="space-y-2.5">
       <DataSourceIdSelect
         kind="sql"
-        value={dataSourceId}
+        value={boundSourceId}
         onChange={id => {
           onChangeDataSource(id);
           setTables([]);

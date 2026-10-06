@@ -17,6 +17,7 @@ import type { CanvasElementProps, ChildWidget } from '../src/features/dashboard/
 import { mapAllChildArrays } from '../src/features/dashboard/template/childArrayVariants.ts';
 import { upgradeSystemQueries } from '../src/features/dashboard/utils/systemQueries.ts';
 import { switchEventCarouselKey } from '../src/features/dashboard/utils/migrateDashboardPlane.ts';
+import { ensureTransitionShiftTemplate } from '../src/features/dashboard/utils/shiftCardTemplates.ts';
 import type { DashboardPlane } from '../src/features/dashboard/types.ts';
 
 const args = process.argv.slice(2);
@@ -63,7 +64,13 @@ for (const plane of planes) {
     id: plane.planeId, name: plane.name, width: plane.width, height: plane.height, elements, createdAt: 0, updatedAt: 0,
   } as DashboardPlane);
   // 事件輪播換成新版清單 SQL 之後，slot key 改用唯一的 event_key（event_id 不同車、不同日會重複）
-  const keyed = switchEventCarouselKey(queries.plane);
+  // 過渡班次卡（沒有就補）＋標題改用短名稱 display_code（只改系統原本的 {trip_code} 綁定）
+  const transition = ensureTransitionShiftTemplate(queries.plane);
+  if (transition.added > 0) {
+    console.log(`過渡班次卡：版面「${plane.name}」補上或更新 ${transition.added} 處`);
+    planeChanged = true;
+  }
+  const keyed = switchEventCarouselKey(transition.plane);
   const keyChanges = keyed.elements.filter((el, i) => el.slotKeyField !== queries.plane.elements[i]?.slotKeyField);
   for (const el of keyChanges) console.log(`事件輪播 slot key 改用 event_key：版面「${plane.name}」 › 元件「${el.label ?? el.id}」（${el.id}）`);
   if (keyChanges.length) planeChanged = true;

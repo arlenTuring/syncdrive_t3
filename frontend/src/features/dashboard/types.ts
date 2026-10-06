@@ -67,6 +67,8 @@ export interface ColorRule {
 export interface TextWidget extends WidgetBase, WidgetDataBinding {
   type: 'text';
   content: string;
+  /** 滑鼠移上去的提示（可帶 {變數}）；例如過渡卡標題顯示短名稱，提示完整的任務代號與訂單 ID */
+  tooltip?: string;
   fontSize: number;
   lineHeight: number;
   fontFamily: string;
@@ -1334,6 +1336,15 @@ export interface DashboardPlane {
   updatedAt: number;
   /** 後端資料列版本（讀取時帶回；單張更新時做樂觀鎖）。前端不自己遞增。 */
   serverVersion?: number;
+  /**
+   * 這張儀表板自己的資料設定（存在伺服器 dashboard_planes.data_settings）。
+   * sourceMap：元件引用的資料來源 ID → 這張實際使用的連線定義 ID；沒列到的照元件原本的 ID。
+   */
+  dataSettings?: PlaneDataSettings;
+}
+
+export interface PlaneDataSettings {
+  sourceMap?: Record<string, string>;
 }
 
 // ─── Widget 預設值工廠 ─────────────────────────────────────────────

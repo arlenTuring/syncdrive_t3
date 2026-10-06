@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { clearDatasourceQueryCacheForQuery, executeDatasourceQuery } from '../store/useDataSourceStore';
+import { clearDatasourceQueryCacheForQuery, executeDatasourceQuery, getDataSourceById } from '../store/useDataSourceStore';
+import { usePlaneSourceResolver } from '../context/PlaneDataSourceContext';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { expandBuiltinSqlMacros } from '../constants/demoSql';
 import { subscribeDatasourceInvalidation } from '../utils/datasourceInvalidationBus';
@@ -57,8 +58,21 @@ export type WidgetDataOptions = WidgetDataBinding & {
  * - once：僅 mount 查一次
  * - poll：legacy 定時輪詢
  */
+/**
+ * 站內 REST 網址（/syncdrive-api/...）跟著這張儀表板選的 SQL 連線（default-internal 的對應）
+ * 打到同一台後端；完整網址（http…）照原樣。
+ */
+export function resolvePlaneRestUrl(url: string, internalBackendUrl: string | undefined): string {
+  if (!url.startsWith('/') || !internalBackendUrl) return url;
+  return `${internalBackendUrl.replace(/\/$/, '')}${url}`;
+}
+
 export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
-  const { dataSourceId, sqlQuery, dataUrl } = opts;
+  const { sqlQuery, dataUrl } = opts;
+  // 這張儀表板「資料設定」選的連線（見 PlaneDataSourceContext）；快取也以解析後的 ID 為 key
+  const resolveSource = usePlaneSourceResolver();
+  const dataSourceId = opts.dataSourceId ? resolveSource(opts.dataSourceId) : opts.dataSourceId;
+  const restSourceId = resolveSource('default-internal');
   const [state, setState] = useState<WidgetFetchState>({ data: [], loading: false, error: null });
   const lastGoodData = useRef<Record<string, unknown>[]>([]);
   const [dataSourceRevision, setDataSourceRevision] = useState(0);
@@ -117,7 +131,17 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
     [opts.invalidateTags, sqlQuery],
   );
 
+  const lastSourceKey = useRef(`${dataSourceId ?? ''}|${restSourceId}`);
   useEffect(() => {
+    // 換了連線（切到別的儀表板設定、或改了資料設定）：上一個連線查到的資料不能再顯示，
+    // 不然新連線查詢失敗時會繼續秀舊連線的值，看起來像新連線的資料
+    const sourceKey = `${dataSourceId ?? ''}|${restSourceId}`;
+    if (lastSourceKey.current !== sourceKey) {
+      lastSourceKey.current = sourceKey;
+      lastGoodData.current = [];
+      lastShownJson.current = null;
+      setState({ data: [], loading: true, error: null });
+    }
     // stream：資料來自 MQTT，SQL hook 不查詢
     if (refreshMode === 'stream') {
       lastGoodData.current = [];
@@ -167,7 +191,10 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
 
       if (dataUrl?.trim()) {
         try {
-          const finalUrl = interpolateVariables(dataUrl, vars);
+          const finalUrl = resolvePlaneRestUrl(
+            interpolateVariables(dataUrl, vars),
+            getDataSourceById(restSourceId)?.backendUrl,
+          );
           const d = await fetchJsonShared(finalUrl) as Record<string, unknown> | Record<string, unknown>[];
           if (isStale(seq)) return;
           appliedSeq = seq;
@@ -231,7 +258,7 @@ export function useWidgetData(opts: WidgetDataOptions): WidgetFetchState {
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [dataSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags, dataSourceRevision]);
+  }, [dataSourceId, restSourceId, sqlQuery, dataUrl, refreshInterval, refreshMode, varsKey, invalidateTags, dataSourceRevision]);
 
   return state;
 }

@@ -39,6 +39,8 @@ export type YardMove = {
   /** 供 order_id 使用的短碼，同一份班表內穩定 */
   tripCode: string;
   label: string;
+  /** 方向：exit＝設施開往站點（出廠、讓站返回），entry＝站點開往設施（入廠、讓站移動）。來自 block.source */
+  direction: 'exit' | 'entry';
   /** 場區作業分類代碼（E 充電、P 行檢、H 停放…），沒有時為 null */
   sectionCode: string | null;
   startMinute: number;
@@ -154,6 +156,7 @@ export function extractYardMoves(body: Record<string, unknown>): {
         timelineRow: row,
         tripCode: buildTripCode(outbound ? 'OUT' : 'IN', row, startMinute),
         label: str(block.label) ?? (outbound ? '整備出廠' : '整備入廠'),
+        direction: outbound ? 'exit' : 'entry',
         sectionCode: str(block.yardExitSectionCode),
         startMinute,
         endMinute,

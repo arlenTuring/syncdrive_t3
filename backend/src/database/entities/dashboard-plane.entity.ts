@@ -52,6 +52,16 @@ export class DashboardPlane {
   @Column({ type: 'jsonb' })
   elements: any;
 
+  /**
+   * 這張儀表板自己的資料設定（2026-10-05）。
+   *
+   * sourceMap：元件引用的資料來源 ID → 這張儀表板實際使用的連線定義 ID。沒列到的照元件原本的 ID。
+   * 連線定義（data_sources）全系統共用、可以重用；這裡只記「這張選了哪一份」，所以改 A 的選擇
+   * 不會動到 B。只存 ID，不存任何連線帳密。
+   */
+  @Column({ name: 'data_settings', type: 'jsonb', nullable: true })
+  dataSettings: { sourceMap?: Record<string, string> } | null;
+
   // 版本序號；每次存檔遞增，供版面異動追溯與樂觀鎖使用
   @Column({ type: 'int', default: 1 })
   version: number;

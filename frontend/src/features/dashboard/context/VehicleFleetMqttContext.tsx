@@ -9,8 +9,10 @@ import {
 } from 'react';
 import {
   useVehicleFleetMqttHub,
+  VTMS_FLEET_HUB_SOURCE_ID,
   type VehicleFleetMqttHub,
 } from '../hooks/useVehicleFleetMqttHub';
+import { usePlaneSourceId } from './PlaneDataSourceContext';
 import type { VtmsStreamKind } from '../utils/vtmsTopic';
 
 /**
@@ -58,7 +60,9 @@ function createVehicleFleetStore(initial: VehicleFleetMqttHub): VehicleFleetStor
 const VehicleFleetStoreContext = createContext<VehicleFleetStore | null>(null);
 
 export function VehicleFleetMqttProvider({ children }: { children: ReactNode }) {
-  const hub = useVehicleFleetMqttHub(true);
+  // 這張儀表板「資料設定」選的 MQTT 連線（default-mqtt 的對應）
+  const sourceId = usePlaneSourceId(VTMS_FLEET_HUB_SOURCE_ID);
+  const hub = useVehicleFleetMqttHub(true, sourceId);
   const [store] = useState(() => createVehicleFleetStore(hub));
 
   // commit 後才通知：訂閱者在同一輪繪製前拿到新 hub

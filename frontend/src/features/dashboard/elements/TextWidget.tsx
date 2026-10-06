@@ -315,8 +315,10 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
     </>
   );
 
+  const tooltip = widget.tooltip ? interpolateVariables(widget.tooltip, variables).trim() : undefined;
   return (
     <div
+      title={tooltip || undefined}
       style={{
         width: '100%', height: '100%',
         fontSize: widget.fontSize,

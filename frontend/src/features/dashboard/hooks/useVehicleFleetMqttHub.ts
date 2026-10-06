@@ -16,7 +16,8 @@ const FLEET_EXPIRY_SWEEP_MS = 1_000;
 /** 後端完整重置測試資料後廣播（data-admin live-data-reset.service.ts） */
 type LiveStateResetPayload = { vehicleCodes?: string[]; at?: number };
 
-const DS_MQTT = 'default-mqtt';
+/** 車隊 hub 預設用的 MQTT 來源 ID；實際連線由每張儀表板的「資料設定」決定（PlaneDataSourceContext） */
+export const VTMS_FLEET_HUB_SOURCE_ID = 'default-mqtt';
 
 const STREAM_SUFFIX: Record<VtmsStreamKind, string> = {
   telemetry: 'telemetry/update',
@@ -50,7 +51,10 @@ const FLEET_HUB_MIN_FLUSH_MS = 50;
  * 全車隊 VTMS MQTT 集中訂閱（telemetry / operation / health）。
  * 每車每 stream 僅一條 listener，供 useMqttData 與班次卡共用。
  */
-export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
+export function useVehicleFleetMqttHub(
+  enabled: boolean,
+  sourceId: string = VTMS_FLEET_HUB_SOURCE_ID,
+): VehicleFleetMqttHub {
   /**
    * 何時該丟掉進來的 MQTT。
    *
@@ -113,8 +117,12 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
     setHub(cleared);
   }, [enabled, paused]);
 
+  const lastSourceRef = useRef(sourceId);
   useEffect(() => {
-    if (!enabled) {
+    // 換了連線（切到選了別的 MQTT 的儀表板，或改了資料設定）：先丟掉上一個連線收到的資料
+    const sourceChanged = lastSourceRef.current !== sourceId;
+    lastSourceRef.current = sourceId;
+    if (!enabled || sourceChanged) {
       pendingRef.current.telemetry.clear();
       pendingRef.current.operation.clear();
       pendingRef.current.health.clear();
@@ -131,10 +139,10 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
       hubRef.current.health.clear();
       hubRef.current = createEmptyHub();
       setHub(hubRef.current);
-      return;
+      if (!enabled) return;
     }
 
-    const ds = getDataSourceById(DS_MQTT);
+    const ds = getDataSourceById(sourceId);
     if (!ds || ds.type !== 'mqtt') return;
 
     const socket = acquireSocket(ds.backendUrl);
@@ -293,7 +301,7 @@ export function useVehicleFleetMqttHub(enabled: boolean): VehicleFleetMqttHub {
       }
       releaseSocket(ds.backendUrl);
     };
-  }, [enabled]);
+  }, [enabled, sourceId]);
 
   return hub;
 }

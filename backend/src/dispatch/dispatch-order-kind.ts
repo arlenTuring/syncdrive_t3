@@ -22,6 +22,27 @@ export function originalTaskType(
   return item.maintenance?.taskType || item.taskType;
 }
 
+const TRANSITION_PURPOSE_WORD: Record<NonNullable<PlannedDispatch['transitionPurpose']>, string> = {
+  yard_exit: '出廠',
+  yard_entry: '入廠',
+  standby: '待命',
+  hold: '暫停',
+};
+
+/**
+ * 過渡卡的短名稱：用途＋設施（出廠 E3、入廠 D2、待命 D3、暫停 D1）。
+ * 出廠後面是出發的設施、入廠後面是要去的設施。用途不明回 null，畫面顯示中性的「過渡」。
+ */
+export function transitionShortLabel(
+  purpose: PlannedDispatch['transitionPurpose'],
+  facility: string | null | undefined,
+): string | null {
+  if (!purpose) return null;
+  const word = TRANSITION_PURPOSE_WORD[purpose];
+  const place = facility?.trim();
+  return place ? `${word} ${place}` : word;
+}
+
 export function businessLineKind(
   item: Pick<PlannedDispatch, 'kind' | 'taskType'> & {
     maintenance?: Pick<
@@ -68,6 +89,14 @@ export function dispatchOrderFields(item: PlannedDispatch): {
       card_label: item.cardLabel,
       route_code: item.routeCode,
       route_name: item.routeName,
+      // 過渡卡顯示用（trip_code、order_id 不變）
+      ...(businessLineKind(item) === 'TRANSITION'
+        ? {
+            transition_purpose: item.transitionPurpose ?? null,
+            transition_facility: item.transitionFacility ?? null,
+            transition_label: transitionShortLabel(item.transitionPurpose, item.transitionFacility),
+          }
+        : {}),
     },
   };
 }

@@ -39,9 +39,24 @@ export function clonePlaneWithNewIds(
     width: body.width,
     height: body.height,
     elements,
+    // 資料設定跟著複製：新儀表板一開始選的連線跟來源相同，之後各改各的
+    ...(body.dataSettings?.sourceMap ? { dataSettings: { sourceMap: { ...body.dataSettings.sourceMap } } } : {}),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });
+}
+
+/** 匯入時另建的專用定義套進新儀表板的資料設定（元件綁定不動） */
+export function applySourceRemap(plane: DashboardPlane, remap: Record<string, string> | undefined): DashboardPlane {
+  if (!remap || Object.keys(remap).length === 0) return plane;
+  const original = plane.dataSettings?.sourceMap ?? {};
+  const sourceMap = { ...original };
+  const targets = new Set(Object.values(original));
+  // 已經被對應過去的目標：改指到另建的專用連線
+  for (const [from, to] of Object.entries(original)) if (remap[to]) sourceMap[from] = remap[to];
+  // 元件直接綁的來源（沒有對應過）：新增一條對應
+  for (const [from, to] of Object.entries(remap)) if (!(from in sourceMap) && !targets.has(from)) sourceMap[from] = to;
+  return { ...plane, dataSettings: { sourceMap } };
 }
 
 export function parseTemplateFile(json: unknown): DashboardTemplateFile {
@@ -75,11 +90,14 @@ export async function importDashboardTemplate(
   file: DashboardTemplateFile,
   options: ImportTemplateOptions = {},
 ): Promise<TemplateImportResult> {
-  const { warnings } = await mergeTemplateDataSources(file.dataSources, {
+  const { warnings, remap } = await mergeTemplateDataSources(file.dataSources, {
     overwriteExisting: options.applyTemplateConnections ?? false,
   });
 
-  const plane = clonePlaneWithNewIds(file.plane, options.planeName ?? file.meta?.name ?? file.plane.name);
+  const plane = applySourceRemap(
+    clonePlaneWithNewIds(file.plane, options.planeName ?? file.meta?.name ?? file.plane.name),
+    remap,
+  );
 
   return {
     plane,
