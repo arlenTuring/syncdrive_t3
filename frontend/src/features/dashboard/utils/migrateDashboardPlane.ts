@@ -7,6 +7,7 @@ import {
 import { upgradeSystemQueries } from './systemQueries';
 import { ensureTransitionShiftTemplate } from './shiftCardTemplates';
 import { EVENT_CENTER_LIST_SQL } from '../constants/demoSql';
+import { STATION_ETA_INVALIDATE_TAGS, STATION_ETA_URL, type StationEtaWidget, type TabListWidget, type TextWidget } from '../types';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -31,13 +32,68 @@ function stripWidgetDemoBehavior(child: ChildWidget): ChildWidget {
   return migrateChildWidgetGenerics(next as unknown as ChildWidget);
 }
 
+function stationUrl(widget: StationEtaWidget): string {
+  const values = (event: 'arrive' | 'depart') => widget.stations
+    .filter(station => (station.events?.length ? station.events : ['arrive']).includes(event))
+    .map(station => encodeURIComponent(station.stationId));
+  const arrive = values('arrive');
+  const depart = values('depart');
+  const query = [arrive.length ? `arrive=${arrive.join(',')}` : '', depart.length ? `depart=${depart.join(',')}` : '', `limit=${widget.limit || 3}`].filter(Boolean).join('&');
+  return `${widget.dataUrl || STATION_ETA_URL}?${query}`;
+}
+
+/** 專用 ETA 元件只做一次資料形狀遷移；ID 與整體外框不變，左側站名使用可編輯文字元件。 */
+export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[] {
+  const out: ChildWidget[] = [];
+  for (const child of children) {
+    if (child.type !== 'station-eta') { out.push(child); continue; }
+    const labelWidth = Math.min(38, Math.max(28, Math.round(child.width * 0.16)));
+    const station = child.title.split(/\s+/)[0] || child.stations[0]?.label || '站點';
+    const stacked = /^(N2W|S2W)$/i.test(station) ? station.split('').join('\n') : station;
+    const label: TextWidget = {
+      id: `${child.id}-station-label`, type: 'text', x: child.x, y: child.y, width: labelWidth, height: child.height,
+      content: stacked, fontSize: Math.max(12, child.fontSize), lineHeight: 1.05, fontFamily: 'system-ui', fontWeight: 'bold',
+      color: child.color, textAlign: 'center', verticalAlign: 'center', borderRadius: child.borderRadius,
+      borderWidth: 1, borderColor: child.borderColor, backgroundColor: child.backgroundColor, colorRulesEnabled: false,
+    };
+    const columns = [
+      ['vehicle_name', '車輛名稱', 48, 'text'],
+      ['task_label', '目前任務標籤', 42, 'text'],
+      ['at', '剩餘時間', 48, 'countdown'],
+      ['event_label', '事件類型', 38, 'text'],
+      ['station_name', '事件所屬站點名稱', 54, 'text'],
+    ] as const;
+    const list: TabListWidget = {
+      id: child.id, type: 'tab-list', x: child.x + labelWidth, y: child.y, width: Math.max(10, child.width - labelWidth), height: child.height,
+      label: station, showTabBar: false, activeTabId: 'events', rowHeight: 20, fontSize: Math.max(9, child.fontSize - 2),
+      textColor: child.color, headerHeight: 22, headerFontSize: 8, headerTextColor: child.mutedColor,
+      backgroundColor: child.backgroundColor, borderColor: child.borderColor, borderWidth: 1, borderRadius: child.borderRadius,
+      tabs: [{
+        id: 'events', label: station, dataUrl: stationUrl(child), dataRowPath: 'events', rowKeyField: 'key',
+        refreshMode: child.refreshMode ?? 'event', freshnessPolicy: child.freshnessPolicy,
+        refreshInterval: child.refreshInterval, invalidateTags: child.invalidateTags ?? [...STATION_ETA_INVALIDATE_TAGS],
+        columns: columns.map(([fieldKey, name, width, format]) => ({ id: `${child.id}-${fieldKey}`, name, fieldKey, width, format, children: [] })),
+      }],
+    };
+    out.push(label, list);
+  }
+  return out;
+}
+
 function migrateCanvasElement(el: CanvasElementProps): CanvasElementProps {
   let next: CanvasElementProps = {
     ...el,
-    children: (el.children ?? [])
+    children: migrateStationEtaChildren((el.children ?? [])
       .filter(c => !REMOVED_WIDGET_TYPES.has(c.type))
-      .map(stripWidgetDemoBehavior),
+      .map(stripWidgetDemoBehavior)),
   };
+  if (!next.shiftCenterRange && next.children.some(child =>
+    'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center'))) {
+    next = {
+      ...next,
+      shiftCenterRange: { dateMode: 'operating', startTime: '00:00', timezone: 'Asia/Taipei' },
+    };
+  }
   if (next.canvasKind === 'map-platform') {
     if (next.mapId === 'vtms-main-loop' || next.mapId === 'vtms-current') {
       next = { ...next, mapId: 't3-main-version' };

@@ -1573,6 +1573,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
     };
   }, []);
   const isMap = el.canvasKind === 'map-platform';
+  const isShiftCenter = el.children.some(child => 'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center'));
+  const shiftRange = el.shiftCenterRange ?? { dateMode: 'operating' as const, startTime: '00:00', timezone: 'Asia/Taipei' };
   const sectionTitle = isMap
     ? t('dashboard.properties.canvas.mapPlatform')
     : el.isGroup
@@ -1627,6 +1629,36 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
       </div>
       <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
+
+      {isShiftCenter && (
+        <div className="space-y-3 rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
+          <div className="text-[11px] font-semibold text-cyan-300">班次中心統計時間</div>
+          <Field label="統計日期">
+            <select
+              value={shiftRange.dateMode}
+              onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, dateMode: e.target.value as 'operating' | 'fixed' } })}
+              className={selectCls}
+            >
+              <option value="operating">跟隨目前營運日期</option>
+              <option value="fixed">選定日期</option>
+            </select>
+          </Field>
+          {shiftRange.dateMode === 'fixed' && (
+            <Field label="日期">
+              <input type="date" value={shiftRange.date ?? ''} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, date: e.target.value } })} className={inputCls} />
+            </Field>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="起始時間">
+              <input type="time" value={shiftRange.startTime} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, startTime: e.target.value || '00:00' } })} className={inputCls} />
+            </Field>
+            <Field label="結束時間">
+              <input readOnly value={`隔日 ${shiftRange.startTime}`} className={inputCls} />
+            </Field>
+          </div>
+          <p className="text-[10px] text-zinc-400">時區：{shiftRange.timezone}；區間包含起點、不包含終點。</p>
+        </div>
+      )}
 
       {el.label === '事件中心' && !el.isGroup && (
         <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
@@ -2879,16 +2911,14 @@ function TabListSettings({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-zinc-400 text-[10px] block">{t('dashboard.properties.widgets.tabList.tabSql')}</label>
-            <textarea
-              rows={3}
-              value={activeTab.sqlQuery ?? ''}
-              onChange={e => updateTab(activeTab.id, { sqlQuery: e.target.value })}
-              className={`${inputCls} font-mono text-[10px]`}
-              placeholder={t('dashboard.properties.widgets.tabList.tabSqlPlaceholder')}
-            />
+          <WidgetDataBindingSettings w={activeTab} onUpdate={(patch) => updateTab(activeTab.id, patch)} />
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="資料列 JSON 路徑"><input value={activeTab.dataRowPath ?? ''} onChange={e => updateTab(activeTab.id, { dataRowPath: e.target.value })} className={inputCls} placeholder="events" /></Field>
+            <Field label="每列識別路徑"><input value={activeTab.rowKeyField ?? ''} onChange={e => updateTab(activeTab.id, { rowKeyField: e.target.value })} className={inputCls} placeholder="key" /></Field>
           </div>
+          <Field label="API／MQTT 合併識別路徑">
+            <input value={activeTab.mergeKeyField ?? ''} onChange={e => updateTab(activeTab.id, { mergeKeyField: e.target.value })} className={inputCls} placeholder="event_id（同時使用兩來源時必填）" />
+          </Field>
 
           {/* 欄位清單 */}
           <div className="pt-2 border-t border-zinc-700/50 space-y-2">
@@ -2942,20 +2972,16 @@ function TabListSettings({
                     <label className="text-zinc-400 text-[10px]">
                       {t('dashboard.properties.widgets.tabList.bindAlias')}
                     </label>
-                    <select
+                    <input
+                      list={`tab-list-fields-${activeTab.id}`}
                       value={effectiveFieldKey}
                       onChange={e => updateColumn(col.id, { fieldKey: e.target.value })}
-                      className={`${selectCls} w-full text-xs py-1.5 font-mono`}
-                    >
-                      <option value="">{t('dashboard.properties.widgets.tabList.selectAlias')}</option>
-                      {detectedSqlFields.map(f => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                      {effectiveFieldKey && !detectedSqlFields.includes(effectiveFieldKey) && (
-                        <option value={effectiveFieldKey}>{t('dashboard.properties.widgets.tabList.customAlias', { key: effectiveFieldKey })}</option>
-                      )}
+                      className={`${inputCls} w-full text-xs py-1.5 font-mono`}
+                      placeholder="欄位或 JSON 路徑"
+                    />
+                    <datalist id={`tab-list-fields-${activeTab.id}`}>{detectedSqlFields.map(f => <option key={f} value={f} />)}</datalist>
+                    <select value={col.format ?? 'text'} onChange={e => updateColumn(col.id, { format: e.target.value as 'text' | 'countdown' })} className={`${selectCls} mt-1`}>
+                      <option value="text">文字</option><option value="countdown">時間欄位轉倒數</option>
                     </select>
                   </div>
 

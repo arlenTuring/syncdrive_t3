@@ -7,10 +7,11 @@ import { DispatchEngineService } from '../dispatch/dispatch-engine.service';
 import {
   noPlanSummary,
   summarizeDailyPlan,
+  tripsInWindow,
   type ShiftCenterSummary,
 } from '../dispatch/daily-plan';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
-import { operatingDayStart } from '../operating-day/operating-day';
+import { DELAY_TOLERANCE_MS, operatingDayStart } from '../operating-day/operating-day';
 import {
   DAY_MINUTES,
   formatClock,
@@ -64,11 +65,79 @@ export class OperationMetricsService {
    * （operating_day、plan_shift_id、plan_digest、plan_trip_code），不看資料來源或執行 ID。
    * 查詢失敗直接丟出（畫面顯示錯誤），不回零。
    */
-  async getShiftCenter(): Promise<ShiftCenterSummary> {
+  async getShiftCenter(options: { date?: string; start?: string } = {}): Promise<ShiftCenterSummary> {
     const operatingNow = this.clock.now();
-    const day = this.clock.operatingDay();
-    const adoption = await this.engine.ensureDailyPlan(day);
-    if (!adoption) return noPlanSummary(day, operatingNow);
+    const day = options.date?.match(/^\d{4}-\d{2}-\d{2}$/) ? options.date : this.clock.operatingDay();
+    const match = (options.start ?? '00:00').match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    if (!match) throw new Error('統計起始時間格式必須為 HH:mm');
+    const dayStart = operatingDayStart(day);
+    if (dayStart == null) throw new Error('統計日期格式不正確');
+    const startMinutes = Number(match[1]) * 60 + Number(match[2]);
+    const rangeStart = dayStart + startMinutes * 60_000;
+    const rangeEnd = rangeStart + DAY_MS;
+    const nextDay = new Date(dayStart + DAY_MS + TAIPEI_OFFSET_MS).toISOString().slice(0, 10);
+    const requiredDays = startMinutes === 0 ? [day] : [day, nextDay];
+    const adoptions = await Promise.all(requiredDays.map(async (value) => ({ day: value, adoption: await this.engine.ensureDailyPlan(value) })));
+    const missingDays = adoptions.filter((item) => !item.adoption).map((item) => item.day);
+    if (adoptions.every((item) => !item.adoption)) return { ...noPlanSummary(day, operatingNow), range: { start: rangeStart, end: rangeEnd, start_time: options.start ?? '00:00', timezone: 'Asia/Taipei' }, missing_days: missingDays };
+    const parts: ShiftCenterSummary[] = [];
+    const trips: NonNullable<ShiftCenterSummary['trips']> = [];
+    for (const item of adoptions) {
+      const adoption = item.adoption;
+      if (!adoption) continue;
+      const selected = tripsInWindow(adoption, rangeStart, rangeEnd);
+      const scoped = { ...adoption, passenger_trips: selected, counts: { ...adoption.counts, passenger: selected.length } };
+      const rows = await this.shiftCenterOrders(item.day, adoption.shift_id);
+      const summary = summarizeDailyPlan(scoped, rows, operatingNow);
+      parts.push(summary);
+      for (const trip of selected) {
+        const matching = rows.filter((row) => row.tripCode === trip.code && row.planDigest === adoption.plan_digest);
+        const completedOrder = matching.find((row) => row.status === 'END');
+        trips.push({
+          ...trip,
+          operating_day: item.day,
+          completed: Boolean(completedOrder),
+          delayed: Boolean(completedOrder && trip.end != null && completedOrder.completedAt != null && completedOrder.completedAt > trip.end + DELAY_TOLERANCE_MS),
+        });
+      }
+    }
+    const total = parts.reduce((sum, part) => sum + (part.total_shifts ?? 0), 0);
+    const completed = parts.reduce((sum, part) => sum + (part.completed_shifts ?? 0), 0);
+    const delayed = parts.reduce((sum, part) => sum + (part.delayed_shifts ?? 0), 0);
+    const pct = total ? Math.floor(100 * completed / total) : 0;
+    const remaining = total - completed;
+    const unachieved = parts.reduce((sum, part) => {
+      if (!part.unachieved) return sum;
+      for (const key of Object.keys(sum) as Array<keyof typeof sum>) sum[key] += part.unachieved[key];
+      return sum;
+    }, { faulted: 0, cancelled: 0, in_progress: 0, pending: 0, not_run_overdue: 0, not_due: 0 });
+    const reasons = [
+      unachieved.faulted ? `故障 ${unachieved.faulted}` : '',
+      unachieved.cancelled ? `取消 ${unachieved.cancelled}` : '',
+      unachieved.not_run_overdue ? `已過時未執行 ${unachieved.not_run_overdue}` : '',
+    ].filter(Boolean);
+    return {
+      ...parts[0]!,
+      state: missingDays.length ? 'incomplete' : 'ok',
+      message: missingDays.length ? `計畫資料不完整：缺少 ${missingDays.join('、')}` : null,
+      operating_day: day,
+      total_shifts: total,
+      completed_shifts: completed,
+      delayed_shifts: delayed,
+      achievement_pct: pct,
+      achievement_line: `達成了 ${pct}%`,
+      remaining_shifts: remaining,
+      remaining_line: remaining > 0 ? `剩餘${remaining}班次` : '',
+      unachieved,
+      unachieved_line: reasons.length ? `未達成：${reasons.join('、')}` : '',
+      other_version_orders: parts.reduce((sum, part) => sum + part.other_version_orders, 0),
+      range: { start: rangeStart, end: rangeEnd, start_time: options.start ?? '00:00', timezone: 'Asia/Taipei' },
+      trips,
+      missing_days: missingDays,
+    };
+  }
+
+  private async shiftCenterOrders(day: string, shiftId: string) {
     const rows: Array<{
       order_id: string;
       trip_code: string;
@@ -87,20 +156,16 @@ export class OperationMetricsService {
        WHERE payload->>'operating_day' = $1
          AND payload->>'plan_shift_id' = $2
        ORDER BY created_at ASC`,
-      [day, adoption.shift_id],
+      [day, shiftId],
     );
-    return summarizeDailyPlan(
-      adoption,
-      rows.map((row) => ({
+    return rows.map((row) => ({
         orderId: row.order_id,
         tripCode: row.trip_code,
         status: row.status,
         planDigest: row.plan_digest,
         closedReason: row.closed_reason,
         completedAt: row.completed_at != null ? Number(row.completed_at) : null,
-      })),
-      operatingNow,
-    );
+      }));
   }
 
   /** 運能趨勢上方四個數值 */

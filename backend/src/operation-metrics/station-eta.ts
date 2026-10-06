@@ -25,6 +25,7 @@ export type PlannedStop = {
   vehicleCode: string;
   stationId: string;
   stationName: string;
+  taskLabel: string;
   /** 這一站在這班站序裡的位置（0 起算） */
   stopIndex: number;
   /** 營運時刻（毫秒）；起站沒有到站、終站沒有出發 */
@@ -55,6 +56,9 @@ export type StationEvent = {
   trip_code: string;
   station_id: string;
   station_name: string;
+  vehicle_name: string;
+  task_label: string;
+  event_label: '到站' | '出發';
   /** 營運時刻（毫秒） */
   at: number;
   /** live：依車端即時回報推估；plan：每日計畫時刻 */
@@ -146,6 +150,9 @@ export function mergeStationEvents(args: {
         trip_code: stop.tripCode,
         station_id: stop.stationId,
         station_name: stop.stationName,
+        vehicle_name: stop.vehicleCode,
+        task_label: stop.taskLabel,
+        event_label: event === 'arrive' ? '到站' : '出發',
         at,
         kind,
         at_station: atStation,

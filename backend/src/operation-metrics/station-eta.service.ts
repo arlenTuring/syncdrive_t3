@@ -86,6 +86,7 @@ export class StationEtaService {
       plan: adoption ? { shift_id: adoption.shift_id, shift_name: adoption.shift_name } : null,
       source: '每日計畫站序＋車端即時回報（營運時間）',
       stations: groups,
+      events: groups.flatMap((group) => group.events),
     };
   }
 
@@ -108,6 +109,7 @@ export class StationEtaService {
           vehicleCode: item.vehicleCode,
           stationId: station.stationId,
           stationName: station.stationName,
+          taskLabel: item.cardLabel || item.routeName || item.tripCode,
           stopIndex: index,
           arriveAt: station.arriveAt ?? null,
           departAt: station.departAt ?? null,

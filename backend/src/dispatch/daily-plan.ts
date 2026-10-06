@@ -31,7 +31,10 @@ import { DELAY_TOLERANCE_MS } from '../operating-day/operating-day';
 
 /** 計畫快照裡的一個載客班次（時間為營運日上的營運時刻，Epoch 毫秒） */
 export type DailyPlanTrip = {
+  /** 跨日期、跨版本仍穩定可核對的計畫班次識別 */
+  id: string;
   code: string;
+  classification: 'passenger';
   start: number | null;
   end: number | null;
 };
@@ -67,6 +70,11 @@ export type DailyPlanAdoption = {
   }>;
 };
 
+/** 半開區間 [start, end)：跨午夜與 05:00 邊界不重複計數。 */
+export function tripsInWindow(adoption: DailyPlanAdoption, start: number, end: number): DailyPlanTrip[] {
+  return adoption.passenger_trips.filter((trip) => trip.start != null && trip.start >= start && trip.start < end);
+}
+
 /** 訂單 payload 上的每日計畫關聯欄位（正式派單、模擬器共用） */
 export const DAILY_PLAN_PAYLOAD_KEYS = {
   operatingDay: 'operating_day',
@@ -86,7 +94,7 @@ export function buildAdoption(args: {
   planDigest: string;
   loadDigest: string | null;
   planned: Array<{ tripCode: string; kind: string; departAt: number; arriveAt: number }>;
-  scheduleTrips: Array<{ trip_code: string; task_type: string }>;
+  scheduleTrips: Array<{ trip_code: string; task_type: string; start?: number | null; end?: number | null }>;
   skipped: number;
   via: DailyPlanAdoptionVia;
   by: string | null;
@@ -94,6 +102,7 @@ export function buildAdoption(args: {
   previous: DailyPlanAdoption | null;
 }): DailyPlanAdoption {
   const timing = new Map(args.planned.map((item) => [item.tripCode, item] as const));
+  const scheduleTiming = new Map(args.scheduleTrips.map((item) => [item.trip_code, item] as const));
   const passengerCodes = new Set<string>();
   for (const trip of args.scheduleTrips) {
     if (trip.task_type === 'passenger' && trip.trip_code) passengerCodes.add(trip.trip_code);
@@ -104,7 +113,14 @@ export function buildAdoption(args: {
   const passengerTrips: DailyPlanTrip[] = [...passengerCodes]
     .map((code) => {
       const item = timing.get(code);
-      return { code, start: item?.departAt ?? null, end: item?.arriveAt ?? null };
+      const scheduled = scheduleTiming.get(code);
+      return {
+        id: `${args.operatingDay}:${args.shift.id}:${args.planDigest}:${code}`,
+        code,
+        classification: 'passenger' as const,
+        start: item?.departAt ?? scheduled?.start ?? null,
+        end: item?.arriveAt ?? scheduled?.end ?? null,
+      };
     })
     .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.code.localeCompare(b.code));
   const count = (kind: string) => args.planned.filter((item) => item.kind === kind).length;
@@ -184,7 +200,7 @@ export type DailyPlanOrderRow = {
 };
 
 export type ShiftCenterSummary = {
-  state: 'ok' | 'no_plan';
+  state: 'ok' | 'no_plan' | 'incomplete';
   message: string | null;
   operating_day: string;
   operating_now: number;
@@ -213,6 +229,9 @@ export type ShiftCenterSummary = {
     adopted_at: number;
     adopted_via: DailyPlanAdoptionVia;
   } | null;
+  range?: { start: number; end: number; start_time: string; timezone: string };
+  trips?: Array<DailyPlanTrip & { operating_day: string; completed: boolean; delayed: boolean }>;
+  missing_days?: string[];
 };
 
 export function noPlanSummary(operatingDay: string, operatingNow: number): ShiftCenterSummary {

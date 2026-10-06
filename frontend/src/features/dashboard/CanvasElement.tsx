@@ -731,11 +731,18 @@ export function CanvasElement({
               ? { x: groupOrigin.x + childGroupDrag.delta.x, y: groupOrigin.y + childGroupDrag.delta.y }
               : null;
 
+            const range = element.shiftCenterRange;
+            const renderedChild = range && 'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center')
+              ? {
+                  ...child,
+                  dataUrl: `/syncdrive-api/operation-metrics/shift-center?start=${encodeURIComponent(range.startTime || '00:00')}${range.dateMode === 'fixed' && range.date ? `&date=${encodeURIComponent(range.date)}` : ''}`,
+                }
+              : child;
             return (
             <ChildWidgetRnd
               key={`${child.id}-${childResetKey}`}
               canvasId={element.id}
-              child={child}
+              child={renderedChild}
               peerChildren={element.children
                 .filter(c => c.id !== child.id && !selectedChildIds.includes(c.id))
                 .map(c => ({ id: c.id, x: c.x, y: c.y, width: c.width, height: c.height }))}

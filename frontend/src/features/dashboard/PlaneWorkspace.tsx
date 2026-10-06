@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { DashboardPlane, CanvasElementProps, ChildWidget, WidgetType, CanvasKind } from './types';
 import { CanvasElement } from './CanvasElement';
 import { useFormatPainter } from './context/FormatPainterContext';
-import { ZoomIn, ZoomOut, Crosshair, Paintbrush, Lock, LockOpen } from 'lucide-react';
+import { ZoomIn, ZoomOut, Crosshair, Paintbrush, Lock, LockOpen, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { useModifierHeld } from './hooks/useModifierHeld';
 import {
   marqueeRectsIntersect,
@@ -12,7 +12,10 @@ import {
 } from './utils/marqueeSelect';
 import {
   readPlaneScaleLock,
+  readZoomToolbarCollapsed,
+  stepPlaneZoom,
   writePlaneScaleLock,
+  writeZoomToolbarCollapsed,
 } from './utils/planeViewScaleLock';
 const zoomBtnStyle: CSSProperties = {
   background: 'none',
@@ -86,6 +89,7 @@ export function PlaneWorkspace({
   const [fitScale, setFitScale] = useState(1);
   const [userZoom, setUserZoom] = useState(1.0);
   const [scaleLocked, setScaleLocked] = useState(false);
+  const [zoomToolsCollapsed, setZoomToolsCollapsed] = useState(readZoomToolbarCollapsed);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
@@ -187,7 +191,7 @@ export function PlaneWorkspace({
         e.preventDefault();
         if (scaleLockedRef.current) return;
         const delta = e.deltaY < 0 ? 0.05 : -0.05;
-        setUserZoom(prev => Math.max(0.2, Math.min(5, +(prev + delta).toFixed(2))));
+        setUserZoom(prev => stepPlaneZoom(prev, delta > 0 ? 1 : -1));
       } else {
         // 檢視模式：僅橫向平移（縱向滾輪改為左右移動）
         const horizontalOnly = horizontalPanOnlyRef.current;
@@ -252,11 +256,11 @@ export function PlaneWorkspace({
 
   const zoomIn = () => {
     if (scaleLocked) return;
-    setUserZoom((p) => Math.min(5, +(p + 0.25).toFixed(2)));
+    setUserZoom((p) => stepPlaneZoom(p, 1));
   };
   const zoomOut = () => {
     if (scaleLocked) return;
-    setUserZoom((p) => Math.max(0.2, +(p - 0.25).toFixed(2)));
+    setUserZoom((p) => stepPlaneZoom(p, -1));
   };
   const zoomReset = () => {
     setPanOffset({ x: 0, y: 0 });
@@ -441,10 +445,15 @@ export function PlaneWorkspace({
     >
       {/* 縮放與平移控制（鎖定後固定 scale，仍可平移） */}
       <div
+        className="transition-all duration-200 motion-reduce:transition-none"
+        aria-hidden={zoomToolsCollapsed}
         style={{ position: isRuntimeFitWidth ? 'fixed' : 'absolute', bottom: 16, right: 16, zIndex: 200,
                  display: 'flex', alignItems: 'center', gap: 6,
                  background: 'rgba(15,22,35,0.9)', border: '1px solid rgba(255,255,255,0.1)',
-                 borderRadius: 10, padding: '6px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+                 borderRadius: 10, padding: '6px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                 opacity: zoomToolsCollapsed ? 0 : 1,
+                 transform: zoomToolsCollapsed ? 'translateY(18px) scale(0.9)' : 'none',
+                 pointerEvents: zoomToolsCollapsed ? 'none' : 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         <button
@@ -492,7 +501,30 @@ export function PlaneWorkspace({
         >
           {scaleLocked ? <Lock size={14} /> : <LockOpen size={14} />}
         </button>
+        <button
+          type="button"
+          onClick={() => { setZoomToolsCollapsed(true); writeZoomToolbarCollapsed(true); }}
+          style={zoomBtnStyle}
+          title="收起縮放工具"
+          aria-label="收起縮放工具"
+        >
+          <ChevronsDownUp size={14} />
+        </button>
       </div>
+      {zoomToolsCollapsed && (
+        <button
+          type="button"
+          className="transition-all duration-200 motion-reduce:transition-none"
+          onClick={(e) => { e.stopPropagation(); setZoomToolsCollapsed(false); writeZoomToolbarCollapsed(false); }}
+          style={{ ...zoomBtnStyle, position: isRuntimeFitWidth ? 'fixed' : 'absolute', bottom: 16, right: 16, zIndex: 201,
+            width: 34, height: 28, background: 'rgba(15,22,35,0.94)', border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+          title="展開縮放工具"
+          aria-label="展開縮放工具"
+        >
+          <ChevronsUpDown size={15} />
+        </button>
+      )}
 
       {/* 平面容器（刻度尺僅編輯模式；自適應模式使用頂端對齊撐滿寬度） */}
       <div

@@ -897,11 +897,12 @@ export interface TabListColumn {
   align?: 'left' | 'center' | 'right';
   fontSize?: number; // 該欄單元格字體大小 (px，可選覆寫)
   textColor?: string; // 該欄單元格文字顏色 (可選覆寫)
+  format?: 'text' | 'countdown';
   children: ChildWidget[]; // 該欄位單元格的子畫布範本
 }
 
 /** Tab 清單單一分頁定義 */
-export interface TabListTab {
+export interface TabListTab extends WidgetDataBinding {
   id: string;
   label: string; // Tab 顯示名稱 (如 "正線班次")
   align?: 'left' | 'center' | 'right'; // 此 Tab 預設整體對齊方式
@@ -909,6 +910,11 @@ export interface TabListTab {
   sqlQuery?: string;
   freshnessPolicy?: FreshnessPolicy;
   refreshInterval?: number;
+  /** REST/JSON 回應中列陣列的路徑（例如 events） */
+  dataRowPath?: string;
+  /** REST 與 MQTT 合併時必填；只合併相同事件識別 */
+  mergeKeyField?: string;
+  rowKeyField?: string;
   columns: TabListColumn[];
 }
 
@@ -943,6 +949,7 @@ export interface TabListWidget extends WidgetBase {
   borderWidth?: number;
   stripeBgColor?: string;
   defaultTab?: string; // 預設選取 Tab ID
+  showTabBar?: boolean;
   dataSourceId?: string;
   mainlineSqlQuery?: string; // 相容既有快捷設定
   maintenanceSqlQuery?: string; // 相容既有快捷設定
@@ -1205,6 +1212,13 @@ export interface CanvasElementProps {
   backgroundImage: string;
   opacity: number;
   children: ChildWidget[];
+  /** 班次中心 24 小時統計窗；跟著 plane 一起存在伺服器 elements JSONB */
+  shiftCenterRange?: {
+    dateMode: 'operating' | 'fixed';
+    date?: string;
+    startTime: string;
+    timezone: string;
+  };
 
   /** 標準畫布 / 圖台容器（內嵌 Map Editor 場域圖） */
   canvasKind?: CanvasKind;

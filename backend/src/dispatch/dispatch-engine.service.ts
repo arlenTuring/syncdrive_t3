@@ -33,7 +33,7 @@ import {
   type DailyPlanAdoption,
   type DailyPlanAdoptionVia,
 } from './daily-plan';
-import { operatingDayOf, operatingDayReference } from '../operating-day/operating-day';
+import { operatingDayOf, operatingDayReference, operatingDayStart } from '../operating-day/operating-day';
 
 type ShiftSource = Awaited<ReturnType<OperationShiftService['getShiftTrips']>>;
 
@@ -265,7 +265,15 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       planDigest,
       loadDigest,
       planned: plan.planned,
-      scheduleTrips: source.trips,
+      scheduleTrips: source.trips.map((trip) => {
+        const dayStart = operatingDayStart(day);
+        return {
+          trip_code: trip.trip_code,
+          task_type: trip.task_type,
+          start: dayStart == null ? null : dayStart + trip.card_start_second * 1000,
+          end: dayStart == null ? null : dayStart + trip.card_end_second * 1000,
+        };
+      }),
       skipped: plan.skipped.length,
       via,
       by,

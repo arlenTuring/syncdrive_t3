@@ -10,6 +10,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TabListWidget, TabListColumn, ChildWidget } from '../types';
 import { useWidgetData } from './useWidgetData';
+import { useMqttData } from './useMqttData';
+import { useOperatingClock } from '../utils/operatingClock';
 import { useIsEditMode } from '../utils/widgetEditPreview';
 import { VariableProvider } from '../VariableContext';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -19,6 +21,37 @@ const TAB_LIST_FONT_WIDGET_TYPES = new Set(['text', 'status-badge', 'alert-banne
 
 function isTabListFontWidget(child: ChildWidget): boolean {
   return TAB_LIST_FONT_WIDGET_TYPES.has(child.type);
+}
+
+export function readTabListPath(value: unknown, path?: string): unknown {
+  if (!path) return value;
+  return path.split('.').filter(Boolean).reduce<unknown>((current, key) =>
+    current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined, value);
+}
+
+export function mergeTabListRows(
+  queryData: Record<string, unknown>[],
+  dataRowPath?: string,
+  mqttData?: Record<string, unknown> | null,
+  mergeKeyField?: string,
+): Record<string, unknown>[] {
+  const root = dataRowPath ? readTabListPath(queryData[0], dataRowPath) : queryData;
+  const rows = (Array.isArray(root) ? root : root && typeof root === 'object' ? [root] : []) as Record<string, unknown>[];
+  if (!mqttData) return rows;
+  if (!mergeKeyField) return rows.length ? rows : [mqttData];
+  const mqttKey = readTabListPath(mqttData, mergeKeyField);
+  return rows.map(row => readTabListPath(row, mergeKeyField) === mqttKey ? { ...row, ...mqttData } : row);
+}
+
+function formatCountdown(value: unknown, now: number): string {
+  const seconds = Math.max(0, Math.ceil((Number(value) - now) / 1000));
+  if (!Number.isFinite(seconds)) return '—';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return hours > 0
+    ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 /** 將內容字級寫入表格本身，以及所有 Tab、所有欄位的文字／徽章元件 */
@@ -52,6 +85,7 @@ function TabListCell({
   textColor,
   tabAlign,
   globalAlign,
+  operatingNow,
 }: {
   column: TabListColumn;
   row: Record<string, unknown>;
@@ -60,6 +94,7 @@ function TabListCell({
   textColor?: string;
   tabAlign?: 'left' | 'center' | 'right';
   globalAlign?: 'left' | 'center' | 'right';
+  operatingNow: number;
 }) {
   const children = column.children ?? [];
   const colW = column.width > 0 ? column.width : '100%';
@@ -79,13 +114,15 @@ function TabListCell({
     column.name?.includes('操作') || column.name?.includes('詳情') ? 'shift_key' : ''
   );
 
+  const rawValue = fieldKey ? readTabListPath(row, fieldKey) : undefined;
+  const displayValue = column.format === 'countdown' ? formatCountdown(rawValue, operatingNow) : rawValue;
   const cellVariables = {
     ...row,
     ...(fieldKey ? {
-      value: row[fieldKey],
-      field: row[fieldKey],
-      cell_value: row[fieldKey],
-      [fieldKey]: row[fieldKey],
+      value: displayValue,
+      field: displayValue,
+      cell_value: displayValue,
+      [fieldKey]: displayValue,
     } : {}),
   };
 
@@ -116,7 +153,7 @@ function TabListCell({
         >
           {children.length === 0 ? (
             <span style={{ fontSize: cellFs, color: cellColor, fontWeight: 500, textAlign: align, width: '100%' }}>
-              {fieldKey && row[fieldKey] !== undefined ? String(row[fieldKey]) : '—'}
+              {displayValue !== undefined && displayValue !== null ? String(displayValue) : '—'}
             </span>
           ) : (
             children.map((child: ChildWidget) => {
@@ -167,6 +204,13 @@ export function TabListWidgetView({
 }) {
   const { t } = useTranslation();
   const isEditMode = useIsEditMode();
+  const clock = useOperatingClock();
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(value => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const operatingNow = clock.operatingNow() + clockTick * 0;
   const tabs = widget.tabs ?? [];
   const defaultTabId = widget.activeTabId ?? widget.defaultTab ?? tabs[0]?.id ?? 'tab-mainline';
   const [currentTabId, setCurrentTabId] = useState<string>(defaultTabId);
@@ -193,9 +237,12 @@ export function TabListWidgetView({
   const queryState = useWidgetData({
     dataSourceId: ds,
     sqlQuery: sql,
-    refreshMode: 'event',
+    dataUrl: activeTab?.dataUrl,
+    freshnessPolicy: activeTab?.freshnessPolicy,
+    refreshMode: activeTab?.refreshMode ?? 'event',
     refreshInterval: activeTab?.refreshInterval,
   });
+  const mqttState = useMqttData(activeTab ?? {});
 
   // 目前班表標題輔助查詢
   const scheduleState = useWidgetData({
@@ -211,10 +258,9 @@ export function TabListWidgetView({
   }, [scheduleState.data]);
 
   // 列資料只來自 SQL；編輯模式也不放示範列——沒資料就讓人看到沒資料
-  const rows = useMemo(
-    () => (queryState.data ?? []) as Record<string, unknown>[],
-    [queryState.data],
-  );
+  const rows = useMemo(() => {
+    return mergeTabListRows(queryState.data, activeTab?.dataRowPath, mqttState.data, activeTab?.mergeKeyField);
+  }, [queryState.data, mqttState.data, activeTab?.dataRowPath, activeTab?.mergeKeyField]);
 
   const fs = widget.fontSize ?? 13;
   const bodyTextColor = widget.textColor ?? '#cbd5e1';
@@ -245,7 +291,7 @@ export function TabListWidgetView({
       }}
     >
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
-      <div
+      {widget.showTabBar !== false && <div
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -322,11 +368,13 @@ export function TabListWidgetView({
             </span>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── 表格區塊 ────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {queryState.loading && rows.length === 0 ? (
+        {queryState.error ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#f87171', fontSize: fs }}>查詢失敗：{queryState.error}</div>
+        ) : queryState.loading && rows.length === 0 ? (
           <div
             style={{
               display: 'flex',
@@ -439,7 +487,7 @@ export function TabListWidgetView({
               )}
               {rows.map((row, i) => (
                 <tr
-                  key={String(row.shift_key ?? row.id ?? `row-${i}`)}
+                  key={String(readTabListPath(row, activeTab?.rowKeyField) ?? row.shift_key ?? row.id ?? `row-${i}`)}
                   style={{
                     height: rowH,
                     backgroundColor: i % 2 === 1 ? (widget.stripeBgColor ?? 'rgba(255,255,255,0.02)') : 'transparent',
@@ -456,6 +504,7 @@ export function TabListWidgetView({
                       textColor={bodyTextColor}
                       tabAlign={activeTab?.align}
                       globalAlign={globalAlign}
+                      operatingNow={operatingNow}
                     />
                   ))}
                 </tr>
