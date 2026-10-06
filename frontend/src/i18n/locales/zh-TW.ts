@@ -3244,7 +3244,7 @@ const zhTW = {
         image: { label: '圖片', description: '外部圖片 URL' },
         colorBlock: { label: '色塊', description: '純色背景色塊（底層）' },
         clock: { label: '時鐘', description: '即時系統時鐘' },
-        'station-eta': { label: '站點到站', description: 'N2W／S2W／T3 等站點接下來到站的車（營運時間）' },
+        'station-eta': { label: '到站／出發', description: 'N2W／S2W／T3 等站點幾分幾秒到站、出發（營運時間）' },
         emptyState: { label: '空狀態', description: '查詢 0 筆時佔位' },
         alertBanner: { label: '資料警示', description: '資料觸發才顯示（編輯時可見）' },
         lineChart: { label: '折線圖', description: 'API 資料折線圖' },

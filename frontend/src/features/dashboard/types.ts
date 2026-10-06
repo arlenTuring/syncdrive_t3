@@ -729,7 +729,7 @@ export interface ClockWidget extends WidgetBase {
   fontFamily: string;
 }
 
-/** 站點到站清單的資料來源（登入端內部端點，不需要車端金鑰） */
+/** 站點到站／出發清單的資料來源（登入端內部端點，不需要車端金鑰） */
 export const STATION_ETA_URL = '/syncdrive-api/operation-metrics/station-eta';
 /**
  * 什麼時候重查：訂單開始／結束（含取消、故障）、車換路段（後端每秒最多一次）、營運時鐘換段、
@@ -743,15 +743,18 @@ export const STATION_ETA_INVALIDATE_TAGS = [
 ] as const;
 
 /**
- * 站點到站清單（N2W、S2W、T3…）：後端 /operation-metrics/station-eta，營運時間。
- * 每列：預計到站 HH:mm、車號、方向／停靠點、即時或計畫。
+ * 站點到站／出發清單（N2W、S2W、T3…）：後端 /operation-metrics/station-eta，營運時間。
+ * 每列：幾分幾秒到站／出發（倒數）、車號、方向／停靠點、即時或計畫。
  */
 export interface StationEtaWidget extends WidgetBase, WidgetDataBinding {
   type: 'station-eta';
   /** 標題（站名） */
   title: string;
-  /** 要列的停靠點：真實站點 ID 與每列顯示的方向／停靠點名稱 */
-  stations: Array<{ stationId: string; label: string }>;
+  /**
+   * 要列的停靠點：真實站點 ID、每列顯示的方向／停靠點名稱、列到站還是出發（或兩者）。
+   * events 省略時只列到站（舊設定）。
+   */
+  stations: Array<{ stationId: string; label: string; events?: Array<'arrive' | 'depart'> }>;
   /** 最多幾筆（預設 3） */
   limit: number;
   fontSize: number;
@@ -1528,7 +1531,7 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
     case 'station-eta':
       return {
         id, type, x, y, width: 220, height: 96,
-        title: '站點到站',
+        title: '到站／出發',
         stations: [],
         limit: 3,
         fontSize: 13,

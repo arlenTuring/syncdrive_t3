@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { usePlaneSourceResolver } from './context/PlaneDataSourceContext';
 import { getDataSourceById } from './store/useDataSourceStore';
 import { resolvePlaneRestUrl } from './elements/useWidgetData';
-import { stationEtaUrl } from './elements/StationEtaWidget';
+import { stationEtaUrl, stationEvents } from './elements/StationEtaWidget';
 import { useTranslation } from 'react-i18next';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
@@ -2221,28 +2221,38 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
     </div>
   );
 }
-/** 站點到站清單：站點用真實 ID，每列的方向／停靠點名稱另外填；顯示真正採用的資料來源 */
+/** 屬性框一行 ↔ 一個停靠點設定：「站點ID=名稱=到站／出發／到站出發」 */
+function stationLine(s: StationEtaWidget['stations'][number]): string {
+  const events = stationEvents(s);
+  const mode = events.includes('arrive') && events.includes('depart') ? '到站出發' : events.includes('depart') ? '出發' : '到站';
+  return `${s.stationId}=${s.label}=${mode}`;
+}
+function parseStationLine(line: string): StationEtaWidget['stations'][number] {
+  const [id = '', label = '', mode = ''] = line.split('=').map((part) => part.trim());
+  const events: Array<'arrive' | 'depart'> = [];
+  if (/到站|arrive/i.test(mode) || !mode) events.push('arrive');
+  if (/出發|depart/i.test(mode)) events.push('depart');
+  return { stationId: id, label: label || id, events };
+}
+/** 站點到站／出發清單：站點用真實 ID，每列的方向／停靠點名稱另外填；顯示真正採用的資料來源 */
 function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; onUpdate: (p: Partial<StationEtaWidget>) => void; onDelete: () => void }) {
   const resolveSource = usePlaneSourceResolver();
   const backendUrl = getDataSourceById(resolveSource('default-internal'))?.backendUrl;
   const effectiveUrl = resolvePlaneRestUrl(stationEtaUrl(w), backendUrl);
-  const [stationsText, setStationsText] = useState(() => w.stations.map((s) => `${s.stationId}=${s.label}`).join('\n'));
+  const [stationsText, setStationsText] = useState(() => w.stations.map(stationLine).join('\n'));
   useEffect(() => {
-    setStationsText(w.stations.map((s) => `${s.stationId}=${s.label}`).join('\n'));
+    setStationsText(w.stations.map(stationLine).join('\n'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [w.id]);
   const commitStations = (text: string) => {
-    const stations = text.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
-      const [id, ...rest] = line.split('=');
-      return { stationId: id!.trim(), label: rest.join('=').trim() || id!.trim() };
-    }).filter((s) => s.stationId);
+    const stations = text.split('\n').map((line) => line.trim()).filter(Boolean).map(parseStationLine).filter((s) => s.stationId);
     onUpdate({ stations });
   };
   return (
     <div className="space-y-4">
-      <SH icon={<Clock size={13} />} label="站點到站" color="#34d399" />
+      <SH icon={<Clock size={13} />} label="到站／出發" color="#34d399" />
       <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
-      <Field label="停靠點（每行：站點ID=方向／停靠點名稱）">
+      <Field label="停靠點（每行：站點ID=方向／停靠點名稱=到站、出發或到站出發）">
         <textarea
           value={stationsText}
           rows={4}

@@ -7,9 +7,10 @@ import { operatingDayReference } from '../operating-day/operating-day';
 import { RedisService } from '../redis/redis.service';
 import { vehicleEtaConfig } from '../vehicle/eta/vehicle-eta.config';
 import {
-  mergeStationArrivals,
+  mergeStationEvents,
   type LiveVehicle,
-  type PlannedArrival,
+  type PlannedStop,
+  type StationEventKind,
   type TripState,
 } from './station-eta';
 
@@ -23,7 +24,7 @@ function str(value: unknown): string | null {
 }
 
 /**
- * 儀表板的站點到站清單（規則見 station-eta.ts）。
+ * 儀表板的站點到站／出發清單（規則見 station-eta.ts）。
  *
  * 登入端用的內部端點：跟對外的車輛即時 ETA（/vehicles/eta，需要 x-api-key）讀同一份車端快照，
  * 但不把任何金鑰放到瀏覽器。時間一律是營運時間；計畫取每日計畫（跟班次中心同一份）。
@@ -32,7 +33,7 @@ function str(value: unknown): string | null {
 export class StationEtaService {
   private planCache: {
     key: string;
-    arrivals: PlannedArrival[];
+    stops: PlannedStop[];
     stopsByTrip: Map<string, string[]>;
     names: Map<string, string>;
   } | null = null;
@@ -44,7 +45,8 @@ export class StationEtaService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async byStation(stationIds: string[], limit: number) {
+  async byStation(stations: Array<{ stationId: string; events: StationEventKind[] }>, limit: number) {
+    const stationIds = stations.map((s) => s.stationId);
     const operatingNow = this.clock.now();
     const day = this.clock.operatingDay();
     const adoption = await this.engine.ensureDailyPlan(day);
@@ -65,10 +67,10 @@ export class StationEtaService {
       for (const row of rows) tripStates.set(row.trip_code, { status: row.status, closedReason: row.closed_reason });
     }
 
-    const stations = mergeStationArrivals({
-      stationIds,
+    const groups = mergeStationEvents({
+      stations,
       stationNames: plan?.names ?? new Map(),
-      planned: (plan?.arrivals ?? []).filter((a) => stationIds.includes(a.stationId)),
+      planned: (plan?.stops ?? []).filter((a) => stationIds.includes(a.stationId)),
       stopsByTrip: plan?.stopsByTrip ?? new Map(),
       live,
       tripStates,
@@ -83,7 +85,7 @@ export class StationEtaService {
       clock: { mode: clock.mode, rate: clock.rate, paused: clock.paused, stale: clock.stale },
       plan: adoption ? { shift_id: adoption.shift_id, shift_name: adoption.shift_name } : null,
       source: '每日計畫站序＋車端即時回報（營運時間）',
-      stations,
+      stations: groups,
     };
   }
 
@@ -93,26 +95,26 @@ export class StationEtaService {
     if (this.planCache?.key === key) return this.planCache;
     const reference = operatingDayReference(day) ?? Date.now();
     const plan = await this.engine.planForShift(shiftId, reference);
-    const arrivals: PlannedArrival[] = [];
+    const stops: PlannedStop[] = [];
     const stopsByTrip = new Map<string, string[]>();
     const names = new Map<string, string>();
     for (const item of plan.planned) {
-      const stops = item.stations.map((s) => s.stationId);
-      stopsByTrip.set(item.tripCode, stops);
+      stopsByTrip.set(item.tripCode, item.stations.map((s) => s.stationId));
       item.stations.forEach((station, index) => {
         names.set(station.stationId, station.stationName);
-        if (station.arriveAt == null) return;
-        arrivals.push({
+        if (station.arriveAt == null && station.departAt == null) return;
+        stops.push({
           tripCode: item.tripCode,
           vehicleCode: item.vehicleCode,
           stationId: station.stationId,
           stationName: station.stationName,
           stopIndex: index,
-          arriveAt: station.arriveAt,
+          arriveAt: station.arriveAt ?? null,
+          departAt: station.departAt ?? null,
         });
       });
     }
-    this.planCache = { key, arrivals, stopsByTrip, names };
+    this.planCache = { key, stops, stopsByTrip, names };
     return this.planCache;
   }
 

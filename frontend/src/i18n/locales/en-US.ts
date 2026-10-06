@@ -3291,7 +3291,7 @@ const enUS: DeepStringify<typeof zhTW> = {
         image: { label: 'Image', description: 'External image URL' },
         colorBlock: { label: 'Color block', description: 'Solid background block' },
         clock: { label: 'Clock', description: 'Live system clock' },
-        'station-eta': { label: 'Station arrivals', description: 'Next arrivals at a station (operating time)' },
+        'station-eta': { label: 'Arrivals / departures', description: 'Countdown to the next arrivals and departures at a station (operating time)' },
         emptyState: { label: 'Empty state', description: 'Placeholder when query returns 0 rows' },
         alertBanner: {
           label: 'Data alert',

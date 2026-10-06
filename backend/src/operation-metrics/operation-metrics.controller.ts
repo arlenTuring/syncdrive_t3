@@ -32,21 +32,34 @@ export class OperationMetricsController {
   }
 
   /**
-   * 站點到站清單（儀表板 N2W／S2W／T3 元件）：每日計畫站序＋車端即時回報，營運時間。
-   * station_id 可重複；limit 預設 3（1～10）。登入端內部端點，不需要車端金鑰。
+   * 站點到站／出發清單（儀表板 N2W／S2W／T3 元件）：每日計畫站序＋車端即時回報，營運時間。
+   * arrive＝列到站的站點、depart＝列出發的站點（可重複或逗號分隔）；station_id 等同 arrive。
+   * limit 預設 3（1～10）。登入端內部端點，不需要車端金鑰。
    */
   @Get('station-eta')
   async getStationEta(
     @Query('station_id') stationId?: string | string[],
+    @Query('arrive') arrive?: string | string[],
+    @Query('depart') depart?: string | string[],
     @Query('limit') limit?: string,
   ) {
-    const ids = (Array.isArray(stationId) ? stationId : stationId ? [stationId] : [])
+    const list = (raw?: string | string[]) => (Array.isArray(raw) ? raw : raw ? [raw] : [])
       .flatMap((value) => String(value).split(','))
       .map((value) => value.trim())
       .filter(Boolean);
-    if (ids.length === 0) throw new BadRequestException('需要 station_id');
+    const byId = new Map<string, Set<'arrive' | 'depart'>>();
+    const add = (id: string, event: 'arrive' | 'depart') => {
+      if (!byId.has(id)) byId.set(id, new Set());
+      byId.get(id)!.add(event);
+    };
+    for (const id of [...list(stationId), ...list(arrive)]) add(id, 'arrive');
+    for (const id of list(depart)) add(id, 'depart');
+    if (byId.size === 0) throw new BadRequestException('需要 arrive 或 depart（站點 ID）');
     const n = limit == null ? 3 : Number(limit);
     if (!Number.isInteger(n) || n < 1 || n > 10) throw new BadRequestException('limit 需為 1～10 的整數');
-    return this.stationEtaService.byStation(ids, n);
+    return this.stationEtaService.byStation(
+      [...byId].map(([stationId, events]) => ({ stationId, events: [...events] })),
+      n,
+    );
   }
 }
