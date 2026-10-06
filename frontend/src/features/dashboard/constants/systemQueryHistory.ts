@@ -59,6 +59,12 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "commit": "bcced54"
   },
   {
+    "family": "mainline-fleet",
+    "fingerprint": "145d92ff20f740",
+    "firstSeen": "2026-10-06",
+    "commit": "3beb061"
+  },
+  {
     "family": "mainline-shifts",
     "fingerprint": "0dc1f5b1ae7657",
     "firstSeen": "2026-06-25",
@@ -131,6 +137,12 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "commit": "646864a"
   },
   {
+    "family": "mainline-shifts",
+    "fingerprint": "00590e5b7e230f",
+    "firstSeen": "2026-10-06",
+    "commit": "3beb061"
+  },
+  {
     "family": "maintenance-shifts",
     "fingerprint": "08882334305f5d",
     "firstSeen": "2026-06-25",
@@ -183,6 +195,12 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "fingerprint": "1188b5d5a8ae2e",
     "firstSeen": "2026-10-05",
     "commit": "bcced54"
+  },
+  {
+    "family": "maintenance-shifts",
+    "fingerprint": "06c217fceda659",
+    "firstSeen": "2026-10-06",
+    "commit": "3beb061"
   },
   {
     "family": "vehicle-status",
@@ -243,5 +261,11 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "fingerprint": "03ed2a0509c8c7",
     "firstSeen": "2026-10-05",
     "commit": "bcced54"
+  },
+  {
+    "family": "vehicle-status",
+    "fingerprint": "0af7bea2f89e1d",
+    "firstSeen": "2026-10-06",
+    "commit": "3beb061"
   }
 ];
