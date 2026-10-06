@@ -132,7 +132,8 @@ for name in sorted(os.listdir(d)):
 PY
 fi
 
-tar -czf "$WORK/syncdata.tar.gz" -C "$WORK/bundle" .
+# COPYFILE_DISABLE：macOS 的 tar 預設會夾帶 ._* 附屬檔（檔案屬性），對面會被當成地圖讀
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$WORK/syncdata.tar.gz" -C "$WORK/bundle" .
 log "打包 $(du -h "$WORK/syncdata.tar.gz" | cut -f1)"
 
 if [ "$DRY_RUN" = true ]; then
@@ -183,7 +184,7 @@ function put(path, payload) {
 (async () => {
   const active = JSON.parse(fs.readFileSync(dir + \"/active-map.json\", \"utf8\"));
   for (const name of fs.readdirSync(dir)) {
-    if (name === \"active-map.json\") continue;
+    if (name === \"active-map.json\" || name.startsWith(\".\") || !name.endsWith(\".json\")) continue;
     const doc = JSON.parse(fs.readFileSync(dir + \"/\" + name, \"utf8\"));
     await put(\"/syncdrive-api/map/library/\" + doc.mapId, { libraryId: doc.mapId, displayName: doc.displayName, version: doc.version, updatedAt: doc.updatedAt, mapDocument: doc });
     console.log(\"    \" + doc.mapId + \"  \" + doc.displayName + \"  \" + doc.version);
