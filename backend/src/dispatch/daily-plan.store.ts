@@ -21,7 +21,8 @@ export class DailyPlanStore {
     const row = await this.settings.findOne({ where: { settingKey: dailyPlanSettingKey(day) } });
     const value = row?.settingValue as DailyPlanAdoption | undefined;
     if (!value || typeof value.shift_id !== 'string' || !Array.isArray(value.passenger_trips)) return null;
-    const needsUpgrade = value.passenger_trips.some((trip) => !trip.id || trip.classification !== 'passenger');
+    const needsUpgrade = !Array.isArray(value.tasks)
+      || value.passenger_trips.some((trip) => !trip.id || trip.classification !== 'passenger');
     if (!needsUpgrade) return value;
     const upgraded: DailyPlanAdoption = {
       ...value,
@@ -29,6 +30,15 @@ export class DailyPlanStore {
         ...trip,
         id: trip.id || `${value.operating_day}:${value.shift_id}:${value.plan_digest}:${trip.code}`,
         classification: 'passenger',
+      })),
+      tasks: Array.isArray(value.tasks) ? value.tasks : value.passenger_trips.map((trip) => ({
+        id: trip.id || `${value.operating_day}:${value.shift_id}:${value.plan_digest}:${trip.code}`,
+        code: trip.code,
+        classification: 'passenger' as const,
+        start: trip.start,
+        end: trip.end,
+        vehicle_code: null,
+        task_type: 'passenger',
       })),
     };
     if (row) {

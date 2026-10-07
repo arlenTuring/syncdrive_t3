@@ -901,6 +901,19 @@ export interface TabListColumn {
   children: ChildWidget[]; // 該欄位單元格的子畫布範本
 }
 
+export interface TabListRowCoupling {
+  enabled: boolean;
+  /** 同一業務事件的關聯鍵（例如同一車輛的同一次停靠） */
+  relationKeyField: string;
+  /** React 列 key 使用的穩定欄位 */
+  stableKeyField: string;
+  statusField: string;
+  /** 由早到晚；同一關聯鍵只顯示目前最晚的狀態。 */
+  statusOrder: string[];
+  /** 每個狀態可把輸出欄位映射到該狀態的來源路徑。 */
+  fieldMappings?: Record<string, Record<string, string>>;
+}
+
 /** Tab 清單單一分頁定義 */
 export interface TabListTab extends WidgetDataBinding {
   id: string;
@@ -915,6 +928,7 @@ export interface TabListTab extends WidgetDataBinding {
   /** REST 與 MQTT 合併時必填；只合併相同事件識別 */
   mergeKeyField?: string;
   rowKeyField?: string;
+  rowCoupling?: TabListRowCoupling;
   columns: TabListColumn[];
 }
 
@@ -937,6 +951,8 @@ export interface TabListWidget extends WidgetBase {
   fontSize?: number; // 內容字級 (px)，預設 13
   textColor?: string; // 內容文字顏色，預設 #e2e8f0
   headerHeight?: number; // 表頭高度 (px)，預設 36
+  /** 舊元件預設顯示；false 時整列與高度都移除。 */
+  showHeader?: boolean;
   headerFontSize?: number; // 表頭字級 (px)，預設 12
   headerBgColor?: string;
   headerTextColor?: string; // 表頭文字顏色，預設 #94a3b8

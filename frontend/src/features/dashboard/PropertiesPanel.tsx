@@ -2852,6 +2852,11 @@ function TabListSettings({
     <div className="space-y-4 text-xs">
       <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#38bdf8" />
 
+      <label className="flex items-center justify-between gap-2 text-zinc-300">
+        <span>顯示欄位名稱</span>
+        <input type="checkbox" checked={w.showHeader !== false} onChange={e => onUpdate({ showHeader: e.target.checked })} />
+      </label>
+
       {/* Tab 管理 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -2919,6 +2924,46 @@ function TabListSettings({
           <Field label="API／MQTT 合併識別路徑">
             <input value={activeTab.mergeKeyField ?? ''} onChange={e => updateTab(activeTab.id, { mergeKeyField: e.target.value })} className={inputCls} placeholder="event_id（同時使用兩來源時必填）" />
           </Field>
+          <div className="pt-2 border-t border-zinc-700/50 space-y-2">
+            <label className="flex items-center justify-between gap-2 text-zinc-300">
+              <span>耦合同一業務事件</span>
+              <input
+                type="checkbox"
+                checked={activeTab.rowCoupling?.enabled === true}
+                onChange={e => updateTab(activeTab.id, {
+                  rowCoupling: {
+                    enabled: e.target.checked,
+                    relationKeyField: activeTab.rowCoupling?.relationKeyField ?? 'coupling_key',
+                    stableKeyField: activeTab.rowCoupling?.stableKeyField ?? 'row_key',
+                    statusField: activeTab.rowCoupling?.statusField ?? 'event',
+                    statusOrder: activeTab.rowCoupling?.statusOrder ?? ['arrive', 'depart'],
+                    fieldMappings: activeTab.rowCoupling?.fieldMappings,
+                  },
+                })}
+              />
+            </label>
+            {activeTab.rowCoupling?.enabled && <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="關聯欄位"><input value={activeTab.rowCoupling.relationKeyField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, relationKeyField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="穩定列識別"><input value={activeTab.rowCoupling.stableKeyField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, stableKeyField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="狀態欄位"><input value={activeTab.rowCoupling.statusField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, statusField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="狀態順序"><input value={activeTab.rowCoupling.statusOrder.join(',')} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, statusOrder: e.target.value.split(',').map(v => v.trim()).filter(Boolean) } })} className={inputCls} /></Field>
+              </div>
+              <Field label="各狀態欄位映射（JSON）">
+                <textarea
+                  key={JSON.stringify(activeTab.rowCoupling.fieldMappings ?? {})}
+                  defaultValue={JSON.stringify(activeTab.rowCoupling.fieldMappings ?? {}, null, 2)}
+                  onBlur={e => {
+                    try {
+                      const value = JSON.parse(e.target.value || '{}') as Record<string, Record<string, string>>;
+                      updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, fieldMappings: value } });
+                    } catch { e.target.value = JSON.stringify(activeTab.rowCoupling?.fieldMappings ?? {}, null, 2); }
+                  }}
+                  className={`${inputCls} min-h-20 font-mono`}
+                />
+              </Field>
+            </>}
+          </div>
 
           {/* 欄位清單 */}
           <div className="pt-2 border-t border-zinc-700/50 space-y-2">

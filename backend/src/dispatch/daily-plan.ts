@@ -39,9 +39,22 @@ export type DailyPlanTrip = {
   end: number | null;
 };
 
+/** 每日計畫中的完整任務；保存計畫不等於建立或派送執行訂單。 */
+export type DailyPlanTask = {
+  id: string;
+  code: string;
+  classification: 'passenger' | 'movement' | 'maintenance';
+  start: number | null;
+  end: number | null;
+  vehicle_code: string | null;
+  task_type: string | null;
+};
+
 export type DailyPlanAdoptionVia = 'deploy' | 'simulator' | 'auto_deployed' | 'manual';
 
 export type DailyPlanAdoption = {
+  /** 2＝已保存正線、整備、過渡的完整採用任務；缺少代表舊快照。 */
+  task_snapshot_version?: 2;
   operating_day: string;
   shift_id: string;
   shift_name: string;
@@ -53,6 +66,7 @@ export type DailyPlanAdoption = {
   plan_digest: string;
   /** 模擬器的完整載入身分（含地圖）；只用來追溯 */
   load_digest: string | null;
+  tasks: DailyPlanTask[];
   passenger_trips: DailyPlanTrip[];
   counts: { passenger: number; movement: number; maintenance: number; skipped: number };
   adopted_at: number;
@@ -93,7 +107,14 @@ export function buildAdoption(args: {
   shift: { id: string; name: string; version: string | null; updatedAt: number | null };
   planDigest: string;
   loadDigest: string | null;
-  planned: Array<{ tripCode: string; kind: string; departAt: number; arriveAt: number }>;
+  planned: Array<{
+    tripCode: string;
+    kind: 'passenger' | 'movement' | 'maintenance';
+    departAt: number;
+    arriveAt: number;
+    vehicleCode?: string | null;
+    taskType?: string | null;
+  }>;
   scheduleTrips: Array<{ trip_code: string; task_type: string; start?: number | null; end?: number | null }>;
   skipped: number;
   via: DailyPlanAdoptionVia;
@@ -123,6 +144,33 @@ export function buildAdoption(args: {
       };
     })
     .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.code.localeCompare(b.code));
+  const tasksByCode = new Map<string, DailyPlanTask>();
+  for (const item of args.planned) {
+    tasksByCode.set(item.tripCode, {
+      id: `${args.operatingDay}:${args.shift.id}:${args.planDigest}:${item.tripCode}`,
+      code: item.tripCode,
+      classification: item.kind,
+      start: item.departAt,
+      end: item.arriveAt,
+      vehicle_code: item.vehicleCode?.trim() || null,
+      task_type: item.taskType?.trim() || null,
+    });
+  }
+  for (const trip of args.scheduleTrips) {
+    // 展開後的 planned 已含真正會採用的整備與過渡；只補尚未指派而未能展開的載客班次。
+    if (!trip.trip_code || trip.task_type !== 'passenger' || tasksByCode.has(trip.trip_code)) continue;
+    tasksByCode.set(trip.trip_code, {
+      id: `${args.operatingDay}:${args.shift.id}:${args.planDigest}:${trip.trip_code}`,
+      code: trip.trip_code,
+      classification: 'passenger',
+      start: trip.start ?? null,
+      end: trip.end ?? null,
+      vehicle_code: null,
+      task_type: trip.task_type || null,
+    });
+  }
+  const tasks = [...tasksByCode.values()]
+    .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.code.localeCompare(b.code));
   const count = (kind: string) => args.planned.filter((item) => item.kind === kind).length;
   const previous = args.previous;
   const sameVersion = previous
@@ -143,6 +191,7 @@ export function buildAdoption(args: {
       ].slice(0, 20)
     : previous?.history ?? [];
   return {
+    task_snapshot_version: 2,
     operating_day: args.operatingDay,
     shift_id: args.shift.id,
     shift_name: args.shift.name,
@@ -150,6 +199,7 @@ export function buildAdoption(args: {
     shift_updated_at: args.shift.updatedAt,
     plan_digest: args.planDigest,
     load_digest: args.loadDigest,
+    tasks,
     passenger_trips: passengerTrips,
     counts: {
       passenger: passengerTrips.length,

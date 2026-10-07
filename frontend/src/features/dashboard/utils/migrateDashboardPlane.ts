@@ -65,11 +65,15 @@ export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[
     ] as const;
     const list: TabListWidget = {
       id: child.id, type: 'tab-list', x: child.x + labelWidth, y: child.y, width: Math.max(10, child.width - labelWidth), height: child.height,
-      label: station, showTabBar: false, activeTabId: 'events', rowHeight: 20, fontSize: Math.max(9, child.fontSize - 2),
+      label: station, showTabBar: false, showHeader: false, activeTabId: 'events', rowHeight: 20, fontSize: Math.max(9, child.fontSize - 2),
       textColor: child.color, headerHeight: 22, headerFontSize: 8, headerTextColor: child.mutedColor,
       backgroundColor: child.backgroundColor, borderColor: child.borderColor, borderWidth: 1, borderRadius: child.borderRadius,
       tabs: [{
-        id: 'events', label: station, dataUrl: stationUrl(child), dataRowPath: 'events', rowKeyField: 'key',
+        id: 'events', label: station, dataUrl: stationUrl(child), dataRowPath: 'events', rowKeyField: 'row_key',
+        rowCoupling: {
+          enabled: true, relationKeyField: 'coupling_key', stableKeyField: 'row_key',
+          statusField: 'event', statusOrder: ['arrive', 'depart'],
+        },
         refreshMode: child.refreshMode ?? 'event', freshnessPolicy: child.freshnessPolicy,
         refreshInterval: child.refreshInterval, invalidateTags: child.invalidateTags ?? [...STATION_ETA_INVALIDATE_TAGS],
         columns: columns.map(([fieldKey, name, width, format]) => ({ id: `${child.id}-${fieldKey}`, name, fieldKey, width, format, children: [] })),
@@ -77,7 +81,22 @@ export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[
     };
     out.push(label, list);
   }
-  return out;
+  return out.map(child => {
+    if (child.type !== 'tab-list' || !['eta-n2w', 'eta-s2w', 'eta-t3'].includes(child.id)) return child;
+    if (!child.tabs.some(tab => tab.dataUrl?.startsWith(STATION_ETA_URL))) return child;
+    return {
+      ...child,
+      showHeader: false,
+      tabs: child.tabs.map(tab => tab.dataUrl?.startsWith(STATION_ETA_URL) ? {
+        ...tab,
+        rowKeyField: 'row_key',
+        rowCoupling: {
+          enabled: true, relationKeyField: 'coupling_key', stableKeyField: 'row_key',
+          statusField: 'event', statusOrder: ['arrive', 'depart'],
+        },
+      } : tab),
+    };
+  });
 }
 
 function migrateCanvasElement(el: CanvasElementProps): CanvasElementProps {

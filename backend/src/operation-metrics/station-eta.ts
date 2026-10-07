@@ -51,6 +51,9 @@ export type TripState = { status: string; closedReason: string | null };
 
 export type StationEvent = {
   key: string;
+  /** 同一車輛、同一次停靠的穩定識別；到站轉出發時不改變。 */
+  coupling_key: string;
+  row_key: string;
   event: StationEventKind;
   vehicle_code: string;
   trip_code: string;
@@ -67,6 +70,7 @@ export type StationEvent = {
   at_station: boolean;
   planned_at: number | null;
   delay_seconds: number | null;
+  time_state: 'countdown' | 'overdue' | 'due' | 'stale';
 };
 
 export type StationEventGroup = {
@@ -121,6 +125,52 @@ export function mergeStationEvents(args: {
   const byStation = new Map(groups.map((g) => [g.station_id, g]));
   const now = args.operatingNow;
 
+  // 只在這個 Table 明確選取的停靠點內，依車輛與計畫順序把「前一班到站 → 下一班出發」配成同一次停靠。
+  const couplingByEvent = new Map<string, string>();
+  const eventId = (stop: PlannedStop, event: StationEventKind) => `${stop.tripCode}|${stop.stationId}|${stop.stopIndex}|${event}`;
+  const byVehicle = new Map<string, Array<{ stop: PlannedStop; event: StationEventKind; at: number }>>();
+  for (const stop of args.planned) {
+    const group = byStation.get(stop.stationId);
+    if (!group) continue;
+    const stops = args.stopsByTrip.get(stop.tripCode) ?? [];
+    const events = byVehicle.get(stop.vehicleCode) ?? [];
+    if (group.wants.has('arrive') && stop.arriveAt != null && stop.stopIndex !== 0) {
+      events.push({ stop, event: 'arrive', at: stop.arriveAt });
+    }
+    if (group.wants.has('depart') && stop.departAt != null && stop.stopIndex !== stops.length - 1) {
+      events.push({ stop, event: 'depart', at: stop.departAt });
+    }
+    byVehicle.set(stop.vehicleCode, events);
+  }
+  for (const [vehicleCode, events] of byVehicle) {
+    let dwellKey: string | null = null;
+    events.sort((a, b) => a.at - b.at || (a.event === 'arrive' ? -1 : 1));
+    for (const item of events) {
+      if (item.event === 'arrive') {
+        dwellKey = `${vehicleCode}|${item.stop.tripCode}|${item.stop.stationId}|${item.stop.stopIndex}`;
+        couplingByEvent.set(eventId(item.stop, item.event), dwellKey);
+      } else {
+        const key = dwellKey ?? `${vehicleCode}|${item.stop.tripCode}|${item.stop.stationId}|${item.stop.stopIndex}`;
+        couplingByEvent.set(eventId(item.stop, item.event), key);
+        dwellKey = null;
+      }
+    }
+  }
+
+  const confirmedDwells = new Set<string>();
+  for (const stop of args.planned) {
+    const live = liveByTrip.get(stop.tripCode);
+    const stops = args.stopsByTrip.get(stop.tripCode) ?? [];
+    const targetIndex = live?.targetStationId ? stops.indexOf(live.targetStationId) : -1;
+    if (live && targetIndex === stop.stopIndex && (
+      (live.distanceM != null && live.distanceM < ARRIVED_DISTANCE_M)
+      || DWELLING_PHASES.has(String(live.vehiclePhase ?? '').toUpperCase())
+    )) {
+      const key = couplingByEvent.get(eventId(stop, 'arrive'));
+      if (key) confirmedDwells.add(key);
+    }
+  }
+
   for (const stop of args.planned) {
     const group = byStation.get(stop.stationId);
     if (!group) continue;
@@ -143,8 +193,16 @@ export function mergeStationEvents(args: {
     const staleHere = !live && staleVehicles.has(stop.vehicleCode);
 
     const push = (event: StationEventKind, at: number, kind: 'live' | 'plan', plannedAt: number | null, atStation = false) => {
+      const couplingKey = couplingByEvent.get(eventId(stop, event)) ?? eventId(stop, event);
+      const timeState: StationEvent['time_state'] = staleHere
+        ? 'stale'
+        : at <= now
+          ? (event === 'depart' && atStation ? 'due' : 'overdue')
+          : 'countdown';
       group.events.push({
-        key: `${stop.tripCode}|${stop.stationId}|${stop.stopIndex}|${event}`,
+        key: eventId(stop, event),
+        coupling_key: couplingKey,
+        row_key: couplingKey,
         event,
         vehicle_code: stop.vehicleCode,
         trip_code: stop.tripCode,
@@ -158,6 +216,7 @@ export function mergeStationEvents(args: {
         at_station: atStation,
         planned_at: plannedAt,
         delay_seconds: plannedAt != null ? Math.round((at - plannedAt) / 1000) : null,
+        time_state: timeState,
       });
       if (staleHere && at <= now + 30 * 60_000) group.staleHere.add(stop.vehicleCode);
     };
@@ -170,20 +229,19 @@ export function mergeStationEvents(args: {
      */
     const isOrigin = stop.stopIndex === 0;
     const isTerminal = stops.length > 0 && stop.stopIndex === stops.length - 1;
+    const arrivalCoupling = couplingByEvent.get(eventId(stop, 'arrive'));
+    const departureCoupling = couplingByEvent.get(eventId(stop, 'depart'));
+    const dwellConfirmed = arrived
+      || (!!arrivalCoupling && confirmedDwells.has(arrivalCoupling))
+      || (!!departureCoupling && confirmedDwells.has(departureCoupling));
 
-    if (group.wants.has('arrive') && stop.arriveAt != null && !isOrigin && !passed && !arrived) {
+    if (group.wants.has('arrive') && stop.arriveAt != null && !isOrigin && !passed && !dwellConfirmed) {
       if (liveArriveAt != null) push('arrive', liveArriveAt, 'live', stop.arriveAt);
       else if (!expired(stop.arriveAt)) push('arrive', stop.arriveAt, 'plan', stop.arriveAt);
     }
 
-    if (group.wants.has('depart') && stop.departAt != null && !isTerminal && !passed) {
-      if (arrived) {
-        push('depart', Math.max(stop.departAt, now), 'live', stop.departAt, true);
-      } else if (liveArriveAt != null) {
-        push('depart', Math.max(stop.departAt, liveArriveAt), 'live', stop.departAt);
-      } else if (!expired(stop.departAt)) {
-        push('depart', stop.departAt, 'plan', stop.departAt);
-      }
+    if (group.wants.has('depart') && stop.departAt != null && !isTerminal && !passed && dwellConfirmed) {
+      push('depart', stop.departAt, 'live', stop.departAt, true);
     }
   }
 

@@ -62,6 +62,24 @@ function getInitialPlanes(): DashboardPlane[] {
   return loadPlanes();
 }
 
+/** JSONB 會重排物件鍵；遷移比較只看值，不能把鍵順序誤認為版面變更。 */
+export function sameDashboardJson(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => sameDashboardJson(value, right[index]));
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every(key => Object.prototype.hasOwnProperty.call(rightRecord, key)
+      && sameDashboardJson(leftRecord[key], rightRecord[key]));
+}
+
 /**
  * 從快取讀版面。
  *
@@ -207,7 +225,7 @@ export function useDashboardEditor() {
          */
         remote.forEach((original, index) => {
           const upgraded = migrated[index];
-          if (JSON.stringify(original.elements) === JSON.stringify(upgraded.elements)) return;
+          if (sameDashboardJson(original.elements, upgraded.elements)) return;
           void saveDashboardPlane(upgraded)
             .then((saved) => {
               if (cancelled) return;

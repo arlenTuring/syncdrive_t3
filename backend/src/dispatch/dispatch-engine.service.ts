@@ -313,7 +313,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const load = deployed && adoption.shift_id === deployed.shiftId
       ? loadDeployed
       : () => this.operationShiftService.getShiftTrips(adoption.shift_id);
-    return { adoption, adoptVia: null, load };
+    return {
+      adoption,
+      // 舊快照只有載客明細；第一次讀取時用同一份班表原地補齊，不改版本或採用歷史。
+      adoptVia: adoption.task_snapshot_version === 2 ? null : adoption.adopted_via,
+      load,
+    };
   }
 
   /**
