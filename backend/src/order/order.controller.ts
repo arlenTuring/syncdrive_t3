@@ -193,15 +193,28 @@ export class OrderController {
       + '欄位定義見車端介接說明書 §五.2。',
   })
   @ApiOkResponse({ description: '更新後之訂單' })
+  @ApiBody({
+    required: false,
+    schema: {
+      type: 'object',
+      properties: {
+        operating_at: { type: 'integer', format: 'int64', description: '車端共用營運時鐘上的事件時刻；省略時以中心接收時刻換算' },
+      },
+    },
+  })
   @ApiBadRequestResponse({ description: 'status 值不合法，或不允許之狀態轉移' })
   @ApiNotFoundResponse({ description: '訂單不存在' })
   async updateOrderProgress(
     @Param('id') id: string,
     @Query('status') status: string,
+    @Body() body: { operating_at?: number } | undefined,
     @Req() req: Request,
   ) {
     await this.orderService.authorizeOrder(id, (req as Request & { vehicleScope?: string[] }).vehicleScope);
-    const result = await this.orderService.updateOrderStatus(id, status, { reporter: 'vehicle' });
+    const result = await this.orderService.updateOrderStatus(id, status, {
+      reporter: 'vehicle',
+      operatingAt: body?.operating_at,
+    });
 
     await this.auditService.write({
       sourceIp: req.ip,

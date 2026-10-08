@@ -14,7 +14,7 @@ describe('generic tab list data rows', () => {
     expect(rows[1]).toMatchObject({ vehicle_name: 'PMS02', remaining_seconds: 30 });
   });
 
-  it('keeps one stable row and advances arrival to departure for one stop', () => {
+  it('does not promote an unconfirmed future departure over the current arrival', () => {
     const rows = coupleTabListRows([
       { coupling_key: 'PMS01-stop-1', row_key: 'PMS01-stop-1', event: 'arrive', label: '到站' },
       { coupling_key: 'PMS01-stop-1', row_key: 'PMS01-stop-1', event: 'depart', label: '出發' },
@@ -26,6 +26,19 @@ describe('generic tab list data rows', () => {
       statusOrder: ['arrive', 'depart'],
     });
     expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ __row_key: 'PMS01-stop-1', event: 'arrive', label: '到站' });
+  });
+
+  it('shows departure when the source confirms it as the only current state', () => {
+    const rows = coupleTabListRows([
+      { coupling_key: 'PMS01-stop-1', row_key: 'PMS01-stop-1', event: 'depart', label: '出發' },
+    ], {
+      enabled: true,
+      relationKeyField: 'coupling_key',
+      stableKeyField: 'row_key',
+      statusField: 'event',
+      statusOrder: ['arrive', 'depart'],
+    });
     expect(rows[0]).toMatchObject({ __row_key: 'PMS01-stop-1', event: 'depart', label: '出發' });
   });
 
@@ -36,7 +49,9 @@ describe('generic tab list data rows', () => {
   });
 
   it('converts pointer distance through the canvas scale when resizing one column', () => {
+    expect(resizeTabListColumn(48, 10, 1)).toBe(58);
     expect(resizeTabListColumn(48, 20.5, 2.05)).toBe(58);
+    expect(resizeTabListColumn(48, 40.5, 4.05)).toBe(58);
     expect(resizeTabListColumn(35, -20.5, 2.05)).toBe(30);
   });
 });

@@ -59,9 +59,11 @@ export class StationEtaService {
         `SELECT COALESCE(payload->>'plan_trip_code', trip_code) AS trip_code, status::text AS status,
                 payload->>'closed_reason' AS closed_reason
          FROM operation_orders
-         WHERE payload->>'operating_day' = $1 AND payload->>'plan_shift_id' = $2
+         WHERE payload->>'operating_day' = $1
+           AND payload->>'plan_shift_id' = $2
+           AND payload->>'plan_digest' = $3
          ORDER BY created_at ASC`,
-        [day, adoption.shift_id],
+        [day, adoption.shift_id, adoption.plan_digest],
       );
       // 同一班重發：以最後一張為準
       for (const row of rows) tripStates.set(row.trip_code, { status: row.status, closedReason: row.closed_reason });

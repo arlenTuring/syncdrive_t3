@@ -71,6 +71,26 @@ describe('站點到站／出發清單', () => {
     expect(g.events[0]!.row_key).toContain('ST01');
   });
 
+  it('同一次停靠沿用 row key：接近到站 → 確認後轉出發 → 開走後移除', () => {
+    const st: PlannedStop = { tripCode: 'ST01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 1, arriveAt: T + 10 * MIN, departAt: null };
+    const tn: PlannedStop = { tripCode: 'TN01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 0, arriveAt: null, departAt: T + 11 * MIN };
+    const base = {
+      planned: [st, tn],
+      stopsByTrip: new Map([['ST01', ['s2w_d_start', 't3_u']], ['TN01', SEQ]]),
+    };
+    const arriving = run({ ...base, live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 100, etaSeconds: 30 })] }, ['arrive', 'depart'], 't3_u');
+    const departing = run({ ...base, live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 1, etaSeconds: 0 })] }, ['arrive', 'depart'], 't3_u');
+    const gone = run({
+      ...base,
+      live: [live({ tripCode: 'TN01', targetStationId: 'n2w_d_end', distanceM: 100 })],
+      tripStates: new Map([['ST01', { status: 'END', closedReason: null }]]),
+    }, ['arrive', 'depart'], 't3_u');
+    expect(arriving.events[0]!.event).toBe('arrive');
+    expect(departing.events[0]!.event).toBe('depart');
+    expect(departing.events[0]!.row_key).toBe(arriving.events[0]!.row_key);
+    expect(gone.events).toEqual([]);
+  });
+
   it('同一台車循環再到同一站是另一筆，不當重複刪掉', () => {
     const g = run({ planned: [...trip('TN01', 'PMS01', 1), ...trip('TN03', 'PMS01', 30)] }, ['arrive']);
     expect(g.events.map((e) => e.trip_code)).toEqual(['TN01', 'TN03']);

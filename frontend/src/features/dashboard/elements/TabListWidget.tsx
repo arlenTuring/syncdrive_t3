@@ -45,16 +45,13 @@ export function mergeTabListRows(
 
 export function coupleTabListRows(rows: Record<string, unknown>[], config?: TabListRowCoupling): Record<string, unknown>[] {
   if (!config?.enabled || !config.relationKeyField || !config.statusField) return rows;
-  const rank = new Map(config.statusOrder.map((status, index) => [status, index]));
   const grouped = new Map<string, Record<string, unknown>>();
   for (const row of rows) {
     const relation = readTabListPath(row, config.relationKeyField);
     if (relation == null || relation === '') continue;
     const key = String(relation);
-    const current = grouped.get(key);
-    const status = String(readTabListPath(row, config.statusField) ?? '');
-    const currentStatus = String(readTabListPath(current, config.statusField) ?? '');
-    if (!current || (rank.get(status) ?? -1) >= (rank.get(currentStatus) ?? -1)) grouped.set(key, row);
+    // 順位不能證明事件已發生；來源須只回目前狀態，重複時保留來源排序的第一筆。
+    if (!grouped.has(key)) grouped.set(key, row);
   }
   return [...grouped].map(([relation, row]) => {
     const status = String(readTabListPath(row, config.statusField) ?? '');
@@ -332,32 +329,71 @@ export function TabListWidgetView({
     if (!activeTab || !onPatchWidget) return;
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
     onEditSessionStart?.();
     const startX = event.clientX;
     const startWidth = draftWidths[column.id] ?? column.width;
     let nextWidth = startWidth;
+    const handle = event.currentTarget as HTMLButtonElement;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     const move = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
       nextWidth = resizeTabListColumn(startWidth, moveEvent.clientX - startX, editorScale);
       setDraftWidths(current => ({ ...current, [column.id]: nextWidth }));
     };
-    const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
-      window.removeEventListener('pointercancel', stop);
+    const clearDraft = () => setDraftWidths(current => {
+      const next = { ...current };
+      delete next[column.id];
+      return next;
+    });
+    const cleanup = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', commit);
+      handle.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', keydown, true);
+      document.body.style.userSelect = previousUserSelect;
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    };
+    const commit = (upEvent: PointerEvent) => {
+      upEvent.preventDefault();
+      upEvent.stopPropagation();
+      cleanup();
       onPatchWidget({
         tabs: tabs.map(tab => tab.id === activeTab.id
           ? { ...tab, columns: tab.columns.map(item => item.id === column.id ? { ...item, width: nextWidth } : item) }
           : tab),
       });
-      setDraftWidths(current => {
-        const next = { ...current };
-        delete next[column.id];
-        return next;
-      });
+      clearDraft();
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
+    const cancel = (cancelEvent?: Event) => {
+      cancelEvent?.preventDefault();
+      cancelEvent?.stopPropagation();
+      cleanup();
+      clearDraft();
+    };
+    const keydown = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === 'Escape') cancel(keyEvent);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', commit);
+    handle.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', keydown, true);
+  };
+
+  const resizeColumnByKeyboard = (event: React.KeyboardEvent, column: TabListColumn) => {
+    if (!activeTab || !onPatchWidget || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onEditSessionStart?.();
+    const delta = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowRight' ? 1 : -1);
+    const width = Math.max(30, column.width + delta);
+    onPatchWidget({
+      tabs: tabs.map(tab => tab.id === activeTab.id
+        ? { ...tab, columns: tab.columns.map(item => item.id === column.id ? { ...item, width } : item) }
+        : tab),
+    });
   };
 
   return (
@@ -489,17 +525,19 @@ export function TabListWidgetView({
         ) : (
           <table
             style={{
-              width: '100%',
-              minWidth: tableWidth,
+              width: tableWidth,
               borderCollapse: 'collapse',
               tableLayout: 'fixed',
             }}
           >
+            <colgroup>
+              {renderedColumns.map(column => <col key={column.id} style={{ width: Math.max(30, column.width) }} />)}
+            </colgroup>
             {/* 表頭 */}
-            {showHeader && <thead>
+            {(showHeader || (isEditMode && isSelected && onPatchWidget)) && <thead>
               <tr
                 style={{
-                  height: headerH,
+                  height: showHeader ? headerH : 10,
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                   backgroundColor: widget.headerBgColor ?? 'transparent',
                 }}
@@ -520,9 +558,10 @@ export function TabListWidgetView({
                         minWidth: col.width > 0 ? col.width : 30,
                         userSelect: 'none',
                         boxSizing: 'border-box',
+                        position: 'relative',
                       }}
                     >
-                      <div
+                      {showHeader && <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -558,7 +597,22 @@ export function TabListWidgetView({
                             <Edit3 size={10} />
                           </button>
                         )}
-                      </div>
+                      </div>}
+                      {isEditMode && isSelected && onPatchWidget && (
+                        <button
+                          type="button"
+                          className="tab-list-column-resize"
+                          aria-label={`調整「${col.name}」欄寬`}
+                          title={`拖拉調整「${col.name}」欄寬；方向鍵微調，Shift 加速`}
+                          onPointerDown={event => beginColumnResize(event, col)}
+                          onKeyDown={event => resizeColumnByKeyboard(event, col)}
+                          style={{
+                            position: 'absolute', right: -5, top: 0, bottom: 0, width: 10, zIndex: 20,
+                            padding: 0, border: 0, borderRight: '1px solid rgba(56,189,248,.85)',
+                            background: 'rgba(56,189,248,.08)', cursor: 'col-resize', touchAction: 'none',
+                          }}
+                        />
+                      )}
                     </th>
                   );
                 })}
@@ -600,24 +654,6 @@ export function TabListWidgetView({
             </tbody>
           </table>
         )}
-        {isEditMode && isSelected && onPatchWidget && renderedColumns.map((column, index) => {
-          const left = renderedColumns.slice(0, index + 1).reduce((sum, item) => sum + Math.max(30, item.width), 0);
-          return (
-            <button
-              key={`resize-${column.id}`}
-              type="button"
-              className="tab-list-column-resize"
-              aria-label={`調整「${column.name}」欄寬`}
-              title={`拖拉調整「${column.name}」欄寬`}
-              onPointerDown={event => beginColumnResize(event, column)}
-              style={{
-                position: 'absolute', left: left - 4, top: 0, bottom: 0, width: 8, zIndex: 20,
-                padding: 0, border: 0, borderRight: '1px solid rgba(56,189,248,.75)',
-                background: 'transparent', cursor: 'col-resize', touchAction: 'none',
-              }}
-            />
-          );
-        })}
       </div>
     </div>
   );
