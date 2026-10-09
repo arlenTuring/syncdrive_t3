@@ -7,9 +7,10 @@ import { OperationShiftModule } from '../operation-shift/operation-shift.module'
 import { TimeTemplateModule } from '../time-template/time-template.module';
 import { OperationMetricsController } from './operation-metrics.controller';
 import { OperationMetricsService } from './operation-metrics.service';
+import { MapModule } from '../map/map.module';
 
 @Module({
-  imports: [OperationShiftModule, TimeTemplateModule, FacilityModule, DispatchModule, RedisModule],
+  imports: [OperationShiftModule, TimeTemplateModule, FacilityModule, DispatchModule, RedisModule, MapModule],
   controllers: [OperationMetricsController],
   providers: [OperationMetricsService, StationEtaService],
 })

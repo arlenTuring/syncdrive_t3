@@ -159,6 +159,24 @@ describe('assignPrioritySlots', () => {
       const round2 = assignPrioritySlots(round1.slots, [...fiveLow(), candidate('X-1', 100)], 6, { arrange: 'keep' });
       expect(round2.slots.map(s => s?.uid ?? null)).toEqual(['M-1', 'M-2', 'M-3', 'M-4', 'M-5', 'X-1']);
     });
+
+    it("arrange='sort' 先依優先權選卡，再用車號自然順序排列", () => {
+      const result = assignPrioritySlots(empty(4), [
+        candidate('PMS10', 100, { sortKey: 'PMS10' }),
+        candidate('PMS2', 50, { sortKey: 'PMS2' }),
+        candidate('PMS1', 10, { sortKey: 'PMS1' }),
+      ], 4, { arrange: 'sort' });
+      expect(result.slots.map(s => s?.uid ?? null)).toEqual(['PMS1', 'PMS2', 'PMS10', null]);
+    });
+  });
+
+  it('同一 merge uid 只選最高優先候選，不生成兩張卡', () => {
+    const result = assignPrioritySlots(empty(2), [
+      candidate('PMS01', 50, { row: { type: 'maintenance' } }),
+      candidate('PMS01', 100, { row: { type: 'mainline' } }),
+    ], 2);
+    expect(result.slots.filter(Boolean)).toHaveLength(1);
+    expect(result.slots[0]?.row).toEqual({ type: 'mainline' });
   });
 
   it('容量大於資料筆數時保留空格（呼叫端另決定 overflowFill 撐滿或留空，這裡本身不硬撐）', () => {

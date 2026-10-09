@@ -60,8 +60,16 @@ export interface AssignPrioritySlotsResult {
 /** 優先程度降冪，再依次排序；都相同回傳 0，交給呼叫端決定穩定次序 */
 function compareByPriority(a: PriorityCandidate, b: PriorityCandidate): number {
   if (a.priority !== b.priority) return b.priority - a.priority;
+  return compareSortKey(a, b);
+}
+
+const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function compareSortKey(a: PriorityCandidate, b: PriorityCandidate): number {
   if (a.sortKey != null && b.sortKey != null && a.sortKey !== b.sortKey) {
-    const asc = a.sortKey < b.sortKey ? -1 : 1;
+    const asc = typeof a.sortKey === 'number' && typeof b.sortKey === 'number'
+      ? a.sortKey - b.sortKey
+      : naturalCollator.compare(String(a.sortKey), String(b.sortKey));
     return a.sortDesc ? -asc : asc;
   }
   return 0;
@@ -71,16 +79,23 @@ export function assignPrioritySlots(
   prevSlots: PrioritySlotCell[],
   candidates: PriorityCandidate[],
   capacity: number,
-  opts: { preemptEqualPriority?: boolean; arrange?: 'priority' | 'keep' } = {},
+  opts: { preemptEqualPriority?: boolean; arrange?: 'priority' | 'sort' | 'keep' } = {},
 ): AssignPrioritySlotsResult {
   const n = Math.max(1, capacity);
   const preemptEqual = opts.preemptEqualPriority ?? false;
   const arrange = opts.arrange ?? 'priority';
 
   // 規則 1：只認 valid 的候選；順便記住原始順序供穩定排序
-  const validCandidates = candidates
+  const validCandidatesWithDuplicates = candidates
     .map((c, i) => ({ c, i }))
     .filter(({ c }) => c.valid);
+  // mergeIdField 會讓不同來源的同一實體共用 uid；先依既有優先規則選一張，再安排位置。
+  const bestByUid = new Map<string, typeof validCandidatesWithDuplicates[number]>();
+  for (const entry of validCandidatesWithDuplicates) {
+    const current = bestByUid.get(entry.c.uid);
+    if (!current || compareByPriority(entry.c, current.c) < 0) bestByUid.set(entry.c.uid, entry);
+  }
+  const validCandidates = [...bestByUid.values()];
   const byUid = new Map(validCandidates.map(({ c }) => [c.uid, c]));
 
   // 規則 2、3：全體候選排序（高優先在前，同優先依 sortKey，再不然依原始順序）
@@ -162,13 +177,15 @@ export function assignPrioritySlots(
   const occupied = next
     .map((cell, idx) => ({ cell, idx }))
     .filter((x): x is { cell: NonNullable<PrioritySlotCell>; idx: number } => x.cell !== null);
-  if (arrange === 'priority') {
+  if (arrange === 'priority' || arrange === 'sort') {
     const prevIndex = new Map<string, number>();
     prevSlots.forEach((cell, i) => { if (cell) prevIndex.set(cell.uid, i); });
     const origOrder = new Map(validCandidates.map(({ c, i }) => [c.uid, i]));
     occupied.sort((x, y) => {
-      const byPriority = compareByPriority(byUid.get(x.cell.uid)!, byUid.get(y.cell.uid)!);
-      if (byPriority !== 0) return byPriority;
+      const byConfiguredOrder = arrange === 'sort'
+        ? compareSortKey(byUid.get(x.cell.uid)!, byUid.get(y.cell.uid)!)
+        : compareByPriority(byUid.get(x.cell.uid)!, byUid.get(y.cell.uid)!);
+      if (byConfiguredOrder !== 0) return byConfiguredOrder;
       const px = prevIndex.get(x.cell.uid) ?? Number.POSITIVE_INFINITY;
       const py = prevIndex.get(y.cell.uid) ?? Number.POSITIVE_INFINITY;
       if (px !== py) return px - py;

@@ -10,6 +10,9 @@ describe('station ETA migration', () => {
     expect(once).toEqual(twice);
     expect(once.map(widget => widget.id)).toEqual(['eta-n2w-station-label', 'eta-n2w']);
     const list = once[1];
+    expect(list.type === 'tab-list' ? list.tabs[0]?.columns.map(column => column.fieldKey) : []).toEqual([
+      'vehicle_name', 'trip_code', 'task_label', 'at', 'event_label', 'station_name',
+    ]);
     expect(list.type).toBe('tab-list');
     if (list.type === 'tab-list') expect(list.tabs[0]?.dataUrl).toContain('arrive=n2w');
   });

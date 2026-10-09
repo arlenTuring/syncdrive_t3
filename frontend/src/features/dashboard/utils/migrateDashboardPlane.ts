@@ -89,6 +89,15 @@ export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[
       showHeader: false,
       tabs: child.tabs.map(tab => tab.dataUrl?.startsWith(STATION_ETA_URL) ? {
         ...tab,
+        columns: tab.columns.some(column => column.fieldKey === 'trip_code')
+          ? tab.columns
+          : tab.columns.flatMap((column, index) => index === 0 ? [
+            column,
+            {
+              id: `${child.id}-trip_code`, name: '班次代號', fieldKey: 'trip_code', width: 64,
+              format: 'text' as const, align: column.align, fontSize: column.fontSize, children: [],
+            },
+          ] : [column]),
         rowKeyField: 'row_key',
         rowCoupling: {
           enabled: true, relationKeyField: 'coupling_key', stableKeyField: 'row_key',

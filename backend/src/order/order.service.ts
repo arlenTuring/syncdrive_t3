@@ -50,6 +50,14 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.FAULTED]: [OrderStatus.PROCESSING, OrderStatus.END],
 };
 
+const CONFIRMED_DWELL_PHASES = new Set(['DWELLING', 'DOCKED', 'AT_STATION']);
+
+function confirmedDwellPatch(vehiclePhase: string, stationId: string | null, reportedAt: number | null | undefined) {
+  return stationId && CONFIRMED_DWELL_PHASES.has(vehiclePhase)
+    ? { last_confirmed_dwell: { station_id: stationId, reported_at: reportedAt ?? Date.now() } }
+    : {};
+}
+
 export type OperationCurrentLeg = {
   target_station_id?: string;
   distance_to_target_m?: number;
@@ -982,6 +990,7 @@ export class OrderService {
       operation_action: operationAction,
       updated_at: payload.timestamp ?? Date.now(),
       ...(reportedAt != null ? { last_operation_report_at: reportedAt } : {}),
+      ...confirmedDwellPatch(vehiclePhase, legTarget, reportedAt),
       ...faultMark,
     };
 
@@ -1301,6 +1310,11 @@ export class OrderService {
       segment_remain_pct: 100,
       updated_at: payload.timestamp ?? Date.now(),
       ...(typeof payload.timestamp === 'number' ? { last_operation_report_at: payload.timestamp } : {}),
+      ...confirmedDwellPatch(
+        String(payload.vehicle_phase ?? '').toUpperCase(),
+        legTarget,
+        typeof payload.timestamp === 'number' ? payload.timestamp : null,
+      ),
       ...this.vehicleFaultMark(
         (order.payload ?? {}) as Record<string, unknown>,
         String(payload.vehicle_phase ?? '').toUpperCase(),
