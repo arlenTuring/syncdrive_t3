@@ -25,6 +25,7 @@ export type PlannedStop = {
   vehicleCode: string;
   stationId: string;
   stationName: string;
+  taskLabel: string;
   /** 這一站在這班站序裡的位置（0 起算） */
   stopIndex: number;
   /** 營運時刻（毫秒）；起站沒有到站、終站沒有出發 */
@@ -46,15 +47,21 @@ export type LiveVehicle = {
   ageSeconds: number;
 };
 
-export type TripState = { status: string; closedReason: string | null };
+export type TripState = { status: string; closedReason: string | null; lastDwellStationId?: string | null };
 
 export type StationEvent = {
   key: string;
+  /** 同一車輛、同一次停靠的穩定識別；到站轉出發時不改變。 */
+  coupling_key: string;
+  row_key: string;
   event: StationEventKind;
   vehicle_code: string;
   trip_code: string;
   station_id: string;
   station_name: string;
+  vehicle_name: string;
+  task_label: string;
+  event_label: '到站' | '出發';
   /** 營運時刻（毫秒） */
   at: number;
   /** live：依車端即時回報推估；plan：每日計畫時刻 */
@@ -63,6 +70,7 @@ export type StationEvent = {
   at_station: boolean;
   planned_at: number | null;
   delay_seconds: number | null;
+  time_state: 'countdown' | 'overdue' | 'due' | 'stale';
 };
 
 export type StationEventGroup = {
@@ -79,8 +87,6 @@ export type StationEventGroup = {
  * 過去的計畫時刻才不會把接下來的到站、出發擠出清單。
  */
 export const PLAN_EXPIRED_AFTER_MS = 30_000;
-/** 到站判定：目標就是這一站、而且距離小於這個值或車端回報停靠中 */
-export const ARRIVED_DISTANCE_M = 5;
 const DWELLING_PHASES = new Set(['DWELLING', 'DOCKED', 'AT_STATION']);
 
 export function mergeStationEvents(args: {
@@ -117,20 +123,96 @@ export function mergeStationEvents(args: {
   const byStation = new Map(groups.map((g) => [g.station_id, g]));
   const now = args.operatingNow;
 
+  const firstAtByTrip = new Map<string, number>();
+  const vehicleByTrip = new Map<string, string>();
+  for (const stop of args.planned) {
+    const at = Math.min(stop.arriveAt ?? Number.POSITIVE_INFINITY, stop.departAt ?? Number.POSITIVE_INFINITY);
+    if (Number.isFinite(at)) firstAtByTrip.set(stop.tripCode, Math.min(firstAtByTrip.get(stop.tripCode) ?? at, at));
+    vehicleByTrip.set(stop.tripCode, stop.vehicleCode);
+  }
+  const latestProgressedAtByVehicle = new Map<string, number>();
+  for (const [tripCode, state] of args.tripStates) {
+    if (!['PROCESSING', 'END', 'FAULTED'].includes(state.status)) continue;
+    const vehicleCode = vehicleByTrip.get(tripCode);
+    const at = firstAtByTrip.get(tripCode);
+    if (!vehicleCode || at == null) continue;
+    latestProgressedAtByVehicle.set(vehicleCode, Math.max(latestProgressedAtByVehicle.get(vehicleCode) ?? at, at));
+  }
+
+  // 只在這個 Table 明確選取的停靠點內，依車輛與計畫順序把「前一班到站 → 下一班出發」配成同一次停靠。
+  const couplingByEvent = new Map<string, string>();
+  const eventId = (stop: PlannedStop, event: StationEventKind) => `${stop.tripCode}|${stop.stationId}|${stop.stopIndex}|${event}`;
+  const byVehicle = new Map<string, Array<{ stop: PlannedStop; event: StationEventKind; at: number }>>();
+  for (const stop of args.planned) {
+    const group = byStation.get(stop.stationId);
+    if (!group) continue;
+    const stops = args.stopsByTrip.get(stop.tripCode) ?? [];
+    const events = byVehicle.get(stop.vehicleCode) ?? [];
+    if (group.wants.has('arrive') && stop.arriveAt != null && stop.stopIndex !== 0) {
+      events.push({ stop, event: 'arrive', at: stop.arriveAt });
+    }
+    if (group.wants.has('depart') && stop.departAt != null && stop.stopIndex !== stops.length - 1) {
+      events.push({ stop, event: 'depart', at: stop.departAt });
+    }
+    byVehicle.set(stop.vehicleCode, events);
+  }
+  for (const [vehicleCode, events] of byVehicle) {
+    let dwellKey: string | null = null;
+    events.sort((a, b) => a.at - b.at || (a.event === 'arrive' ? -1 : 1));
+    for (const item of events) {
+      if (item.event === 'arrive') {
+        dwellKey = `${vehicleCode}|${item.stop.tripCode}|${item.stop.stationId}|${item.stop.stopIndex}`;
+        couplingByEvent.set(eventId(item.stop, item.event), dwellKey);
+      } else {
+        const key = dwellKey ?? `${vehicleCode}|${item.stop.tripCode}|${item.stop.stationId}|${item.stop.stopIndex}`;
+        couplingByEvent.set(eventId(item.stop, item.event), key);
+        dwellKey = null;
+      }
+    }
+  }
+
+  const confirmedDwells = new Set<string>();
+  const completedTerminalDwells = new Set<string>();
+  for (const stop of args.planned) {
+    const live = liveByTrip.get(stop.tripCode);
+    const stops = args.stopsByTrip.get(stop.tripCode) ?? [];
+    const targetIndex = live?.targetStationId ? stops.indexOf(live.targetStationId) : -1;
+    const state = args.tripStates.get(stop.tripCode);
+    const normalTerminalCompletion = state?.status === 'END'
+      && !state.closedReason
+      && stop.stopIndex === stops.length - 1;
+    if (normalTerminalCompletion) {
+      const key = couplingByEvent.get(eventId(stop, 'arrive'));
+      if (key) completedTerminalDwells.add(key);
+    }
+    if (state?.lastDwellStationId === stop.stationId) {
+      const key = couplingByEvent.get(eventId(stop, 'arrive'));
+      if (key) confirmedDwells.add(key);
+    }
+    if (live
+      && targetIndex === stop.stopIndex
+      && DWELLING_PHASES.has(String(live.vehiclePhase ?? '').toUpperCase())
+    ) {
+      const key = couplingByEvent.get(eventId(stop, 'arrive'));
+      if (key) confirmedDwells.add(key);
+    }
+  }
+
   for (const stop of args.planned) {
     const group = byStation.get(stop.stationId);
     if (!group) continue;
     const state = args.tripStates.get(stop.tripCode);
     // 班次已結束（完成、取消、故障結案）：這一站已經不會再有到站或出發
     if (state && (state.status === 'END' || state.status === 'FAULTED')) continue;
+    // 舊待發單若已被同車後續實際任務超越，不能再靠計畫時間補回畫面。
+    if (state?.status === 'PENDING'
+      && (firstAtByTrip.get(stop.tripCode) ?? 0) < (latestProgressedAtByVehicle.get(stop.vehicleCode) ?? 0)) continue;
     const live = liveByTrip.get(stop.tripCode);
     const stops = args.stopsByTrip.get(stop.tripCode) ?? [];
     const targetIndex = live?.targetStationId ? stops.indexOf(live.targetStationId) : -1;
     const atTarget = !!live && targetIndex === stop.stopIndex;
-    const arrived = atTarget && (
-      (live!.distanceM != null && live!.distanceM < ARRIVED_DISTANCE_M)
-      || DWELLING_PHASES.has(String(live!.vehiclePhase ?? '').toUpperCase())
-    );
+    // 距離只是定位估值，不能單獨證明停靠；到站只認車端停靠 phase，跨班終點則認正常 REST 結案。
+    const arrived = atTarget && DWELLING_PHASES.has(String(live!.vehiclePhase ?? '').toUpperCase());
     const liveArriveAt = atTarget && !arrived && live!.etaSeconds != null
       ? live!.observedOp + live!.etaSeconds * 1000
       : null;
@@ -139,18 +221,30 @@ export function mergeStationEvents(args: {
     const staleHere = !live && staleVehicles.has(stop.vehicleCode);
 
     const push = (event: StationEventKind, at: number, kind: 'live' | 'plan', plannedAt: number | null, atStation = false) => {
+      const couplingKey = couplingByEvent.get(eventId(stop, event)) ?? eventId(stop, event);
+      const timeState: StationEvent['time_state'] = staleHere
+        ? 'stale'
+        : at <= now
+          ? (event === 'depart' && atStation ? 'due' : 'overdue')
+          : 'countdown';
       group.events.push({
-        key: `${stop.tripCode}|${stop.stationId}|${stop.stopIndex}|${event}`,
+        key: eventId(stop, event),
+        coupling_key: couplingKey,
+        row_key: couplingKey,
         event,
         vehicle_code: stop.vehicleCode,
         trip_code: stop.tripCode,
         station_id: stop.stationId,
         station_name: stop.stationName,
+        vehicle_name: stop.vehicleCode,
+        task_label: stop.taskLabel,
+        event_label: event === 'arrive' ? '到站' : '出發',
         at,
         kind,
         at_station: atStation,
         planned_at: plannedAt,
         delay_seconds: plannedAt != null ? Math.round((at - plannedAt) / 1000) : null,
+        time_state: timeState,
       });
       if (staleHere && at <= now + 30 * 60_000) group.staleHere.add(stop.vehicleCode);
     };
@@ -163,20 +257,24 @@ export function mergeStationEvents(args: {
      */
     const isOrigin = stop.stopIndex === 0;
     const isTerminal = stops.length > 0 && stop.stopIndex === stops.length - 1;
+    const arrivalCoupling = couplingByEvent.get(eventId(stop, 'arrive'));
+    const departureCoupling = couplingByEvent.get(eventId(stop, 'depart'));
+    const dwellConfirmed = arrived
+      || (!!arrivalCoupling && confirmedDwells.has(arrivalCoupling))
+      || (!!departureCoupling && confirmedDwells.has(departureCoupling))
+      // 前一班正常結案可延續終點停靠證據，但下一班必須真的已建成待發單，不能拿歷史計畫補事件。
+      || (state?.status === 'PENDING' && (
+        (!!arrivalCoupling && completedTerminalDwells.has(arrivalCoupling))
+        || (!!departureCoupling && completedTerminalDwells.has(departureCoupling))
+      ));
 
-    if (group.wants.has('arrive') && stop.arriveAt != null && !isOrigin && !passed && !arrived) {
+    if (group.wants.has('arrive') && stop.arriveAt != null && !isOrigin && !passed && !dwellConfirmed) {
       if (liveArriveAt != null) push('arrive', liveArriveAt, 'live', stop.arriveAt);
       else if (!expired(stop.arriveAt)) push('arrive', stop.arriveAt, 'plan', stop.arriveAt);
     }
 
-    if (group.wants.has('depart') && stop.departAt != null && !isTerminal && !passed) {
-      if (arrived) {
-        push('depart', Math.max(stop.departAt, now), 'live', stop.departAt, true);
-      } else if (liveArriveAt != null) {
-        push('depart', Math.max(stop.departAt, liveArriveAt), 'live', stop.departAt);
-      } else if (!expired(stop.departAt)) {
-        push('depart', stop.departAt, 'plan', stop.departAt);
-      }
+    if (group.wants.has('depart') && stop.departAt != null && !isTerminal && !passed && dwellConfirmed) {
+      push('depart', stop.departAt, 'live', stop.departAt, true);
     }
   }
 

@@ -25,11 +25,17 @@ import {
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 import { OperationShiftService } from './operation-shift.service';
+import { ModuleRef } from '@nestjs/core';
+import { DispatchEngineService } from '../dispatch/dispatch-engine.service';
+import { OperatingClockService } from '../operating-day/operating-clock.service';
 
 @ApiTags('Operation Shifts')
 @Controller('syncdrive-api/operation-shift')
 export class OperationShiftController {
-  constructor(private readonly operationShiftService: OperationShiftService) {}
+  constructor(
+    private readonly operationShiftService: OperationShiftService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   @Get('list')
   @ApiOperation({ summary: '正線班表列表（分頁、篩選）' })
@@ -168,9 +174,29 @@ export class OperationShiftController {
     @Param('id') id: string,
     @Body() body?: { reviewer_name?: string },
   ) {
-    return this.operationShiftService.deployShift(id, {
+    const deployed = await this.operationShiftService.deployShift(id, {
       reviewerName: body?.reviewer_name,
     });
+    // 正式部署也立即保存完整每日計畫；不建立任何執行訂單。
+    const engine = this.moduleRef.get(DispatchEngineService, { strict: false });
+    const clock = this.moduleRef.get(OperatingClockService, { strict: false });
+    const { adoption } = await engine.adoptDailyPlan({
+      shiftId: id,
+      day: clock.operatingDay(),
+      via: 'deploy',
+      by: body?.reviewer_name ?? null,
+    });
+    return {
+      ...deployed,
+      daily_plan: {
+        operating_day: adoption.operating_day,
+        shift_id: adoption.shift_id,
+        shift_version: adoption.shift_version,
+        plan_digest: adoption.plan_digest,
+        tasks: adoption.tasks.length,
+        counts: adoption.counts,
+      },
+    };
   }
 
   @Post('detail/:id/duplicate')

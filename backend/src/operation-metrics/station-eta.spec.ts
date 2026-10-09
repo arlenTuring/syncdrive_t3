@@ -22,27 +22,26 @@ const run = (args: Partial<Parameters<typeof mergeStationEvents>[0]>, events: St
 const brief = (g: ReturnType<typeof run>) => g.events.map((e) => [e.trip_code, e.event, e.kind, (e.at - T) / 1000]);
 
 describe('站點到站／出發清單', () => {
-  it('開往這一站：到站用車端剩餘秒數；出發取計畫出發與即時到站的較晚者', () => {
+  it('開往這一站：只顯示到站，不在確認抵達前預先產生出發列', () => {
     const g = run({ planned: [...trip('TN01', 'PMS01', -1), ...trip('TN02', 'PMS02', 4)], live: [live({ etaSeconds: 150 })] });
     expect(brief(g)).toEqual([
       ['TN01', 'arrive', 'live', 150],
-      ['TN01', 'depart', 'live', 240],
       ['TN02', 'arrive', 'plan', 420],
-      ['TN02', 'depart', 'plan', 540],
     ]);
   });
 
-  it('晚到時出發也跟著晚：即時到站晚於計畫出發，出發＝即時到站', () => {
+  it('即使即時 ETA 已晚於計畫出發，未確認到站仍不冒充出發', () => {
     const g = run({ planned: trip('TN01', 'PMS01', -1), live: [live({ etaSeconds: 300 })] });
-    expect(brief(g)).toEqual([['TN01', 'arrive', 'live', 300], ['TN01', 'depart', 'live', 300]]);
+    expect(brief(g)).toEqual([['TN01', 'arrive', 'live', 300]]);
   });
 
   it('停在站上：到站那一筆移除；出發照計畫，已經過了就是現在並標示停靠中', () => {
-    const g = run({ planned: trip('TN01', 'PMS01', -1), live: [live({ distanceM: 1, etaSeconds: 0 })] });
+    const g = run({ planned: trip('TN01', 'PMS01', -1), live: [live({ distanceM: 1, etaSeconds: 0, vehiclePhase: 'DWELLING' })] });
     expect(brief(g)).toEqual([['TN01', 'depart', 'live', 240]]);
     expect(g.events[0]!.at_station).toBe(true);
     const late = run({ planned: trip('TN01', 'PMS01', -10), live: [live({ vehiclePhase: 'DWELLING' })] });
-    expect(brief(late)).toEqual([['TN01', 'depart', 'live', 0]]);
+    expect(brief(late)).toEqual([['TN01', 'depart', 'live', -300]]);
+    expect(late.events[0]!.time_state).toBe('due');
   });
 
   it('已經開往後面的站：這一站的到站、出發都移除；班次結束、取消也移除', () => {
@@ -55,7 +54,7 @@ describe('站點到站／出發清單', () => {
     const planned = [...trip('TN01', 'PMS01', 1), ...trip('TN02', 'PMS02', 7)];
     expect(run({ planned }, ['arrive']).events.every((e) => e.event === 'arrive')).toBe(true);
     // 起站只有出發、終站只有到站
-    expect(brief(run({ planned }, ['arrive', 'depart'], 't3_u'))).toEqual([['TN01', 'depart', 'plan', 60], ['TN02', 'depart', 'plan', 420]]);
+    expect(brief(run({ planned }, ['arrive', 'depart'], 't3_u'))).toEqual([]);
     expect(brief(run({ planned }, ['arrive', 'depart'], 'n2w_d_start'))).toEqual([['TN01', 'arrive', 'plan', 420], ['TN02', 'arrive', 'plan', 780]]);
   });
 
@@ -63,8 +62,76 @@ describe('站點到站／出發清單', () => {
     // ST 終點 T3上行 有到站 07:10、出發 07:11（計畫照樣記了出發）；TN 起站 T3上行 07:11 出發
     const st: PlannedStop = { tripCode: 'ST01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 1, arriveAt: T + 10 * MIN, departAt: T + 11 * MIN };
     const tn: PlannedStop = { tripCode: 'TN01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 0, arriveAt: T + 10 * MIN, departAt: T + 11 * MIN };
-    const g = run({ planned: [st, tn], stopsByTrip: new Map([['ST01', ['s2w_d_start', 't3_u']], ['TN01', SEQ]]) }, ['arrive', 'depart'], 't3_u');
-    expect(brief(g)).toEqual([['ST01', 'arrive', 'plan', 600], ['TN01', 'depart', 'plan', 660]]);
+    const g = run({
+      planned: [st, tn],
+      stopsByTrip: new Map([['ST01', ['s2w_d_start', 't3_u']], ['TN01', SEQ]]),
+      live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 1, vehiclePhase: 'DWELLING' })],
+    }, ['arrive', 'depart'], 't3_u');
+    expect(brief(g)).toEqual([['TN01', 'depart', 'live', 660]]);
+    expect(g.events[0]!.row_key).toContain('ST01');
+  });
+
+  it('同一次停靠沿用 row key：接近到站 → 確認後轉出發 → 開走後移除', () => {
+    const st: PlannedStop = { tripCode: 'ST01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 1, arriveAt: T + 10 * MIN, departAt: null };
+    const tn: PlannedStop = { tripCode: 'TN01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 0, arriveAt: null, departAt: T + 11 * MIN };
+    const base = {
+      planned: [st, tn],
+      stopsByTrip: new Map([['ST01', ['s2w_d_start', 't3_u']], ['TN01', SEQ]]),
+    };
+    const arriving = run({ ...base, live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 100, etaSeconds: 30 })] }, ['arrive', 'depart'], 't3_u');
+    const departing = run({ ...base, live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 1, etaSeconds: 0, vehiclePhase: 'DWELLING' })] }, ['arrive', 'depart'], 't3_u');
+    const gone = run({
+      ...base,
+      live: [live({ tripCode: 'TN01', targetStationId: 'n2w_d_end', distanceM: 100 })],
+      tripStates: new Map([['ST01', { status: 'END', closedReason: null }]]),
+    }, ['arrive', 'depart'], 't3_u');
+    expect(arriving.events[0]!.event).toBe('arrive');
+    expect(departing.events[0]!.event).toBe('depart');
+    expect(departing.events[0]!.row_key).toBe(arriving.events[0]!.row_key);
+    expect(gone.events).toEqual([]);
+  });
+
+  it('短暫停靠快照被下一則覆蓋後，訂單保存的停靠證據仍讓原列轉成出發', () => {
+    const planned = trip('TN01', 'PMS01', -1);
+    const g = run({
+      planned,
+      tripStates: new Map([['TN01', { status: 'PROCESSING', closedReason: null, lastDwellStationId: 'n2w_d_end' }]]),
+      live: [live({ targetStationId: 'n2w_d_end', distanceM: 30, vehiclePhase: 'TRANSITING' })],
+    });
+    expect(g.events[0]).toMatchObject({ event: 'depart', trip_code: 'TN01', station_id: 'n2w_d_end' });
+  });
+
+  it('前一班正常結案後仍保留同次停靠，下一班原列顯示出發；距離本身不算到站', () => {
+    const st: PlannedStop = { tripCode: 'ST01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 1, arriveAt: T + 10 * MIN, departAt: null };
+    const tn: PlannedStop = { tripCode: 'TN01', vehicleCode: 'PMS01', stationId: 't3_u', stationName: 'T3上行', stopIndex: 0, arriveAt: null, departAt: T + 11 * MIN };
+    const base = { planned: [st, tn], stopsByTrip: new Map([['ST01', ['s2w_d_start', 't3_u']], ['TN01', SEQ]]) };
+    const closeButMoving = run({ ...base, live: [live({ tripCode: 'ST01', targetStationId: 't3_u', distanceM: 1, vehiclePhase: 'TRANSITING' })] }, ['arrive', 'depart'], 't3_u');
+    expect(closeButMoving.events[0]?.event).toBe('arrive');
+
+    const waiting = run({
+      ...base,
+      tripStates: new Map([['ST01', { status: 'END', closedReason: null }], ['TN01', { status: 'PENDING', closedReason: null }]]),
+    }, ['arrive', 'depart'], 't3_u');
+    expect(waiting.events).toHaveLength(1);
+    expect(waiting.events[0]).toMatchObject({ event: 'depart', trip_code: 'TN01', row_key: closeButMoving.events[0]?.row_key });
+
+    const planOnly = run({
+      ...base,
+      tripStates: new Map([['ST01', { status: 'END', closedReason: null }]]),
+    }, ['arrive', 'depart'], 't3_u');
+    expect(planOnly.events).toEqual([]);
+
+    const laterTrip: PlannedStop = { ...st, tripCode: 'ST02', arriveAt: T + 20 * MIN };
+    const superseded = run({
+      planned: [st, tn, laterTrip],
+      stopsByTrip: new Map([...base.stopsByTrip, ['ST02', ['s2w_d_start', 't3_u']]]),
+      tripStates: new Map([
+        ['ST01', { status: 'END', closedReason: null }],
+        ['TN01', { status: 'PENDING', closedReason: null }],
+        ['ST02', { status: 'END', closedReason: null }],
+      ]),
+    }, ['arrive', 'depart'], 't3_u');
+    expect(superseded.events).toEqual([]);
   });
 
   it('同一台車循環再到同一站是另一筆，不當重複刪掉', () => {
@@ -81,8 +148,8 @@ describe('站點到站／出發清單', () => {
 
   it('計畫時刻已過、又沒有即時資料：不列，也不佔前幾筆的名額', () => {
     expect(run({ planned: trip('TN01', 'PMS01', -20) }).events).toEqual([]);
-    // TN01 的到站（07:02）已過、出發（07:04）還沒到：只剩出發，接著是 TN02
+    // TN01 的到站已過且無確認：不生成出發；接著只列後續到站
     const g = run({ planned: [...trip('TN01', 'PMS01', -1), ...trip('TN02', 'PMS02', 4), ...trip('TN03', 'PMS03', 10)], operatingNow: T + 3 * MIN }, ['arrive', 'depart']);
-    expect(brief(g).slice(0, 3)).toEqual([['TN01', 'depart', 'plan', 240], ['TN02', 'arrive', 'plan', 420], ['TN02', 'depart', 'plan', 540]]);
+    expect(brief(g).slice(0, 2)).toEqual([['TN02', 'arrive', 'plan', 420], ['TN03', 'arrive', 'plan', 780]]);
   });
 });

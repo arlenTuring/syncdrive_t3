@@ -117,6 +117,15 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
     expect((await service.updateOrderStatus(onTime.id, 'END')).delayMinutes).toBe(0);
   });
 
+  it('倍速車端回報的營運事件時間不被 HTTP 接收延遲改寫', async () => {
+    const order = { ...makeOrder(OrderStatus.PROCESSING), plannedEnd: '100000' } as OperationOrder;
+    orderRepo.findOne.mockResolvedValue(order);
+    const result = await service.updateOrderStatus(order.id, 'END', { reporter: 'vehicle', operatingAt: 101000 });
+    expect((result.payload as Record<string, unknown>).op_completed_at).toBe(101000);
+    expect((result.payload as Record<string, unknown>).vehicle_progress_at).toHaveProperty('END');
+    expect(result.delayMinutes).toBe(0);
+  });
+
   it('允許 FAULTED → PROCESSING（人工復歸）', async () => {
     orderRepo.findOne.mockResolvedValue(makeOrder(OrderStatus.FAULTED));
     const result = await service.updateOrderStatus(

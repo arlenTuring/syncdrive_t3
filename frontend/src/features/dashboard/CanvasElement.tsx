@@ -731,11 +731,18 @@ export function CanvasElement({
               ? { x: groupOrigin.x + childGroupDrag.delta.x, y: groupOrigin.y + childGroupDrag.delta.y }
               : null;
 
+            const range = element.shiftCenterRange;
+            const renderedChild = range && 'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center')
+              ? {
+                  ...child,
+                  dataUrl: `/syncdrive-api/operation-metrics/shift-center?start=${encodeURIComponent(range.startTime || '00:00')}${range.dateMode === 'fixed' && range.date ? `&date=${encodeURIComponent(range.date)}` : ''}`,
+                }
+              : child;
             return (
             <ChildWidgetRnd
               key={`${child.id}-${childResetKey}`}
               canvasId={element.id}
-              child={child}
+              child={renderedChild}
               peerChildren={element.children
                 .filter(c => c.id !== child.id && !selectedChildIds.includes(c.id))
                 .map(c => ({ id: c.id, x: c.x, y: c.y, width: c.width, height: c.height }))}
@@ -832,6 +839,7 @@ export function CanvasElement({
                 setCurrentChildSize({ width: child.width, height: child.height });
                 setCurrentChildPos({ x: child.x, y: child.y });
               }}
+              onEditSessionStart={onEditSessionStart}
               onResize={(w, h, x, y) => {
                 setCurrentChildSize({ width: w, height: h });
                 setCurrentChildPos({ x, y });
@@ -959,6 +967,7 @@ interface ChildRndProps {
   onResizeStart: () => void;
   onResize: (w: number, h: number, x: number, y: number) => void;
   onResizeEnd: (valid: boolean) => void;
+  onEditSessionStart?: () => void;
   onSnapGuidesChange?: (guides: AlignGuideLine[]) => void;
   onDoubleClick?: () => void;
 }
@@ -1001,6 +1010,7 @@ function ChildWidgetRnd({
   onResizeStart,
   onResize,
   onResizeEnd,
+  onEditSessionStart,
   onSnapGuidesChange,
   onDoubleClick,
 }: ChildRndProps) {
@@ -1151,7 +1161,7 @@ const color =  {
       dragGrid={[1, 1]}
       resizeGrid={[1, 1]}
       disableDragging={!isEditMode || painterActive || disableDrag || modifierHeld}
-      cancel={undefined}
+      cancel=".tab-list-column-resize"
       enableResizing={isEditMode && isSelected && !isRotated ? CHILD_RESIZE_HANDLES : false}
       resizeHandleStyles={isEditMode && isSelected && !isRotated ? childResizeHandleStyle(color) : {}}
       className="child-widget-container"
@@ -1311,13 +1321,14 @@ const color =  {
           }} />
         )}
         <BindingWarningIcon issue={bindingIssue} />
-        <div style={{ width: '100%', height: '100%', pointerEvents: isEditMode ? 'none' : 'auto', userSelect: 'none' }}>
+        <div style={{ width: '100%', height: '100%', pointerEvents: isEditMode && child.type !== 'tab-list' && child.type !== 'shift-list' ? 'none' : 'auto', userSelect: 'none' }}>
           <EditModeProvider value={isEditMode}>
             <WidgetRenderer
               widget={child}
               isSelected={isSelected}
               editorScale={scale}
               onPatchWidget={(patch) => onUpdate(patch)}
+              onEditSessionStart={onEditSessionStart}
             />
           </EditModeProvider>
         </div>

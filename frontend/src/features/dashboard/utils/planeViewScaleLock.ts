@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'syncdrive_dashboard_plane_scale_lock';
+const TOOLBAR_KEY = 'syncdrive_dashboard_zoom_toolbar_collapsed';
 
 export type PlaneScaleLockPref = {
   locked: boolean;
@@ -48,4 +49,16 @@ export function writePlaneScaleLock(planeId: string, pref: PlaneScaleLockPref) {
     };
   }
   writeStore(store);
+}
+
+export function stepPlaneZoom(value: number, direction: 1 | -1): number {
+  return Math.max(0.2, Math.min(5, Math.round((value + direction * 0.05) * 100) / 100));
+}
+
+export function readZoomToolbarCollapsed(): boolean {
+  try { return window.localStorage.getItem(TOOLBAR_KEY) === '1'; } catch { return false; }
+}
+
+export function writeZoomToolbarCollapsed(collapsed: boolean) {
+  try { window.localStorage.setItem(TOOLBAR_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
 }

@@ -897,11 +897,25 @@ export interface TabListColumn {
   align?: 'left' | 'center' | 'right';
   fontSize?: number; // 該欄單元格字體大小 (px，可選覆寫)
   textColor?: string; // 該欄單元格文字顏色 (可選覆寫)
+  format?: 'text' | 'countdown';
   children: ChildWidget[]; // 該欄位單元格的子畫布範本
 }
 
+export interface TabListRowCoupling {
+  enabled: boolean;
+  /** 同一業務事件的關聯鍵（例如同一車輛的同一次停靠） */
+  relationKeyField: string;
+  /** React 列 key 使用的穩定欄位 */
+  stableKeyField: string;
+  statusField: string;
+  /** 由早到晚；同一關聯鍵只顯示目前最晚的狀態。 */
+  statusOrder: string[];
+  /** 每個狀態可把輸出欄位映射到該狀態的來源路徑。 */
+  fieldMappings?: Record<string, Record<string, string>>;
+}
+
 /** Tab 清單單一分頁定義 */
-export interface TabListTab {
+export interface TabListTab extends WidgetDataBinding {
   id: string;
   label: string; // Tab 顯示名稱 (如 "正線班次")
   align?: 'left' | 'center' | 'right'; // 此 Tab 預設整體對齊方式
@@ -909,6 +923,12 @@ export interface TabListTab {
   sqlQuery?: string;
   freshnessPolicy?: FreshnessPolicy;
   refreshInterval?: number;
+  /** REST/JSON 回應中列陣列的路徑（例如 events） */
+  dataRowPath?: string;
+  /** REST 與 MQTT 合併時必填；只合併相同事件識別 */
+  mergeKeyField?: string;
+  rowKeyField?: string;
+  rowCoupling?: TabListRowCoupling;
   columns: TabListColumn[];
 }
 
@@ -931,6 +951,8 @@ export interface TabListWidget extends WidgetBase {
   fontSize?: number; // 內容字級 (px)，預設 13
   textColor?: string; // 內容文字顏色，預設 #e2e8f0
   headerHeight?: number; // 表頭高度 (px)，預設 36
+  /** 舊元件預設顯示；false 時整列與高度都移除。 */
+  showHeader?: boolean;
   headerFontSize?: number; // 表頭字級 (px)，預設 12
   headerBgColor?: string;
   headerTextColor?: string; // 表頭文字顏色，預設 #94a3b8
@@ -943,6 +965,7 @@ export interface TabListWidget extends WidgetBase {
   borderWidth?: number;
   stripeBgColor?: string;
   defaultTab?: string; // 預設選取 Tab ID
+  showTabBar?: boolean;
   dataSourceId?: string;
   mainlineSqlQuery?: string; // 相容既有快捷設定
   maintenanceSqlQuery?: string; // 相容既有快捷設定
@@ -1112,7 +1135,7 @@ export interface GroupSortRule {
   direction: 'asc' | 'desc';
 }
 
-export type GroupArrangeMode = 'priority' | 'keep';
+export type GroupArrangeMode = 'priority' | 'sort' | 'keep';
 
 /** 樣板選擇條件：規則之間為 AND，條件全部符合才選用此樣板。 */
 export interface GroupTemplateCondition {
@@ -1182,6 +1205,7 @@ export interface GenericGroupConfig {
   /**
    * 可見項目選定後怎麼排列：
    * - priority（預設）：優先程度高者在前，同優先依次排序，再相同維持目前位置
+   * - sort：選卡仍依優先程度，選定後只依次排序欄位排列
    * - keep：保留既有位置，只把空格往左補齊
    */
   arrangeMode?: GroupArrangeMode;
@@ -1205,6 +1229,13 @@ export interface CanvasElementProps {
   backgroundImage: string;
   opacity: number;
   children: ChildWidget[];
+  /** 班次中心 24 小時統計窗；跟著 plane 一起存在伺服器 elements JSONB */
+  shiftCenterRange?: {
+    dateMode: 'operating' | 'fixed';
+    date?: string;
+    startTime: string;
+    timezone: string;
+  };
 
   /** 標準畫布 / 圖台容器（內嵌 Map Editor 場域圖） */
   canvasKind?: CanvasKind;

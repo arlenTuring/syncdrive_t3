@@ -3,6 +3,7 @@ import {
   describeSwitch,
   noPlanSummary,
   summarizeDailyPlan,
+  tripsInWindow,
   type DailyPlanAdoption,
   type DailyPlanOrderRow,
 } from './daily-plan';
@@ -11,7 +12,7 @@ const DAY = '2026-10-06';
 const T0 = new Date(2026, 9, 6, 6, 0, 0).getTime();
 const MIN = 60_000;
 
-function plannedItem(tripCode: string, kind: string, startMin: number, durMin = 20) {
+function plannedItem(tripCode: string, kind: 'passenger' | 'movement' | 'maintenance', startMin: number, durMin = 20) {
   return { tripCode, kind, departAt: T0 + startMin * MIN, arriveAt: T0 + (startMin + durMin) * MIN };
 }
 
@@ -50,7 +51,34 @@ describe('每日計畫', () => {
     const adoption = adopt(planned);
     expect(adoption.passenger_trips.map((trip) => trip.code)).toEqual(['NT01', 'TS01', 'ST01', 'NT99']);
     expect(adoption.counts).toMatchObject({ passenger: 4, movement: 1, maintenance: 1 });
+    expect(adoption.tasks.map((task) => task.classification)).toEqual([
+      'movement', 'passenger', 'passenger', 'passenger', 'maintenance', 'passenger',
+    ]);
     expect(adoption.passenger_trips.at(-1)!.start).toBeGreaterThan(T0 + 18 * 60 * MIN);
+  });
+
+  it('未指派且沒有執行訂單的計畫班次仍有穩定識別與正式分類', () => {
+    const adoption = buildAdoption({
+      operatingDay: DAY,
+      shift: { id: 'S1', name: '班表', version: '3', updatedAt: 1 },
+      planDigest: 'v1', loadDigest: null, planned: [],
+      scheduleTrips: [{ trip_code: 'UNASSIGNED-1', task_type: 'passenger', start: T0, end: T0 + 20 * MIN }],
+      skipped: 1, via: 'manual', by: null, now: 1, previous: null,
+    });
+    expect(adoption.passenger_trips[0]).toMatchObject({
+      id: `${DAY}:S1:v1:UNASSIGNED-1`, code: 'UNASSIGNED-1', classification: 'passenger', start: T0,
+    });
+    expect(adoption.tasks[0]).toMatchObject({ code: 'UNASSIGNED-1', vehicle_code: null });
+    expect(summarizeDailyPlan(adoption, [], T0)).toMatchObject({ total_shifts: 1, completed_shifts: 0 });
+  });
+
+  it('24 小時視窗包含起點、不包含終點；05:00 邊界歸下一窗', () => {
+    const adoption = adopt([
+      plannedItem('AT-START', 'passenger', 0),
+      plannedItem('INSIDE', 'passenger', 60),
+      plannedItem('AT-END', 'passenger', 24 * 60),
+    ]);
+    expect(tripsInWindow(adoption, T0, T0 + 24 * 60 * MIN).map(trip => trip.code)).toEqual(['AT-START', 'INSIDE']);
   });
 
   it('同一個計畫班次重發、重試只算一次完成；完成數不超過分母', () => {

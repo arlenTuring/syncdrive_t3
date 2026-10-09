@@ -271,11 +271,13 @@ function serializePlanned(
 function summarizeAdoption(adoption: DailyPlanAdoption): Record<string, unknown> {
   return {
     operating_day: adoption.operating_day,
+    task_snapshot_version: adoption.task_snapshot_version ?? null,
     shift_id: adoption.shift_id,
     shift_name: adoption.shift_name,
     shift_version: adoption.shift_version,
     plan_digest: adoption.plan_digest,
     load_digest: adoption.load_digest,
+    tasks: adoption.tasks.length,
     passenger_trips: adoption.passenger_trips.length,
     counts: adoption.counts,
     adopted_at: adoption.adopted_at,

@@ -487,6 +487,7 @@ export function GenericGroupSettings({
               className={selectCls}
             >
               <option value="priority">優先程度高者在前</option>
+              <option value="sort">選卡後依排序欄位排列</option>
               <option value="keep">保留既有位置</option>
             </select>
           </Section>

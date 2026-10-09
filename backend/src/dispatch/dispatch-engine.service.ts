@@ -33,7 +33,7 @@ import {
   type DailyPlanAdoption,
   type DailyPlanAdoptionVia,
 } from './daily-plan';
-import { operatingDayOf, operatingDayReference } from '../operating-day/operating-day';
+import { operatingDayOf, operatingDayReference, operatingDayStart } from '../operating-day/operating-day';
 
 type ShiftSource = Awaited<ReturnType<OperationShiftService['getShiftTrips']>>;
 
@@ -265,7 +265,15 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       planDigest,
       loadDigest,
       planned: plan.planned,
-      scheduleTrips: source.trips,
+      scheduleTrips: source.trips.map((trip) => {
+        const dayStart = operatingDayStart(day);
+        return {
+          trip_code: trip.trip_code,
+          task_type: trip.task_type,
+          start: dayStart == null ? null : dayStart + trip.card_start_second * 1000,
+          end: dayStart == null ? null : dayStart + trip.card_end_second * 1000,
+        };
+      }),
       skipped: plan.skipped.length,
       via,
       by,
@@ -305,7 +313,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const load = deployed && adoption.shift_id === deployed.shiftId
       ? loadDeployed
       : () => this.operationShiftService.getShiftTrips(adoption.shift_id);
-    return { adoption, adoptVia: null, load };
+    return {
+      adoption,
+      // 舊快照只有載客明細；第一次讀取時用同一份班表原地補齊，不改版本或採用歷史。
+      adoptVia: adoption.task_snapshot_version === 2 ? null : adoption.adopted_via,
+      load,
+    };
   }
 
   /**

@@ -1573,6 +1573,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
     };
   }, []);
   const isMap = el.canvasKind === 'map-platform';
+  const isShiftCenter = el.children.some(child => 'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center'));
+  const shiftRange = el.shiftCenterRange ?? { dateMode: 'operating' as const, startTime: '00:00', timezone: 'Asia/Taipei' };
   const sectionTitle = isMap
     ? t('dashboard.properties.canvas.mapPlatform')
     : el.isGroup
@@ -1627,6 +1629,36 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
       </div>
       <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
       <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
+
+      {isShiftCenter && (
+        <div className="space-y-3 rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
+          <div className="text-[11px] font-semibold text-cyan-300">班次中心統計時間</div>
+          <Field label="統計日期">
+            <select
+              value={shiftRange.dateMode}
+              onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, dateMode: e.target.value as 'operating' | 'fixed' } })}
+              className={selectCls}
+            >
+              <option value="operating">跟隨目前營運日期</option>
+              <option value="fixed">選定日期</option>
+            </select>
+          </Field>
+          {shiftRange.dateMode === 'fixed' && (
+            <Field label="日期">
+              <input type="date" value={shiftRange.date ?? ''} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, date: e.target.value } })} className={inputCls} />
+            </Field>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="起始時間">
+              <input type="time" value={shiftRange.startTime} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, startTime: e.target.value || '00:00' } })} className={inputCls} />
+            </Field>
+            <Field label="結束時間">
+              <input readOnly value={`隔日 ${shiftRange.startTime}`} className={inputCls} />
+            </Field>
+          </div>
+          <p className="text-[10px] text-zinc-400">時區：{shiftRange.timezone}；區間包含起點、不包含終點。</p>
+        </div>
+      )}
 
       {el.label === '事件中心' && !el.isGroup && (
         <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
@@ -2820,6 +2852,11 @@ function TabListSettings({
     <div className="space-y-4 text-xs">
       <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#38bdf8" />
 
+      <label className="flex items-center justify-between gap-2 text-zinc-300">
+        <span>顯示欄位名稱</span>
+        <input type="checkbox" checked={w.showHeader !== false} onChange={e => onUpdate({ showHeader: e.target.checked })} />
+      </label>
+
       {/* Tab 管理 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -2879,15 +2916,53 @@ function TabListSettings({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-zinc-400 text-[10px] block">{t('dashboard.properties.widgets.tabList.tabSql')}</label>
-            <textarea
-              rows={3}
-              value={activeTab.sqlQuery ?? ''}
-              onChange={e => updateTab(activeTab.id, { sqlQuery: e.target.value })}
-              className={`${inputCls} font-mono text-[10px]`}
-              placeholder={t('dashboard.properties.widgets.tabList.tabSqlPlaceholder')}
-            />
+          <WidgetDataBindingSettings w={activeTab} onUpdate={(patch) => updateTab(activeTab.id, patch)} />
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="資料列 JSON 路徑"><input value={activeTab.dataRowPath ?? ''} onChange={e => updateTab(activeTab.id, { dataRowPath: e.target.value })} className={inputCls} placeholder="events" /></Field>
+            <Field label="每列識別路徑"><input value={activeTab.rowKeyField ?? ''} onChange={e => updateTab(activeTab.id, { rowKeyField: e.target.value })} className={inputCls} placeholder="key" /></Field>
+          </div>
+          <Field label="API／MQTT 合併識別路徑">
+            <input value={activeTab.mergeKeyField ?? ''} onChange={e => updateTab(activeTab.id, { mergeKeyField: e.target.value })} className={inputCls} placeholder="event_id（同時使用兩來源時必填）" />
+          </Field>
+          <div className="pt-2 border-t border-zinc-700/50 space-y-2">
+            <label className="flex items-center justify-between gap-2 text-zinc-300">
+              <span>耦合同一業務事件</span>
+              <input
+                type="checkbox"
+                checked={activeTab.rowCoupling?.enabled === true}
+                onChange={e => updateTab(activeTab.id, {
+                  rowCoupling: {
+                    enabled: e.target.checked,
+                    relationKeyField: activeTab.rowCoupling?.relationKeyField ?? 'coupling_key',
+                    stableKeyField: activeTab.rowCoupling?.stableKeyField ?? 'row_key',
+                    statusField: activeTab.rowCoupling?.statusField ?? 'event',
+                    statusOrder: activeTab.rowCoupling?.statusOrder ?? ['arrive', 'depart'],
+                    fieldMappings: activeTab.rowCoupling?.fieldMappings,
+                  },
+                })}
+              />
+            </label>
+            {activeTab.rowCoupling?.enabled && <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="關聯欄位"><input value={activeTab.rowCoupling.relationKeyField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, relationKeyField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="穩定列識別"><input value={activeTab.rowCoupling.stableKeyField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, stableKeyField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="狀態欄位"><input value={activeTab.rowCoupling.statusField} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, statusField: e.target.value } })} className={inputCls} /></Field>
+                <Field label="狀態順序"><input value={activeTab.rowCoupling.statusOrder.join(',')} onChange={e => updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, statusOrder: e.target.value.split(',').map(v => v.trim()).filter(Boolean) } })} className={inputCls} /></Field>
+              </div>
+              <Field label="各狀態欄位映射（JSON）">
+                <textarea
+                  key={JSON.stringify(activeTab.rowCoupling.fieldMappings ?? {})}
+                  defaultValue={JSON.stringify(activeTab.rowCoupling.fieldMappings ?? {}, null, 2)}
+                  onBlur={e => {
+                    try {
+                      const value = JSON.parse(e.target.value || '{}') as Record<string, Record<string, string>>;
+                      updateTab(activeTab.id, { rowCoupling: { ...activeTab.rowCoupling!, fieldMappings: value } });
+                    } catch { e.target.value = JSON.stringify(activeTab.rowCoupling?.fieldMappings ?? {}, null, 2); }
+                  }}
+                  className={`${inputCls} min-h-20 font-mono`}
+                />
+              </Field>
+            </>}
           </div>
 
           {/* 欄位清單 */}
@@ -2942,20 +3017,16 @@ function TabListSettings({
                     <label className="text-zinc-400 text-[10px]">
                       {t('dashboard.properties.widgets.tabList.bindAlias')}
                     </label>
-                    <select
+                    <input
+                      list={`tab-list-fields-${activeTab.id}`}
                       value={effectiveFieldKey}
                       onChange={e => updateColumn(col.id, { fieldKey: e.target.value })}
-                      className={`${selectCls} w-full text-xs py-1.5 font-mono`}
-                    >
-                      <option value="">{t('dashboard.properties.widgets.tabList.selectAlias')}</option>
-                      {detectedSqlFields.map(f => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                      {effectiveFieldKey && !detectedSqlFields.includes(effectiveFieldKey) && (
-                        <option value={effectiveFieldKey}>{t('dashboard.properties.widgets.tabList.customAlias', { key: effectiveFieldKey })}</option>
-                      )}
+                      className={`${inputCls} w-full text-xs py-1.5 font-mono`}
+                      placeholder="欄位或 JSON 路徑"
+                    />
+                    <datalist id={`tab-list-fields-${activeTab.id}`}>{detectedSqlFields.map(f => <option key={f} value={f} />)}</datalist>
+                    <select value={col.format ?? 'text'} onChange={e => updateColumn(col.id, { format: e.target.value as 'text' | 'countdown' })} className={`${selectCls} mt-1`}>
+                      <option value="text">文字</option><option value="countdown">時間欄位轉倒數</option>
                     </select>
                   </div>
 

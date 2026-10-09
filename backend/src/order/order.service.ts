@@ -50,6 +50,14 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.FAULTED]: [OrderStatus.PROCESSING, OrderStatus.END],
 };
 
+const CONFIRMED_DWELL_PHASES = new Set(['DWELLING', 'DOCKED', 'AT_STATION']);
+
+function confirmedDwellPatch(vehiclePhase: string, stationId: string | null, reportedAt: number | null | undefined) {
+  return stationId && CONFIRMED_DWELL_PHASES.has(vehiclePhase)
+    ? { last_confirmed_dwell: { station_id: stationId, reported_at: reportedAt ?? Date.now() } }
+    : {};
+}
+
 export type OperationCurrentLeg = {
   target_station_id?: string;
   distance_to_target_m?: number;
@@ -633,7 +641,7 @@ export class OrderService {
   async updateOrderStatus(
     id: string,
     statusStr: string,
-    options?: { reporter?: 'vehicle' },
+    options?: { reporter?: 'vehicle'; operatingAt?: number },
   ): Promise<OperationOrder> {
     if (!this.nonEmpty(id)) return this.updateOrderStatusLocked(id, statusStr, options);
     return this.withOrderLock(id, () => this.updateOrderStatusLocked(id, statusStr, options));
@@ -642,7 +650,7 @@ export class OrderService {
   private async updateOrderStatusLocked(
     id: string,
     statusStr: string,
-    options?: { reporter?: 'vehicle' },
+    options?: { reporter?: 'vehicle'; operatingAt?: number },
   ): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
     const normalizedStatus = this.nonEmpty(statusStr);
@@ -689,6 +697,9 @@ export class OrderService {
     }
 
     const now = Date.now();
+    if (options?.operatingAt != null && (!Number.isSafeInteger(options.operatingAt) || options.operatingAt < 0)) {
+      throw new BadRequestException({ statusCode: 400, code: 'INVALID_OPERATING_AT', message: 'operating_at 必須為非負 Epoch 毫秒整數' });
+    }
     order.status = targetStatus;
     if (options?.reporter === 'vehicle') {
       // 車端 REST 回報的證據（中心端收到的時間）；追蹤統計的「開始／結案」只認這個
@@ -699,7 +710,9 @@ export class OrderService {
       };
     }
     // 營運時刻（operating-day.ts）：計畫時刻、延誤、班次中心都在營運時間上比；實際時刻另外保留
-    const operatingNow = this.toOperating(now);
+    // 車端已在共用營運時鐘上知道事件發生時刻時，以該時刻計算準點；HTTP 接收時間仍保留在
+    // vehicle_progress_at／completedAt，避免倍速把網路與事件迴圈延遲放大成營運延誤。
+    const operatingNow = options?.operatingAt ?? this.toOperating(now);
     if (targetStatus === OrderStatus.END || targetStatus === OrderStatus.FAULTED) {
       order.completedAt = String(now);
       order.payload = { ...((order.payload ?? {}) as Record<string, unknown>), op_completed_at: operatingNow };
@@ -977,6 +990,7 @@ export class OrderService {
       operation_action: operationAction,
       updated_at: payload.timestamp ?? Date.now(),
       ...(reportedAt != null ? { last_operation_report_at: reportedAt } : {}),
+      ...confirmedDwellPatch(vehiclePhase, legTarget, reportedAt),
       ...faultMark,
     };
 
@@ -1296,6 +1310,11 @@ export class OrderService {
       segment_remain_pct: 100,
       updated_at: payload.timestamp ?? Date.now(),
       ...(typeof payload.timestamp === 'number' ? { last_operation_report_at: payload.timestamp } : {}),
+      ...confirmedDwellPatch(
+        String(payload.vehicle_phase ?? '').toUpperCase(),
+        legTarget,
+        typeof payload.timestamp === 'number' ? payload.timestamp : null,
+      ),
       ...this.vehicleFaultMark(
         (order.payload ?? {}) as Record<string, unknown>,
         String(payload.vehicle_phase ?? '').toUpperCase(),

@@ -8,8 +8,10 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TabListWidget, TabListColumn, ChildWidget } from '../types';
+import type { TabListWidget, TabListColumn, ChildWidget, TabListRowCoupling } from '../types';
 import { useWidgetData } from './useWidgetData';
+import { useMqttData } from './useMqttData';
+import { useOperatingClock } from '../utils/operatingClock';
 import { useIsEditMode } from '../utils/widgetEditPreview';
 import { VariableProvider } from '../VariableContext';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -19,6 +21,72 @@ const TAB_LIST_FONT_WIDGET_TYPES = new Set(['text', 'status-badge', 'alert-banne
 
 function isTabListFontWidget(child: ChildWidget): boolean {
   return TAB_LIST_FONT_WIDGET_TYPES.has(child.type);
+}
+
+export function readTabListPath(value: unknown, path?: string): unknown {
+  if (!path) return value;
+  return path.split('.').filter(Boolean).reduce<unknown>((current, key) =>
+    current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined, value);
+}
+
+export function mergeTabListRows(
+  queryData: Record<string, unknown>[],
+  dataRowPath?: string,
+  mqttData?: Record<string, unknown> | null,
+  mergeKeyField?: string,
+): Record<string, unknown>[] {
+  const root = dataRowPath ? readTabListPath(queryData[0], dataRowPath) : queryData;
+  const rows = (Array.isArray(root) ? root : root && typeof root === 'object' ? [root] : []) as Record<string, unknown>[];
+  if (!mqttData) return rows;
+  if (!mergeKeyField) return rows.length ? rows : [mqttData];
+  const mqttKey = readTabListPath(mqttData, mergeKeyField);
+  return rows.map(row => readTabListPath(row, mergeKeyField) === mqttKey ? { ...row, ...mqttData } : row);
+}
+
+export function coupleTabListRows(rows: Record<string, unknown>[], config?: TabListRowCoupling): Record<string, unknown>[] {
+  if (!config?.enabled || !config.relationKeyField || !config.statusField) return rows;
+  const grouped = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const relation = readTabListPath(row, config.relationKeyField);
+    if (relation == null || relation === '') continue;
+    const key = String(relation);
+    // 順位不能證明事件已發生；來源須只回目前狀態，重複時保留來源排序的第一筆。
+    if (!grouped.has(key)) grouped.set(key, row);
+  }
+  return [...grouped].map(([relation, row]) => {
+    const status = String(readTabListPath(row, config.statusField) ?? '');
+    const mapped: Record<string, unknown> = {
+      ...row,
+      __row_key: readTabListPath(row, config.stableKeyField) ?? relation,
+    };
+    for (const [target, source] of Object.entries(config.fieldMappings?.[status] ?? {})) {
+      mapped[target] = readTabListPath(row, source);
+    }
+    return mapped;
+  });
+}
+
+export function formatTabListCountdown(value: unknown, now: number, state?: unknown): string {
+  if (value == null || value === '') return '—';
+  const target = Number(value);
+  if (!Number.isFinite(target)) return '—';
+  const seconds = Math.ceil((target - now) / 1000);
+  if (seconds <= 0) {
+    if (state === 'due') return '待發';
+    if (state === 'stale') return '資料過期';
+    if (state === 'overdue') return '延誤';
+    return '待確認';
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return hours > 0
+    ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+export function resizeTabListColumn(startWidth: number, screenDelta: number, editorScale: number): number {
+  return Math.max(30, Math.round(startWidth + screenDelta / Math.max(0.01, editorScale)));
 }
 
 /** 將內容字級寫入表格本身，以及所有 Tab、所有欄位的文字／徽章元件 */
@@ -52,6 +120,7 @@ function TabListCell({
   textColor,
   tabAlign,
   globalAlign,
+  operatingNow,
 }: {
   column: TabListColumn;
   row: Record<string, unknown>;
@@ -60,6 +129,7 @@ function TabListCell({
   textColor?: string;
   tabAlign?: 'left' | 'center' | 'right';
   globalAlign?: 'left' | 'center' | 'right';
+  operatingNow: number;
 }) {
   const children = column.children ?? [];
   const colW = column.width > 0 ? column.width : '100%';
@@ -79,13 +149,17 @@ function TabListCell({
     column.name?.includes('操作') || column.name?.includes('詳情') ? 'shift_key' : ''
   );
 
+  const rawValue = fieldKey ? readTabListPath(row, fieldKey) : undefined;
+  const displayValue = column.format === 'countdown'
+    ? formatTabListCountdown(rawValue, operatingNow, readTabListPath(row, 'time_state'))
+    : rawValue;
   const cellVariables = {
     ...row,
     ...(fieldKey ? {
-      value: row[fieldKey],
-      field: row[fieldKey],
-      cell_value: row[fieldKey],
-      [fieldKey]: row[fieldKey],
+      value: displayValue,
+      field: displayValue,
+      cell_value: displayValue,
+      [fieldKey]: displayValue,
     } : {}),
   };
 
@@ -95,6 +169,7 @@ function TabListCell({
         padding: '2px 8px',
         height: rowHeight,
         width: colW,
+        minWidth: colW,
         maxWidth: colW,
         boxSizing: 'border-box',
         verticalAlign: 'middle',
@@ -116,7 +191,7 @@ function TabListCell({
         >
           {children.length === 0 ? (
             <span style={{ fontSize: cellFs, color: cellColor, fontWeight: 500, textAlign: align, width: '100%' }}>
-              {fieldKey && row[fieldKey] !== undefined ? String(row[fieldKey]) : '—'}
+              {displayValue !== undefined && displayValue !== null ? String(displayValue) : '—'}
             </span>
           ) : (
             children.map((child: ChildWidget) => {
@@ -161,12 +236,27 @@ function TabListCell({
 export function TabListWidgetView({
   widget,
   onEnterEditColumn,
+  isSelected,
+  editorScale = 1,
+  onPatchWidget,
+  onEditSessionStart,
 }: {
   widget: TabListWidget;
   onEnterEditColumn?: (tabId: string, columnId: string) => void;
+  isSelected?: boolean;
+  editorScale?: number;
+  onPatchWidget?: (patch: Partial<TabListWidget>) => void;
+  onEditSessionStart?: () => void;
 }) {
   const { t } = useTranslation();
   const isEditMode = useIsEditMode();
+  const clock = useOperatingClock();
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(value => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const operatingNow = clock.operatingNow() + clockTick * 0;
   const tabs = widget.tabs ?? [];
   const defaultTabId = widget.activeTabId ?? widget.defaultTab ?? tabs[0]?.id ?? 'tab-mainline';
   const [currentTabId, setCurrentTabId] = useState<string>(defaultTabId);
@@ -193,9 +283,12 @@ export function TabListWidgetView({
   const queryState = useWidgetData({
     dataSourceId: ds,
     sqlQuery: sql,
-    refreshMode: 'event',
+    dataUrl: activeTab?.dataUrl,
+    freshnessPolicy: activeTab?.freshnessPolicy,
+    refreshMode: activeTab?.refreshMode ?? 'event',
     refreshInterval: activeTab?.refreshInterval,
   });
+  const mqttState = useMqttData(activeTab ?? {});
 
   // 目前班表標題輔助查詢
   const scheduleState = useWidgetData({
@@ -211,10 +304,10 @@ export function TabListWidgetView({
   }, [scheduleState.data]);
 
   // 列資料只來自 SQL；編輯模式也不放示範列——沒資料就讓人看到沒資料
-  const rows = useMemo(
-    () => (queryState.data ?? []) as Record<string, unknown>[],
-    [queryState.data],
-  );
+  const rows = useMemo(() => coupleTabListRows(
+    mergeTabListRows(queryState.data, activeTab?.dataRowPath, mqttState.data, activeTab?.mergeKeyField),
+    activeTab?.rowCoupling,
+  ), [queryState.data, mqttState.data, activeTab?.dataRowPath, activeTab?.mergeKeyField, activeTab?.rowCoupling]);
 
   const fs = widget.fontSize ?? 13;
   const bodyTextColor = widget.textColor ?? '#cbd5e1';
@@ -227,6 +320,81 @@ export function TabListWidgetView({
   const rowH = widget.rowHeight ?? 48;
   const headerH = widget.headerHeight ?? 38;
   const columns = activeTab?.columns ?? [];
+  const [draftWidths, setDraftWidths] = useState<Record<string, number>>({});
+  const renderedColumns = columns.map(column => ({ ...column, width: draftWidths[column.id] ?? column.width }));
+  const tableWidth = renderedColumns.reduce((sum, column) => sum + Math.max(30, column.width), 0);
+  const showHeader = widget.showHeader !== false;
+
+  const beginColumnResize = (event: React.PointerEvent, column: TabListColumn) => {
+    if (!activeTab || !onPatchWidget) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    onEditSessionStart?.();
+    const startX = event.clientX;
+    const startWidth = draftWidths[column.id] ?? column.width;
+    let nextWidth = startWidth;
+    const handle = event.currentTarget as HTMLButtonElement;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+    const move = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+      nextWidth = resizeTabListColumn(startWidth, moveEvent.clientX - startX, editorScale);
+      setDraftWidths(current => ({ ...current, [column.id]: nextWidth }));
+    };
+    const clearDraft = () => setDraftWidths(current => {
+      const next = { ...current };
+      delete next[column.id];
+      return next;
+    });
+    const cleanup = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', commit);
+      handle.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', keydown, true);
+      document.body.style.userSelect = previousUserSelect;
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    };
+    const commit = (upEvent: PointerEvent) => {
+      upEvent.preventDefault();
+      upEvent.stopPropagation();
+      cleanup();
+      onPatchWidget({
+        tabs: tabs.map(tab => tab.id === activeTab.id
+          ? { ...tab, columns: tab.columns.map(item => item.id === column.id ? { ...item, width: nextWidth } : item) }
+          : tab),
+      });
+      clearDraft();
+    };
+    const cancel = (cancelEvent?: Event) => {
+      cancelEvent?.preventDefault();
+      cancelEvent?.stopPropagation();
+      cleanup();
+      clearDraft();
+    };
+    const keydown = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === 'Escape') cancel(keyEvent);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', commit);
+    handle.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', keydown, true);
+  };
+
+  const resizeColumnByKeyboard = (event: React.KeyboardEvent, column: TabListColumn) => {
+    if (!activeTab || !onPatchWidget || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onEditSessionStart?.();
+    const delta = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowRight' ? 1 : -1);
+    const width = Math.max(30, column.width + delta);
+    onPatchWidget({
+      tabs: tabs.map(tab => tab.id === activeTab.id
+        ? { ...tab, columns: tab.columns.map(item => item.id === column.id ? { ...item, width } : item) }
+        : tab),
+    });
+  };
 
   return (
     <div
@@ -245,7 +413,7 @@ export function TabListWidgetView({
       }}
     >
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
-      <div
+      {widget.showTabBar !== false && <div
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -322,11 +490,13 @@ export function TabListWidgetView({
             </span>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── 表格區塊 ────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {queryState.loading && rows.length === 0 ? (
+      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        {queryState.error ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#f87171', fontSize: fs }}>查詢失敗：{queryState.error}</div>
+        ) : queryState.loading && rows.length === 0 ? (
           <div
             style={{
               display: 'flex',
@@ -355,21 +525,24 @@ export function TabListWidgetView({
         ) : (
           <table
             style={{
-              width: '100%',
+              width: tableWidth,
               borderCollapse: 'collapse',
               tableLayout: 'fixed',
             }}
           >
+            <colgroup>
+              {renderedColumns.map(column => <col key={column.id} style={{ width: Math.max(30, column.width) }} />)}
+            </colgroup>
             {/* 表頭 */}
-            <thead>
+            {(showHeader || (isEditMode && isSelected && onPatchWidget)) && <thead>
               <tr
                 style={{
-                  height: headerH,
+                  height: showHeader ? headerH : 10,
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
                   backgroundColor: widget.headerBgColor ?? 'transparent',
                 }}
               >
-                {columns.map((col) => {
+                {renderedColumns.map((col) => {
                   const effectiveAlign = col.align ?? activeTab?.align ?? globalAlign;
                   return (
                     <th
@@ -382,11 +555,13 @@ export function TabListWidgetView({
                         fontWeight: 500,
                         whiteSpace: 'nowrap',
                         width: col.width > 0 ? col.width : 'auto',
+                        minWidth: col.width > 0 ? col.width : 30,
                         userSelect: 'none',
                         boxSizing: 'border-box',
+                        position: 'relative',
                       }}
                     >
-                      <div
+                      {showHeader && <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -422,12 +597,27 @@ export function TabListWidgetView({
                             <Edit3 size={10} />
                           </button>
                         )}
-                      </div>
+                      </div>}
+                      {isEditMode && isSelected && onPatchWidget && (
+                        <button
+                          type="button"
+                          className="tab-list-column-resize"
+                          aria-label={`調整「${col.name}」欄寬`}
+                          title={`拖拉調整「${col.name}」欄寬；方向鍵微調，Shift 加速`}
+                          onPointerDown={event => beginColumnResize(event, col)}
+                          onKeyDown={event => resizeColumnByKeyboard(event, col)}
+                          style={{
+                            position: 'absolute', right: -5, top: 0, bottom: 0, width: 10, zIndex: 20,
+                            padding: 0, border: 0, borderRight: '1px solid rgba(56,189,248,.85)',
+                            background: 'rgba(56,189,248,.08)', cursor: 'col-resize', touchAction: 'none',
+                          }}
+                        />
+                      )}
                     </th>
                   );
                 })}
               </tr>
-            </thead>
+            </thead>}
             {/* 表身 (資料重複列) */}
             <tbody>
               {isEditMode && rows.length === 0 && (
@@ -439,14 +629,14 @@ export function TabListWidgetView({
               )}
               {rows.map((row, i) => (
                 <tr
-                  key={String(row.shift_key ?? row.id ?? `row-${i}`)}
+                  key={String(row.__row_key ?? readTabListPath(row, activeTab?.rowKeyField) ?? row.shift_key ?? row.id ?? `row-${i}`)}
                   style={{
                     height: rowH,
                     backgroundColor: i % 2 === 1 ? (widget.stripeBgColor ?? 'rgba(255,255,255,0.02)') : 'transparent',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                   }}
                 >
-                  {columns.map((col) => (
+                  {renderedColumns.map((col) => (
                     <TabListCell
                       key={col.id}
                       column={col}
@@ -456,6 +646,7 @@ export function TabListWidgetView({
                       textColor={bodyTextColor}
                       tabAlign={activeTab?.align}
                       globalAlign={globalAlign}
+                      operatingNow={operatingNow}
                     />
                   ))}
                 </tr>

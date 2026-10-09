@@ -1,4 +1,4 @@
-import type { ChildWidget, AlertBannerWidget, VehicleAlertBannerWidget, VehicleContainerWidget } from '../types';
+import type { ChildWidget, AlertBannerWidget, VehicleAlertBannerWidget, VehicleContainerWidget, TabListWidget } from '../types';
 import { TextWidgetView }        from './TextWidget';
 import { ImageWidgetView }       from './ImageWidget';
 import { LineChartWidgetView }   from './LineChartWidget';
@@ -27,11 +27,13 @@ export function WidgetRenderer({
   isSelected,
   editorScale,
   onPatchWidget,
+  onEditSessionStart,
 }: {
   widget: ChildWidget;
   isSelected?: boolean;
   editorScale?: number;
   onPatchWidget?: (patch: Partial<ChildWidget>) => void;
+  onEditSessionStart?: () => void;
 }) {
   switch (widget.type) {
     case 'text':           return <TextWidgetView widget={widget} />;
@@ -54,8 +56,8 @@ export function WidgetRenderer({
     case 'map-canvas':     return <MapCanvasWidgetView widget={widget} />;
     case 'unit-telemetry-card': return <UnitTelemetryCardWidgetView widget={widget} />;
     case 'alert-banner': return <AlertBannerWidgetView widget={widget} />;
-    case 'tab-list':       return <TabListWidgetView widget={widget} />;
-    case 'shift-list':     return widget.tabs && widget.tabs.length > 0 ? <TabListWidgetView widget={widget} /> : <ShiftListWidgetView widget={widget} />;
+    case 'tab-list':       return <TabListWidgetView widget={widget} isSelected={isSelected} editorScale={editorScale} onPatchWidget={onPatchWidget as (patch: Partial<TabListWidget>) => void} onEditSessionStart={onEditSessionStart} />;
+    case 'shift-list':     return widget.tabs && widget.tabs.length > 0 ? <TabListWidgetView widget={widget} isSelected={isSelected} editorScale={editorScale} onPatchWidget={onPatchWidget as (patch: Partial<TabListWidget>) => void} onEditSessionStart={onEditSessionStart} /> : <ShiftListWidgetView widget={widget} />;
     case 'vehicle-container':
       return (
         <VehicleContainerWidgetView
@@ -104,5 +106,3 @@ export function WidgetRenderer({
     }
   }
 }
-
-

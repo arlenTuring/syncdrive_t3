@@ -15,8 +15,11 @@ export class OperationMetricsController {
 
   /** 班次中心：目前營運日採用的每日計畫——總共／完成／延誤班次、達成率、剩餘班次、未達成原因 */
   @Get('shift-center')
-  async getShiftCenter() {
-    return this.operationMetricsService.getShiftCenter();
+  async getShiftCenter(
+    @Query('date') date?: string,
+    @Query('start') start?: string,
+  ) {
+    return this.operationMetricsService.getShiftCenter({ date, start });
   }
 
   /** 運能趨勢上方數值：即時／目標／可用／下段 */
