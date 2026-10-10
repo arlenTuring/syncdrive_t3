@@ -3197,10 +3197,8 @@ const enUS: DeepStringify<typeof zhTW> = {
           zoomOut: 'Zoom out',
         },
         vehicleContainer: {
-          editHint: 'While editing, only this template shows on the map (yellow frame). At runtime the platform clones it per MQTT vehicle.',
           showLabel: 'Display label',
           labelPlaceholder: 'Vehicle',
-          editStyle: 'Edit vehicle style',
           actions: 'Behavior actions',
           offsetX: 'Offset X',
           offsetY: 'Offset Y',

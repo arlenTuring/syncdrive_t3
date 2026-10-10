@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import i18n from '../../i18n'
 import { MapEditorToolbar } from './components/MapEditorToolbar'
 import { MapLibraryPage } from './components/MapLibraryPage'
+import { VehicleModelManagement } from '../vehicle-editor/management/VehicleModelManagement'
 import { Inspector } from './components/Inspector'
 import { TrajectoryPanel } from './components/TrajectoryPanel'
 import { LeaveEditConfirmDialog } from './components/LeaveEditConfirmDialog'
@@ -272,6 +273,8 @@ type LoadedMapMeta = EditSessionSnapshot['loadedMapMeta']
 type MapEditorScreen = 'library' | 'editor'
 
 export type MapEditorAppProps = {
+  /** 從儀表板「前往圖資管理編輯」：打開車輛模型（nonce 每次不同） */
+  vehicleModelsRequest?: { definitionKey?: string | null; mapId?: string | null; nonce: number } | null
   workspace?: 'map' | 'trajectory'
   onBackToHome?: () => void
 }
@@ -329,6 +332,7 @@ const NO_LIVE_ENTRIES: Record<string, MqttLiveEntry> = {}
 
 export default function MapEditorApp({
   workspace = 'map',
+  vehicleModelsRequest = null,
   onBackToHome,
 }: MapEditorAppProps) {
   const { t } = useTranslation()
@@ -395,6 +399,17 @@ export default function MapEditorApp({
   const [primaryMapCheck, setPrimaryMapCheck] = useState<{ libraryId: string; primary: boolean } | null>(null)
   const [primaryDialogEntry, setPrimaryDialogEntry] = useState<MapLibraryEntry | null>(null)
   const [mapScreen, setMapScreen] = useState<MapEditorScreen>('library')
+  /** 圖資管理首頁的分頁：地圖清單或車輛模型 */
+  const [libraryTab, setLibraryTab] = useState<'maps' | 'vehicles'>(
+    vehicleModelsRequest ? 'vehicles' : 'maps',
+  )
+  const handledVehicleRequest = useRef<number | null>(null)
+  useEffect(() => {
+    if (!vehicleModelsRequest || handledVehicleRequest.current === vehicleModelsRequest.nonce) return
+    handledVehicleRequest.current = vehicleModelsRequest.nonce
+    setLibraryTab('vehicles')
+    setMapScreen('library')
+  }, [vehicleModelsRequest])
   const [mapExtentMeters] = useState<MapExtentMeters>(defaultMapExtentMeters)
   const [loadedMapMeta, setLoadedMapMeta] = useState<LoadedMapMeta>({
     libraryId: '',
@@ -4140,7 +4155,38 @@ export default function MapEditorApp({
       }`}
     >
       {isMapWorkspace && mapScreen === 'library' && (
-        <MapLibraryPage onOpenMap={openLibraryMap} onBackToHome={onBackToHome} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 gap-1 border-b border-zinc-800 bg-zinc-950 px-4 pt-2" role="tablist" aria-label="圖資管理">
+            {(
+              [
+                ['maps', '地圖'],
+                ['vehicles', '車輛模型'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={libraryTab === value}
+                onClick={() => setLibraryTab(value)}
+                className={`rounded-t-md border border-b-0 px-4 py-2 text-sm font-medium ${
+                  libraryTab === value
+                    ? 'border-zinc-600 bg-zinc-900 text-cyan-200'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1">
+            {libraryTab === 'maps' ? (
+              <MapLibraryPage onOpenMap={openLibraryMap} onBackToHome={onBackToHome} />
+            ) : (
+              <VehicleModelManagement key={vehicleModelsRequest?.nonce ?? 0} focus={vehicleModelsRequest} />
+            )}
+          </div>
+        </div>
       )}
       {isMapWorkspace && mapScreen === 'editor' && backendSyncFailed && (
         <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-xs text-amber-300">

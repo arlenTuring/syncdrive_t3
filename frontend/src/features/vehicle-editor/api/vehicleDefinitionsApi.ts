@@ -17,7 +17,7 @@ import type { VehicleDefinition } from '../types';
  */
 
 /** 後端回傳的一列 */
-type VehicleDefinitionRow = {
+export type VehicleDefinitionRow = {
   definitionKey: string;
   name: string;
   vehicleModel?: string | null;
@@ -26,6 +26,7 @@ type VehicleDefinitionRow = {
   backgroundColor?: string | null;
   elements?: unknown;
   previewData?: unknown;
+  rearAxleFromTailRatio?: number | null;
   version?: number | null;
   createdAt?: number | null;
   updatedAt?: number | null;
@@ -43,7 +44,7 @@ const ENDPOINT = 'syncdrive-api/vehicle-definitions';
  * <code>definitionKey</code> 就是前端原本的 <code>id</code>：圖台元件綁的是這個值，
  * 換到資料庫之後那些綁定必須繼續有效，所以它是對外身分，資料庫的 uuid 只是內部主鍵。
  */
-function toDefinition(row: VehicleDefinitionRow): VehicleDefinition {
+export function vehicleDefinitionFromRow(row: VehicleDefinitionRow): VehicleDefinition {
   return {
     id: row.definitionKey,
     name: row.name,
@@ -52,8 +53,12 @@ function toDefinition(row: VehicleDefinitionRow): VehicleDefinition {
     backgroundColor: row.backgroundColor ?? 'transparent',
     elements: Array.isArray(row.elements) ? (row.elements as VehicleDefinition['elements']) : [],
     previewData: (row.previewData as VehicleDefinition['previewData']) ?? undefined,
-    createdAt: row.createdAt ?? Date.now(),
-    updatedAt: row.updatedAt ?? Date.now(),
+    ...(typeof row.rearAxleFromTailRatio === 'number'
+      ? { rearAxleFromTailRatio: row.rearAxleFromTailRatio }
+      : {}),
+    createdAt: Number(row.createdAt) || Date.now(),
+    updatedAt: Number(row.updatedAt) || Date.now(),
+    ...(typeof row.version === 'number' ? { serverVersion: row.version } : {}),
   };
 }
 
@@ -66,7 +71,59 @@ function toRow(definition: VehicleDefinition): VehicleDefinitionRow {
     backgroundColor: definition.backgroundColor ?? null,
     elements: definition.elements ?? [],
     previewData: definition.previewData ?? null,
+    rearAxleFromTailRatio: definition.rearAxleFromTailRatio ?? null,
   };
+}
+
+/** 後端回 409：別人已經改過（current 是伺服器上的那一份），或仍被引用（references） */
+export class VehicleDefinitionConflictError extends Error {
+  readonly current: VehicleDefinition | null;
+  readonly references: VehicleModelReference[] | null;
+
+  constructor(
+    message: string,
+    current: VehicleDefinition | null,
+    references: VehicleModelReference[] | null,
+  ) {
+    super(message);
+    this.current = current;
+    this.references = references;
+  }
+}
+
+export type VehicleModelReference =
+  | { kind: 'default' }
+  | { kind: 'map'; mapId: string }
+  | {
+      kind: 'dashboard';
+      planeId: string;
+      planeName: string;
+      elementId: string;
+      childId: string | null;
+      label: string | null;
+    };
+
+async function readError(res: Response): Promise<Error> {
+  const body = (await res.json().catch(() => null)) as {
+    message?: string | string[] | { message?: string; current?: VehicleDefinitionRow | null; references?: VehicleModelReference[] };
+    current?: VehicleDefinitionRow | null;
+    references?: VehicleModelReference[];
+  } | null;
+  const detail = body && typeof body.message === 'object' && !Array.isArray(body.message) ? body.message : body;
+  const message = Array.isArray(detail?.message)
+    ? detail.message.join('、')
+    : typeof detail?.message === 'string'
+      ? detail.message
+      : `HTTP ${res.status}`;
+  if (res.status === 409) {
+    const current = (detail as { current?: VehicleDefinitionRow | null })?.current;
+    return new VehicleDefinitionConflictError(
+      message,
+      current ? vehicleDefinitionFromRow(current) : null,
+      (detail as { references?: VehicleModelReference[] })?.references ?? null,
+    );
+  }
+  return new Error(message);
 }
 
 export async function fetchVehicleDefinitions(
@@ -77,28 +134,45 @@ export async function fetchVehicleDefinitions(
     throw new Error(`載具定義載入失敗（${res.status}）`);
   }
   const rows = (await res.json()) as VehicleDefinitionRow[];
-  return Array.isArray(rows) ? rows.map(toDefinition) : [];
+  return Array.isArray(rows) ? rows.map(vehicleDefinitionFromRow) : [];
 }
 
 /**
- * 整批覆寫：送進去的清單就是完整結果，沒出現的會被刪除。
- *
- * 編輯器在畫布上一次操作的是一整份清單（新增、刪除、改名、改元件樹都在同一個
- * state），逐筆 PATCH 會逼前端自己追蹤哪一筆變了，而且刪除很容易漏同步。
- * 清單本身只有個位數，整批寫入的成本可以忽略。
+ * 存一個模型。baseVersion＝這份是從伺服器第幾版改來的；新模型不帶。
+ * 伺服器已經是別的版本（別人改過）或同 ID 已存在時丟 VehicleDefinitionConflictError，不覆蓋。
  */
-export async function saveVehicleDefinitions(
-  definitions: VehicleDefinition[],
+export async function saveVehicleDefinition(
+  definition: VehicleDefinition,
+  baseVersion: number | null,
   backendUrl = resolveVehicleDefinitionsBackendUrl(),
-): Promise<VehicleDefinition[]> {
-  const res = await fetch(`${backendUrl}/${ENDPOINT}`, {
+): Promise<VehicleDefinition> {
+  const res = await fetch(`${backendUrl}/${ENDPOINT}/${encodeURIComponent(definition.id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: definitions.map(toRow) }),
+    body: JSON.stringify({ item: toRow(definition), baseVersion }),
   });
-  if (!res.ok) {
-    throw new Error(`載具定義儲存失敗（${res.status}）`);
-  }
-  const rows = (await res.json()) as VehicleDefinitionRow[];
-  return Array.isArray(rows) ? rows.map(toDefinition) : definitions;
+  if (!res.ok) throw await readError(res);
+  return vehicleDefinitionFromRow((await res.json()) as VehicleDefinitionRow);
+}
+
+/** 刪除；仍被引用時丟 VehicleDefinitionConflictError（references 列出在哪裡） */
+export async function deleteVehicleDefinition(
+  definitionKey: string,
+  backendUrl = resolveVehicleDefinitionsBackendUrl(),
+): Promise<void> {
+  const res = await fetch(`${backendUrl}/${ENDPOINT}/${encodeURIComponent(definitionKey)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw await readError(res);
+}
+
+export async function fetchVehicleDefinitionReferences(
+  definitionKey: string,
+  backendUrl = resolveVehicleDefinitionsBackendUrl(),
+): Promise<VehicleModelReference[]> {
+  const res = await fetch(
+    `${backendUrl}/${ENDPOINT}/${encodeURIComponent(definitionKey)}/references`,
+  );
+  if (!res.ok) throw await readError(res);
+  return (await res.json()) as VehicleModelReference[];
 }

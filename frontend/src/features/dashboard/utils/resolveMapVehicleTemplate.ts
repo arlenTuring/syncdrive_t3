@@ -1,14 +1,13 @@
+import { useMemo } from 'react';
 import type { CanvasElementProps, RouteActionIconRule, VehicleContainerWidget } from '../types';
-import {
-  resolveMapPlatformVehicleDefinition,
-} from '../../vehicle-editor/storage/vehicleDefinitionStorage';
+import { resolveVehicleDefinition } from '../../vehicle-editor/storage/vehicleDefinitionStorage';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
-import {
-  DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX,
-  DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX,
-} from '../../map-editor/vehicles/resolveMapVehicleTrackSizing';
+import { useMapVehicleModel } from '../../vehicle-editor/model/useMapVehicleModel';
 
-/** 圖台載具樣板：由載具容器子元件定義，套用至場域內所有即時車輛 */
+/**
+ * 圖台車輛樣板：模型＋顯示尺寸上限框＋行為圖示設定。
+ * 顯示尺寸只是上限框，車身依模型自己的比例等比塞進去（見 fitVehicleMarkerSize）。
+ */
 export interface MapVehicleTemplateConfig {
   definition: VehicleDefinition | null;
   displayWidthPx: number;
@@ -27,27 +26,24 @@ export function findVehicleContainerTemplate(
   return (child as VehicleContainerWidget | undefined) ?? null;
 }
 
-export function resolveMapVehicleTemplate(
+/**
+ * 舊格式相容：模型與尺寸還存在儀表板圖台元件的「載具容器」上（搬到圖資管理之前的做法）。
+ *
+ * 只認明確的模型 ID。以前還會依名稱「VTMS 巴士 · PMS01」或清單第一筆補一個模型，
+ * 那不是使用者的選擇，不再採用。這張地圖在圖資管理設定之後就不會走到這裡；
+ * 等所有地圖都遷移完，這段可以拿掉（遷移見 圖資管理 → 車輛模型 → 遷移）。
+ */
+export function resolveLegacyCanvasVehicleTemplate(
   canvas: CanvasElementProps,
-): MapVehicleTemplateConfig {
+): MapVehicleTemplateConfig | null {
   const widget = findVehicleContainerTemplate(canvas);
-
-  const definition = resolveMapPlatformVehicleDefinition({
-    vehicleDefinitionId: widget?.vehicleDefinitionId ?? canvas.vehicleDefinitionId,
-    vehicleDefinitionName: canvas.vehicleDefinitionName,
-    useDefaultVehicleDefinition:
-      canvas.useDefaultVehicleDefinition ?? Boolean(widget?.vehicleDefinitionId),
-  });
-
-  const displayWidthPx =
-    widget?.width
-    ?? canvas.vehicleDisplayWidthPx
-    ?? DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX;
-  const displayHeightPx =
-    widget?.height
-    ?? canvas.vehicleDisplayHeightPx
-    ?? DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX;
-
+  const definitionId = widget?.vehicleDefinitionId ?? canvas.vehicleDefinitionId;
+  if (!definitionId) return null;
+  const definition = resolveVehicleDefinition(definitionId);
+  if (!definition) return null;
+  const displayWidthPx = widget?.width ?? canvas.vehicleDisplayWidthPx;
+  const displayHeightPx = widget?.height ?? canvas.vehicleDisplayHeightPx;
+  if (!displayWidthPx || !displayHeightPx) return null;
   return {
     definition,
     displayWidthPx,
@@ -58,4 +54,26 @@ export function resolveMapVehicleTemplate(
     behaviorIconSize: widget?.behaviorIconSize,
     templateWidgetId: widget?.id,
   };
+}
+
+/**
+ * 儀表板圖台用的車輛樣板。順序只看明確引用：
+ * 1. 圖資管理裡這張地圖的設定
+ * 2. 這個圖台元件上舊的載具容器（尚未遷移的舊資料）
+ * 3. 系統預設模型
+ */
+export function useCanvasMapVehicleTemplate(
+  element: CanvasElementProps,
+  enabled: boolean,
+): MapVehicleTemplateConfig | null {
+  const remote = useMapVehicleModel(enabled ? element.mapId : null);
+  const legacy = useMemo(
+    () => (enabled ? resolveLegacyCanvasVehicleTemplate(element) : null),
+    [element, enabled],
+  );
+  if (!enabled) return null;
+  const source = remote.resolution?.source;
+  if (source === 'map') return remote.template;
+  if (legacy) return legacy;
+  return source === 'default' ? remote.template : null;
 }

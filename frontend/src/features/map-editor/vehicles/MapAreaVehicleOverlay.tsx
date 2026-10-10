@@ -64,14 +64,16 @@ import { DEFAULT_MAP_VEHICLE_ICON } from './defaultMapVehicleIcon';
 import { MapVehicleMarker } from './MapVehicleMarker';
 import { resolveMapVehicleBgColor } from './resolveMapVehicleAppearance';
 import type { AreaVehicleLive, MapVehicleIconSpec } from './types';
-import { MapVehicleDisplaySizer } from '../../dashboard/elements/MapVehicleDisplaySizer';
 import {
   computeVehicleBodyCenterOffsetFromRearAxleInDisplayPx,
   computeVehicleRearAxleAnchorPx,
   computeRearAxleAreaLocalForBodyCenterAt,
   computeRearAxleAreaLocalForIconBodyCenterAt,
 } from '../../vehicle-editor/utils/vehicleRearAxleAnchor';
-import { isLandscapeVehicleDefinition } from '../../vehicle-editor/utils/vehicleContentBounds';
+import {
+  fitVehicleMarkerSize,
+  isLandscapeVehicleDefinition,
+} from '../../vehicle-editor/utils/vehicleContentBounds';
 import {
   MapVehicleBehaviorOverlay,
   type MapVehicleBehaviorConfig,
@@ -113,15 +115,6 @@ function readOrderId(payload: Record<string, unknown> | undefined): string | nul
   return typeof id === 'string' && id.trim() ? id.trim() : null;
 }
 
-/**
- * 沒有載具容器校準尺寸時的後備（區域像素）。
- *
- * 有 vehicle-container／vehicleDisplay*Px 時以校準為準——儀表板編輯器調好的長寬
- * 才是車號可讀性的來源。這裡硬編死會讓本地跟雲端只要平面設定不同就長得不一樣，
- * 而且會把樣板上 20–23px 的車號壓到幾乎看不清。
- */
-const FALLBACK_TRACK_VEHICLE_WIDTH_PX = 120;
-const FALLBACK_TRACK_VEHICLE_HEIGHT_PX = 42;
 
 function radToDeg(rad: number): number {
   return (rad * 180) / Math.PI;
@@ -251,9 +244,7 @@ export function MapAreaVehicleOverlay({
   vehicleDisplayWidthPx,
   vehicleDisplayHeightPx,
   routes,
-  vehicleFitMode = 'contain',
   vehicleBehavior,
-  vehicleEditSizer = null,
   livePositionTweenMs = 0,
   roofIndicator,
   orderStationsById,
@@ -274,13 +265,7 @@ export function MapAreaVehicleOverlay({
   vehicleDisplayHeightPx: number;
   /** 地圖上的營運路線；有的話用訂單目標站推出走廊，限縮挑塊的候選軌道 */
   routes?: readonly MapPlannedRoute[];
-  vehicleFitMode?: 'contain' | 'stretch';
   vehicleBehavior?: MapVehicleBehaviorConfig;
-  /** 儀表板編輯：對第一輛預覽載具顯示校準框 */
-  vehicleEditSizer?: {
-    targetKey: string;
-    onSizeChange: (width: number, height: number) => void;
-  } | null;
   /**
    * 即時圖台位置補間（毫秒）。> 0 時對車輛標記的 left/top 套用線性 CSS transition，
    * 讓 1Hz 的遙測座標在兩幀之間平滑滑動（避免「一格一格跳」）。0 表示即時定位（編輯器用）。
@@ -433,7 +418,7 @@ export function MapAreaVehicleOverlay({
       !routePath && targetStationId ? routeCorridors.byTargetStation.get(targetStationId) : undefined;
     const frame: TrackerFrame = {
       // 最後<strong>收到</strong>遙測的時刻：停站時畫面不變、updatedAt 不動，拿它量斷訊會把停站誤判成斷訊
-      t: vehicleLastSeenAt(vehicle.vehicleId) ?? vehicle.updatedAt ?? Date.now(),
+      t: vehicle.sourceAt ?? vehicleLastSeenAt(vehicle.vehicleId) ?? vehicle.updatedAt ?? Date.now(),
       xM: vehicle.xM,
       yM: vehicle.yM,
       orderKey,
@@ -758,18 +743,19 @@ export function MapAreaVehicleOverlay({
          * 尺寸必須吃 vehicleDisplay*Px：那是儀表板上調好的「車號要多大才看得清」。
          * 硬編 72×30 會把樣板字級壓掉，本地／雲端只要平面校準不同就對不齊。
          */
-        const markerW = vehicleDefinition
-          ? displayW || FALLBACK_TRACK_VEHICLE_WIDTH_PX
-          : iconSpec.width;
-        const markerH = vehicleDefinition
-          ? displayH || FALLBACK_TRACK_VEHICLE_HEIGHT_PX
-          : iconSpec.height;
         /*
-         * 有比例尺換算時長寬各自代表真實公尺數：沿線與橫向的 px/m 本來就不同（同一格
-         * 一個方向壓縮、另一個沒有），用 contain 取兩者小的那個縮放，等於把已經算對的
-         * 其中一軸再縮一次。這時只能各軸獨立縮。
+         * 自訂模型：顯示尺寸只是上限框，車身照自己的比例等比塞進去（見 fitVehicleMarkerSize）。
+         * markerW／markerH 就是車身實際畫出來的大小，後面的錨點、車身中心、渲染都用這一組，
+         * 不會出現「定位用一組、畫的時候又被拉成另一組」。
+         *
+         * 以前這裡用 stretch 各軸獨立縮，理由是沿線與橫向的比例尺不同；但車的外觀不該承擔
+         * 示意圖兩軸壓縮率的差別——那樣車身、輪胎、車號全被擠扁。地圖縮放由整張圖等比處理。
          */
-        const fitMode = vehicleDefinition ? 'stretch' : vehicleFitMode;
+        const markerSize = vehicleDefinition
+          ? fitVehicleMarkerSize(vehicleDefinition, displayW, displayH)
+          : null;
+        const markerW = markerSize ? markerSize.width : iconSpec.width;
+        const markerH = markerSize ? markerSize.height : iconSpec.height;
 
         const headingRad = readVehicleHeadingRad(vehicle.payload);
         const steeringRad = readVehicleSteeringAngleRad(vehicle.payload);
@@ -843,7 +829,6 @@ export function MapAreaVehicleOverlay({
               vehicleDefinition,
               markerW,
               markerH,
-              fitMode,
             )
           : null;
         const anchorX = vehicleDefinition
@@ -862,7 +847,6 @@ export function MapAreaVehicleOverlay({
                 vehicleDefinition,
                 markerW,
                 markerH,
-                fitMode,
                 containerRotateDeg,
                 placementLocal,
               )
@@ -962,7 +946,6 @@ export function MapAreaVehicleOverlay({
               vehicleDefinition,
               markerW,
               markerH,
-              fitMode,
               containerRotateDeg,
             )
           : { dx: 0, dy: 0 };
@@ -1067,8 +1050,6 @@ export function MapAreaVehicleOverlay({
 
         if (vehicleDefinition) {
           const vehicleKey = `${vehicle.areaId}:${vehicle.vehicleId}`;
-          const showEditSizer =
-            vehicleEditSizer != null && vehicleEditSizer.targetKey === vehicleKey;
 
           return (
             <div key={vehicleKey} {...placementDebugAttrs}>
@@ -1076,7 +1057,7 @@ export function MapAreaVehicleOverlay({
               {anchorDebug}
               {cellBadge}
               <div
-                style={{ ...style, overflow: 'visible', pointerEvents: showEditSizer ? 'auto' : 'none' }}
+                style={{ ...style, overflow: 'visible', pointerEvents: 'none' }}
               >
                 <div className="pointer-events-none">
                   {/*
@@ -1089,7 +1070,6 @@ export function MapAreaVehicleOverlay({
                     liveData={liveData}
                     displayWidth={markerW}
                     displayHeight={markerH}
-                    fitMode={fitMode}
                     layoutMode="rear-axle-pivot"
                     livePayloadOnly
                     mapHeadingRad={headingRad}
@@ -1104,18 +1084,6 @@ export function MapAreaVehicleOverlay({
                     vehicleCenterY={markerH / 2}
                     liveData={liveData}
                   />
-                ) : null}
-                {showEditSizer ? (
-                  <div className="absolute left-0 top-0 z-[5]">
-                    <MapVehicleDisplaySizer
-                      definition={vehicleDefinition}
-                      widthPx={displayW}
-                      heightPx={displayH}
-                      liveData={liveData}
-                      overlayOnly
-                      onSizeChange={vehicleEditSizer.onSizeChange}
-                    />
-                  </div>
                 ) : null}
               </div>
             </div>

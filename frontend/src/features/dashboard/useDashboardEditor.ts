@@ -10,7 +10,6 @@ import {
 import {
   DASHBOARD_PLANES_STORAGE_KEY as STORAGE_KEY,
 } from '../../lib/canvasCacheReset';
-import { createBlankVehicleForContainer } from '../vehicle-editor/storage/vehicleDefinitionStorage';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import { DASHBOARD_PLANES_TAG, fetchDashboardPlanes, saveDashboardPlane, saveDashboardPlanes } from './api/dashboardPlanesApi';
 import { cloneDemoPlane } from './constants/demoPlane';
@@ -599,11 +598,8 @@ export function useDashboardEditor() {
     const canvas = plane?.elements.find((el) => el.id === canvasId);
     if (!canAddWidgetToCanvas(canvas, widgetType)) return undefined;
     recordHistory();
-    let widget = createWidget(widgetType, x, y);
-    if (widgetType === 'vehicle-container') {
-      const vehicleDefinitionId = createBlankVehicleForContainer();
-      widget = { ...widget, vehicleDefinitionId } as ChildWidget;
-    }
+    // 載具容器不在儀表板建立模型：放上去之後在屬性面板選一個圖資管理裡的既有模型
+    const widget = createWidget(widgetType, x, y);
     setPlanes(prev => {
       const next = prev.map(p => p.id === activePlaneId
         ? {

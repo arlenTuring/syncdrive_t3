@@ -73,7 +73,6 @@ export function computeVehicleRearAxleAnchorPx(
   definition: VehicleDefinition,
   displayWidth?: number,
   displayHeight?: number,
-  fitMode: 'contain' | 'stretch' = 'contain',
 ): { x: number; y: number; contentX: number; contentY: number } {
   const bounds = computeVehicleMapRenderBounds(definition);
   const content = mapDisplayContentSize(definition, bounds);
@@ -83,16 +82,8 @@ export function computeVehicleRearAxleAnchorPx(
   const targetH = displayHeight ?? content.height;
   const scaleX = targetW / Math.max(1, content.width);
   const scaleY = targetH / Math.max(1, content.height);
+  // 車身一律等比（見 fitVehicleMarkerSize）；長寬不再各自縮放
   const uniformScale = Math.min(scaleX, scaleY);
-
-  if (fitMode === 'stretch') {
-    return {
-      contentX,
-      contentY,
-      x: contentX * scaleX,
-      y: contentY * scaleY,
-    };
-  }
 
   return {
     contentX,
@@ -125,23 +116,17 @@ export function computeVehicleBodyCenterOffsetFromRearAxleInDisplayPx(
   definition: VehicleDefinition,
   displayWidth: number,
   displayHeight: number,
-  fitMode: 'contain' | 'stretch',
   rotateDeg: number,
 ): { dx: number; dy: number } {
-  const pivot = computeVehicleRearAxleAnchorPx(
-    definition,
-    displayWidth,
-    displayHeight,
-    fitMode,
-  );
+  const pivot = computeVehicleRearAxleAnchorPx(definition, displayWidth, displayHeight);
   const bounds = computeVehicleMapRenderBounds(definition);
   const display = mapDisplayContentSize(definition, bounds);
   const bodyCenter = computeVehicleBodyCenterContentPx(definition);
 
   const scaleX = displayWidth / Math.max(1, display.width);
   const scaleY = displayHeight / Math.max(1, display.height);
-  const sx = fitMode === 'stretch' ? scaleX : Math.min(scaleX, scaleY);
-  const sy = fitMode === 'stretch' ? scaleY : sx;
+  const sx = Math.min(scaleX, scaleY);
+  const sy = sx;
 
   const vx = bodyCenter.x - pivot.contentX;
   const vy = bodyCenter.y - pivot.contentY;
@@ -169,7 +154,6 @@ export function computeRearAxleAreaLocalForBodyCenterAt(
   definition: VehicleDefinition,
   displayWidth: number,
   displayHeight: number,
-  fitMode: 'contain' | 'stretch',
   rotateDeg: number,
   targetCenter: { x: number; y: number },
 ): { x: number; y: number } {
@@ -177,7 +161,6 @@ export function computeRearAxleAreaLocalForBodyCenterAt(
     definition,
     displayWidth,
     displayHeight,
-    fitMode,
     rotateDeg,
   );
   return {

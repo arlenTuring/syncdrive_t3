@@ -3150,10 +3150,8 @@ const zhTW = {
           zoomOut: '縮小',
         },
         vehicleContainer: {
-          editHint: '編輯時地圖上只會顯示這一個樣板（黃框）。執行後圖台才依 MQTT 在各地點複製樣板、顯示多輛即時車輛。',
           showLabel: '顯示標籤',
           labelPlaceholder: '載具',
-          editStyle: '編輯載具樣式',
           actions: '作動行為',
           offsetX: '偏移 X',
           offsetY: '偏移 Y',

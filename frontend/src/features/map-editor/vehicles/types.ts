@@ -56,5 +56,10 @@ export interface AreaVehicleLive {
   payload: Record<string, unknown>
   topic: string
   updatedAt: number
+  /**
+   * 資料本身的收到時刻（歷史回放才有）。有的話渲染層用它判斷斷訊與停站，
+   * 不讀即時車隊的「最後收到時刻」。
+   */
+  sourceAt?: number
   isDemo?: boolean
 }

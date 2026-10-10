@@ -978,8 +978,8 @@ export type ShiftListWidget = TabListWidget;
 /** 圖台內載具樣板：定義車體樣式與作動行為，執行期套用至場域內所有即時車輛 */
 export interface VehicleContainerWidget extends WidgetBase, WidgetDataBinding {
   type: 'vehicle-container';
-  /** 載具編輯器 localStorage 中的定義 id */
-  vehicleDefinitionId: string;
+  /** 使用的車輛模型（圖資管理 → 車輛模型，後端 vehicle_definitions 的 definition_key）；未選擇時為空 */
+  vehicleDefinitionId?: string;
   /** 顯示用標籤 */
   label?: string;
   /** 作動行為圖示規則（與路線進度相同資料流模式） */

@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import type { CanvasElementProps, ChildWidget, WidgetType } from './types';
 import { WidgetRenderer } from './elements/WidgetRenderer';
-import { VEHICLE_DEFINITIONS_UPDATED_EVENT } from '../../lib/migrateLocalCacheToServer';
 import { GroupCanvasRenderer } from './elements/GroupCanvasRenderer';
 import { MapPlatformLayer } from './elements/MapPlatformLayer';
 import { BindingWarningIcon } from './components/BindingWarningIcon';
@@ -34,9 +33,7 @@ import {
 } from '../../lib/elementResize';
 import { RotatedElementResizeHandles } from '../../lib/RotatedElementResizeHandles';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
-import {
-  resolveMapVehicleTemplate,
-} from './utils/resolveMapVehicleTemplate';
+import { useCanvasMapVehicleTemplate } from './utils/resolveMapVehicleTemplate';
 import { isTabCanvas } from './utils/tabCanvas';
 
 const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
@@ -366,19 +363,9 @@ export function CanvasElement({
   }
 
   const isMapPlatform = element.canvasKind === 'map-platform';
-  // 載具定義快取被後端內容換掉時重新套用（見 migrateLocalCacheToServer）
-  const [vehicleDefinitionsVersion, setVehicleDefinitionsVersion] = useState(0);
-  useEffect(() => {
-    if (!isMapPlatform) return;
-    const bump = () => setVehicleDefinitionsVersion((v) => v + 1);
-    window.addEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
-    return () => window.removeEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
-  }, [isMapPlatform]);
-  const vehicleTemplate = useMemo(
-    () => (isMapPlatform ? resolveMapVehicleTemplate(element) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [element, isMapPlatform, vehicleDefinitionsVersion],
-  );
+  // 車輛模型：圖資管理的地圖設定為準（共用解析，模型或設定一改就更新）；這張地圖還沒設定時
+  // 才退回這個圖台元件上舊的載具容器樣板，再沒有才用系統預設模型
+  const vehicleTemplate = useCanvasMapVehicleTemplate(element, isMapPlatform);
   const boxShadow = isEditMode && isSelected
     ? (canDropCanvas ? '0 0 0 2px #06b6d4, 0 0 12px rgba(6,182,212,0.25)' : '0 0 0 4px #ef4444, 0 0 20px rgba(239,68,68,0.5)')
     : isMapPlatform
