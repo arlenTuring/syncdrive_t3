@@ -6,12 +6,14 @@ import { DegradedOperationEvent } from '../database/entities/degraded-operation-
 import { DegradedOperationDraft } from '../database/entities/degraded-operation-draft.entity';
 import { SystemSetting } from '../database/entities/system-setting.entity';
 import { SystemHealthModule } from '../system-health/system-health.module';
+import { DegradedReplayModule } from '../degraded-replay/degraded-replay.module';
 import { DegradedOperationController } from './degraded-operation.controller';
 import { DegradedOperationService } from './degraded-operation.service';
 
 @Module({
   imports: [
     SystemHealthModule,
+    DegradedReplayModule,
     TypeOrmModule.forFeature([
       DegradedOperationPlan,
       DegradedOperationExecution,

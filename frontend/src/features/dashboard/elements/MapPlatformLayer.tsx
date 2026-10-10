@@ -15,6 +15,8 @@ import {
   DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX,
 } from '../../map-editor/vehicles/resolveMapVehicleTrackSizing';
 import type { MapVehicleTemplateConfig } from '../utils/resolveMapVehicleTemplate';
+import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
+import type { MqttLiveEntry } from '../../map-editor/live/mqttLiveTypes';
 import { useMapMqttLive } from './useMapMqttLive';
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import { MapSimVehicleMotionBridge } from './MapSimVehicleMotionBridge';
@@ -182,6 +184,71 @@ export function MapPlatformLayer({
         routes={routes}
         vehicleBehavior={vehicleBehavior}
         vehicleRoofIndicator={vehicleRoofIndicator}
+        orderStationsById={orderStationsById}
+        viewportRef={viewportRef}
+      />
+    </div>
+  );
+}
+
+/**
+ * 圖台的純呈現：地圖與車輛都由外部提供，不訂閱任何即時資料。
+ *
+ * 歷史回放用它畫當時版本的地圖與回放出來的車輛；車輛判位、補間、圖示與即時圖台是
+ * 同一套（MapSimVehicleMotionBridge → MapAreaCanvas），只有資料入口不同。
+ */
+export function MapPlatformCanvas({
+  map,
+  vehicles,
+  liveById,
+  tweenMs,
+  orderStationsById,
+  vehicleTemplate = null,
+}: {
+  map: {
+    areas: MapAreaObject[];
+    routes: MapPlannedRoute[];
+    pixelSize: MapPixelSize;
+    pixelOrigin: { x: number; y: number };
+  };
+  vehicles: AreaVehicleLive[];
+  liveById: Record<string, MqttLiveEntry>;
+  tweenMs: number;
+  orderStationsById: Record<string, readonly string[]>;
+  /** 車輛模型與顯示設定（圖資管理的地圖設定，或回放保存的當時快照） */
+  vehicleTemplate?: MapVehicleTemplateConfig | null;
+}) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const vehicleBehavior = useMemo(
+    () =>
+      vehicleTemplate
+        ? {
+            actionIconRules: vehicleTemplate.actionIconRules,
+            behaviorOffsetX: vehicleTemplate.behaviorOffsetX,
+            behaviorOffsetY: vehicleTemplate.behaviorOffsetY,
+            behaviorIconSize: vehicleTemplate.behaviorIconSize,
+          }
+        : undefined,
+    [vehicleTemplate],
+  );
+  return (
+    <div className="relative h-full min-h-[120px] w-full overflow-hidden bg-zinc-950">
+      <MapSimVehicleMotionBridge
+        pixelSize={map.pixelSize}
+        pixelOrigin={map.pixelOrigin}
+        areas={map.areas}
+        vehiclesRaw={vehicles}
+        simPlaybackActive={false}
+        speedMultiplier={1}
+        liveTweenMs={tweenMs}
+        liveById={liveById}
+        showVehicleTelemetry={false}
+        vehicleDefinition={vehicleTemplate?.definition ?? null}
+        vehicleDisplayWidthPx={vehicleTemplate?.displayWidthPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX}
+        vehicleDisplayHeightPx={vehicleTemplate?.displayHeightPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX}
+        routes={map.routes}
+        vehicleBehavior={vehicleBehavior}
+        vehicleRoofIndicator={null}
         orderStationsById={orderStationsById}
         viewportRef={viewportRef}
       />

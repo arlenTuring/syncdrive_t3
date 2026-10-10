@@ -78,6 +78,11 @@ import { DegradedOperationExecution } from './database/entities/degraded-operati
 import { DegradedOperationEvent } from './database/entities/degraded-operation-event.entity';
 import { DegradedOperationDraft } from './database/entities/degraded-operation-draft.entity';
 import { DegradedOperationModule } from './degraded-operation/degraded-operation.module';
+import {
+  DegradedReplayFrame,
+  DegradedReplayMap,
+  DegradedReplaySession,
+} from './database/entities/degraded-replay.entities';
 
 @Module({
   imports: [
@@ -114,6 +119,7 @@ import { DegradedOperationModule } from './degraded-operation/degraded-operation
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
           DegradedOperationPlan, DegradedOperationExecution, DegradedOperationEvent, DegradedOperationDraft,
+          DegradedReplaySession, DegradedReplayMap, DegradedReplayFrame,
           DataAdminAudit,
           // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
           PartnerApiKey,

@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   FileClock,
   Gauge,
+  Hourglass,
+  Pencil,
   RefreshCw,
   Settings2,
   SlidersHorizontal,
@@ -9,6 +11,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { MapPlatformLayer } from "../dashboard/elements/MapPlatformLayer";
+import { VehicleFleetMqttProvider } from "../dashboard/context/VehicleFleetMqttContext";
+import { useMapVehicleModel } from "../vehicle-editor/model/useMapVehicleModel";
+import { DegradedHistoryView } from "./DegradedHistoryView";
+import { ImpactMetrics } from "./DegradedIcons";
+import { degradedSidePanel } from "./degradedLifecycle";
+import { MapViewport } from "./MapViewport";
 import {
   AdjustExecutionDialog,
   ExecutionContentDialog,
@@ -47,9 +55,8 @@ export function DegradedOperationPage() {
     );
   const [status, setStatus] = useState<LoadState<OperationStatus>>(loading);
   const [mapId, setMapId] = useState<LoadState<string>>(loading);
-  const [tab, setTab] = useState<"plans" | "impact">("plans");
   const [notice, setNotice] = useState<string | null>(null);
-  const [view, setView] = useState<"live" | "manage">("live");
+  const [view, setView] = useState<"live" | "manage" | "history">("live");
   const [customOpen, setCustomOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] =
     useState<DegradedOperationPlan | null>(null);
@@ -66,10 +73,7 @@ export function DegradedOperationPage() {
   }, []);
   const reloadStatus = useCallback(() => {
     void fetchDegradedOperationStatus()
-      .then((value) => {
-        setStatus({ loading: false, value, error: null });
-        if (value.mode === "degraded") setTab("impact");
-      })
+      .then((value) => setStatus({ loading: false, value, error: null }))
       .catch((error: Error) =>
         setStatus({ loading: false, value: null, error: error.message }),
       );
@@ -86,9 +90,14 @@ export function DegradedOperationPage() {
       .catch((error: Error) =>
         setMapId({ loading: false, value: null, error: error.message }),
       );
+  }, [reload]);
+  // 只有即時頁要每秒更新狀態；在歷史頁、計畫管理時不輪詢，回來時立刻重讀一次
+  useEffect(() => {
+    if (view !== "live") return undefined;
+    reloadStatus();
     const timer = window.setInterval(reloadStatus, 1_000);
     return () => window.clearInterval(timer);
-  }, [reload, reloadStatus]);
+  }, [reloadStatus, view]);
 
   const submit = async (
     plan: Pick<
@@ -118,10 +127,12 @@ export function DegradedOperationPage() {
     setNotice(result.message);
     reloadStatus();
   };
-  const active = status.value?.active_execution;
+  // 右側顯示什麼完全依後端生命週期決定（見 degradedLifecycle），不給手動切換
+  const side = degradedSidePanel(status);
+  const active = side.kind === "impact" ? side.execution : null;
   const pending = status.value?.pending;
-  const degraded = status.value?.mode === "degraded" && active;
-  const unknown = status.error || status.value?.mode === "unknown";
+  const degraded = !!active;
+  const unknown = side.kind === "error";
   const modeLabel = status.loading
     ? "讀取中…"
     : unknown
@@ -140,6 +151,9 @@ export function DegradedOperationPage() {
         ),
       )
     : "00:00:00";
+
+  if (view === "history")
+    return <DegradedHistoryView onBack={() => setView("live")} />;
 
   if (view === "manage")
     return (
@@ -172,7 +186,7 @@ export function DegradedOperationPage() {
             <>
               <button
                 type="button"
-                onClick={() => setNotice("歷史降級紀錄畫面等待後續設計")}
+                onClick={() => setView("history")}
                 className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-sm"
               >
                 <FileClock className="size-4" />
@@ -259,7 +273,7 @@ export function DegradedOperationPage() {
                 {mapId.error || "目前沒有啟用的地圖"}
               </div>
             ) : (
-              <MapPlatformLayer mapId={mapId.value} />
+              <LiveMap mapId={mapId.value} />
             )}
           </div>
         </div>
@@ -273,32 +287,24 @@ export function DegradedOperationPage() {
             <RefreshCw className="size-4 text-zinc-400" />
           </button>
         </div>
-        <div className="grid grid-cols-2 rounded-xl border border-zinc-700 bg-zinc-800/70 p-1">
-          <button
-            type="button"
-            onClick={() => setTab("plans")}
-            className={`rounded-lg px-3 py-2 text-sm ${tab === "plans" ? "bg-blue-600" : "text-zinc-500"}`}
-          >
-            降級計畫清單
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("impact")}
-            className={`rounded-lg px-3 py-2 text-sm ${tab === "impact" ? "bg-blue-600" : "text-zinc-500"}`}
-          >
-            降級影響範圍
-          </button>
-        </div>
-        {tab === "impact" && active ? (
+        {side.kind === "impact" ? (
           <ActiveSummary
-            active={active}
+            active={side.execution}
             duration={duration}
             onAdjust={() => setActiveDialog("adjust")}
             onContent={() => setActiveDialog("content")}
           />
-        ) : tab === "impact" ? (
+        ) : side.kind === "loading" ? (
           <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-zinc-800 text-zinc-500">
-            目前沒有執行中的降級
+            讀取營運狀態…
+          </div>
+        ) : side.kind === "error" ? (
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-red-900/60 px-6 text-center text-red-300">
+            <AlertTriangle className="size-6" />
+            營運狀態未知：{side.message}
+            <button type="button" onClick={reload} className="text-sm underline">
+              重新讀取
+            </button>
           </div>
         ) : (
           <PlanCards
@@ -361,10 +367,10 @@ export function DegradedOperationPage() {
         <ExecutionContentDialog
           execution={active}
           onClose={() => setActiveDialog(null)}
-          onSubmit={async (name, description, level) => {
+          onSubmit={async (name, description) => {
             const result = await updateDegradedExecutionContent(
               active.execution_id,
-              { name, description, level, version: active.version },
+              { name, description, version: active.version },
             );
             setActiveDialog(null);
             setNotice(result.message);
@@ -383,7 +389,6 @@ export function DegradedOperationPage() {
             });
             setActiveDialog(null);
             setNotice(result.message);
-            setTab("plans");
             reloadStatus();
           }}
         />
@@ -475,10 +480,10 @@ function ActiveSummary({
   onContent: () => void;
 }) {
   return (
-    <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl bg-[#191c1f] p-4">
+    <div className="mt-1 min-h-0 flex-1 overflow-y-auto rounded-xl bg-[#191c1f] p-4">
       <h3 className="border-b border-zinc-700 pb-3">降級影響範圍</h3>
-      <div className="my-5 text-center text-xl text-zinc-300">
-        <TimerReset className="mr-2 inline size-5" />
+      <div className="my-5 flex items-center justify-center gap-2 text-xl text-zinc-300">
+        <Hourglass className="size-5 text-zinc-400" />
         持續時間 {duration}
       </div>
       <button
@@ -489,21 +494,7 @@ function ActiveSummary({
         <SlidersHorizontal className="mr-2 inline size-4" />
         調整降級參數
       </button>
-      <div className="grid grid-cols-3 gap-2 rounded-xl bg-[#222831] p-4 text-center text-zinc-400">
-        <div>
-          速限
-          <b className="block text-2xl font-normal text-white">
-            {active.speed_limit_kmh}
-            <small> km/h</small>
-          </b>
-        </div>
-        <div>
-          運能損失<b className="block text-2xl font-normal text-white">— %</b>
-        </div>
-        <div>
-          影響班次<b className="block text-2xl font-normal text-white">—</b>
-        </div>
-      </div>
+      <ImpactMetrics speedLimitKmh={active.speed_limit_kmh} />
       <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
         管理狀態已受理；車端控制契約尚未接通，控制結果：未下發。
       </p>
@@ -512,6 +503,7 @@ function ActiveSummary({
         onClick={onContent}
         className="my-4 w-full rounded-xl border border-zinc-600 py-2.5"
       >
+        <Pencil className="mr-2 inline size-4" />
         填寫降級計畫內容
       </button>
       <div className="rounded-xl bg-[#1d2024] p-4">
@@ -526,6 +518,40 @@ function ActiveSummary({
       </div>
     </div>
   );
+}
+
+/**
+ * 降級頁的即時地圖：接上全車隊 MQTT（跟儀表板同一個 VehicleFleetMqttProvider），
+ * 車輛外觀用圖資管理裡這張地圖的模型與顯示尺寸（共用解析，模型一改就更新）。
+ * 視角另存一份，不動其他儀表板的縮放設定。
+ */
+function LiveMap({ mapId }: { mapId: string }) {
+  const model = useMapVehicleModel(mapId);
+  const notice = vehicleModelNotice(model);
+  return (
+    <VehicleFleetMqttProvider>
+      <div className="relative h-full w-full">
+        <MapViewport storageKey="live">
+          <MapPlatformLayer mapId={mapId} vehicleTemplate={model.template} />
+        </MapViewport>
+        {notice ? (
+          <span className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs text-amber-200">
+            {notice}
+          </span>
+        ) : null}
+      </div>
+    </VehicleFleetMqttProvider>
+  );
+}
+
+function vehicleModelNotice(model: ReturnType<typeof useMapVehicleModel>): string | null {
+  const resolution = model.resolution;
+  if (model.status === "error" && !resolution) return `車輛模型讀取失敗：${model.error}`;
+  if (!resolution) return null;
+  if (resolution.missingDefinitionKey)
+    return `設定的車輛模型 ${resolution.missingDefinitionKey} 已不存在，暫以圖示顯示`;
+  if (resolution.source === "none") return "這張地圖尚未在圖資管理設定車輛模型，暫以圖示顯示";
+  return null;
 }
 
 function formatDuration(ms: number) {

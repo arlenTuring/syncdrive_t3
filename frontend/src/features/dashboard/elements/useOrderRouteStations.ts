@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { AreaVehicleLive } from '../../map-editor/vehicles/types';
 import type { OrderTaskMeta } from '../../map-editor/vehicles/yardExitStaging';
 import { fetchShiftRecordDetail } from '../../shift-records/api/shiftRecordsApi';
@@ -17,6 +17,16 @@ const listeners = new Set<() => void>();
 const inflight = new Set<string>();
 const MAX_CACHE = 300;
 
+/**
+ * 歷史回放用：訂單站序與任務用途由回放資料提供（降級開始時保存的訂單快照）。
+ * 有這個 context 時完全不查即時訂單 API——現在的訂單內容不能拿來補歷史。
+ */
+export type OrderRouteOverride = {
+  stationsById: Readonly<Record<string, readonly string[]>>;
+  metaById: Readonly<Record<string, OrderTaskMeta>>;
+};
+export const OrderRouteOverrideContext = createContext<OrderRouteOverride | null>(null);
+
 function orderIdOf(vehicle: AreaVehicleLive): string | null {
   const id = vehicle.payload?.order_id;
   return typeof id === 'string' && id.trim() ? id.trim() : null;
@@ -33,8 +43,10 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
   }, [vehicles]);
   const key = orderIds.join('|');
   const [version, setVersion] = useState(0);
+  const override = useContext(OrderRouteOverrideContext);
 
   useEffect(() => {
+    if (override) return undefined;
     let cancelled = false;
     for (const id of orderIds) {
       if (cache.has(id) || inflight.has(id)) continue;
@@ -73,17 +85,17 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, override]);
 
   return useMemo(() => {
     const out: Record<string, readonly string[]> = {};
     for (const id of orderIds) {
-      const stations = cache.get(id);
+      const stations = override ? override.stationsById[id] : cache.get(id);
       if (stations && stations.length >= 2) out[id] = stations;
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, version]);
+  }, [key, version, override]);
 }
 
 /**
@@ -100,14 +112,15 @@ export function useOrderTaskMeta(vehicles: readonly AreaVehicleLive[]): Record<s
       listeners.delete(fn);
     };
   }, []);
+  const override = useContext(OrderRouteOverrideContext);
   const ids = vehicles.map(orderIdOf).filter((id): id is string => !!id).sort().join('|');
   return useMemo(() => {
     const out: Record<string, OrderTaskMeta> = {};
     for (const id of ids.split('|')) {
-      const meta = id ? metaCache.get(id) : undefined;
+      const meta = id ? (override ? override.metaById[id] : metaCache.get(id)) : undefined;
       if (meta) out[id] = meta;
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids, version]);
+  }, [ids, version, override]);
 }

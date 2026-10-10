@@ -16,6 +16,7 @@ import { DegradedOperationPlan } from '../database/entities/degraded-operation-p
 import { SystemSetting } from '../database/entities/system-setting.entity';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
 import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
+import { DegradedReplayRecorder } from '../degraded-replay/degraded-replay.recorder';
 import type {
   AdjustExecutionDto,
   CreateDegradedOperationPlanDto,
@@ -29,6 +30,8 @@ import type {
 
 const STATE_KEY = 'degraded_operation.state';
 const BUSY_STATUSES = ['scheduled', 'activating', 'active', 'restoring'];
+/** 已正式開始、還沒恢復完成：前端只顯示影響範圍，回放也從這段開始 */
+const IN_EFFECT_STATUSES = ['activating', 'active', 'restoring'];
 const CONTROL_UNAVAILABLE = 'degraded_control_contract_unavailable';
 
 type StateValue = {
@@ -79,6 +82,7 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
     private readonly dataSource: DataSource,
     private readonly clock: OperatingClockService,
     private readonly foundation: SystemFoundationSettingsService,
+    private readonly replayRecorder: DegradedReplayRecorder,
   ) {}
 
   onModuleInit(): void {
@@ -217,7 +221,8 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
     const defaultSpeed = (await this.foundation.get()).globalParams
       .defaultVehicleSpeedLimitKmh;
 
-    return this.dataSource.transaction(async (manager) => {
+    let started: DegradedOperationExecution | null = null;
+    const response = await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         'degraded_operation_execute',
       ]);
@@ -266,6 +271,7 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
         updatedAt: String(realNow),
       });
       await manager.save(execution);
+      if (immediate) started = execution;
       await this.writeState(
         manager,
         immediate
@@ -295,6 +301,9 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
           : '降級預約已保存，將由後端營運時鐘啟用。',
       );
     });
+    // 交易確定後才開始保存回放資料：交易失敗的那一筆不會留下保存紀錄
+    if (started) await this.startReplay(started);
+    return response;
   }
 
   async cancelScheduled(id: string, version: number, operator = 'unknown') {
@@ -381,7 +390,6 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
       const before = this.executionResponse(execution);
       execution.planName = this.requireName(input.name);
       execution.planDescription = this.description(input.description);
-      execution.level = input.level;
       execution.version += 1;
       execution.updatedAt = String(Date.now());
       await manager.save(execution);
@@ -400,7 +408,7 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
     if (!input.personnel_and_vehicles_cleared || !input.alarms_cleared) {
       throw new BadRequestException('解除降級前必須完成兩項安全確認');
     }
-    return this.dataSource.transaction(async (manager) => {
+    const response = await this.dataSource.transaction(async (manager) => {
       const execution = await this.lockExecution(
         manager,
         id,
@@ -437,6 +445,11 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
         '管理端降級狀態已解除；本次未曾下發車端限制，未清除其他速限。',
       );
     });
+    await this.replayRecorder.stop(id, {
+      real: Number(response.ended_at_real),
+      operating: Number(response.ended_at_operating),
+    });
+    return response;
   }
 
   async getOperationStatus() {
@@ -446,9 +459,12 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
     const execution = id
       ? await this.executions.findOne({ where: { id } })
       : null;
+    const inEffect = IN_EFFECT_STATUSES.includes(
+      execution?.executionStatus ?? '',
+    );
     const consistent =
       state.mode === 'degraded'
-        ? execution?.executionStatus === 'active'
+        ? inEffect
         : !state.pendingExecutionId ||
           execution?.executionStatus === 'scheduled';
     return {
@@ -458,9 +474,7 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
           ? this.executionResponse(execution)
           : null,
       active_execution:
-        execution?.executionStatus === 'active'
-          ? this.executionResponse(execution)
-          : null,
+        execution && inEffect ? this.executionResponse(execution) : null,
       operating_now: this.clock.now(),
       real_now: Date.now(),
       updated_at: row.updatedAt,
@@ -567,14 +581,14 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
       .orderBy('execution.scheduled_for_operating', 'ASC')
       .getOne();
     if (!due) return;
-    await this.dataSource.transaction(async (manager) => {
+    const activated = await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         'degraded_operation_execute',
       ]);
       const execution = await manager.findOne(DegradedOperationExecution, {
         where: { id: due.id },
       });
-      if (!execution || execution.executionStatus !== 'scheduled') return;
+      if (!execution || execution.executionStatus !== 'scheduled') return null;
       const realNow = Date.now();
       execution.executionStatus = 'active';
       execution.startedAtOperating = String(operatingNow);
@@ -606,6 +620,16 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
         after: this.executionResponse(execution),
         operatingAt: operatingNow,
       });
+      return execution;
+    });
+    if (activated) await this.startReplay(activated);
+  }
+
+  private async startReplay(execution: DegradedOperationExecution) {
+    await this.replayRecorder.start({
+      id: execution.id,
+      startedAtReal: Number(execution.startedAtReal),
+      startedAtOperating: Number(execution.startedAtOperating),
     });
   }
 

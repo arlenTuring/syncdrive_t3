@@ -1,5 +1,7 @@
 import { resolveBrowserApiBaseUrl } from "../../lib/browserApiBase";
 import { getDemoAccount } from "../schedule-management/utils/demoAccountPreference";
+import type { VehicleDefinitionRow } from "../vehicle-editor/api/vehicleDefinitionsApi";
+import type { MapVehicleSetting } from "../vehicle-editor/model/mapVehicleSettingsApi";
 
 const API = "/syncdrive-api/degraded-operation";
 
@@ -184,7 +186,7 @@ export function adjustDegradedExecution(
 
 export function updateDegradedExecutionContent(
   id: string,
-  input: { name: string; description: string; level: number; version: number },
+  input: { name: string; description: string; version: number },
 ) {
   return json<ExecutionResponse>(
     `${API}/executions/${encodeURIComponent(id)}/content`,
@@ -244,4 +246,174 @@ export async function fetchActiveMapId(): Promise<string> {
   const mapId = String(body.mapId ?? "").trim();
   if (!mapId) throw new Error("目前沒有啟用的地圖");
   return mapId;
+}
+
+// ── 歷史紀錄與回放（唯讀）────────────────────────────────────────────
+
+export type ReplayAvailability = {
+  state: "not_started" | "none" | "partial" | "complete" | "recording";
+  reason: string | null;
+};
+
+export type HistoryItem = {
+  execution_id: string;
+  source_plan_id: string | null;
+  name: string;
+  description: string;
+  level: number;
+  speed_limit_kmh: number;
+  execution_status: ExecutionResponse["execution_status"];
+  control_status: string;
+  schedule_mode: "immediate" | "scheduled";
+  scheduled_for_operating: number | null;
+  started_at_operating: number | null;
+  started_at_real: number | null;
+  ended_at_operating: number | null;
+  ended_at_real: number | null;
+  operator_id: string;
+  created_at: number | null;
+  replay: ReplayAvailability;
+};
+
+export type ParameterChange = {
+  event_id: string;
+  action: string;
+  operator_id: string;
+  operated_at_real: number;
+  effective_at_operating: number | null;
+  level: number | null;
+  speed_limit_kmh: number | null;
+  previous_level: number | null;
+  previous_speed_limit_kmh: number | null;
+  control: {
+    result: string;
+    dispatched_at_real: number | null;
+    reason: string | null;
+  };
+};
+
+export type HistoryDetail = HistoryItem & {
+  parameter_changes: ParameterChange[];
+};
+
+export type ReplayGap = {
+  from_real: number;
+  to_real: number;
+  from_operating: number | null;
+  to_operating: number | null;
+  reason: string;
+  count?: number;
+};
+
+export type ReplayMeta = {
+  execution_id: string;
+  availability: ReplayAvailability;
+  window: { from_operating: number; to_operating: number; ongoing: boolean } | null;
+  map: {
+    map_id: string;
+    map_hash: string;
+    version: string | null;
+    display_name: string | null;
+  } | null;
+  coverage: {
+    status: string;
+    initial_captured: boolean;
+    frame_count: number;
+    dropped_count: number;
+    gaps: ReplayGap[];
+    last_error: string | null;
+  } | null;
+  stale_after_ms: number;
+  max_frames_per_request: number;
+  /** 開始時的車輛模型快照；null＝這筆紀錄沒有保存（功能上線前） */
+  vehicle_model: ReplayVehicleModelSnapshot | null;
+};
+
+export type ReplayVehicleModelSnapshot = {
+  capturedAt: number;
+  source: "map" | "default" | "none";
+  setting: MapVehicleSetting | null;
+  missingDefinitionKey: string | null;
+  definition: VehicleDefinitionRow | null;
+};
+
+export type ReplayFrame = {
+  seq: number;
+  stream: "telemetry" | "operation" | "health" | "facility" | "order";
+  kind: "initial" | "live";
+  vehicle_code: string | null;
+  topic: string | null;
+  received_at: number;
+  operating_at: number;
+  vehicle_ts: number | null;
+  payload: Record<string, unknown>;
+};
+
+export type ReplaySnapshot = {
+  execution_id: string;
+  at: number;
+  frames: ReplayFrame[];
+  reference: { received_at: number; operating_at: number; seq: number } | null;
+};
+
+export type ReplayFramesPage = {
+  execution_id: string;
+  from: number;
+  to: number;
+  frames: ReplayFrame[];
+  covered_to: number;
+  next: { from: number; after_seq: number } | null;
+};
+
+const executionPath = (id: string) => `${API}/executions/${encodeURIComponent(id)}`;
+
+export function fetchDegradedHistory(
+  params: { page?: number; pageSize?: number } = {},
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("page_size", String(params.pageSize));
+  return json<{ items: HistoryItem[]; total: number; page: number; page_size: number }>(
+    `${API}/executions${query.size ? `?${query}` : ""}`,
+    { signal },
+  );
+}
+
+export function fetchDegradedHistoryDetail(id: string, signal?: AbortSignal) {
+  return json<HistoryDetail>(executionPath(id), { signal });
+}
+
+export function fetchReplayMeta(id: string, signal?: AbortSignal) {
+  return json<ReplayMeta>(`${executionPath(id)}/replay`, { signal });
+}
+
+export function fetchReplayMap(id: string, signal?: AbortSignal) {
+  return json<{ map_id: string; map_hash: string; version: string | null; document: unknown }>(
+    `${executionPath(id)}/replay/map`,
+    { signal },
+  );
+}
+
+export function fetchReplaySnapshot(id: string, at: number, signal?: AbortSignal) {
+  return json<ReplaySnapshot>(
+    `${executionPath(id)}/replay/snapshot?at=${Math.floor(at)}`,
+    { signal },
+  );
+}
+
+export function fetchReplayFrames(
+  id: string,
+  input: { from: number; to: number; afterSeq?: number; limit?: number },
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({
+    from: String(Math.floor(input.from)),
+    to: String(Math.floor(input.to)),
+  });
+  if (input.afterSeq !== undefined) query.set("after_seq", String(input.afterSeq));
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  return json<ReplayFramesPage>(`${executionPath(id)}/replay/frames?${query}`, {
+    signal,
+  });
 }

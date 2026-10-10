@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Entity('degraded_operation_executions')
+@Index('IDX_DEGRADED_EXECUTION_STARTED', ['startedAtOperating', 'createdAt'])
 export class DegradedOperationExecution {
   @PrimaryColumn({ type: 'varchar', length: 36, name: 'execution_id' })
   id: string;

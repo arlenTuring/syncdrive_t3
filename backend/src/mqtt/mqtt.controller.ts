@@ -5,6 +5,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { MqttService } from './mqtt.service';
 import { TelemetryWriteQueue } from './telemetry-write.queue';
 import { normalizeVehicleCode } from '../common/vehicle-codes';
+import { DegradedReplayRecorder } from '../degraded-replay/degraded-replay.recorder';
 
 @Controller()
 export class MqttController {
@@ -15,6 +16,7 @@ export class MqttController {
     private readonly eventsGateway: EventsGateway,
     private readonly mqttService: MqttService,
     private readonly telemetryWriteQueue: TelemetryWriteQueue,
+    private readonly replayRecorder: DegradedReplayRecorder,
   ) {}
 
   /**
@@ -51,6 +53,8 @@ export class MqttController {
       this.telemetryWriteQueue.enqueue(vehicleCode, data);
     }
 
+    // 降級進行中才會真的保存（見 DegradedReplayRecorder）；平常只是一次判斷
+    this.replayRecorder.capture('telemetry', vehicleCode, null, data);
     this.eventsGateway.broadcastTelemetry(vehicleCode, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
@@ -79,6 +83,7 @@ export class MqttController {
       });
     }
 
+    this.replayRecorder.capture('health', vehicleCode, null, data);
     this.eventsGateway.broadcastHealth(vehicleCode, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
@@ -95,6 +100,7 @@ export class MqttController {
     await this.redisService.setOperationUpdate(vehicleCode, enriched);
     await this.mqttService.syncOperationOrderFromLive(vehicleCode, enriched);
 
+    this.replayRecorder.capture('operation', vehicleCode, null, enriched);
     this.eventsGateway.broadcastOperation(vehicleCode, enriched);
     this.eventsGateway.broadcastMqttMessage(topic, enriched);
   }
@@ -124,6 +130,7 @@ export class MqttController {
     if (!data) return;
 
     await this.mqttService.handleSlotStatus(data);
+    this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
@@ -131,6 +138,7 @@ export class MqttController {
   async handleGenericStatus(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
     if (!data) return;
+    this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
@@ -146,6 +154,7 @@ export class MqttController {
   async handleDoorUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
     if (!data) return;
+    this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
@@ -154,6 +163,7 @@ export class MqttController {
   async handlePsdUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
     if (!data) return;
+    this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
@@ -162,6 +172,7 @@ export class MqttController {
   async handleSyncdriveFacility(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
     if (!data) return;
+    this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 }
