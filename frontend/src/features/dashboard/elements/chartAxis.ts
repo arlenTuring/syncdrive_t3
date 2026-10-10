@@ -59,6 +59,23 @@ export function computeCurrentTimeWindow(
   return { min, max, now: nowMin };
 }
 
+/** 帶日期的時間戳（Epoch 毫秒，數字或數字字串） */
+export function parseEpochMs(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 1e11 ? n : null;
+}
+
+/**
+ * 即時時間軸的 X：相對「現在」的分鐘偏移。
+ * 帶日期的時間戳直接相減（跨午夜、跨日都正確）；只有 HH:mm 的舊資料才照時鐘猜前後 12 小時。
+ */
+export function liveOffsetMinutes(raw: unknown, anchorClockMin: number, nowMs?: number): number {
+  const epoch = parseEpochMs(raw);
+  if (epoch !== null && nowMs !== undefined) return (epoch - nowMs) / 60_000;
+  const clock = parseTimeValue(raw);
+  return clockToOffsetMinutes(clock ?? 0, anchorClockMin);
+}
+
 /** 時鐘分鐘 → 相對「現在」的偏移（處理跨日 HH:mm） */
 export function clockToOffsetMinutes(clockMin: number, nowMin: number): number {
   let d = clockMin - nowMin;
@@ -258,6 +275,8 @@ export function buildChartScales(
   widget: LineChartWidget,
   yFields: string[],
   clockNow?: number,
+  /** 即時軸的「現在」（營運時間，Epoch 毫秒）；資料是帶日期的時間戳時用它對齊 */
+  nowMs?: number,
 ) {
   const xUnit = widget.xAxis?.unit ?? 'number';
   const yUnit = widget.yAxis?.unit ?? 'number';
@@ -270,12 +289,8 @@ export function buildChartScales(
   const anchorNow = clockNow ?? getNowMinutes();
 
   const xs = data.map((d, i) => {
-    const clock = parseDataValue(d[widget.xField], xUnit, i);
-    if (useLiveTime && xUnit === 'time') {
-      const t = parseTimeValue(d[widget.xField]) ?? clock;
-      return clockToOffsetMinutes(t, anchorNow);
-    }
-    return clock;
+    if (useLiveTime && xUnit === 'time') return liveOffsetMinutes(d[widget.xField], anchorNow, nowMs);
+    return parseDataValue(d[widget.xField], xUnit, i);
   });
   const ysAll = fields.flatMap(field =>
     data.map(d => parseYDataValue(d[field], yUnit)).filter((v): v is number => v !== null),
@@ -294,6 +309,13 @@ export function buildChartScales(
     xView = computeViewRange(xs, widget.xAxis, mode, padding);
   }
   const yView = computeViewRange(ysAll, widget.yAxis, mode, padding);
+  // 定軸量程裝不下實際資料時往外撐，不能讓超出量程的點被丟掉（整條線消失）
+  if (ysAll.length) {
+    const dataMax = Math.max(...ysAll);
+    const dataMin = Math.min(...ysAll);
+    if (dataMax > yView.max) yView.max = dataMax + (dataMax - yView.min) * 0.05;
+    if (dataMin < yView.min) yView.min = dataMin - (yView.max - dataMin) * 0.05;
+  }
 
   return {
     xs,
@@ -381,22 +403,24 @@ export function buildAxisBandRects(params: {
   ch: number;
   /** 即時軸：將 HH:mm 轉為相對現在的偏移 */
   liveClockNow?: number;
+  /** 即時軸的「現在」（Epoch 毫秒）：資料是帶日期的時間戳時用 */
+  liveNowMs?: number;
 }): AxisBandRect[] {
   const {
-    data, widget, band, xScale, yScale, xViewMin, xViewMax, yViewMin, yViewMax, cw, ch, liveClockNow,
+    data, widget, band, xScale, yScale, xViewMin, xViewMax, yViewMin, yViewMax, cw, ch, liveClockNow, liveNowMs,
   } = params;
+  const colorOf = (row: Record<string, unknown>): string => {
+    const own = band.colorField ? String(row[band.colorField] ?? '').trim() : '';
+    return own || resolveAxisBandColor(row[band.segmentField], band);
+  };
   if (!data.length) return [];
   const opacity = clamp(band.opacity ?? 1, 0, 1);
   const thickness = Math.max(1, Math.floor(band.thickness ?? 4));
   const rects: AxisBandRect[] = [];
 
   const toXValue = (raw: unknown, index: number, unit: ChartAxisUnit): number => {
-    const clock = parseDataValue(raw, unit, Math.max(0, index));
-    if (liveClockNow !== undefined && unit === 'time') {
-      const t = parseTimeValue(raw) ?? clock;
-      return clockToOffsetMinutes(t, liveClockNow);
-    }
-    return clock;
+    if (liveClockNow !== undefined && unit === 'time') return liveOffsetMinutes(raw, liveClockNow, liveNowMs);
+    return parseDataValue(raw, unit, Math.max(0, index));
   };
 
   if (band.axis === 'x') {
@@ -416,7 +440,7 @@ export function buildAxisBandRects(params: {
       const b = clamp(rightVal, xViewMin, xViewMax);
       const x1 = clamp(xScale(a), 0, cw);
       const x2 = clamp(xScale(b), 0, cw);
-      const color = resolveAxisBandColor(row[band.segmentField], band);
+      const color = colorOf(row);
       if (x2 - x1 <= 0.5) continue;
       rects.push({
         x: x1,

@@ -161,6 +161,11 @@ export interface ChartAxisBandConfig {
   colorRules: ChartAxisBandColorRule[];
   /** 無匹配規則時的預設色 */
   defaultColor?: string;
+  /**
+   * 顏色直接取資料列的這個欄位（例如時間模板時段的顏色 segment_color）；有值時優先於 colorRules，
+   * 不必在元件裡再維護一份色表。
+   */
+  colorField?: string;
   /** 區段條厚度（px） */
   thickness?: number;
   /** 區段條透明度 0~1 */
@@ -232,6 +237,10 @@ export interface LineChartSeriesConfig {
   eventLabelStyle?: LineChartEventLabelStyle;
   /** 折線下方漸層區域填充 */
   areaFill?: boolean;
+  /** 每筆資料畫小圓點（預設 true；關閉後仍保留「現在」端點與事件標記） */
+  showPoints?: boolean;
+  /** 「現在」端點與數值標在這條線（例如實際運能）；都沒標時用第一條 */
+  nowEndpoint?: boolean;
 }
 
 /**
@@ -247,6 +256,8 @@ export interface LineChartWidget extends WidgetBase, WidgetDataBinding {
   /** 多線系列（屬性面板「新增」）；與 yFields 同步寫入以利舊版相容 */
   series?: LineChartSeriesConfig[];
   yFields: string[];
+  /** 資料問題欄位（例如 data_issue）：第一列有值時在圖上顯示，不畫假線 */
+  dataIssueField?: string;
   xTickInterval: number;
   strokeColors: string[];
   xAxis?: ChartAxisConfig;

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId } from 'react';
 import type { LineChartEventLabelStyle, LineChartSeriesConfig, LineChartWidget } from '../types';
 import { TrendingUp } from 'lucide-react';
 import { useWidgetData } from './useWidgetData';
@@ -16,7 +16,6 @@ import {
   chartPlotSize,
   formatAxisValue,
   hourTickOffsets,
-  interpolateYAtMinute,
   makeScale,
   parseYDataValue,
   parseTimeValue,
@@ -92,11 +91,9 @@ function UnifiedLineChart({
   const pad = resolveChartPadding(widget);
   const { cw, ch } = chartPlotSize(width, height, pad);
   const liveTime = isLiveTimeAxis(widget);
-  const nowMin = useChartNow(liveTime, 2_000);
-  const scales = useMemo(
-    () => buildChartScales(data, widget, yFields, nowMin),
-    [data, widget, yFields, nowMin],
-  );
+  const { nowMs, nowMin } = useChartNow(liveTime, 2_000);
+  const clipId = `chart-clip-${useId().replace(/:/g, '')}`;
+  const scales = buildChartScales(data, widget, yFields, nowMin, nowMs);
   const xScale = makeScale(scales.xView.min, scales.xView.max, cw);
   const yScale = makeScale(scales.yView.min, scales.yView.max, ch);
   const yPix = (v: number) => ch - yScale(v);
@@ -107,22 +104,23 @@ function UnifiedLineChart({
   const anchorNow = scales.clockNow ?? nowMin;
   const nowMinute = liveTime ? 0 : (scales.xView.now ?? nowMin);
   const nowX = xScale(nowMinute);
-  const primaryYs = data.map(d =>
-    primary ? parseYDataValue(d[primary.yField], scales.yUnit) : null,
-  );
-  const actualXs: number[] = [];
-  const actualYs: number[] = [];
-  data.forEach((_row, i) => {
-    const yv = primaryYs[i];
-    if (yv !== null) {
-      actualXs.push(scales.xs[i] ?? i);
-      actualYs.push(yv);
-    }
-  });
-  const nowYVal =
-    liveTime && actualXs.length
-      ? interpolateYAtMinute(actualXs, actualYs, nowMinute)
-      : null;
+  /**
+   * 「現在」端點：主線最後一個有值、而且不在未來的點（後端那份資料的現在，跟即時數值同一個算法）。
+   * 值是 0 也照畫；不在資料之間插值、不拿未來的點。
+   */
+  let nowPoint: { x: number; y: number } | null = null;
+  const nowSeries = seriesList.find(series => series.nowEndpoint) ?? primary;
+  const nowColor = nowSeries?.color ?? primaryColor;
+  if (liveTime && nowSeries) {
+    data.forEach((row, i) => {
+      const yv = parseYDataValue(row[nowSeries.yField], scales.yUnit);
+      const xv = scales.xs[i] ?? i;
+      if (yv === null || xv > nowMinute + 0.01) return;
+      if (!nowPoint || xv >= nowPoint.x) nowPoint = { x: xv, y: yv };
+    });
+  }
+  const nowEndpoint = nowPoint as { x: number; y: number } | null;
+  const dataIssue = widget.dataIssueField ? String(data[0]?.[widget.dataIssueField] ?? '').trim() : '';
 
   const highlightTime = resolveHighlightTime(widget);
   let highlightIdx =
@@ -167,6 +165,7 @@ function UnifiedLineChart({
     cw,
     ch,
     liveClockNow: liveTime ? anchorNow : undefined,
+    liveNowMs: liveTime ? nowMs : undefined,
   };
   const xBandRects = xBand ? buildAxisBandRects({ ...bandParams, band: xBand }) : [];
   const yBandRects = yBand ? buildAxisBandRects({ ...bandParams, band: yBand }) : [];
@@ -194,6 +193,9 @@ function UnifiedLineChart({
   return (
     <ChartSvg width={width} height={height}>
       <defs>
+        <clipPath id={clipId}>
+          <rect x={0} y={-6} width={cw} height={ch + 6} />
+        </clipPath>
         <linearGradient id="capacity-area-fill" x1="0" y1="1" x2="0" y2="0">
           <stop offset="28.36%" stopColor="rgba(43, 127, 255, 0)" />
           <stop offset="78.36%" stopColor="rgba(43, 127, 255, 0.127404)" />
@@ -272,75 +274,88 @@ function UnifiedLineChart({
           </text>
         )}
 
+        {/* 線畫在可視區裁切範圍內：視窗邊界外的點保留（線段跟邊界相交處照樣畫到邊緣），不丟端點 */}
+        <g clipPath={`url(#${clipId})`}>
         {seriesList.map(series => {
           const color = series.color ?? '#06b6d4';
           const sw = series.strokeWidth ?? 2;
-          const linePoints: Array<{ x: number; y: number }> = [];
+          // 缺值（null）把線斷開：不跨缺段連成完整線，也不補 0
+          const runs: Array<Array<{ x: number; y: number }>> = [];
+          let run: Array<{ x: number; y: number }> = [];
           data.forEach((d, i) => {
-            const xv = scales.xs[i] ?? i;
             const yv = parseYDataValue(d[series.yField], scales.yUnit);
-            if (yv === null) return;
-            if (xv < scales.xView.min || xv > scales.xView.max) return;
-            if (yv < scales.yView.min || yv > scales.yView.max) return;
-            linePoints.push({ x: xScale(xv), y: yPix(yv) });
+            if (yv === null) {
+              if (run.length) runs.push(run);
+              run = [];
+              return;
+            }
+            run.push({ x: xScale(scales.xs[i] ?? i), y: yPix(yv) });
           });
-          const pts = linePoints.map(p => `${p.x},${p.y}`).join(' ');
-          const areaPath = series.areaFill && linePoints.length >= 2
-            ? `M ${linePoints[0].x},${linePoints[0].y} ${linePoints.slice(1).map(p => `L ${p.x},${p.y}`).join(' ')} L ${linePoints[linePoints.length - 1].x},${ch} L ${linePoints[0].x},${ch} Z`
-            : '';
+          if (run.length) runs.push(run);
 
           return (
             <g key={series.id}>
-              {areaPath && (
-                <path d={areaPath} fill="url(#capacity-area-fill)" stroke="none" />
-              )}
-              {pts && (
+              {series.areaFill && runs.map((points, ri) => points.length >= 2 && (
+                <path
+                  key={`area-${ri}`}
+                  d={`M ${points[0].x},${points[0].y} ${points.slice(1).map(p => `L ${p.x},${p.y}`).join(' ')} L ${points[points.length - 1].x},${ch} L ${points[0].x},${ch} Z`}
+                  fill="url(#capacity-area-fill)"
+                  stroke="none"
+                />
+              ))}
+              {runs.map((points, ri) => (
                 <polyline
-                  points={pts}
+                  key={`line-${ri}`}
+                  points={points.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="none"
                   stroke={color}
                   strokeWidth={sw}
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
-              )}
-              {data.map((d, i) => {
-                const xv = scales.xs[i] ?? i;
-                const yv = parseYDataValue(d[series.yField], scales.yUnit);
-                if (yv === null || xv < scales.xView.min || xv > scales.xView.max) return null;
-                return (
-                  <circle key={`pt-${series.id}-${i}`} cx={xScale(xv)} cy={yPix(yv)} r={2.5} fill={color} />
-                );
-              })}
+              ))}
+              {series.showPoints !== false && runs.flat().map((p, pi) => (
+                <circle key={`pt-${series.id}-${pi}`} cx={p.x} cy={p.y} r={2.5} fill={color} />
+              ))}
             </g>
           );
         })}
+        </g>
 
-        {liveTime && nowYVal !== null && nowYVal > 0 && nowX >= 0 && nowX <= cw && primary && (
-          <>
-            <line
-              x1={nowX}
-              x2={nowX}
-              y1={0}
-              y2={ch}
-              stroke="rgba(148,163,184,0.45)"
-              strokeWidth={1}
-              strokeDasharray="4 3"
-            />
-            <circle cx={nowX} cy={yPix(nowYVal)} r={5} fill={primaryColor} />
-            <rect x={nowX - 28} y={yPix(nowYVal) - 32} width={56} height={22} rx={8} fill={calloutFill} />
+        {/* 現在：垂直虛線（營運時間）＋主線端點與數值 */}
+        {liveTime && nowX >= 0 && nowX <= cw && (
+          <line
+            x1={nowX}
+            x2={nowX}
+            y1={0}
+            y2={ch}
+            stroke="rgba(148,163,184,0.45)"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+        )}
+        {nowEndpoint && xScale(nowEndpoint.x) >= 0 && xScale(nowEndpoint.x) <= cw && (
+          <g data-chart-now-endpoint={nowEndpoint.y}>
+            <circle cx={xScale(nowEndpoint.x)} cy={yPix(nowEndpoint.y)} r={5} fill={nowColor} />
+            <rect x={xScale(nowEndpoint.x) - 28} y={yPix(nowEndpoint.y) - 32} width={56} height={22} rx={8} fill={calloutFill} />
             <text
-              x={nowX}
-              y={yPix(nowYVal) - 17}
+              x={xScale(nowEndpoint.x)}
+              y={yPix(nowEndpoint.y) - 17}
               textAnchor="middle"
               fill={calloutText}
               fontSize={calloutFs}
               fontWeight="500"
               fontFamily={FONT}
             >
-              {formatAxisValue(nowYVal, scales.yAxis)}
+              {formatAxisValue(nowEndpoint.y, scales.yAxis)}
             </text>
-          </>
+          </g>
+        )}
+
+        {dataIssue && (
+          <text x={6} y={14} fill="#FDC700" fontSize={calloutFs} fontFamily={FONT} data-chart-data-issue>
+            ⚠ {dataIssue}
+          </text>
         )}
 
         {highlightIdx >= 0 && inView(highlightIdx) && primary && (
@@ -460,7 +475,8 @@ export function LineChartWidgetView({ widget }: { widget: LineChartWidget }) {
   });
   const hasSource = !!(widget.dataSourceId || widget.dataUrl);
   const modeLabel = widget.viewportMode === 'data-centered' ? '資料為中心' : '定軸';
-  const showHeader = !!(widget.title?.trim() || loading || error || !hasSource);
+  // 已經有資料時，背景補查的「載入中」不佔標題列（不然每次輪詢圖都縮一下）
+  const showHeader = !!(widget.title?.trim() || (loading && data.length === 0) || error || !hasSource);
   const plot = plotSizeFromWidget(widget, showHeader ? HEADER_H : 0);
   const isEditPreview = shouldShowEditPreview(isEditMode, hasBinding, data.length > 0);
   const previewLabel = resolveWidgetPreviewLabel({ ...widget, type: 'line-chart' });

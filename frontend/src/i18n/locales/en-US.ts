@@ -3051,6 +3051,7 @@ const enUS: DeepStringify<typeof zhTW> = {
           legendName: 'Legend name',
           lineWidth: 'Line width (px)',
           eventLabels: 'Event labels',
+          showPoints: 'Show data points (the now marker and event flags stay)',
           labelField: 'Label field',
           flagField: 'Flag field (optional)',
           textColorShort: 'Text color',

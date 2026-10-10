@@ -1,4 +1,6 @@
 import {
+  buildCapacityTrend,
+  type CapacityDay,
   formatHeadway,
   mergeDepartureLeads,
   nextSegment,
@@ -69,4 +71,74 @@ describe('operation-metrics', () => {
   });
 
 
+});
+
+describe('buildCapacityTrend', () => {
+  const DAY = 24 * 60 * 60_000;
+  const day0 = Date.UTC(2026, 9, 10) - 8 * 3600_000; // 台北 2026-10-10 00:00
+  const template = templateSegments({
+    attributes: [
+      { id: 'peak', name: '尖峰模式', capacityPphpd: 1400, color: '#FF8904' },
+      { id: 'off', name: '離峰模式', capacityPphpd: 0, color: '#00D3F2' },
+      { id: 'greet', name: '招呼模式', capacityPphpd: 365, color: '#00D492' },
+    ],
+    intervals: [
+      { startTime: '00:00', endTime: '05:00', attributeId: 'greet' },
+      { startTime: '05:00', endTime: '07:00', attributeId: 'off' },
+      { startTime: '07:00', endTime: '10:00', attributeId: 'peak' },
+      { startTime: '10:00', endTime: '23:00', attributeId: 'off' },
+      { startTime: '23:00', endTime: '00:00', attributeId: 'greet' },
+    ],
+  });
+  const days: CapacityDay[] = [
+    { dayStart: day0 - DAY, segments: template, templateIssue: null },
+    { dayStart: day0, segments: template, templateIssue: null },
+    { dayStart: day0 + DAY, segments: template, templateIssue: null },
+  ];
+  const fmt = (ts: number) => new Date(ts + 8 * 3600_000).toISOString().slice(11, 16);
+  const build = (now: number, actualAt: (ts: number) => number | null, issue: string | null = null, d: CapacityDay[] = days) =>
+    buildCapacityTrend({ now, days: d, pastMinutes: 120, futureMinutes: 240, bucketMinutes: 10, actualAt, dataIssue: issue, formatTime: fmt });
+
+  it('gray line follows the template across the whole window (incl. future and legal 0), as steps at segment boundaries', () => {
+    const now = day0 + (6 * 60 + 20) * 60_000;
+    const rows = build(now, () => null);
+    expect(rows[0].ts).toBeLessThanOrEqual(now - 120 * 60_000);
+    expect(rows.at(-1)!.ts).toBeGreaterThanOrEqual(now + 240 * 60_000);
+    expect(rows.every((row) => row.forecast_util !== null)).toBe(true);
+    expect(rows.some((row) => row.forecast_util === 0)).toBe(true);
+    const boundary = rows.filter((row) => row.ts === day0 + 7 * 3600_000);
+    expect(boundary.map((row) => [row.forecast_util, row.segment_id, row.segment_color])).toEqual([
+      [0, 'off', '#00D3F2'],
+      [1400, 'peak', '#FF8904'],
+    ]);
+    // 時間戳排序，不是 HH:mm 字串
+    expect(rows.map((row) => row.ts)).toEqual([...rows.map((row) => row.ts)].sort((a, b) => a - b));
+  });
+
+  it('blue line stops at now, keeps 0, leaves gaps as null and marks the now row', () => {
+    const now = day0 + 8 * 3600_000 + 5 * 60_000;
+    const runStart = day0 + 7 * 3600_000;
+    const rows = build(now, (ts) => (ts < runStart ? null : 0));
+    expect(rows.filter((row) => row.ts > now).every((row) => row.actual_util === null)).toBe(true);
+    expect(rows.filter((row) => row.ts < runStart).every((row) => row.actual_util === null)).toBe(true);
+    const nowRow = rows.find((row) => row.is_now)!;
+    expect(nowRow).toMatchObject({ ts: now, actual_util: 0, now_ms: now });
+  });
+
+  it('crosses midnight with dated timestamps and per-day templates', () => {
+    const now = day0 + DAY + 30 * 60_000; // 隔天 00:30
+    const rows = build(now, () => 100);
+    const times = rows.map((row) => row.time);
+    expect(times).toContain('23:00');
+    expect(times).toContain('00:30');
+    expect(rows.find((row) => row.time === '23:30')!.segment_id).toBe('greet');
+    expect(rows.find((row) => row.time === '23:30')!.ts).toBeLessThan(now);
+  });
+
+  it('a missing template is reported, never drawn as a fake line', () => {
+    const missing: CapacityDay[] = days.map((d) => ({ ...d, segments: null, templateIssue: '部署班表沒有綁定時間模板' }));
+    const rows = build(day0 + 8 * 3600_000, () => 500, '部署班表沒有綁定時間模板', missing);
+    expect(rows.every((row) => row.forecast_util === null)).toBe(true);
+    expect(rows[0].data_issue).toBe('部署班表沒有綁定時間模板');
+  });
 });

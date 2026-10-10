@@ -11,15 +11,15 @@ import {
   type ShiftCenterSummary,
 } from '../dispatch/daily-plan';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
-import { DELAY_TOLERANCE_MS, operatingDayStart } from '../operating-day/operating-day';
+import { DELAY_TOLERANCE_MS, localMidnight, operatingDayOf, operatingDayStart } from '../operating-day/operating-day';
 import {
+  buildCapacityTrend,
   DAY_MINUTES,
   formatClock,
   formatHeadway,
   mergeDepartureLeads,
   nextSegment,
   perVehiclePphpd,
-  plannedLeadsFromShift,
   pphpdAt,
   routesFromShift,
   segmentAt,
@@ -33,8 +33,6 @@ const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const TREND_BUCKET_MINUTES = 10;
 const TREND_PAST_MINUTES = 120;
 const TREND_FUTURE_MINUTES = 240;
-/** 實際運能低於計畫這個比例就在圖上標記 */
-const TREND_SHORTFALL_RATIO = 0.8;
 
 /** 台北時間今天 00:00（Epoch 毫秒） */
 function taipeiDayStart(now: number): number {
@@ -171,16 +169,19 @@ export class OperationMetricsService {
   /** 運能趨勢上方四個數值 */
   async getCapacitySummary(now = this.clock.now()) {
     const ctx = await this.loadCapacityContext(now);
-    const nowSecond = Math.round((now - ctx.dayStart) / 1000);
-    const nowMinute = nowSecond / 60;
-    const current = segmentAt(ctx.segments, nowMinute);
-    const next = nextSegment(ctx.segments, nowMinute);
+    const today = ctx.days.find((day) => day.isCurrent)!;
+    const nowMinute = (now - today.dayStart) / 60_000;
+    const segments = today.segments ?? [];
+    const current = segmentAt(segments, nowMinute);
+    const next = nextSegment(segments, nowMinute);
     const vehicles = await this.maintenanceDistributionService.getVehicleDistribution();
     const standby = vehicles.find((row) => row.status_code === 'STANDBY')?.vehicle_count ?? 0;
+    const live = ctx.actualAt(now);
     return {
-      live_val: roundTo(pphpdAt(ctx.actualLeads, nowSecond, ctx.vehicleCapacity), 10),
+      // 跟運能趨勢圖「現在」那一點同一個算法、同一個營運時刻；算不出來（沒有實際資料）就是 null
+      live_val: live,
       target_val: current?.pphpd ?? 0,
-      avail_val: roundTo(standby * perVehiclePphpd(ctx.body, ctx.vehicleCapacity), 10),
+      avail_val: roundTo(standby * perVehiclePphpd(today.body, ctx.vehicleCapacity), 10),
       avail_hint: `可調度${standby}輛`,
       next_val: next?.pphpd ?? 0,
       next_hint: next ? formatClock(next.startMinute) : '—',
@@ -188,85 +189,105 @@ export class OperationMetricsService {
       // 目前時段的目標班距：部署班表綁定的時間模板裡，這個時段屬性設定的班距
       headway_seconds: current?.headwaySeconds ?? null,
       headway_line: `班距 ${formatHeadway(current?.headwaySeconds ?? null)}`,
+      data_issue: ctx.dataIssue,
     };
   }
 
-  /** 運能趨勢圖：計畫（班表發車）與實際（訂單實際發車）pphpd，過去 2 小時到未來 4 小時 */
+  /**
+   * 運能趨勢圖：過去 2 小時到未來 4 小時（營運時間，帶日期的時間戳）。
+   * 灰線＝部署班表綁定的時間模板各時段的預期運能；藍線＝實際發車換算的運能，只到現在。
+   * 規則見 operation-metrics.ts buildCapacityTrend。
+   */
   async getCapacityTrend(now = this.clock.now()) {
     const ctx = await this.loadCapacityContext(now);
-    const nowMinute = (now - ctx.dayStart) / 60_000;
-    const firstBucket = Math.floor((nowMinute - TREND_PAST_MINUTES) / TREND_BUCKET_MINUTES) * TREND_BUCKET_MINUTES;
-    const lastBucket = Math.ceil((nowMinute + TREND_FUTURE_MINUTES) / TREND_BUCKET_MINUTES) * TREND_BUCKET_MINUTES;
-    const rows: Array<Record<string, unknown>> = [];
-    let previousShort = false;
-    for (let minute = firstBucket; minute <= lastBucket; minute += TREND_BUCKET_MINUTES) {
-      const sampleMinute = minute <= nowMinute && minute + TREND_BUCKET_MINUTES > nowMinute ? nowMinute : minute;
-      const second = Math.round(sampleMinute * 60);
-      const forecast = roundTo(pphpdAt(ctx.plannedLeads, second, ctx.vehicleCapacity), 10);
-      const past = sampleMinute <= nowMinute;
-      const actual = past ? roundTo(pphpdAt(ctx.actualLeads, second, ctx.vehicleCapacity), 10) : null;
-      const short = actual != null && forecast > 0 && actual < forecast * TREND_SHORTFALL_RATIO;
-      rows.push({
-        time: formatClock(sampleMinute),
-        actual_util: actual,
-        forecast_util: forecast,
-        segment_code: past ? 'IN_SERVICE' : 'SCHEDULED',
-        // 只標記「開始不足」的那一點，連續不足不重複標
-        is_anomaly: short && !previousShort,
-        anomaly_label: short && !previousShort
-          ? `低於計畫 ${Math.round(100 * (1 - (actual ?? 0) / forecast))}%`
-          : null,
-      });
-      previousShort = short;
-    }
-    return rows;
+    return buildCapacityTrend({
+      now,
+      days: ctx.days,
+      pastMinutes: TREND_PAST_MINUTES,
+      futureMinutes: TREND_FUTURE_MINUTES,
+      bucketMinutes: TREND_BUCKET_MINUTES,
+      actualAt: ctx.actualAt,
+      dataIssue: ctx.dataIssue,
+      formatTime: (ts) => formatClock((ts - localMidnight(ts)) / 60_000),
+    });
   }
 
-  private async loadCapacityContext(now: number): Promise<{
-    body: Record<string, unknown>;
-    dayStart: number;
-    vehicleCapacity: number;
-    segments: ReturnType<typeof templateSegments>;
-    plannedLeads: DepartureLead[];
-    actualLeads: DepartureLead[];
-  }> {
-    // 營運日與班表都取每日計畫（跟班次中心同一份），時間是營運時間
-    const day = this.clock.operatingDay();
-    const dayStart = operatingDayStart(day) ?? taipeiDayStart(now);
+  /** 某營運日採用的班表與它綁定的時間模板 */
+  private async loadCapacityDay(day: string, isCurrent: boolean) {
+    const dayStart = operatingDayStart(day) ?? taipeiDayStart(this.clock.now());
+    // 今天會自動採用部署中的班表；過去的日子只讀當天的紀錄，沒有就是沒有
     const adoption = await this.engine.ensureDailyPlan(day);
     const shift = adoption ? await this.adoptedShift(adoption.shift_id) : null;
     const body = shift?.body ?? {};
-
     let templateBody: Record<string, unknown> | null = null;
+    let templateIssue: string | null = null;
     const templateId = typeof body.timeTemplateId === 'string' ? body.timeTemplateId.trim() : '';
-    if (templateId) {
+    if (!shift) {
+      templateIssue = `${day} 沒有採用的班表`;
+    } else if (!templateId) {
+      templateIssue = '部署班表沒有綁定時間模板';
+    } else {
       try {
         templateBody = (await this.timeTemplateService.getTemplateDetail(templateId)).body;
       } catch (err) {
         this.logger.warn(`找不到班表綁定的時間模板 ${templateId}：${(err as Error).message}`);
+        templateIssue = `讀不到班表綁定的時間模板 ${templateId}`;
       }
     }
-    const vehicleCapacity = Number(templateBody?.vehicleCapacity) || 0;
-    const routes = routesFromShift(body);
+    const segments = templateBody ? templateSegments(templateBody) : null;
+    if (templateBody && segments!.length === 0) templateIssue = '時間模板沒有有效的時段';
+    return {
+      day,
+      dayStart,
+      isCurrent,
+      shiftId: shift?.shiftId ?? null,
+      body,
+      templateBody,
+      segments: segments && segments.length > 0 ? segments : null,
+      templateIssue,
+    };
+  }
 
-    // 班表是日循環：前一天延續到今天、今天延續到明天的班次都要算進取樣視窗
-    const dayLeads = plannedLeadsFromShift(body, routes);
-    const plannedLeads = [-1, 0, 1].flatMap((day) =>
-      dayLeads.map((lead) => ({ ...lead, atSecond: lead.atSecond + day * DAY_MINUTES * 60 })));
+  private async loadCapacityContext(now: number) {
+    // 營運日與班表都取每日計畫（跟班次中心同一份），時間是營運時間
+    const day = this.clock.operatingDay();
+    const today = await this.loadCapacityDay(day, true);
+    const previousDay = operatingDayOf(today.dayStart - 12 * 60 * 60 * 1000);
+    const yesterday = await this.loadCapacityDay(previousDay, false);
+    // 明天：班表是日循環，預期運能沿用今天部署中的模板（只用在灰線；實際值一律不跨日複製）
+    const tomorrow = { ...today, day: operatingDayOf(today.dayStart + 36 * 60 * 60 * 1000), dayStart: today.dayStart + DAY_MS, isCurrent: false };
+    const days = [yesterday, today, tomorrow];
 
+    const vehicleCapacity = Number(today.templateBody?.vehicleCapacity) || 0;
+    const dataIssue = today.templateIssue
+      ?? (vehicleCapacity > 0 ? null : '時間模板沒有設定車輛載客量，無法換算運能');
+
+    // 實際發車：昨天與今天各自採用的那份班表的正線訂單，以實際開始執行的營運時刻為準
+    // （沒有實際開始時刻的不算，不拿計畫時刻冒充）。重播時只算這一次執行。
+    const replay = this.clock.replayRun();
     const actualLeads: DepartureLead[] = [];
-    if (shift) {
+    for (const source of [yesterday, today]) {
+      if (!source.shiftId) continue;
+      const routes = routesFromShift(source.body);
+      const params: unknown[] = [source.shiftId, source.day];
+      let runFilter = '';
+      if (replay?.runId) {
+        params.push(replay.runId);
+        runFilter = `AND payload->>'plan_run_id' = $${params.length}`;
+      }
       const rows: Array<{ vehicle_code: string; route_code: string | null; route_id: string | null; started_at: string }> = await this.dataSource.query(
         `SELECT vehicle_code,
                 payload->>'route_code' AS route_code,
                 route_id,
-                COALESCE((payload->>'op_started_at')::bigint, (payload->>'actual_started_at')::bigint, planned_start) AS started_at
+                COALESCE((payload->>'op_started_at')::bigint, (payload->>'actual_started_at')::bigint) AS started_at
          FROM operation_orders
          WHERE line_kind = 'MAINLINE'
            AND payload->>'plan_shift_id' = $1
            AND payload->>'operating_day' = $2
-           AND status IN ('PROCESSING', 'END')`,
-        [shift.shiftId, day],
+           AND status IN ('PROCESSING', 'END')
+           AND COALESCE(payload->>'op_started_at', payload->>'actual_started_at') IS NOT NULL
+           ${runFilter}`,
+        params,
       );
       const routeIdByCode = new Map(routes.filter((route) => route.routeCode).map((route) => [route.routeCode!, route.routeId] as const));
       const directionByRoute = new Map(routes.map((route) => [route.routeId, route.directionKey] as const));
@@ -275,7 +296,8 @@ export class OperationMetricsService {
         const routeKey = (row.route_code ? routeIdByCode.get(row.route_code) : undefined) ?? row.route_id ?? '';
         if (!routeKey) continue;
         const list = byVehicle.get(row.vehicle_code) ?? [];
-        list.push({ routeKey, atSecond: Math.round((Number(row.started_at) - dayStart) / 1000) });
+        // 秒數一律以今天零點為基準，昨天的發車是負數，跨午夜的班距照算
+        list.push({ routeKey, atSecond: Math.round((Number(row.started_at) - today.dayStart) / 1000) });
         byVehicle.set(row.vehicle_code, list);
       }
       for (const segments of byVehicle.values()) {
@@ -283,7 +305,14 @@ export class OperationMetricsService {
       }
     }
 
-    return { body, dayStart, vehicleCapacity, segments: templateSegments(templateBody), plannedLeads, actualLeads };
+    // 實際資料從哪裡開始有：重播是這次執行開始的時刻；正式營運是昨天零點（往前沒有載入）
+    const actualFrom = replay?.startedAt ?? yesterday.dayStart;
+    const actualAt = (ts: number): number | null => {
+      if (vehicleCapacity <= 0 || ts < actualFrom || ts > now) return null;
+      return roundTo(pphpdAt(actualLeads, Math.round((ts - today.dayStart) / 1000), vehicleCapacity), 10);
+    };
+
+    return { days, vehicleCapacity, dataIssue, actualAt };
   }
 
   /** 每日計畫的班表內容：跟部署中是同一份就用它的快取，否則讀那一份 */

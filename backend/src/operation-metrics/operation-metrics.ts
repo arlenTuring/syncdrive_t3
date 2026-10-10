@@ -33,6 +33,9 @@ export type TemplateSegment = {
   pphpd: number;
   /** 時段屬性設定的目標班距（秒）；模板沒設就是 null */
   headwaySeconds: number | null;
+  /** 時段屬性（尖峰、離峰、招呼…）的 ID 與顏色：運能趨勢色帶直接用模板的顏色 */
+  attributeId: string | null;
+  color: string | null;
 };
 
 export type DepartureLead = { directionKey: string; atSecond: number };
@@ -95,6 +98,8 @@ export function templateSegments(templateBody: Record<string, unknown> | null): 
       label: str(interval.name) ?? str(attr?.name) ?? '',
       pphpd: Number(attr?.capacityPphpd) || 0,
       headwaySeconds: Number(attr?.headwaySeconds) > 0 ? Number(attr?.headwaySeconds) : null,
+      attributeId: str(interval.attributeId),
+      color: str(attr?.color),
     });
   }
   return segments.sort((a, b) => a.startMinute - b.startMinute);
@@ -214,4 +219,136 @@ export function formatHeadway(seconds: number | null): string {
   if (seconds == null || !(seconds > 0)) return '—';
   const total = Math.round(seconds);
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+
+/* ─────────────────────────── 運能趨勢圖 ─────────────────────────── */
+
+/** 某個營運日的運能資料：該日採用的班表所綁定的時間模板時段，與該日的實際發車 */
+export type CapacityDay = {
+  /** 營運日零點（Epoch 毫秒） */
+  dayStart: number;
+  /** 模板時段；模板缺失或無效時為 null（搭配 templateIssue） */
+  segments: TemplateSegment[] | null;
+  templateIssue: string | null;
+};
+
+export type CapacityTrendRow = {
+  /** 營運時間（Epoch 毫秒）——圖的 X 軸用它，不用只有時分的字串排序 */
+  ts: number;
+  /** 顯示用 HH:mm（營運時間） */
+  time: string;
+  /** 模板此刻時段的預期運能；模板缺失或該時刻沒有時段就是 null */
+  forecast_util: number | null;
+  /** 實際運能；未來、或沒有實際資料的時段是 null（不補 0） */
+  actual_util: number | null;
+  segment_id: string | null;
+  segment_label: string | null;
+  segment_color: string | null;
+  /** 這一列是「現在」（跟即時數值同一個時刻、同一個算法） */
+  is_now: boolean;
+  /** 後端算這份資料時的營運時刻 */
+  now_ms: number;
+  /**
+   * 異常標記：只有真實的異常事件才標。目前沒有接到這類資料來源，一律 false／null。
+   * （實際運能是過去 60 分鐘的班距換算，時段一切換就必然低於新時段的預期，那不是異常。）
+   */
+  is_anomaly: boolean;
+  anomaly_label: string | null;
+  /** 資料問題（模板缺失、沒設載客量…）；有問題時圖上要顯示，不畫假線 */
+  data_issue: string | null;
+};
+
+/**
+ * 運能趨勢：過去 pastMinutes 到未來 futureMinutes，每 bucketMinutes 取樣，另外加上「現在」與每個
+ * 時段邊界（邊界前後各一列，灰線照時段階梯呈現，不在兩個時段之間平滑出不存在的數值）。
+ *
+ * - 灰線（forecast_util）：取樣時刻所屬營運日的模板時段預期運能；跟上方「目標數值」「下段數值」
+ *   同一份時段資料。模板合法的 0 照畫；模板缺失／無效就是 null 並回報 data_issue。
+ * - 藍線（actual_util）：只到現在；actualAt 回 null（沒有實際資料）的地方斷開，不補 0。
+ */
+export function buildCapacityTrend(args: {
+  now: number;
+  days: CapacityDay[];
+  pastMinutes: number;
+  futureMinutes: number;
+  bucketMinutes: number;
+  /** 某時刻的實際運能；沒有實際資料可算時回 null */
+  actualAt: (ts: number) => number | null;
+  dataIssue: string | null;
+  formatTime: (ts: number) => string;
+}): CapacityTrendRow[] {
+  const { now, days, pastMinutes, futureMinutes, bucketMinutes, actualAt, dataIssue, formatTime } = args;
+  const bucketMs = bucketMinutes * 60_000;
+  const from = now - pastMinutes * 60_000;
+  const to = now + futureMinutes * 60_000;
+  const sortedDays = [...days].sort((a, b) => a.dayStart - b.dayStart);
+
+  const dayOf = (ts: number) => {
+    let found: CapacityDay | null = null;
+    for (const day of sortedDays) if (day.dayStart <= ts) found = day;
+    return found;
+  };
+  const segmentFor = (ts: number): TemplateSegment | null => {
+    const day = dayOf(ts);
+    if (!day?.segments) return null;
+    return segmentAt(day.segments, (ts - day.dayStart) / 60_000);
+  };
+
+  type Sample = { ts: number; segment: TemplateSegment | null; isNow: boolean };
+  // 時段邊界：每個營運日的每個時段起點（跨午夜的時段起點在前一天；相鄰兩天算到同一點只留一個）
+  const boundaries = new Set<number>();
+  for (const day of sortedDays) {
+    for (const segment of day.segments ?? []) {
+      for (const offsetDay of [0, 1]) {
+        const boundary = day.dayStart + (segment.startMinute + offsetDay * DAY_MINUTES) * 60_000;
+        if (boundary > from && boundary < to) boundaries.add(boundary);
+      }
+    }
+  }
+  const samples: Sample[] = [];
+  // 取樣格對齊營運日零點（10 分鐘整除 60，跨午夜也對齊）；落在邊界上的格子由邊界那兩列代表
+  const anchor = sortedDays[0]?.dayStart ?? 0;
+  for (let ts = anchor + Math.floor((from - anchor) / bucketMs) * bucketMs; ts <= to + bucketMs; ts += bucketMs) {
+    if (ts < from - bucketMs || boundaries.has(ts)) continue;
+    samples.push({ ts, segment: segmentFor(ts), isNow: false });
+  }
+  samples.push({ ts: now, segment: segmentFor(now), isNow: true });
+  for (const boundary of boundaries) {
+    const before = segmentFor(boundary - 1);
+    const after = segmentFor(boundary);
+    // 前後是同一種時段、預期運能也一樣（例如兩天的招呼模式接在一起）：不是邊界
+    if (before?.attributeId === after?.attributeId && before?.pphpd === after?.pphpd) {
+      samples.push({ ts: boundary, segment: after, isNow: false });
+      continue;
+    }
+    samples.push({ ts: boundary, segment: before, isNow: false });
+    samples.push({ ts: boundary, segment: after, isNow: false });
+  }
+  // 依時間排序；同一時刻保留插入順序（邊界：舊時段在前、新時段在後）
+  const ordered = samples
+    .map((sample, index) => ({ sample, index }))
+    .sort((a, b) => a.sample.ts - b.sample.ts || a.index - b.index)
+    .map(({ sample }) => sample);
+
+  const rows: CapacityTrendRow[] = [];
+  for (const sample of ordered) {
+    const forecast = sample.segment ? sample.segment.pphpd : null;
+    const actual = sample.ts <= now ? actualAt(sample.ts) : null;
+    rows.push({
+      ts: sample.ts,
+      time: formatTime(sample.ts),
+      forecast_util: forecast,
+      actual_util: actual,
+      segment_id: sample.segment?.attributeId ?? null,
+      segment_label: sample.segment?.label ?? null,
+      segment_color: sample.segment?.color ?? null,
+      is_now: sample.isNow,
+      now_ms: now,
+      is_anomaly: false,
+      anomaly_label: null,
+      data_issue: dataIssue,
+    });
+  }
+  return rows;
 }

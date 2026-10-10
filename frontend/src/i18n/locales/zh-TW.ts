@@ -3004,6 +3004,7 @@ const zhTW = {
           legendName: '圖例名稱',
           lineWidth: '線寬(px)',
           eventLabels: '事件標籤',
+          showPoints: '顯示資料點（現在端點與事件標記不受影響）',
           labelField: '標籤欄位',
           flagField: '旗標欄位（可選）',
           textColorShort: '文字色',
