@@ -43,6 +43,21 @@ function notCancelledSql(o: string): string {
   return `NOT (${o}.status = 'FAULTED' AND ${o}.payload ? 'cancel_requested_at')`;
 }
 
+/**
+ * 過渡單（出廠、入廠、待命、暫停、空車移動）的短名稱：下單時存的 transition_label；舊單沒有就照
+ * 結構化的任務子類型推待命／暫停，其他一律中性的「過渡」，不從代號或位置猜。班次卡標題與車輛卡標籤共用。
+ */
+function transitionLabelSql(o: string): string {
+  return `CASE
+    WHEN NULLIF(TRIM(${o}.payload->>'transition_label'), '') IS NOT NULL THEN TRIM(${o}.payload->>'transition_label')
+    WHEN COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), ${o}.payload->>'task_type') = 'standby'
+      THEN TRIM(CONCAT('待命 ', COALESCE(NULLIF(${o}.payload->>'yard_slot_id', ''), ${o}.maint_station, '')))
+    WHEN COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), ${o}.payload->>'task_type') = 'idle'
+      THEN TRIM(CONCAT('暫停 ', COALESCE(NULLIF(${o}.payload->>'yard_slot_id', ''), ${o}.maint_station, '')))
+    ELSE '過渡'
+  END`;
+}
+
 export const EVENT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_events,
@@ -396,19 +411,28 @@ SELECT
   CASE
     WHEN active_order.business_kind = 'MAINLINE' THEN active_order.trip_code
     WHEN active_order.business_kind = 'MAINTENANCE' THEN active_order.maint_type_label
+    WHEN active_order.business_kind = 'TRANSITION' THEN '過渡'
     ELSE NULL
   END AS badge_label,
   CASE
     WHEN active_order.business_kind = 'MAINLINE' THEN 'mainline'
     WHEN active_order.business_kind = 'MAINTENANCE' THEN 'maintenance'
+    WHEN active_order.business_kind = 'TRANSITION' THEN 'transition'
     ELSE NULL
   END AS badge_kind,
+  -- 過渡標籤的提示：出廠 E3、入廠 D2、待命 D3、暫停 D1（跟班次卡標題同一套規則）
+  CASE
+    WHEN active_order.business_kind = 'TRANSITION' THEN ${transitionLabelSql('active_order')}
+    ELSE active_order.trip_code
+  END AS badge_detail,
   CASE
     WHEN active_order.business_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_bg, '#422006')
+    WHEN active_order.business_kind = 'TRANSITION' THEN '#6D28D9'
     ELSE COALESCE(m.trip_badge_bg, '#7e57c2')
   END AS trip_badge_bg,
   CASE
     WHEN active_order.business_kind = 'MAINTENANCE' THEN COALESCE(active_order.maint_type_color, '#FD9A00')
+    WHEN active_order.business_kind = 'TRANSITION' THEN '#FFFFFF'
     ELSE COALESCE(m.trip_badge_color, '#f3e8ff')
   END AS trip_badge_color,
   COALESCE(m.badge_outline, '0') AS badge_outline,
@@ -609,12 +633,7 @@ SELECT
   -- trip_code 原樣保留（詳情、紀錄、MQTT 對應都用它）
   CASE
     WHEN o.business_kind <> 'TRANSITION' THEN o.trip_code
-    WHEN NULLIF(TRIM(o.payload->>'transition_label'), '') IS NOT NULL THEN TRIM(o.payload->>'transition_label')
-    WHEN COALESCE(NULLIF(o.payload->>'maintenance_task_type', ''), o.payload->>'task_type') = 'standby'
-      THEN TRIM(CONCAT('待命 ', COALESCE(NULLIF(o.payload->>'yard_slot_id', ''), o.maint_station, '')))
-    WHEN COALESCE(NULLIF(o.payload->>'maintenance_task_type', ''), o.payload->>'task_type') = 'idle'
-      THEN TRIM(CONCAT('暫停 ', COALESCE(NULLIF(o.payload->>'yard_slot_id', ''), o.maint_station, '')))
-    ELSE '過渡'
+    ELSE ${transitionLabelSql('o')}
   END AS display_code,
   CONCAT(o.trip_code, ' ', COALESCE(o.display_name, o.vehicle_code)) AS trip_header,
   CASE WHEN o.business_kind = 'TRANSITION' THEN '過渡' ELSE o.card_label END AS direction_label,
