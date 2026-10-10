@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  AlertTriangle,
   ClipboardList,
   DoorOpen,
   FileText,
@@ -21,6 +22,7 @@ import TimeTemplatesApp from '../time-templates';
 import MaintenanceTasksApp from '../maintenance-tasks';
 import ShiftListApp from '../shift-list';
 import ShiftDeploymentApp from '../shift-deployment';
+import DegradedOperationApp from '../degraded-operation';
 import DispatchSchedulingApp from '../dispatch-scheduling';
 import PsdControlApp from '../psd-control';
 import VirtualFenceManagementApp from '../virtual-fence-management';
@@ -80,6 +82,12 @@ function useWorkspaceChrome(
       return {
         title: t('nav.items.shift-deployment'),
         icon: <Activity className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'degraded-operation') {
+      return {
+        title: t('nav.items.degraded-operation'),
+        icon: <AlertTriangle className="size-4 text-amber-400" aria-hidden />,
       };
     }
     if (view === 'dispatch-scheduling') {
@@ -265,6 +273,14 @@ export default function ScheduleManagementApp({
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.shift-deployment') })}>
               <ShiftDeploymentApp />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'degraded-operation' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
+            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.degraded-operation') })}>
+              <DegradedOperationApp />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}

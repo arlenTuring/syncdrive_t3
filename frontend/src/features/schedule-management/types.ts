@@ -30,7 +30,7 @@ export type ScheduleNavItem = ShellNavItem;
 
 export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
   { id: 'shift-deployment', label: 'nav.items.shift-deployment', enabled: true },
-  { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: false },
+  { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: true },
   { id: 'dispatch-scheduling', label: 'nav.items.dispatch-scheduling', enabled: true },
   { id: 'psd-control', label: 'nav.items.psd-control', enabled: true },
 ];
