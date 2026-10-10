@@ -11,6 +11,10 @@ export function inferInvalidateTagsFromSql(sql: string | undefined): string[] {
     tags.add('domain:event_center');
     tags.add('table:security_event_log');
   }
+  if (s.includes('MAP_VERSIONS')) {
+    // 讀圖資（例如現行站名）：圖資保存後重新查
+    tags.add('domain:map_stations');
+  }
   if (s.includes('OPERATION_ORDERS')) {
     tags.add('table:operation_orders');
     tags.add('domain:shift_center');

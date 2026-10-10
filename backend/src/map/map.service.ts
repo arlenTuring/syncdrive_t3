@@ -1,4 +1,5 @@
 import {
+  InternalServerErrorException,
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -6,6 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 import { Repository } from 'typeorm';
 import { backendScriptPath } from '../common/backend-script-path';
 import { MapEntity } from '../database/entities/map.entity';
@@ -115,6 +117,7 @@ export class MapService implements OnModuleInit {
     private readonly maps: Repository<MapEntity>,
     @InjectRepository(MapVersion)
     private readonly mapVersions: Repository<MapVersion>,
+    private readonly invalidation: DatasourceInvalidationService,
   ) {}
 
   onModuleInit() {
@@ -216,7 +219,36 @@ export class MapService implements OnModuleInit {
       mapDocument: body.mapDocument,
     });
     await this.saveMapDraftToDb(mapId, body);
+    // 站名等圖資內容改了：班次卡、ETA、圖台重新取一次（名稱在讀取時才解析，訂單與班表不動）
+    this.invalidation.emit(
+      [DS_TAGS.MAP_STATIONS, DS_TAGS.MAINLINE_SHIFTS, DS_TAGS.MAINTENANCE_SHIFTS, DS_TAGS.SHIFT_CENTER],
+      `map_saved:${mapId}`,
+    );
     return written as PublishedMapLibraryDocumentDto;
+  }
+
+  /**
+   * 現行站名：這張圖上每個停靠點的正式名稱，以站點 ID（stationId）與停靠點設施 ID 兩種鍵查。
+   *
+   * 名稱規則跟圖資的營運站點清單同一套（map-operation-nodes.js effectiveStationName：自訂顯示名稱
+   * → stationName）。只用明確的 ID 對應，不比對名稱、編號或順序；不同地圖各自一份。
+   * 讀的是已保存的那份圖資（檔案修改時間快取，保存後立即生效）。圖不存在就是空的，呼叫端沿用快照。
+   */
+  stationNameIndex(mapId: string | null | undefined): Map<string, string> {
+    const index = new Map<string, string>();
+    const id = String(mapId ?? '').trim();
+    if (!id) return index;
+    try {
+      for (const station of this.getOperationNodes(id).stations) {
+        // 沒有名稱時登記簿會拿站點 ID 頂替：那不是名稱，呼叫端保留快照
+        if (!station.stationName || station.stationName === station.stationId) continue;
+        index.set(station.stationId, station.stationName);
+        if (station.facilityId) index.set(station.facilityId, station.stationName);
+      }
+    } catch {
+      // 找不到這張圖：回空的
+    }
+    return index;
   }
 
   /** 存一份到資料庫；資料庫不通時不擋存檔（檔案那一份已經寫好了），但要留紀錄 */
@@ -275,7 +307,9 @@ export class MapService implements OnModuleInit {
         );
       }
     } catch (err) {
+      // 資料庫是大家共用的那一份：沒寫進去就要讓保存失敗，不能回假成功
       console.warn(`[map-library] 寫入資料庫失敗（${mapId}）`, err);
+      throw new InternalServerErrorException(`圖資沒有存進資料庫：${(err as Error).message}`);
     }
   }
 

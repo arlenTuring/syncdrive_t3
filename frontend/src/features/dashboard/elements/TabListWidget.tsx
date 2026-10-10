@@ -287,6 +287,8 @@ export function TabListWidgetView({
     freshnessPolicy: activeTab?.freshnessPolicy,
     refreshMode: activeTab?.refreshMode ?? 'event',
     refreshInterval: activeTab?.refreshInterval,
+    // 頁籤設定的失效標籤（訂單、營運時鐘、圖資保存…）；沒傳的話 REST 來源推不出標籤，就只會在加速重播時補查
+    invalidateTags: activeTab?.invalidateTags,
   });
   const mqttState = useMqttData(activeTab ?? {});
 

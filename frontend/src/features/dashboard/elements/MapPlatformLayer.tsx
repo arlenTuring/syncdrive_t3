@@ -1,6 +1,7 @@
 /**
  * 圖台渲染層：供「圖台容器」與舊版 map-canvas 子元件共用。
  */
+import { subscribeDatasourceInvalidation } from '../utils/datasourceInvalidationBus';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Map as MapIcon } from 'lucide-react';
 import type { MapAreaObject, MapPixelSize } from '../../map-editor/types/area';
@@ -94,6 +95,16 @@ export function MapPlatformLayer({
   const vehicleDisplayHeightPx =
     vehicleTemplate?.displayHeightPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX;
 
+  /** 這張圖在別處保存（例如改了站名）：重新載入，不用手動清快取 */
+  const [mapRevision, setMapRevision] = useState(0);
+  useEffect(() => {
+    if (!mapId) return;
+    const resolved = resolveMapId(mapId);
+    return subscribeDatasourceInvalidation((payload) => {
+      if (payload.reason === `map_saved:${resolved}`) setMapRevision((value) => value + 1);
+    });
+  }, [mapId]);
+
   useEffect(() => {
     if (!mapId) {
       setAreas([]);
@@ -138,7 +149,7 @@ export function MapPlatformLayer({
     return () => {
       cancelled = true;
     };
-  }, [mapId]);
+  }, [mapId, mapRevision]);
 
   if (loading) {
     return (

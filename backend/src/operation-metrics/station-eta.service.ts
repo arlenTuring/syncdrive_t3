@@ -6,6 +6,7 @@ import { OperatingClockService } from '../operating-day/operating-clock.service'
 import { operatingDayReference } from '../operating-day/operating-day';
 import { RedisService } from '../redis/redis.service';
 import { MapService } from '../map/map.service';
+import { resolveMapIdFromShiftBody } from '../operation-shift/timetable/station-alias';
 import { vehicleEtaConfig } from '../vehicle/eta/vehicle-eta.config';
 import {
   mergeStationEvents,
@@ -37,6 +38,8 @@ export class StationEtaService {
     stops: PlannedStop[];
     stopsByTrip: Map<string, string[]>;
     names: Map<string, string>;
+    /** 班表引用的地圖：站點 ID 屬於這張圖 */
+    mapId: string | null;
   } | null = null;
 
   constructor(
@@ -87,11 +90,23 @@ export class StationEtaService {
       });
     }
 
+    /*
+     * 站名在這裡（快取之後）才解析：同一張圖、同一個站點 ID 的最新保存名稱優先，圖上沒有才用班表
+     * 展開時的快照。計畫快取只以班表版本為鍵，圖資改名不會改版本，所以名稱不能跟著快取。
+     */
+    const currentNames = this.mapService.stationNameIndex(plan?.mapId ?? activeMapId);
+    const nameOf = (stationId: string, snapshot: string) => currentNames.get(stationId) ?? snapshot;
+    const stationNames = new Map<string, string>();
+    for (const [stationId, snapshot] of plan?.names ?? []) stationNames.set(stationId, nameOf(stationId, snapshot));
+    for (const station of stations) {
+      const current = currentNames.get(station.stationId);
+      if (current && !stationNames.has(station.stationId)) stationNames.set(station.stationId, current);
+    }
     const groups = mergeStationEvents({
       stations,
-      stationNames: plan?.names ?? new Map(),
+      stationNames,
       // 保留完整計畫，mergeStationEvents 才能判斷某張舊待發單是否已被後續實際任務超越。
-      planned: plan?.stops ?? [],
+      planned: (plan?.stops ?? []).map((stop) => ({ ...stop, stationName: nameOf(stop.stationId, stop.stationName) })),
       stopsByTrip: plan?.stopsByTrip ?? new Map(),
       live,
       tripStates,
@@ -137,7 +152,7 @@ export class StationEtaService {
         });
       });
     }
-    this.planCache = { key, stops, stopsByTrip, names };
+    this.planCache = { key, stops, stopsByTrip, names, mapId: resolveMapIdFromShiftBody(plan.body ?? {}) };
     return this.planCache;
   }
 

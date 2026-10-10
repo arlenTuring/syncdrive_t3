@@ -9,6 +9,7 @@ import { In, Repository } from 'typeorm';
 import { Vehicle } from '../database/entities/vehicle.entity';
 import { OperationOrder } from '../database/entities/operation-order.entity';
 import { OperationShiftService } from '../operation-shift/operation-shift.service';
+import { resolveMapIdFromShiftBody } from '../operation-shift/timetable/station-alias';
 import { OrderService } from '../order/order.service';
 import { dispatchConfig } from './dispatch.config';
 import {
@@ -191,6 +192,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     planDigest: string;
     /** 採用紀錄的版本；跟 planDigest 不同代表班表在採用後被改過 */
     adoptedDigest: string;
+    /** 班表引用的地圖（站點 ID 屬於這張圖）；舊班表沒記就是 null */
+    mapId: string | null;
   } | null> {
     const day = operatingDayOf(localMidnight(reference));
     const resolved = await this.resolveDailySource(day, { allowAuto: true });
@@ -202,7 +205,13 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     if (resolved.adoptVia) {
       adoption = await this.saveAdoption(day, source, plan, planDigest, resolved.adoption, resolved.adoptVia);
     }
-    return { ...plan, operatingDay: day, planDigest, adoptedDigest: adoption!.plan_digest };
+    return {
+      ...plan,
+      operatingDay: day,
+      planDigest,
+      adoptedDigest: adoption!.plan_digest,
+      mapId: resolveMapIdFromShiftBody(source.body),
+    };
   }
 
   /**
@@ -577,7 +586,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    */
   private async issueOrder(
     item: PlannedDispatch,
-    plan: { shiftId: string; shiftName: string; operatingDay: string; planDigest: string },
+    plan: { shiftId: string; shiftName: string; operatingDay: string; planDigest: string; mapId?: string | null },
   ): Promise<void> {
     const { shiftId, shiftName } = plan;
     const fields = dispatchOrderFields(item);
@@ -603,6 +612,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         [DAILY_PLAN_PAYLOAD_KEYS.shiftId]: shiftId,
         [DAILY_PLAN_PAYLOAD_KEYS.planDigest]: plan.planDigest,
         [DAILY_PLAN_PAYLOAD_KEYS.tripCode]: item.tripCode,
+        // 站點 ID 屬於哪張圖：現行站名依「同一張圖、同一個站點 ID」解析最新保存的名稱
+        ...(plan.mapId ? { plan_map_id: plan.mapId } : {}),
         planned_depart_at: item.departAt,
         planned_arrive_at: item.arriveAt,
         origin: item.origin && {

@@ -58,6 +58,57 @@ function transitionLabelSql(o: string): string {
   END`;
 }
 
+/**
+ * 現行站名（同一張圖、同一個站點 ID → 圖資上最新保存的名稱），規則跟後端 MapService.stationNameIndex
+ * （map-operation-nodes.js effectiveStationName）相同：
+ * - 只看有站點 ID、有場域座標的停靠點（DockingPoint）；鍵是站點 ID（stationId）與停靠點設施 ID 兩種。
+ * - 名稱：自訂顯示名稱 → stationName → 舊版 dockingStation；都沒有就不列（呼叫端保留快照）。
+ * - 讀資料庫裡已保存的圖資（map_versions 第 0 版＝最新保存）；不同地圖各自一份，不比對名稱。
+ * 只用在現行畫面；訂單上的快照不改。
+ */
+const MAP_STATION_NAMES_CTE = `map_station_names AS (
+  SELECT DISTINCT ON (mv.map_id, k.station_key)
+    mv.map_id,
+    k.station_key,
+    COALESCE(
+      NULLIF(regexp_replace(TRIM(f->>'customName'), '\\s+', ' ', 'g'), ''),
+      NULLIF(regexp_replace(TRIM(f->'parameters'->>'stationName'), '\\s+', ' ', 'g'), ''),
+      CASE WHEN f->'parameters'->>'dockingStation' IN ('N2W', 'T3', 'S2W') THEN f->'parameters'->>'dockingStation' END
+    ) AS station_name
+  FROM map_versions mv
+  CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(mv.body->'areas') = 'array' THEN mv.body->'areas' ELSE '[]'::jsonb END) a
+  CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a->'facilities') = 'array' THEN a->'facilities' ELSE '[]'::jsonb END) f
+  CROSS JOIN LATERAL (VALUES (f->>'id'), (TRIM(f->'parameters'->>'stationId'))) k(station_key)
+  WHERE mv.version = 0
+    AND f->>'type' = 'DockingPoint'
+    AND NULLIF(TRIM(f->'parameters'->>'stationId'), '') IS NOT NULL
+    AND jsonb_typeof(f->'parameters'->'refFieldXM') = 'number'
+    AND jsonb_typeof(f->'parameters'->'refFieldYM') = 'number'
+    AND NULLIF(k.station_key, '') IS NOT NULL
+)`;
+
+/** 單一站點的現行站名（需要 MAP_STATION_NAMES_CTE）；圖上沒有回 NULL */
+function currentStationNameSql(o: string, stationIdExpr: string): string {
+  return `(SELECT msn.station_name FROM map_station_names msn
+      WHERE msn.map_id = ${o}.payload->>'plan_map_id' AND msn.station_key = ${stationIdExpr} AND msn.station_name IS NOT NULL
+      LIMIT 1)`;
+}
+
+/** 訂單站序（payload.stations），站名換成現行站名；其餘欄位原樣 */
+function currentStationsSql(o: string): string {
+  return `COALESCE((
+      SELECT jsonb_agg(
+        CASE WHEN msn.station_name IS NOT NULL THEN s.st || jsonb_build_object('station_name', msn.station_name) ELSE s.st END
+        ORDER BY s.ord
+      )
+      FROM jsonb_array_elements(
+        CASE WHEN jsonb_typeof(${o}.payload->'stations') = 'array' THEN ${o}.payload->'stations' ELSE '[]'::jsonb END
+      ) WITH ORDINALITY AS s(st, ord)
+      LEFT JOIN map_station_names msn
+        ON msn.map_id = ${o}.payload->>'plan_map_id' AND msn.station_key = s.st->>'station_id' AND msn.station_name IS NOT NULL
+    ), '[]'::jsonb)`;
+}
+
 export const EVENT_CENTER_SUMMARY_SQL = `
 SELECT
   COUNT(*)::int AS total_events,
@@ -484,10 +535,15 @@ FROM (
 
 /** 正線班次：每筆訂單（YYMMDD-trip_code）+ route_id 站點巢狀結構 */
 export const MAINLINE_SHIFTS_SQL = `
-WITH active_orders AS (
+WITH ${MAP_STATION_NAMES_CTE},
+active_orders AS (
   SELECT
     o.*,
     v.display_name,
+    -- 站序與起訖點換成目前圖資上的站名（同一張圖、同一個站點 ID；圖上沒有就保留下單時的快照）
+    ${currentStationsSql('o')} AS current_stations,
+    ${currentStationNameSql('o', "o.payload->'origin'->>'id'")} AS current_origin_name,
+    ${currentStationNameSql('o', "o.payload->'destination'->>'id'")} AS current_destination_name,
     COALESCE(NULLIF(TRIM(o.payload->>'card_label'), ''), '營運') AS card_label,
     ${orderBusinessKindSql('o')} AS business_kind,
     CASE
@@ -686,23 +742,23 @@ SELECT
    * payload->'stations' 裡，每一班都不同，照它取才是這一班真的會停的站。
    */
   COALESCE(
-    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
+    (SELECT st->>'station_name' FROM jsonb_array_elements(o.current_stations) st
       ORDER BY (st->>'order')::int ASC LIMIT 1),
-    NULLIF(o.payload->'origin'->>'name', ''),
+    NULLIF(COALESCE(o.current_origin_name, o.payload->'origin'->>'name'), ''),
     NULLIF(o.route_origin, ''),
     '—'
   ) AS st_a,
   COALESCE(
-    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
+    (SELECT st->>'station_name' FROM jsonb_array_elements(o.current_stations) st
       ORDER BY (st->>'order')::int ASC OFFSET 1 LIMIT 1),
     NULLIF(o.route_mid, ''),
-    NULLIF(o.payload->'destination'->>'name', ''),
+    NULLIF(COALESCE(o.current_destination_name, o.payload->'destination'->>'name'), ''),
     '—'
   ) AS st_b,
   COALESCE(
-    (SELECT st->>'station_name' FROM jsonb_array_elements(o.payload->'stations') st
+    (SELECT st->>'station_name' FROM jsonb_array_elements(o.current_stations) st
       ORDER BY (st->>'order')::int DESC LIMIT 1),
-    NULLIF(o.payload->'destination'->>'name', ''),
+    NULLIF(COALESCE(o.current_destination_name, o.payload->'destination'->>'name'), ''),
     NULLIF(o.route_destination, ''),
     '—'
   ) AS st_c,
@@ -724,7 +780,7 @@ SELECT
       )::text
       FROM jsonb_array_elements(
         CASE
-          WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations'
+          WHEN jsonb_typeof(o.current_stations) = 'array' THEN o.current_stations
           ELSE '[]'::jsonb
         END
       ) st
@@ -748,7 +804,7 @@ SELECT
       (
         SELECT GREATEST((st->>'order')::int - 2, 0)
         FROM jsonb_array_elements(
-          CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END
+          CASE WHEN jsonb_typeof(o.current_stations) = 'array' THEN o.current_stations ELSE '[]'::jsonb END
         ) st
         WHERE st->>'station_id' = o.payload->'current_leg'->>'target_station_id'
         LIMIT 1
@@ -808,13 +864,13 @@ SELECT
        */
       SELECT st->>'station_name'
       FROM jsonb_array_elements(
-        CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END
+        CASE WHEN jsonb_typeof(o.current_stations) = 'array' THEN o.current_stations ELSE '[]'::jsonb END
       ) st
       WHERE (st->>'order')::int >= COALESCE(
         (
           SELECT (target->>'order')::int
           FROM jsonb_array_elements(
-            CASE WHEN jsonb_typeof(o.payload->'stations') = 'array' THEN o.payload->'stations' ELSE '[]'::jsonb END
+            CASE WHEN jsonb_typeof(o.current_stations) = 'array' THEN o.current_stations ELSE '[]'::jsonb END
           ) target
           WHERE target->>'station_id' = COALESCE(
             NULLIF(TRIM(o.next_station), ''),
@@ -831,8 +887,8 @@ SELECT
       ORDER BY (st->>'order')::int
       LIMIT 1
     ),
-    CASE WHEN o.status = 'PENDING' THEN o.payload->'origin'->>'name' END,
-    o.payload->'destination'->>'name',
+    CASE WHEN o.status = 'PENDING' THEN COALESCE(o.current_origin_name, o.payload->'origin'->>'name') END,
+    COALESCE(o.current_destination_name, o.payload->'destination'->>'name'),
     '—'
   ) AS next_station,
   CASE
