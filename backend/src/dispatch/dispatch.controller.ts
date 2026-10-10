@@ -8,6 +8,7 @@ import { OperatingClockService } from '../operating-day/operating-clock.service'
 import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
+import { MapService } from '../map/map.service';
 
 /**
  * 即時調度引擎的內部維運介面。
@@ -22,6 +23,7 @@ export class DispatchController {
     private readonly engine: DispatchEngineService,
     private readonly simulationPlan: SimulationPlanService,
     private readonly operatingClock: OperatingClockService,
+    private readonly mapService: MapService,
   ) {}
 
   @Get('daily-plan')
@@ -148,13 +150,16 @@ export class DispatchController {
     const plan = await this.engine.planToday();
     if (!plan) return { deployed: false, message: '目前沒有部署中的班表' };
     const detailed = full === '1' || full === 'true';
+    // 現行計畫的站名：班表引用的那張圖上最新保存的名稱（站點 ID 不變）；計畫本身與版本摘要不動
+    const names = this.mapService.stationNameIndex(plan.mapId);
     return {
       deployed: true,
       shift_id: plan.shiftId,
       shift_name: plan.shiftName,
+      map_id: plan.mapId,
       trip_count: plan.planned.length,
       skipped: plan.skipped,
-      trips: plan.planned.map((item) => serializePlanned(item, detailed)),
+      trips: plan.planned.map((item) => serializePlanned(withCurrentStationNames(item, names), detailed)),
     };
   }
 
@@ -238,6 +243,22 @@ export class DispatchController {
 }
 
 /** /plan 與 /plan/shift/:id 共用的任務格式 */
+/** 呈現用：站點與起訖點換成目前圖資上的名稱（同一個 ID 才換；圖上沒有就保留快照） */
+function withCurrentStationNames(item: PlannedDispatch, names: Map<string, string>): PlannedDispatch {
+  if (names.size === 0) return item;
+  const point = <T extends { id: string; name: string; kind: string } | null | undefined>(value: T): T =>
+    value && value.kind === 'station' && names.has(value.id) ? { ...value, name: names.get(value.id)! } : value;
+  return {
+    ...item,
+    origin: point(item.origin),
+    destination: point(item.destination),
+    stations: item.stations.map((station) => ({
+      ...station,
+      stationName: names.get(station.stationId) ?? station.stationName,
+    })),
+  };
+}
+
 function serializePlanned(
   item: PlannedDispatch,
   detailed: boolean,
