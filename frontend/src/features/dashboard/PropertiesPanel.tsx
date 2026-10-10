@@ -1202,6 +1202,14 @@ function LineChartSeriesFields({
         <label className="flex items-center gap-2 text-xs text-zinc-400">
           <input
             type="checkbox"
+            checked={series.showPoints !== false}
+            onChange={e => patch({ showPoints: e.target.checked })}
+          />
+          {t('dashboard.properties.widgets.chart.showPoints')}
+        </label>
+        <label className="flex items-center gap-2 text-xs text-zinc-400">
+          <input
+            type="checkbox"
             checked={series.eventLabelsEnabled === true}
             onChange={e => patch({ eventLabelsEnabled: e.target.checked })}
           />

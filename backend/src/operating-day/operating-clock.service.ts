@@ -61,6 +61,16 @@ export class OperatingClockService implements OnModuleInit {
       : operatingDayOf(this.now(realTs));
   }
 
+  /**
+   * 目前這次重播：執行 ID 與開始時的營運時刻（實際資料最早只到這裡，之前沒有這次執行的紀錄）。
+   * 正式營運回 null。
+   */
+  replayRun(): { runId: string | null; startedAt: number } | null {
+    if (this.state.mode !== 'replay') return null;
+    const first = this.state.segments[0];
+    return first ? { runId: this.state.runId, startedAt: first.opStart } : null;
+  }
+
   snapshot(realNow = Date.now()) {
     return describeClock(this.state, realNow);
   }
