@@ -1,3 +1,4 @@
+import { ObstacleRingWidget } from './ObstacleRingWidget';
 import type { ChildWidget, AlertBannerWidget, VehicleAlertBannerWidget, VehicleContainerWidget, TabListWidget } from '../types';
 import { TextWidgetView }        from './TextWidget';
 import { ImageWidgetView }       from './ImageWidget';
@@ -47,6 +48,7 @@ export function WidgetRenderer({
     case 'status-badge':   return <StatusBadgeWidgetView widget={widget} />;
     case 'stat-card':      return <StatCardWidgetView widget={widget} />;
     case 'station-eta':    return <StationEtaWidgetView widget={widget} />;
+    case 'obstacle-ring':  return <ObstacleRingWidget widget={widget} />;
     case 'progress-bar':   return <ProgressBarWidgetView widget={widget} />;
     case 'clock':          return <ClockWidgetView widget={widget} />;
     case 'empty-state':    return <EmptyStateWidgetView widget={widget} />;

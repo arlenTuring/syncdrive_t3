@@ -3261,6 +3261,7 @@ const zhTW = {
           label: '載具樣板',
           description: '圖台載具外觀與行為樣板（執行期套用至所有即時車輛）',
         },
+        obstacleRing: { label: '八方向障礙指示', description: '車輛周圍八個提示點，各方向獨立綁資料欄位' },
         tabList: { label: 'Tab 清單表格', description: '可切 Tab 與自訂欄位子畫布的動態表格' },
       },
       containerItems: {

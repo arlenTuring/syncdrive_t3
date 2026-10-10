@@ -3314,6 +3314,10 @@ const enUS: DeepStringify<typeof zhTW> = {
           label: 'Vehicle template',
           description: 'Map vehicle look & behavior (applied to all live vehicles at runtime)',
         },
+        obstacleRing: {
+          label: 'Obstacle ring (8 directions)',
+          description: 'Eight indicator dots around a vehicle, each bound to its own field',
+        },
         tabList: {
           label: 'Tab list table',
           description: 'Tabbed table with custom column subcanvases',

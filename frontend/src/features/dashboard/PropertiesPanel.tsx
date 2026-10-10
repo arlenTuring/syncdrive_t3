@@ -18,6 +18,9 @@ import type {
   TabListTab,
   TabListColumn,
 } from './types';
+import { BUILTIN_BACKGROUND_IMAGES, canvasBackgroundCss } from './constants/backgroundImages';
+import { OBSTACLE_DIRECTION_LABELS } from './utils/obstacleDirection';
+import { OBSTACLE_DIRECTIONS, type ObstacleDirection, type ObstacleDirectionBinding, type ObstacleRingWidget } from './types';
 import { VehicleBehaviorSettingsFields } from '../vehicle-editor/model/VehicleBehaviorSettingsFields';
 import { useVehicleModelList } from '../vehicle-editor/model/useVehicleModelList';
 import { useMapVehicleModel } from '../vehicle-editor/model/useMapVehicleModel';
@@ -557,8 +560,43 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           <option value="default">{t('dashboard.properties.widgets.gauge.variantDefault')}</option>
           <option value="semi-arc">{t('dashboard.properties.widgets.gauge.variantSemiArc')}</option>
           <option value="ring">{t('dashboard.properties.widgets.gauge.variantRing')}</option>
+          <option value="band">數字＋水平色帶</option>
         </select>
       </Field>
+      {w.gaugeVariant === 'band' || w.gaugeVariant === 'semi-arc' ? (
+        <Field label="色帶方向">
+          <select
+            value={w.arcVariant ?? 'speed'}
+            onChange={e => onUpdate({ arcVariant: e.target.value as GaugeWidget['arcVariant'] })}
+            className={selectCls}
+          >
+            <option value="speed">速度：低綠 → 高紅</option>
+            <option value="load">電量：低紅 → 高綠</option>
+          </select>
+        </Field>
+      ) : null}
+      {w.gaugeVariant === 'band' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="小數位數">
+            <NumberInput
+              min={0}
+              max={4}
+              value={w.gaugeDecimals ?? 1}
+              onChange={n => onUpdate({ gaugeDecimals: Math.max(0, Math.min(4, Math.round(n))) })}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="色帶高度（px）">
+            <NumberInput
+              min={2}
+              max={24}
+              value={w.gaugeBandHeight ?? 6}
+              onChange={n => onUpdate({ gaugeBandHeight: Math.max(2, n) })}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      ) : null}
       
       <div className="grid grid-cols-3 gap-1.5">
         <Field label={t('dashboard.properties.min')}><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
@@ -1551,6 +1589,141 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   );
 }
 
+/**
+ * 八方向障礙指示：共用一個 MQTT 來源／topic（topic 用 ${vehicle_code} 跟著群組的每台車），
+ * 每個方向各自一條 JSON 路徑與判定方式。沒填路徑的方向顯示「未知」，不會變紅。
+ */
+function ObstacleRingSettings({
+  w,
+  onUpdate,
+  onDelete,
+}: {
+  w: ObstacleRingWidget;
+  onUpdate: (p: Partial<ObstacleRingWidget>) => void;
+  onDelete: () => void;
+}) {
+  const patchDirection = (direction: ObstacleDirection, patch: Partial<ObstacleDirectionBinding>) =>
+    onUpdate({
+      directions: {
+        ...w.directions,
+        [direction]: { ...(w.directions?.[direction] ?? { path: '', mode: 'boolean' }), ...patch },
+      },
+    });
+  return (
+    <div className="space-y-4">
+      <SH icon={<AlertTriangle size={13} />} label="八方向障礙指示" color="#fb7185" />
+      <p className="text-[10px] leading-relaxed text-zinc-500">
+        方向以卡片上的車頭（朝上）為準。只有資料明確表示偵測到才變紅；沒填路徑、沒資料、斷線、過期或值看不懂都顯示為半透明（未知），不當成安全。
+        字串 "false" 視為沒有偵測到。
+      </p>
+      <DataBindingSettings w={w} onUpdate={onUpdate} />
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="點大小">
+          <NumberInput min={2} max={40} value={w.dotSize ?? 8} onChange={n => onUpdate({ dotSize: Math.max(2, n) })} className={inputCls} />
+        </Field>
+        <Field label="無障礙（灰）">
+          <input type="color" value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+        </Field>
+        <Field label="有障礙（紅）">
+          <input type="color" value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+        </Field>
+      </div>
+      <div className="space-y-2">
+        {OBSTACLE_DIRECTIONS.map((direction) => {
+          const binding = w.directions?.[direction] ?? { path: '', mode: 'boolean' as const };
+          return (
+            <div key={direction} className="space-y-1 rounded border border-zinc-700/60 bg-zinc-800/30 p-2">
+              <div className="flex items-center gap-2">
+                <span className="w-8 shrink-0 text-[11px] font-semibold text-zinc-300">{OBSTACLE_DIRECTION_LABELS[direction]}</span>
+                <input
+                  value={binding.path}
+                  onChange={e => patchDirection(direction, { path: e.target.value })}
+                  placeholder="JSON 路徑（未設定＝未知）"
+                  className={`${inputCls} font-mono`}
+                  style={{ fontSize: 10 }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                <select
+                  value={binding.mode}
+                  onChange={e => patchDirection(direction, { mode: e.target.value as ObstacleDirectionBinding['mode'] })}
+                  className={selectCls}
+                  style={{ fontSize: 10 }}
+                >
+                  <option value="boolean">布林：true＝偵測到</option>
+                  <option value="distance">距離：≤ 門檻＝偵測到</option>
+                </select>
+                {binding.mode === 'distance' ? (
+                  <input
+                    type="number"
+                    value={binding.threshold ?? ''}
+                    onChange={e => patchDirection(direction, { threshold: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    placeholder="門檻（單位依協議）"
+                    className={inputCls}
+                    style={{ fontSize: 10 }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <PositionFields widget={w as ChildWidget} onUpdate={onUpdate as (p: Partial<ChildWidget>) => void} />
+      <DeleteBtn onDelete={onDelete} />
+    </div>
+  );
+}
+
+/**
+ * 背景圖片：從內建背景清單挑一張，或「無背景圖片」。圖片疊在背景顏色上、等比完整呈現。
+ * 群組（子畫布）選的背景會畫在每一張樣板卡片上。
+ */
+function BackgroundImagePicker({
+  value,
+  backgroundColor,
+  isGroup,
+  onChange,
+}: {
+  value: string;
+  backgroundColor: string;
+  isGroup: boolean;
+  onChange: (url: string) => void;
+}) {
+  const options = [{ id: '', label: '無背景圖片', url: '', width: 339, height: 191 }, ...BUILTIN_BACKGROUND_IMAGES];
+  return (
+    <Field label="背景圖片">
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="背景圖片">
+        {options.map((option) => {
+          const selected = (value || '') === option.url;
+          return (
+            <button
+              key={option.id || 'none'}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              title={option.label}
+              onClick={() => onChange(option.url)}
+              className={`rounded-md border p-1 text-left ${selected ? 'border-cyan-500 ring-1 ring-cyan-500/40' : 'border-zinc-700 hover:border-zinc-500'}`}
+            >
+              <div
+                className="w-full rounded"
+                style={{
+                  aspectRatio: `${option.width} / ${option.height}`,
+                  background: canvasBackgroundCss(backgroundColor, option.url, 'contain'),
+                }}
+              />
+              <span className="mt-1 block truncate text-[10px] text-zinc-400">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {isGroup ? (
+        <p className="mt-1 text-[10px] text-zinc-500">群組：背景圖畫在每一張樣板卡片上，背景顏色仍是整個群組的底色。</p>
+      ) : null}
+    </Field>
+  );
+}
+
 function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterTemplateEditMode }: {
   el: CanvasElementProps;
   onUpdate: (p: Partial<CanvasElementProps>) => void;
@@ -1626,6 +1799,14 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <Field label={t('dashboard.properties.height')}><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
       <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+      {el.canvasKind !== 'map-platform' ? (
+        <BackgroundImagePicker
+          value={el.backgroundImage ?? ''}
+          backgroundColor={el.backgroundColor}
+          isGroup={!!el.isGroup}
+          onChange={(url) => onUpdate({ backgroundImage: url, backgroundImageFit: 'contain' })}
+        />
+      ) : null}
       <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
 
       {isShiftCenter && (
@@ -3349,6 +3530,7 @@ export function PropertiesPanel({
               case 'segment-bar':    return <SegmentBarSettings {...props as any} />;
               case 'clock':          return <ClockSettings {...props as any} />;
               case 'station-eta':    return <StationEtaSettings {...props as any} />;
+              case 'obstacle-ring':  return <ObstacleRingSettings {...props as any} />;
               case 'empty-state':    return <EmptyStateSettings {...props as any} />;
               case 'map-canvas':     return <MapCanvasSettings {...props as any} />;
               case 'unit-telemetry-card': return <UnitTelemetrySettings {...props as any} />;

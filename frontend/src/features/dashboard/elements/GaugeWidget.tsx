@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react';
 import type { GaugeWidget as GaugeWidgetType } from '../types';
 import { useWidgetData } from './useWidgetData';
+import {
+  bandColorAt,
+  bandPosition,
+  formatGaugeValue,
+  LOAD_BAND_SEGMENTS,
+  SPEED_BAND_SEGMENTS,
+} from './gaugeBand';
 import { useMqttData } from './useMqttData';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import {
@@ -18,6 +25,69 @@ import {
 
 interface Props {
   widget: GaugeWidgetType;
+}
+
+/** 數字＋單位在上、水平色帶＋指示點在下（車輛資訊卡的速度／電量） */
+function BandGaugeView({ widget, value }: { widget: GaugeWidgetType; value: number | null }) {
+  const segments = widget.arcVariant === 'load' ? LOAD_BAND_SEGMENTS : SPEED_BAND_SEGMENTS;
+  const position = bandPosition(value, widget.min, widget.max);
+  const bandH = Math.max(2, widget.gaugeBandHeight ?? 6);
+  const dot = bandH + 4;
+  const valueColor = position === null ? '#a1a1aa' : bandColorAt(segments, position);
+  const stops = segments.flatMap((segment, index) => {
+    const from = index === 0 ? 0 : segments[index - 1].end;
+    return [`${segment.color} ${from * 100}%`, `${segment.color} ${segment.end * 100}%`];
+  });
+  const pad = resolveGaugeContentPaddingCss(widget.gaugeContentPadding);
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        padding: widget.gaugeContentPadding ? pad : '6px 8px',
+        background: widget.panelBackgroundColor ?? 'transparent',
+        borderRadius: widget.panelBorderRadius ?? 0,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: widget.gaugeTextGap ?? 4,
+      }}
+    >
+      <div
+        style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 3, lineHeight: 1.05, whiteSpace: 'nowrap' }}
+      >
+        <span style={{ fontSize: widget.gaugeValueFontSize ?? 22, color: valueColor }} data-gauge-value>
+          {formatGaugeValue(value, widget.gaugeDecimals)}
+        </span>
+        <span style={{ fontSize: widget.gaugeUnitFontSize ?? 12, color: '#e4e4e7' }}>{widget.unit}</span>
+      </div>
+      <div style={{ position: 'relative', height: dot, display: 'flex', alignItems: 'center' }}>
+        <div
+          style={{
+            width: '100%',
+            height: bandH,
+            borderRadius: bandH / 2,
+            background: `linear-gradient(90deg, ${stops.join(', ')})`,
+          }}
+        />
+        {position !== null ? (
+          <span
+            data-gauge-dot={position.toFixed(4)}
+            style={{
+              position: 'absolute',
+              left: `calc(${position * 100}% - ${(position * dot)}px)`,
+              width: dot,
+              height: dot,
+              borderRadius: '50%',
+              background: '#ffffff',
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
+            }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /** 設計稿：分段色弧 + 弧上徑向細指針 + 數值在弧內 bowl */
@@ -340,6 +410,18 @@ export function GaugeWidget({ widget }: Props) {
 
   const value = Math.max(widget.min, Math.min(widget.max, rawValue));
   const showOffline = !hasValue;
+
+  if (widget.gaugeVariant === 'band') {
+    // 色帶模式顯示真值（不夾在量程內），只有指示點夾在兩端
+    return (
+      <WidgetEditPreviewOutline
+        active={isEditPreview}
+        label={resolveWidgetPreviewLabel({ ...widget, type: 'gauge' })}
+      >
+        <BandGaugeView widget={widget} value={hasValue ? rawValue : null} />
+      </WidgetEditPreviewOutline>
+    );
+  }
 
   const wrap = (node: ReactNode) => (
     <WidgetEditPreviewOutline

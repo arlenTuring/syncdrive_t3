@@ -689,7 +689,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   let displaySelectedElementId = selectedElementId;
 
   if (editingGroup && subcanvasEdit && dualSubcanvas) {
-    const { editW, editH, laneW, laneH, gapW } = dualSubcanvas;
+    const { editW, editH, laneW, laneH, gapW, designW, designH } = dualSubcanvas;
     displayPlane = {
       id: 'template-plane-dual',
       name: t('dashboard.editorChrome.editDualName', { label: editingGroup.label }),
@@ -703,6 +703,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           y: 0,
           width: laneW,
           height: laneH,
+          backgroundImageArea: { width: designW, height: designH },
           isGroup: false,
           opacity: 100,
           label: t('dashboard.dualCanvas.defaultData'),
@@ -715,6 +716,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           y: 0,
           width: laneW,
           height: laneH,
+          backgroundImageArea: { width: designW, height: designH },
           isGroup: false,
           opacity: 100,
           label: t('dashboard.dualCanvas.normalData'),
@@ -726,7 +728,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     };
     displaySelectedElementId = dualEditFocusId;
   } else if (editingGroup && subcanvasEdit) {
-    const { editW, editH } = subcanvasEdit;
+    const { editW, editH, designW, designH } = subcanvasEdit;
     displayPlane = {
       id: 'template-plane',
       name: t('dashboard.editorChrome.editGroupTemplate', { label: editingGroup.label }),
@@ -739,6 +741,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         y: 0,
         width: editW,
         height: editH,
+        // 編輯區比樣板大：背景圖只畫在左上角的樣板設計尺寸內，跟執行時每張卡片一致
+        backgroundImageArea: { width: designW, height: designH },
         isGroup: false,
         opacity: 100,
         label: t('dashboard.editorChrome.labelTemplate', { label: editingGroup.label }),
@@ -1034,6 +1038,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         y: 0,
         width: editW,
         height: editH,
+        backgroundImageArea: {
+          width: editingTemplateGroup.templateWidth || editingTemplateGroup.width,
+          height: editingTemplateGroup.templateHeight || editingTemplateGroup.height,
+        },
         isGroup: false, // 編輯單一樣板內容時關閉群組渲染（不然會遞迴跑一次泛用群組管線）
         genericGroup: undefined,
         label: `${editingTemplateGroup.label} · ${editingTemplateDef?.name ?? ''}`,
