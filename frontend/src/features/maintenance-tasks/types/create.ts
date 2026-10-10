@@ -47,7 +47,15 @@ export type MaintenanceTaskBasicDraft = {
 
 export type MaintenanceFacilityEquipmentRow = {
   id: string;
+  /**
+   * 地圖設施 ID（這一列的識別）。地圖上改名不會變；後端讀取整備任務時依它帶出目前名稱。
+   * 舊資料沒有，由後端用明確關聯補上（見 backend maintenance-task-facilities.ts）。
+   */
+  equipmentId?: string;
+  /** 設施名稱（顯示用快照，讀取時會換成地圖上的目前名稱） */
   mapCode: string;
+  /** 後端在這張圖上找不到這個設施 */
+  unresolved?: boolean;
   /** 空字串表示無途經點 */
   waypointCode: string;
 };

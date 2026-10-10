@@ -163,7 +163,7 @@ export type MaintenanceBodySectionKey =
   | 'maintenance'
   | 'mobile';
 
-/** 從整備任務 body 抽出指定區段的設施代號（equipment.mapCode） */
+/** 從整備任務 body 抽出指定區段的設施識別（地圖設施 ID；舊資料沒有 ID 時用 equipment.mapCode） */
 export function extractFacilityMapCodes(
   maintenanceBody: Record<string, unknown> | null | undefined,
   sectionKey: MaintenanceBodySectionKey,
@@ -177,7 +177,11 @@ export function extractFacilityMapCodes(
   const codes: string[] = [];
   for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
-    const mapCode = (row as { mapCode?: unknown }).mapCode;
+    // 優先用地圖設施 ID（＝拓樸節點 ID，改名不變）；只有沒有 ID 的舊列才用名稱
+    const equipmentId = (row as { equipmentId?: unknown }).equipmentId;
+    const mapCode = typeof equipmentId === 'string' && equipmentId.trim()
+      ? equipmentId
+      : (row as { mapCode?: unknown }).mapCode;
     if (typeof mapCode !== 'string' || !mapCode.trim()) continue;
     const normalized = normalizeFacilityCode(mapCode);
     if (normalized === 'UNSPECIFIED') continue;

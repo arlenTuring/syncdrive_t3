@@ -536,3 +536,24 @@ describe('連續整備串的外掛班次', () => {
     assert.equal(entries[0]!.routeId, 'tn');
   });
 });
+
+describe('整備任務設施以地圖設施 ID 對應', () => {
+  it('有 equipmentId 時用 ID 比對拓樸節點，名稱改掉也對得到同一個節點', async () => {
+    const { extractFacilityMapCodes } = await import('./maintenanceFirstTripOrigins');
+    const { nodeMatchesMoveCardCodes } = await import('./moveCardShared');
+    const body = {
+      mobile: {
+        stepEnabled: true,
+        equipmentRows: [
+          { id: 'r1', equipmentId: '093', mapCode: '[備用]N2W下行出發' },
+          { id: 'r2', mapCode: 'D1' },
+        ],
+      },
+    };
+    const codes = extractFacilityMapCodes(body, 'mobile');
+    assert.deepEqual(codes, ['093', 'D1']);
+    // 地圖上 093 已改名為 NW下發2：仍以 ID 命中
+    assert.equal(nodeMatchesMoveCardCodes({ id: '093', label: 'NW下發2' }, codes), true);
+    assert.equal(nodeMatchesMoveCardCodes({ id: '091', label: 'NW下發1' }, codes), false);
+  });
+});

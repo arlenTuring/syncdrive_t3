@@ -1,5 +1,5 @@
 import { Loader2, Plus, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveActiveMaintenanceMapId } from '../api/fieldEquipmentApi';
 import type { FieldEquipmentItem } from '../api/fieldEquipmentApi';
@@ -68,10 +68,10 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
     };
   }, []);
 
-  const selectedCodes = useMemo(
-    () => new Set(rows.map((row) => row.mapCode).filter(Boolean)),
-    [rows],
-  );
+  /** 一列指到哪個設施：以設施 ID 為準；沒有 ID 的舊列才用名稱找（後端讀取時通常已補上 ID） */
+  const equipmentIdOf = (row: TRow): string =>
+    row.equipmentId || equipment.find((item) => item.mapCode === row.mapCode)?.equipmentId || '';
+  const selectedIds = new Set(rows.map(equipmentIdOf).filter(Boolean));
 
   const canAddRow = rows.length < equipment.length;
 
@@ -92,7 +92,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
 
   const optionsForRow = (row: TRow) =>
     equipment.filter(
-      (item) => item.mapCode === row.mapCode || !selectedCodes.has(item.mapCode),
+      (item) => item.equipmentId === equipmentIdOf(row) || !selectedIds.has(item.equipmentId),
     );
 
   return (
@@ -141,13 +141,24 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
               className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-3"
             >
               <select
-                value={row.mapCode}
-                onChange={(e) => updateRow(row.id, { mapCode: e.target.value } as Partial<TRow>)}
+                value={equipmentIdOf(row)}
+                onChange={(e) => {
+                  const item = equipment.find((candidate) => candidate.equipmentId === e.target.value);
+                  // 存設施 ID（識別）與目前名稱（顯示快照）
+                  updateRow(row.id, {
+                    equipmentId: item?.equipmentId ?? '',
+                    mapCode: item?.mapCode ?? '',
+                    unresolved: undefined,
+                  } as Partial<TRow>);
+                }}
                 className={SELECT_CLASS}
               >
                 <option value="">{t('maintenanceTasks.facilityRows.selectFacility')}</option>
+                {row.unresolved && !equipmentIdOf(row) ? (
+                  <option value="" disabled>{`${row.mapCode}（地圖上找不到這個設施）`}</option>
+                ) : null}
                 {optionsForRow(row).map((item) => (
-                  <option key={item.equipmentId} value={item.mapCode}>
+                  <option key={item.equipmentId} value={item.equipmentId}>
                     {item.mapCode}
                   </option>
                 ))}

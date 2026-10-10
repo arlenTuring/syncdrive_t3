@@ -66,8 +66,8 @@ export function StepStationDurationParams({
       return [
         ...facilities.items,
         ...stations.stations.map((station): FieldEquipmentItem => ({
+          // 識別是停靠點的地圖設施 ID（＝拓樸節點 ID）；站名只是顯示，改名不影響對應
           equipmentId: station.facilityId,
-          // 存的是站名——引擎比對拓樸節點時用的就是節點顯示名
           mapCode: station.stationName,
           equipmentKind: 'docking',
           objectCategory: 'facility',
