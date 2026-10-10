@@ -45,6 +45,7 @@ import { clearMapRevisionsForLibrary } from '../utils/mapRevisionHistory'
 import { NewMapPixelDialog } from './NewMapPixelDialog'
 import { SetPrimaryMapDialog } from './SetPrimaryMapDialog'
 import { BackToHomeButton } from '../../../components/BackToHomeButton'
+import { AnchoredPopover } from '../../../lib/AnchoredPopover'
 import { StatusTag, type StatusTagStyle } from '../../../components/StatusTag'
 import {
   fetchMapLibraryBackendStatus,
@@ -138,8 +139,9 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   const [page, setPage] = useState(1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
-  const rowMenuRef = useRef<HTMLDivElement>(null)
-  const importMenuRef = useRef<HTMLDivElement>(null)
+  /** 開著的那一列的「…」按鈕（選單以它定位，關閉後焦點回到它） */
+  const rowMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const importMenuButtonRef = useRef<HTMLButtonElement>(null)
 
   const refreshActiveStatus = useCallback(async () => {
     const status = await fetchMapLibraryBackendStatus()
@@ -526,21 +528,6 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     })
   }
 
-  useEffect(() => {
-    if (!openMenuId && !importMenuOpen) return
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (openMenuId && rowMenuRef.current && !rowMenuRef.current.contains(target)) {
-        setOpenMenuId(null)
-      }
-      if (importMenuOpen && importMenuRef.current && !importMenuRef.current.contains(target)) {
-        setImportMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [openMenuId, importMenuOpen])
-
   const columns: Array<{ key: MapLibrarySortKey; label: string; width: string }> = [
     { key: 'status', label: t('mapLibrary.columns.status'), width: 'w-[120px] min-w-[120px]' },
     { key: 'version', label: t('mapLibrary.columns.version'), width: 'w-[120px] min-w-[120px]' },
@@ -649,25 +636,34 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             }}
           />
           {/* 匯入：檔案、貼上、從伺服器載入收在同一顆按鈕 */}
-          <div ref={importMenuRef} className="relative">
+          <div className="relative">
             <button
+              ref={importMenuButtonRef}
               type="button"
               onClick={() => setImportMenuOpen((v) => !v)}
+              aria-haspopup="menu"
               aria-expanded={importMenuOpen}
               className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-[#51A2FF] transition hover:bg-[rgba(81,162,255,0.08)]"
             >
               <CloudDownload className="size-[18px]" aria-hidden />
               {t('mapLibrary.importFile')}
             </button>
-            {importMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl">
+            <AnchoredPopover
+              open={importMenuOpen}
+              anchorRef={importMenuButtonRef}
+              onClose={() => setImportMenuOpen(false)}
+              role="menu"
+              ariaLabel={t('mapLibrary.importFile')}
+              className="min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl"
+            >
                 <button
                   type="button"
                   onClick={() => {
                     setImportMenuOpen(false)
                     fileInputRef.current?.click()
                   }}
-                  className={menuItemClass}
+                  role="menuitem"
+                    className={menuItemClass}
                 >
                   <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
                   {t('mapLibrary.importFromFile')}
@@ -678,7 +674,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                     setImportMenuOpen(false)
                     setPasteOpen((v) => !v)
                   }}
-                  className={menuItemClass}
+                  role="menuitem"
+                    className={menuItemClass}
                 >
                   <FileText className="size-4 text-[#99A1AF]" aria-hidden />
                   {t('mapLibrary.pasteFile')}
@@ -689,13 +686,13 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                     setImportMenuOpen(false)
                     void handleOpenServerList()
                   }}
-                  className={menuItemClass}
+                  role="menuitem"
+                    className={menuItemClass}
                 >
                   <Server className="size-4 text-[#99A1AF]" aria-hidden />
                   {t('mapLibrary.loadFromServer')}
                 </button>
-              </div>
-            )}
+            </AnchoredPopover>
           </div>
           <button
             type="button"
@@ -893,17 +890,12 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                           <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
                             {formatMapListDate(entry.updatedAt)}
                           </td>
-                          {/* 選單開著的那一格要疊在後面幾列的固定欄之上，不然選單被下一列的「…」蓋住 */}
-                          <td
-                            className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-[#1f1f23] ${
-                              openMenuId === entry.libraryId ? '!z-[25]' : ''
-                            }`}
-                          >
-                            <div
-                              ref={openMenuId === entry.libraryId ? rowMenuRef : undefined}
-                              className="relative flex justify-center"
-                            >
+                          <td className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-[#1f1f23]`}>
+                            <div className="flex justify-center">
                               <button
+                                ref={openMenuId === entry.libraryId ? rowMenuButtonRef : undefined}
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === entry.libraryId}
                                 type="button"
                                 onClick={() =>
                                   setOpenMenuId((prev) =>
@@ -916,15 +908,23 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                               >
                                 <MoreHorizontal className="size-6" aria-hidden />
                               </button>
-                              {openMenuId === entry.libraryId && (
-                                <div className="absolute right-0 top-full z-40 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl">
+                              {/* 掛到 body：表格的 overflow-auto 不會裁切；首列、末列都依可用空間往上或往下開 */}
+                              <AnchoredPopover
+                                open={openMenuId === entry.libraryId}
+                                anchorRef={rowMenuButtonRef}
+                                onClose={() => setOpenMenuId(null)}
+                                role="menu"
+                                ariaLabel={t('common.moreActions')}
+                                className="min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl"
+                              >
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setOpenMenuId(null)
                                       onOpenMap(entry.libraryId)
                                     }}
-                                    className={menuItemClass}
+                                    role="menuitem"
+                    className={menuItemClass}
                                   >
                                     <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
                                     {t('mapLibrary.openTitle')}
@@ -936,7 +936,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                         setOpenMenuId(null)
                                         handleSetActive(entry)
                                       }}
-                                      className={menuItemClass}
+                                      role="menuitem"
+                    className={menuItemClass}
                                       title={t('mapLibrary.setActiveTitle')}
                                     >
                                       <MapPin className="size-4 text-[#99A1AF]" aria-hidden />
@@ -949,7 +950,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                       setOpenMenuId(null)
                                       startRename(entry)
                                     }}
-                                    className={menuItemClass}
+                                    role="menuitem"
+                    className={menuItemClass}
                                   >
                                     <Pencil className="size-4 text-[#99A1AF]" aria-hidden />
                                     {t('mapLibrary.renameTitle')}
@@ -960,7 +962,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                       setOpenMenuId(null)
                                       void handleDuplicate(entry.libraryId)
                                     }}
-                                    className={menuItemClass}
+                                    role="menuitem"
+                    className={menuItemClass}
                                   >
                                     <Copy className="size-4 text-[#99A1AF]" aria-hidden />
                                     {t('mapLibrary.duplicateTitle')}
@@ -971,7 +974,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                       setOpenMenuId(null)
                                       handleExport(entry)
                                     }}
-                                    className={menuItemClass}
+                                    role="menuitem"
+                    className={menuItemClass}
                                   >
                                     <Download className="size-4 text-[#99A1AF]" aria-hidden />
                                     {t('mapLibrary.exportTitle')}
@@ -982,13 +986,13 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                       setOpenMenuId(null)
                                       void handleDelete(entry)
                                     }}
+                                    role="menuitem"
                                     className={`${menuItemClass} hover:text-red-300`}
                                   >
                                     <Trash2 className="size-4 text-[#99A1AF]" aria-hidden />
                                     {t('common.delete')}
                                   </button>
-                                </div>
-                              )}
+                              </AnchoredPopover>
                             </div>
                           </td>
                         </tr>

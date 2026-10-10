@@ -31,12 +31,12 @@ export function VehicleContainerWidgetView({
           definition={definition}
           displayWidth={widget.width}
           displayHeight={widget.height}
-          fitMode="stretch"
+         
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-1 rounded bg-[#0a0f1a]/90 text-zinc-500">
           <Bus size={20} className="text-amber-500/60" />
-          <span className="text-[10px]">請編輯載具樣式</span>
+          <span className="text-[10px]">請選擇車輛模型</span>
         </div>
       )}
       <VehicleContainerBehaviorOverlay

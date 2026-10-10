@@ -381,7 +381,6 @@ export function FenceMapPanel({
           editMode={false}
           liveById={{}}
           areaVehicles={[]}
-          vehicleEditSizer={null}
           slotPreview={null}
           onSelectArea={() => {}}
           onSelectFacility={() => {}}

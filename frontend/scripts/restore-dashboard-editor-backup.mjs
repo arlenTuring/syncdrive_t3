@@ -13,7 +13,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const constantsDir = resolve(__dirname, '../src/features/dashboard/constants');
 const backupsDir = resolve(constantsDir, 'backups');
 const templatesDir = resolve(__dirname, '../public/dashboard-templates');
-const vehicleConstantsDir = resolve(__dirname, '../src/features/vehicle-editor/constants');
 
 const backupBase = process.argv[2] ?? 'dashboard-editor-backup-2026-06-14-user-tuned';
 const demoPlaneSrc = resolve(backupsDir, `${backupBase}.demo-plane.json`);
@@ -23,7 +22,6 @@ const vehiclesSrc = resolve(backupsDir, `${backupBase}.vehicles.json`);
 
 const snapshotOut = resolve(constantsDir, 'demoPlane.snapshot.json');
 const masterTemplateOut = resolve(templatesDir, 'syncdrive-master-dashboard-3840x1080.json');
-const vehicleSnapshotOut = resolve(vehicleConstantsDir, 'vehicleDefinitions.snapshot.json');
 
 function requireFile(path) {
   if (!existsSync(path)) {
@@ -62,12 +60,10 @@ if (template) {
 }
 
 if (vehiclesBackup?.vehicles?.length) {
-  writeFileSync(
-    vehicleSnapshotOut,
-    JSON.stringify(vehiclesBackup.vehicles, null, 2),
-    'utf8',
+  // 車輛模型不再打包成程式內建快照（前端已不讀它）；請到 圖資管理 → 車輛模型 →「匯入 JSON」上傳到後端
+  console.log(
+    `備份含 ${vehiclesBackup.vehicles.length} 筆車輛模型：未寫入程式碼，請在圖資管理 → 車輛模型匯入 ${vehiclesSrc}`,
   );
-  console.log(`已還原載具定義快照：${vehicleSnapshotOut}（${vehiclesBackup.vehicles.length} 筆）`);
 }
 
 if (fullBackup?.storage) {

@@ -133,6 +133,8 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
 
   return (
     <div
+      title={resolvedBadgeFinal?.detail && resolvedBadgeFinal.detail !== label ? resolvedBadgeFinal.detail : undefined}
+      data-badge-kind={resolvedBadgeFinal?.kind}
       style={{
         width: '100%',
         height: '100%',

@@ -10,6 +10,7 @@ import { SystemSetting } from '../database/entities/system-setting.entity';
 import {
   CreateDegradedOperationPlanDto,
   RestoreExecutionDto,
+  UpdateExecutionContentDto,
 } from './degraded-operation.dto';
 import {
   DegradedOperationService,
@@ -121,6 +122,97 @@ describe('degraded operation', () => {
   });
 });
 
+describe('degraded operation content and replay lifecycle', () => {
+  const immediate = {
+    name: '原名稱',
+    description: '原說明',
+    level: 2,
+    speed_limit_kmh: 25,
+    schedule_mode: 'immediate' as const,
+    time_zone: 'Asia/Taipei',
+    idempotency_key: 'content-test',
+  };
+
+  it('updates only name and description; level and speed stay unchanged even if sent', async () => {
+    const harness = createHarness(Date.parse('2026-10-10T02:15:30Z'));
+    const started = await harness.service.execute(immediate, 'tester');
+    const updated = await harness.service.updateContent(
+      started.execution_id,
+      {
+        name: '新名稱',
+        description: '新說明',
+        version: started.version,
+        // 舊版前端或惡意請求多帶的欄位：不得改變本次參數
+        level: 1,
+        speed_limit_kmh: 0,
+      } as never,
+      'tester',
+    );
+    expect(updated).toMatchObject({
+      name: '新名稱',
+      description: '新說明',
+      level: 2,
+      speed_limit_kmh: 25,
+    });
+    expect(harness.executions.get(started.execution_id)).toMatchObject({
+      level: 2,
+      speedLimitKmh: 25,
+    });
+  });
+
+  it('content DTO has no level field and validates without one', () => {
+    expect(
+      validateSync(
+        plainToInstance(UpdateExecutionContentDto, {
+          name: '名稱',
+          version: 1,
+        }),
+      ),
+    ).toHaveLength(0);
+    expect(
+      Object.keys(
+        plainToInstance(UpdateExecutionContentDto, { name: 'a', version: 1 }),
+      ),
+    ).not.toContain('level');
+  });
+
+  it('starts replay recording after an immediate start and stops it on restore', async () => {
+    const harness = createHarness(Date.parse('2026-10-10T02:15:30Z'));
+    const started = await harness.service.execute(immediate, 'tester');
+    expect(harness.replayRecorder.started).toEqual([started.execution_id]);
+    // 相同請求重送：不重複啟動保存
+    await harness.service.execute(immediate, 'tester');
+    expect(harness.replayRecorder.started).toHaveLength(1);
+    await harness.service.restore(
+      started.execution_id,
+      {
+        personnel_and_vehicles_cleared: true,
+        alarms_cleared: true,
+        version: started.version,
+      },
+      'tester',
+    );
+    expect(harness.replayRecorder.stopped).toEqual([started.execution_id]);
+  });
+
+  it('starts replay recording when a scheduled execution becomes due, not when it is booked', async () => {
+    const harness = createHarness(Date.parse('2026-10-10T02:15:30Z'));
+    const booked = await harness.service.execute(
+      {
+        ...immediate,
+        schedule_mode: 'scheduled',
+        scheduled_time: '10:16',
+        idempotency_key: 'book',
+      },
+      'tester',
+    );
+    expect(harness.replayRecorder.started).toHaveLength(0);
+    harness.setNow(Date.parse('2026-10-10T02:16:01Z'));
+    await harness.service.processDueSchedules();
+    expect(harness.replayRecorder.started).toEqual([booked.execution_id]);
+  });
+});
+
 function createHarness(initialNow: number) {
   let now = initialNow;
   const plans = new Map<string, DegradedOperationPlan>();
@@ -138,7 +230,7 @@ function createHarness(initialNow: number) {
           : entity === DegradedOperationEvent
             ? events
             : drafts;
-  const create = <T>(entity: new () => T, value: Partial<T>) =>
+  const create = <T extends object>(entity: new () => T, value: Partial<T>) =>
     Object.assign(new entity(), value);
   const save = async <
     T extends { id?: string; key?: string; settingKey?: string },
@@ -156,9 +248,7 @@ function createHarness(initialNow: number) {
     where: Record<string, unknown>,
   ) =>
     Object.entries(where).every(([key, expected]) =>
-      expected &&
-      typeof expected === 'object' &&
-      '_value' in (expected as object)
+      expected && typeof expected === 'object' && '_value' in expected
         ? (expected as { _value: unknown[] })._value.includes(row[key])
         : row[key] === expected,
     );
@@ -211,6 +301,16 @@ function createHarness(initialNow: number) {
   const foundation = {
     get: async () => ({ globalParams: { defaultVehicleSpeedLimitKmh: 40 } }),
   };
+  const replayRecorder = {
+    started: [] as string[],
+    stopped: [] as string[],
+    start: async (execution: { id: string }) => {
+      replayRecorder.started.push(execution.id);
+    },
+    stop: async (id: string) => {
+      replayRecorder.stopped.push(id);
+    },
+  };
   const recreateService = () =>
     new DegradedOperationService(
       repo(DegradedOperationPlan) as never,
@@ -221,10 +321,12 @@ function createHarness(initialNow: number) {
       dataSource as never,
       clock as never,
       foundation as never,
+      replayRecorder as never,
     );
   return {
     service: recreateService(),
     recreateService,
+    replayRecorder,
     executions,
     setNow: (value: number) => {
       now = value;

@@ -50,6 +50,7 @@ import { buildCatalogActionRules } from '../vehicle-operation-actions';
 import { presetIconUrl } from './iconLibrary';
 import { DEMO_FS as FS } from './demoTypography';
 import demoPlaneSnapshot from './demoPlane.snapshot.json';
+import { upgradeVehicleCardGroup } from '../utils/vehicleInfoCardTemplate';
 
 const DS = 'default-internal';
 const MQTT = 'default-mqtt';
@@ -1691,6 +1692,8 @@ elements[8].children = [
 ];
 
 elements[9].children = vehicleStatusCardTemplate(VEHICLE_STATUS_SLOT_W, VEHICLE_STATUS_SLOT_H);
+// 車輛資訊卡新版版面（背景圖 bg1、俯視車輛、八方向障礙、色帶速度／電量）：跟已存版面的升級走同一份規則
+elements[9] = upgradeVehicleCardGroup(elements[9]);
 
 const DEMO_PLANE_BASE: DashboardPlane = {
   id: 'demo-plane',

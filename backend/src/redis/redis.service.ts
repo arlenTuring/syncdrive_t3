@@ -209,6 +209,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.set(key, JSON.stringify(payload));
   }
 
+  /** 讀取車輛最新一筆 operation/update 快取（車端原樣） */
+  async getOperationUpdate(vehicleCode: string): Promise<Record<string, unknown> | null> {
+    const raw = await this.client.get(`vtms:operation:${vehicleCode}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
   /** 讀取車輛最新一筆 telemetry 快取，供 operation/update 處理流程比對場區位置用。 */
   async getTelemetry(vehicleCode: string): Promise<Record<string, unknown> | null> {
     const raw = await this.client.get(`vtms:telemetry:${vehicleCode}`);

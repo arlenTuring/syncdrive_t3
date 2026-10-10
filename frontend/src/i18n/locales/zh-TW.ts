@@ -3150,10 +3150,8 @@ const zhTW = {
           zoomOut: '縮小',
         },
         vehicleContainer: {
-          editHint: '編輯時地圖上只會顯示這一個樣板（黃框）。執行後圖台才依 MQTT 在各地點複製樣板、顯示多輛即時車輛。',
           showLabel: '顯示標籤',
           labelPlaceholder: '載具',
-          editStyle: '編輯載具樣式',
           actions: '作動行為',
           offsetX: '偏移 X',
           offsetY: '偏移 Y',
@@ -3263,6 +3261,7 @@ const zhTW = {
           label: '載具樣板',
           description: '圖台載具外觀與行為樣板（執行期套用至所有即時車輛）',
         },
+        obstacleRing: { label: '八方向障礙指示', description: '車輛周圍八個提示點，各方向獨立綁資料欄位' },
         tabList: { label: 'Tab 清單表格', description: '可切 Tab 與自訂欄位子畫布的動態表格' },
       },
       containerItems: {

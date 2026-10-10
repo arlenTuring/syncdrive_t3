@@ -59,6 +59,7 @@ const PALETTE_ITEMS: PaletteItemDef[] = [
   { type: 'maintenance-distribution', i18nKey: 'maintenanceDistribution', icon: <LayoutGrid size={18} />, color: '#f43f5e', category: 'ops' },
   { type: 'unit-telemetry-card', i18nKey: 'unitTelemetry', icon: <Activity size={18} />, color: '#a78bfa', category: 'ops' },
   { type: 'vehicle-container', i18nKey: 'vehicleContainer', icon: <Bus size={18} />, color: '#f59e0b', category: 'ops' },
+  { type: 'obstacle-ring', i18nKey: 'obstacleRing', icon: <AlertTriangle size={18} />, color: '#fb7185', category: 'ops' },
   { type: 'tab-list', i18nKey: 'tabList', icon: <List size={18} />, color: '#3b82f6', category: 'ops' },
 ];
 

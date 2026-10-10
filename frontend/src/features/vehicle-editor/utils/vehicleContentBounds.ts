@@ -83,3 +83,35 @@ export function computeVehicleContainerDisplaySize(
     height: Math.max(24, Math.round(display.height)),
   };
 }
+
+/**
+ * 地圖上一台車實際畫多大：把「顯示尺寸」當成上限框，車身內容等比塞進去。
+ *
+ * 四種尺寸要分清楚：
+ * 1. 模型編輯畫布（definition.width／height）——含留白，不是車身。
+ * 2. 車身內容範圍（computeVehicleMapRenderBounds，以 body 元件為準）——比例由它決定。
+ * 3. 地圖顯示尺寸（這裡的 boxWidth／boxHeight，來自圖資管理的設定）——只是上限框。
+ * 4. 地圖視角縮放——整張圖一起等比放大縮小，跟這裡無關。
+ *
+ * 以前圖台對自訂模型用 stretch：長寬各自換算。顯示框的比例只要跟車身不同，車身、
+ * 輪胎、門、車號就被擠成細條（降級頁 60×10 套到 260×78 的車身，直向只剩 55%）。
+ * 這裡只取一個倍率，回傳的寬高與車身同比例；呼叫端拿這組寬高當 marker，渲染、
+ * 後軸錨點、車身中心都用同一組值。
+ */
+export function fitVehicleMarkerSize(
+  definition: VehicleDefinition,
+  boxWidth: number,
+  boxHeight: number,
+): { width: number; height: number; scale: number } {
+  const content = mapDisplayContentSize(
+    definition,
+    computeVehicleMapRenderBounds(definition),
+  );
+  const cw = Math.max(1, content.width);
+  const ch = Math.max(1, content.height);
+  const scale = Math.max(
+    0.01,
+    Math.min(Math.max(1, boxWidth) / cw, Math.max(1, boxHeight) / ch),
+  );
+  return { width: cw * scale, height: ch * scale, scale };
+}

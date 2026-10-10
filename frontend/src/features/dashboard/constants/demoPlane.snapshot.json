@@ -1405,26 +1405,73 @@
       "iteratorField": "shift_key",
       "genericGroup": {
         "enabled": true,
-        "sources": [{
-          "id": "shift-roster",
-          "label": "正線與過渡班次",
-          "dataSourceId": "default-internal",
-          "sqlQuery": "SELECT * FROM operation_orders WHERE false",
-          "refreshInterval": 30,
-          "refreshMode": "event",
-          "invalidateTags": ["table:operation_orders", "domain:mainline_shifts"],
-          "itemIdField": "shift_key"
-        }],
+        "sources": [
+          {
+            "id": "shift-roster",
+            "label": "正線與過渡班次",
+            "dataSourceId": "default-internal",
+            "sqlQuery": "SELECT * FROM operation_orders WHERE false",
+            "refreshInterval": 30,
+            "refreshMode": "event",
+            "invalidateTags": [
+              "table:operation_orders",
+              "domain:mainline_shifts"
+            ],
+            "itemIdField": "shift_key"
+          }
+        ],
         "itemIdField": "shift_key",
         "arrangeMode": "priority",
         "defaultPriority": 0,
         "priorityRules": [
-          { "id": "shift-emergency", "priority": 1000, "conditions": [{ "field": "order_status", "operator": "eq", "value": "FAULTED" }] },
-          { "id": "shift-mainline", "priority": 300, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "MAINLINE" }] },
-          { "id": "shift-transition", "priority": 200, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "TRANSITION" }] },
-          { "id": "shift-maintenance", "priority": 100, "conditions": [{ "field": "business_kind", "operator": "eq", "value": "MAINTENANCE" }] }
+          {
+            "id": "shift-emergency",
+            "priority": 1000,
+            "conditions": [
+              {
+                "field": "order_status",
+                "operator": "eq",
+                "value": "FAULTED"
+              }
+            ]
+          },
+          {
+            "id": "shift-mainline",
+            "priority": 300,
+            "conditions": [
+              {
+                "field": "business_kind",
+                "operator": "eq",
+                "value": "MAINLINE"
+              }
+            ]
+          },
+          {
+            "id": "shift-transition",
+            "priority": 200,
+            "conditions": [
+              {
+                "field": "business_kind",
+                "operator": "eq",
+                "value": "TRANSITION"
+              }
+            ]
+          },
+          {
+            "id": "shift-maintenance",
+            "priority": 100,
+            "conditions": [
+              {
+                "field": "business_kind",
+                "operator": "eq",
+                "value": "MAINTENANCE"
+              }
+            ]
+          }
         ],
-        "capacityConfig": { "capacity": 6 }
+        "capacityConfig": {
+          "capacity": 6
+        }
       }
     },
     {
@@ -3434,48 +3481,17 @@
       "height": 192,
       "label": "車輛狀態",
       "backgroundColor": "#09090b",
-      "backgroundImage": "",
+      "backgroundImage": "/dashboard-icons/background/bg1.svg",
       "opacity": 100,
       "children": [
         {
-          "id": "co5fwiq",
-          "type": "color-block",
-          "x": 0,
-          "y": 0,
-          "width": 330,
-          "height": 192,
-          "backgroundColor": "#18181B",
-          "borderRadius": 12,
-          "borderWidth": 1,
-          "borderColor": "#00BC7D",
-          "opacity": 100,
-          "bindBorderColorVar": "card_border_color",
-          "bindBorderFromHealthField": true,
-          "healthFieldForBorder": "overall_health",
-          "mqttDataSourceId": "default-mqtt",
-          "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
-        },
-        {
-          "id": "yr6ct1n",
-          "type": "color-block",
-          "x": 0,
-          "y": 0,
-          "width": 330,
-          "height": 172,
-          "backgroundColor": "rgba(212, 212, 216, 0.1)",
-          "borderRadius": 0,
-          "borderWidth": 0,
-          "borderColor": "transparent",
-          "opacity": 100
-        },
-        {
           "id": "fdfnpzn",
           "type": "text",
-          "x": 13,
-          "y": 13,
-          "width": 206,
-          "height": 24,
-          "content": "{vehicle_code}",
+          "x": 96,
+          "y": 12,
+          "width": 128,
+          "height": 26,
+          "content": "{vehicle_display}",
           "fontSize": 18,
           "lineHeight": 1.33,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
@@ -3495,9 +3511,9 @@
         {
           "id": "vyam42w",
           "type": "status-badge",
-          "x": 247,
+          "x": 228,
           "y": 13,
-          "width": 70,
+          "width": 90,
           "height": 24,
           "valueField": "{badge_label}",
           "defaultLabel": "",
@@ -3523,58 +3539,76 @@
         {
           "id": "a12yrez",
           "type": "gauge",
-          "x": 13,
-          "y": 45,
-          "width": 149,
-          "height": 90,
+          "x": 222,
+          "y": 46,
+          "width": 96,
+          "height": 58,
           "title": "",
           "valueField": "demo_speed",
           "unit": "km/h",
           "min": 0,
           "max": 40,
-          "gaugeValueFontSize": 18,
-          "gaugeUnitFontSize": 14,
+          "gaugeValueFontSize": 22,
+          "gaugeUnitFontSize": 12,
           "colorStops": [],
-          "gaugeVariant": "semi-arc",
+          "gaugeVariant": "band",
           "arcVariant": "speed",
           "panelBackgroundColor": "rgba(212, 212, 216, 0.1)",
           "panelBorderRadius": 8,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/telemetry/update",
           "mqttValuePath": "kinematics.velocity",
-          "refreshInterval": 0
+          "refreshInterval": 0,
+          "gaugeDecimals": 1,
+          "gaugeBandHeight": 5,
+          "gaugeTextGap": 4,
+          "gaugeContentPadding": {
+            "top": 6,
+            "right": 10,
+            "bottom": 8,
+            "left": 10
+          }
         },
         {
           "id": "t0a9cdq",
           "type": "gauge",
-          "x": 168,
-          "y": 45,
-          "width": 149,
-          "height": 90,
+          "x": 222,
+          "y": 112,
+          "width": 96,
+          "height": 58,
           "title": "",
           "valueField": "demo_load",
           "unit": "%",
           "min": 0,
           "max": 100,
-          "gaugeValueFontSize": 18,
-          "gaugeUnitFontSize": 14,
+          "gaugeValueFontSize": 22,
+          "gaugeUnitFontSize": 12,
           "colorStops": [],
-          "gaugeVariant": "semi-arc",
+          "gaugeVariant": "band",
           "arcVariant": "load",
           "panelBackgroundColor": "rgba(212, 212, 216, 0.1)",
           "panelBorderRadius": 8,
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/telemetry/update",
           "mqttValuePath": "energy.battery_level",
-          "refreshInterval": 0
+          "refreshInterval": 0,
+          "gaugeDecimals": 1,
+          "gaugeBandHeight": 5,
+          "gaugeTextGap": 4,
+          "gaugeContentPadding": {
+            "top": 6,
+            "right": 10,
+            "bottom": 8,
+            "left": 10
+          }
         },
         {
           "id": "fs6gbgo",
           "type": "alert-banner",
-          "x": 13,
-          "y": 45,
-          "width": 304,
-          "height": 22,
+          "x": 12,
+          "y": 42,
+          "width": 306,
+          "height": 20,
           "content": "警示規則預覽（輪播）",
           "fontSize": 12,
           "fontFamily": "system-ui, sans-serif",
@@ -3664,10 +3698,10 @@
         {
           "id": "l43k254",
           "type": "text",
-          "x": 13,
-          "y": 141,
-          "width": 71,
-          "height": 24,
+          "x": 14,
+          "y": 48,
+          "width": 88,
+          "height": 26,
           "content": "運算",
           "fontSize": 16,
           "lineHeight": 1.25,
@@ -3720,10 +3754,10 @@
         {
           "id": "ezstl00",
           "type": "text",
-          "x": 90,
-          "y": 141,
-          "width": 71,
-          "height": 24,
+          "x": 14,
+          "y": 80,
+          "width": 88,
+          "height": 26,
           "content": "感測",
           "fontSize": 16,
           "lineHeight": 1.25,
@@ -3776,10 +3810,10 @@
         {
           "id": "kyz5bxe",
           "type": "text",
-          "x": 167,
-          "y": 141,
-          "width": 71,
-          "height": 24,
+          "x": 14,
+          "y": 112,
+          "width": 88,
+          "height": 26,
           "content": "通訊",
           "fontSize": 16,
           "lineHeight": 1.25,
@@ -3832,10 +3866,10 @@
         {
           "id": "nufr0tp",
           "type": "text",
-          "x": 244,
-          "y": 141,
-          "width": 71,
-          "height": 24,
+          "x": 14,
+          "y": 144,
+          "width": 88,
+          "height": 26,
           "content": "線控",
           "fontSize": 16,
           "lineHeight": 1.25,
@@ -3886,27 +3920,14 @@
           "mqttTopic": "v1/vtms/${vehicle_code}/health/heartbeat"
         },
         {
-          "id": "5o72lz6",
-          "type": "color-block",
-          "x": 116,
-          "y": 172,
-          "width": 97,
-          "height": 20,
-          "backgroundColor": "rgba(212, 212, 216, 0.1)",
-          "borderRadius": 0,
-          "borderWidth": 0,
-          "borderColor": "transparent",
-          "opacity": 100
-        },
-        {
           "id": "7sdk6u1",
           "type": "text",
-          "x": 13,
-          "y": 172,
-          "width": 304,
+          "x": 121,
+          "y": 170,
+          "width": 88,
           "height": 20,
           "content": "{segment_label}",
-          "fontSize": 12,
+          "fontSize": 13,
           "lineHeight": 1.29,
           "fontFamily": "system-ui, -apple-system, \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
           "fontWeight": "normal",
@@ -3924,6 +3945,65 @@
           "contentPadding": "0 10px 2px 6px",
           "mqttDataSourceId": "default-mqtt",
           "mqttTopic": "v1/vtms/${vehicle_code}/operation/update"
+        },
+        {
+          "id": "94wo97h-vehicle-top-view",
+          "type": "image",
+          "x": 145,
+          "y": 68,
+          "width": 38,
+          "height": 72,
+          "src": "/dashboard-icons/vehicles/vehicles.svg",
+          "objectFit": "contain",
+          "borderRadius": 0,
+          "backgroundColor": "transparent"
+        },
+        {
+          "id": "94wo97h-obstacle-ring",
+          "type": "obstacle-ring",
+          "x": 118,
+          "y": 46,
+          "width": 92,
+          "height": 116,
+          "dotSize": 8,
+          "idleColor": "#6B7280",
+          "alertColor": "#FB2C36",
+          "mqttDataSourceId": "default-mqtt",
+          "mqttTopic": "v1/vtms/${vehicle_code}/telemetry/update",
+          "directions": {
+            "front_left": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "front": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "front_right": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "left": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "right": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "rear_left": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "rear": {
+              "path": "",
+              "mode": "boolean"
+            },
+            "rear_right": {
+              "path": "",
+              "mode": "boolean"
+            }
+          }
         }
       ],
       "isGroup": true,
@@ -3945,7 +4025,8 @@
       "groupTilePadY": 0,
       "templateHideChrome": true,
       "templateWidth": 330,
-      "templateHeight": 192
+      "templateHeight": 192,
+      "backgroundImageFit": "contain"
     }
   ],
   "createdAt": 1789713696758,

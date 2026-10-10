@@ -10,13 +10,20 @@ export const ORDER_PRIORITY_MAINT = 40;
 const ACTIVE_MAINLINE_STATUS = new Set(['PENDING', 'PROCESSING']);
 const ACTIVE_MAINT_STATUS = new Set(['PENDING', 'PROCESSING']);
 
-export type VehicleMonitorBadgeKind = 'mainline' | 'maintenance' | 'none';
+export type VehicleMonitorBadgeKind = 'mainline' | 'maintenance' | 'transition' | 'none';
+
+/** 過渡（出廠、入廠、待命、暫停、空車移動）：跟班次中心過渡卡同一組紫色 */
+export const TRANSITION_BADGE_LABEL = '過渡';
+export const TRANSITION_BADGE_BG = '#6D28D9';
+export const TRANSITION_BADGE_COLOR = '#FFFFFF';
 
 export interface VehicleMonitorBadge {
   label: string;
   bg: string;
   color: string;
   kind: VehicleMonitorBadgeKind;
+  /** 滑鼠提示：過渡單的「待命 D3」「出廠 E3」等短名稱，或正線／整備的任務代號 */
+  detail?: string;
 }
 
 const EMPTY_BADGE: VehicleMonitorBadge = {
@@ -25,6 +32,16 @@ const EMPTY_BADGE: VehicleMonitorBadge = {
   color: '',
   kind: 'none',
 };
+
+function transitionBadge(source: Record<string, unknown> | VariableMap): VehicleMonitorBadge {
+  return {
+    label: readStr(source, 'badge_label') || TRANSITION_BADGE_LABEL,
+    bg: readStr(source, 'trip_badge_bg') || TRANSITION_BADGE_BG,
+    color: readStr(source, 'trip_badge_color') || TRANSITION_BADGE_COLOR,
+    kind: 'transition',
+    detail: readStr(source, 'badge_detail') || undefined,
+  };
+}
 
 export function isShiftTripCode(code: unknown): boolean {
   if (code === null || code === undefined) return false;
@@ -61,6 +78,7 @@ function mergeOperationContext(
     trip_badge_color: variables.trip_badge_color,
     badge_label: variables.badge_label,
     badge_kind: variables.badge_kind,
+    badge_detail: variables.badge_detail,
     vehicle_phase: variables.vehicle_phase,
     yard_slot_id: variables.yard_slot_id,
     segment_label: variables.segment_label,
@@ -129,8 +147,10 @@ export function resolveVehicleMonitorBadge(
       };
     }
     if (scheduledKind === 'maintenance') {
-      return maintenanceBadgeFromLabel(variables, scheduledLabel);
+      return { ...maintenanceBadgeFromLabel(variables, scheduledLabel), detail: readStr(variables, 'badge_detail') || undefined };
     }
+    // 過渡（待命、出入廠、暫停）是自己一類，不補成整備，也不讓 MQTT 進度蓋成空白
+    if (scheduledKind === 'transition') return transitionBadge(variables);
   }
 
   const ctx = mergeOperationContext(variables, sources.operation);
@@ -178,13 +198,6 @@ export function resolveVehicleMonitorBadge(
     }
   }
 
-  const maintLabel = readStr(ctx, 'maint_type_label');
-  if (maintLabel && !isShiftTripCode(maintLabel)) {
-    if (phase === 'CHARGING' || phase === 'YARD_DWELLING' || phase === 'DOCKING') {
-      return maintenanceBadgeFromLabel(ctx, maintLabel);
-    }
-  }
-
   const kind = readStr(ctx, 'badge_kind');
   const fallback = readStr(ctx, 'badge_label');
   if (fallback) {
@@ -199,6 +212,7 @@ export function resolveVehicleMonitorBadge(
     if (kind === 'maintenance' && !isShiftTripCode(fallback)) {
       return maintenanceBadgeFromLabel(ctx, fallback);
     }
+    if (kind === 'transition') return transitionBadge(ctx);
   }
 
   // 沒有訂單、沒有任務標籤時不顯示徽章。原本會看車停在哪一格、用格位代號開頭字母

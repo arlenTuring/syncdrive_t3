@@ -312,10 +312,17 @@ export interface GaugeWidget extends WidgetBase, WidgetDataBinding {
   min: number;
   max: number;
   colorStops: Array<{ at: number; color: string }>; // at: 0~1
-  /** semi-arc：半圓漸層弧 + 指針 + 中央數值；ring：全圓達成進度環 */
-  gaugeVariant?: 'default' | 'semi-arc' | 'ring';
-  /** semi-arc 時：速度弧（綠→紅）或 電量弧（紅→綠） */
+  /**
+   * semi-arc：半圓漸層弧 + 指針 + 中央數值；ring：全圓達成進度環；
+   * band：上方數字＋單位、下方水平色帶＋指示點（車輛資訊卡的速度／電量）
+   */
+  gaugeVariant?: 'default' | 'semi-arc' | 'ring' | 'band';
+  /** semi-arc／band 時：速度色帶（低綠→高紅）或 電量色帶（低紅→高綠） */
   arcVariant?: 'speed' | 'load';
+  /** 顯示小數位數（未設時沿用舊行為：整數照原樣、非整數一位） */
+  gaugeDecimals?: number;
+  /** band：色帶高度（px） */
+  gaugeBandHeight?: number;
   /** 中央顯示數值字級（px） */
   gaugeValueFontSize?: number;
   /** 單位文字字級（px） */
@@ -746,6 +753,45 @@ export const STATION_ETA_INVALIDATE_TAGS = [
  * 站點到站／出發清單（N2W、S2W、T3…）：後端 /operation-metrics/station-eta，營運時間。
  * 每列：幾分幾秒到站／出發（倒數）、車號、方向／停靠點、即時或計畫。
  */
+/** 八方向障礙指示的方向（以卡片上車頭朝上為準，不跟地圖 heading 旋轉） */
+export const OBSTACLE_DIRECTIONS = [
+  'front_left',
+  'front',
+  'front_right',
+  'left',
+  'right',
+  'rear_left',
+  'rear',
+  'rear_right',
+] as const;
+export type ObstacleDirection = (typeof OBSTACLE_DIRECTIONS)[number];
+
+/** 單一方向的判定：JSON 路徑＋判定方式 */
+export interface ObstacleDirectionBinding {
+  /** 這個方向在 payload 裡的 JSON 路徑（空＝未設定，顯示未知） */
+  path: string;
+  /**
+   * boolean：明確 true／"true"／1 才算偵測到，明確 false／"false"／0 算沒有；
+   * distance：數值 ≤ 門檻算偵測到、> 門檻算沒有（單位依協議，門檻要自己填，不預設）
+   */
+  mode: 'boolean' | 'distance';
+  threshold?: number;
+}
+
+/**
+ * 八方向障礙指示：八個提示點圍在中央（中央透明，可疊在車輛圖片上）。
+ * 共用元件自己的 MQTT 訂閱（同一條車隊資料流），每個方向各自一條 JSON 路徑。
+ */
+export interface ObstacleRingWidget extends WidgetBase, WidgetDataBinding {
+  type: 'obstacle-ring';
+  dotSize: number;
+  /** 明確沒有偵測到 */
+  idleColor: string;
+  /** 明確偵測到障礙 */
+  alertColor: string;
+  directions: Record<ObstacleDirection, ObstacleDirectionBinding>;
+}
+
 export interface StationEtaWidget extends WidgetBase, WidgetDataBinding {
   type: 'station-eta';
   /** 標題（站名） */
@@ -978,8 +1024,8 @@ export type ShiftListWidget = TabListWidget;
 /** 圖台內載具樣板：定義車體樣式與作動行為，執行期套用至場域內所有即時車輛 */
 export interface VehicleContainerWidget extends WidgetBase, WidgetDataBinding {
   type: 'vehicle-container';
-  /** 載具編輯器 localStorage 中的定義 id */
-  vehicleDefinitionId: string;
+  /** 使用的車輛模型（圖資管理 → 車輛模型，後端 vehicle_definitions 的 definition_key）；未選擇時為空 */
+  vehicleDefinitionId?: string;
   /** 顯示用標籤 */
   label?: string;
   /** 作動行為圖示規則（與路線進度相同資料流模式） */
@@ -1014,7 +1060,8 @@ export type ChildWidget =
   | VehicleAlertBannerWidget
   | VehicleContainerWidget
   | TabListWidget
-  | StationEtaWidget;
+  | StationEtaWidget
+  | ObstacleRingWidget;
 
 export type WidgetType = ChildWidget['type'] | 'shift-list';
 
@@ -1226,7 +1273,18 @@ export interface CanvasElementProps {
   height: number;
   label: string;
   backgroundColor: string;
+  /**
+   * 背景圖片（內建背景清單的 URL，見 constants/backgroundImages）。背景顏色仍是底色，圖片疊在上面、
+   * 不重複鋪。群組畫布的背景圖畫在每一個樣板 slot 上（子畫布編輯時看到的就是那一張）。
+   */
   backgroundImage: string;
+  /** 背景圖縮放：contain＝等比完整呈現（不裁切）；cover＝填滿可能裁切（舊行為，未設時沿用） */
+  backgroundImageFit?: 'contain' | 'cover';
+  /**
+   * 只給編輯器顯示用、不存檔：子畫布編輯區比樣板大時，背景圖只畫在左上角這塊樣板設計尺寸內，
+   * 跟執行時每張卡片的背景位置一致。
+   */
+  backgroundImageArea?: { width: number; height: number };
   opacity: number;
   children: ChildWidget[];
   /** 班次中心 24 小時統計窗；跟著 plane 一起存在伺服器 elements JSONB */
@@ -1558,6 +1616,18 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         dateFormat: 'YYYY-MM-DD',
         fontSize: 32, dateFontSize: 12,
         color: '#f1f5f9', dateColor: '#94a3b8', fontFamily: 'monospace',
+      };
+    case 'obstacle-ring':
+      return {
+        id, type, x, y, width: 90, height: 118,
+        dotSize: 8,
+        idleColor: '#6B7280',
+        alertColor: '#FB2C36',
+        mqttDataSourceId: 'default-mqtt',
+        mqttTopic: 'v1/vtms/${vehicle_code}/telemetry/update',
+        directions: Object.fromEntries(
+          OBSTACLE_DIRECTIONS.map((direction) => [direction, { path: '', mode: 'boolean' }]),
+        ) as Record<ObstacleDirection, ObstacleDirectionBinding>,
       };
     case 'station-eta':
       return {

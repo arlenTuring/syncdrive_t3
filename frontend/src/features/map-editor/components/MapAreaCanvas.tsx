@@ -100,8 +100,6 @@ type MapAreaCanvasProps = {
   vehicleDisplayHeightPx?: number
   /** 地圖上的營運路線：車輛定位用來推算「這台車該在哪幾塊軌道上」 */
   routes?: readonly MapPlannedRoute[]
-  /** stretch：填滿樣板框；contain：等比縮放 */
-  vehicleFitMode?: 'contain' | 'stretch'
   /** 載具樣板作動行為設定 */
   vehicleBehavior?: import('../../dashboard/elements/MapVehicleBehaviorOverlay').MapVehicleBehaviorConfig
   /** 車頂軌道進度指標設定 */
@@ -110,11 +108,6 @@ type MapAreaCanvasProps = {
   orderStationsById?: Record<string, readonly string[]>
   /** 圖台車輛座標／heading 等除錯標籤 */
   showVehicleTelemetry?: boolean
-  /** 儀表板編輯：載具顯示校準框（地圖像素座標，與載具同層） */
-  vehicleEditSizer?: {
-    targetKey: string
-    onSizeChange: (width: number, height: number) => void
-  } | null
   slotPreview?: {
     facilityId: string
     occupancy: SlotOccupancy
@@ -252,12 +245,10 @@ export function MapAreaCanvas({
   vehicleDisplayWidthPx,
   vehicleDisplayHeightPx,
   routes,
-  vehicleFitMode = 'contain',
   vehicleBehavior,
   vehicleRoofIndicator,
   orderStationsById,
   showVehicleTelemetry = true,
-  vehicleEditSizer = null,
   slotPreview = null,
   onSelectArea,
   onSelectBasemap,
@@ -877,12 +868,10 @@ export function MapAreaCanvas({
                 vehicleDefinition={vehicleDefinition}
                 vehicleDisplayWidthPx={vehicleDisplayWidthPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX}
                 vehicleDisplayHeightPx={vehicleDisplayHeightPx ?? DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX}
-                vehicleFitMode={vehicleFitMode}
                 routes={routes}
                 vehicleBehavior={vehicleBehavior}
                 roofIndicator={vehicleRoofIndicator}
                 orderStationsById={orderStationsById}
-                vehicleEditSizer={vehicleEditSizer}
                 livePositionTweenMs={livePositionTweenMsProp ?? (isEmbedded ? 1200 : 0)}
               />
             ) : null}

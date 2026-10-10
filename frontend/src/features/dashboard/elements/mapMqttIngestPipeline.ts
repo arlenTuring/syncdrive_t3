@@ -270,9 +270,21 @@ type MergeCacheEntry = {
   merged: Record<string, unknown>;
 };
 
+export type MapMqttIngestPipelineOptions = {
+  /**
+   * 資料時刻的來源。即時圖台不給：用本機收到的時刻（Date.now()）。
+   * 歷史回放給的是那一筆資料當時的收到時刻，車輛物件會帶 sourceAt，渲染層判斷
+   * 斷訊、停站時就用歷史時間，不會拿即時車隊的最後收到時刻來混。
+   */
+  now?: () => number;
+};
+
 export function createMapMqttIngestPipeline(
   onFlush: (snapshot: MapMqttFlushSnapshot) => void,
+  options: MapMqttIngestPipelineOptions = {},
 ) {
+  const now = options.now ?? Date.now;
+  const historical = !!options.now;
   let areas: MapAreaObject[] = [];
   let trackNetwork: TrackNetwork = EMPTY_TRACK_NETWORK;
   let facilityIndex: FacilityIndex = { byEntityKey: new Map(), areaPatterns: [] };
@@ -478,7 +490,7 @@ export function createMapMqttIngestPipeline(
         xM: yardSnap.xM,
         yM: yardSnap.yM,
         visualKey: vehicleVisualKey(merged),
-        updatedAt: Date.now(),
+        updatedAt: now(),
       });
     }
 
@@ -506,7 +518,7 @@ export function createMapMqttIngestPipeline(
         xM: snap?.xM ?? emitted.xM,
         yM: snap?.yM ?? emitted.yM,
         visualKey: vehicleVisualKey(merged),
-        updatedAt: Date.now(),
+        updatedAt: now(),
       });
     }
   }
@@ -559,7 +571,7 @@ export function createMapMqttIngestPipeline(
       xM: pos.x,
       yM: pos.y,
       visualKey,
-      updatedAt: Date.now(),
+      updatedAt: now(),
     });
   }
 
@@ -672,6 +684,7 @@ export function createMapMqttIngestPipeline(
         payload: pending.payload,
         topic: pending.topic,
         updatedAt: pending.updatedAt,
+        ...(historical ? { sourceAt: pending.updatedAt } : {}),
       });
     }
 

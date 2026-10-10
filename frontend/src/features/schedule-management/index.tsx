@@ -28,6 +28,10 @@ import PsdControlApp from '../psd-control';
 import VirtualFenceManagementApp from '../virtual-fence-management';
 import SystemFoundationApp from '../system-foundation';
 import type { ShellView } from './types';
+import {
+  OPEN_VEHICLE_MODELS_EVENT,
+  type OpenVehicleModelsDetail,
+} from '../../lib/vehicleModelNavigation';
 import { SIDEBAR_MODULE_GROUPS } from './types';
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
 import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
@@ -198,6 +202,20 @@ export default function ScheduleManagementApp({
     if (view === 'trajectory') setTrajectoryMounted(true);
   }, [view]);
 
+  // 儀表板「前往圖資管理編輯」：切到圖資資料管理並打開車輛模型（圖資頁可能還沒掛載，所以經 prop 傳過去）
+  const [vehicleModelsRequest, setVehicleModelsRequest] = useState<
+    (OpenVehicleModelsDetail & { nonce: number }) | null
+  >(null);
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<OpenVehicleModelsDetail>).detail ?? {};
+      setVehicleModelsRequest({ ...detail, nonce: Date.now() });
+      setView('map');
+    };
+    window.addEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
+  }, []);
+
   useEffect(() => {
     writeAdminModePreference(adminMode);
   }, [adminMode]);
@@ -342,7 +360,7 @@ export default function ScheduleManagementApp({
               {...frameProps}
             >
               <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.map') })}>
-                <MapEditorApp workspace="map" />
+                <MapEditorApp workspace="map" vehicleModelsRequest={vehicleModelsRequest} />
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>
           </div>

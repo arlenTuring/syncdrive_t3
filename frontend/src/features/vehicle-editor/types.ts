@@ -99,6 +99,11 @@ export interface VehicleDefinition {
   previewData?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
+  /**
+   * 後端版本號（只有從後端讀到的才有）。修改時當 baseVersion 送回去，伺服器已經是更新的
+   * 版本就拒絕，不會蓋掉別人剛存的內容。還沒存上後端的模型沒有這個值。
+   */
+  serverVersion?: number;
 }
 
 export type VehicleElementPatch = Partial<VehicleElement>;

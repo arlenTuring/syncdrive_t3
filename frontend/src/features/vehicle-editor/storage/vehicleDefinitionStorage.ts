@@ -1,115 +1,87 @@
 import { VEHICLE_DEFINITIONS_STORAGE_KEY } from '../../../lib/canvasCacheReset';
-import { createUserRestoredVtmsVehicle } from '../constants/userRestoredVtmsVehicle';
-import vehicleDefinitionsSnapshot from '../constants/vehicleDefinitions.snapshot.json';
-import { newVehicleId } from '../utils/id';
 import { migrateVehicleDefinition } from '../utils/migrateVehicleDefinition';
 import type { VehicleDefinition } from '../types';
 
-function loadEmbeddedVehicleDefinitions(): VehicleDefinition[] {
-  const snapshot = vehicleDefinitionsSnapshot as VehicleDefinition[];
-  if (!Array.isArray(snapshot) || snapshot.length === 0) {
-    return [migrateVehicleDefinition(createUserRestoredVtmsVehicle())];
-  }
-  return snapshot.map(migrateVehicleDefinition);
-}
-
-function persistVehicleDefinitions(list: VehicleDefinition[]): void {
-  try {
-    localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    /* quota */
-  }
-}
-
 export { migrateVehicleDefinition } from '../utils/migrateVehicleDefinition';
 
-export const DEFAULT_VEHICLE_DEFINITION_NAME = 'VTMS 巴士 · PMS01';
-
+/**
+ * 本機快取裡的模型（後端清單的副本，App 啟動時由 migrateLocalCacheToServer 寫入）。
+ *
+ * 只給還沒遷移到圖資管理的舊圖台元件同步查模型用（resolveLegacyCanvasVehicleTemplate、
+ * 儀表板獨立載具容器）。快取空就是空的：不再拿程式內建的範例模型頂替——那不是使用者的模型。
+ */
 export function loadVehicleDefinitions(): VehicleDefinition[] {
   try {
     const raw = localStorage.getItem(VEHICLE_DEFINITIONS_STORAGE_KEY);
-    if (!raw) return loadEmbeddedVehicleDefinitions();
-    const parsed = JSON.parse(raw) as VehicleDefinition[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return loadEmbeddedVehicleDefinitions();
-    }
-    return parsed.map(migrateVehicleDefinition);
+    const parsed = raw ? (JSON.parse(raw) as VehicleDefinition[]) : [];
+    return Array.isArray(parsed) ? parsed.map(migrateVehicleDefinition) : [];
   } catch {
-    return loadEmbeddedVehicleDefinitions();
+    return [];
   }
 }
 
-/** 內建範例載具（不依賴 localStorage id） */
-export function embeddedSampleVehicleDefinition(): VehicleDefinition {
-  return migrateVehicleDefinition(createUserRestoredVtmsVehicle());
+/** 依 ID 找模型（只認明確 ID，不依名稱或清單順序猜） */
+export function resolveVehicleDefinition(id?: string): VehicleDefinition | null {
+  if (!id) return null;
+  return loadVehicleDefinitions().find((v) => v.id === id) ?? null;
 }
 
-/** 圖台預設：依名稱找範例載具，否則取第一筆，最後回落內建範例 */
-export function resolveDefaultMapVehicleDefinition(): VehicleDefinition {
-  return (
-    resolveVehicleDefinition(undefined, DEFAULT_VEHICLE_DEFINITION_NAME) ??
-    loadVehicleDefinitions()[0] ??
-    embeddedSampleVehicleDefinition()
-  );
+/**
+ * 舊快取保全：以後端內容覆寫本機快取之前，把「本機有、但後端沒有或內容不同」的模型另存一份。
+ *
+ * 快取以前是模型的唯一存放處；只在某台瀏覽器做過的模型，若直接被後端清單蓋掉就永遠找不回來。
+ * 另存在 LEGACY_VEHICLE_DEFINITIONS_KEY，由圖資管理 → 車輛模型 → 舊資料逐一比對、由使用者決定匯入。
+ * 同 ID 已經另存過就不覆蓋（保留第一次看到的那份）。
+ */
+export const LEGACY_VEHICLE_DEFINITIONS_KEY = 'syncdrive_vehicle_definitions_legacy';
+
+function vehicleContentKey(v: VehicleDefinition): string {
+  return JSON.stringify({
+    name: v.name,
+    width: v.width,
+    height: v.height,
+    backgroundColor: v.backgroundColor ?? null,
+    elements: v.elements,
+    previewData: v.previewData ?? null,
+    rearAxleFromTailRatio: v.rearAxleFromTailRatio ?? null,
+  });
 }
 
-export function resolveVehicleDefinition(
-  id?: string,
-  name?: string,
-): VehicleDefinition | null {
-  const list = loadVehicleDefinitions();
-  if (id) {
-    const byId = list.find((v) => v.id === id);
-    if (byId) return byId;
+export function stashLegacyVehicleCache(serverList: VehicleDefinition[]): void {
+  try {
+    const raw = localStorage.getItem(VEHICLE_DEFINITIONS_STORAGE_KEY);
+    const cached = raw ? (JSON.parse(raw) as VehicleDefinition[]) : [];
+    if (!Array.isArray(cached) || cached.length === 0) return;
+    const server = new Map(
+      serverList.map((v) => [v.id, vehicleContentKey(migrateVehicleDefinition(v))]),
+    );
+    const stashRaw = localStorage.getItem(LEGACY_VEHICLE_DEFINITIONS_KEY);
+    const stash = stashRaw ? (JSON.parse(stashRaw) as VehicleDefinition[]) : [];
+    const stashed = new Set((Array.isArray(stash) ? stash : []).map((v) => v.id));
+    const additions = cached.filter(
+      (v) =>
+        v?.id &&
+        !stashed.has(v.id) &&
+        // 已經從後端讀過的（帶版本）不是「只在本機」的舊資料
+        v.serverVersion === undefined &&
+        server.get(v.id) !== vehicleContentKey(migrateVehicleDefinition(v)),
+    );
+    if (additions.length === 0) return;
+    localStorage.setItem(
+      LEGACY_VEHICLE_DEFINITIONS_KEY,
+      JSON.stringify([...(Array.isArray(stash) ? stash : []), ...additions]),
+    );
+  } catch {
+    /* 讀不到或寫不進去：不影響畫面 */
   }
-  if (name?.trim()) {
-    const byName = list.find((v) => v.name === name.trim());
-    if (byName) return byName;
+}
+
+export function readLegacyVehicleCache(): VehicleDefinition[] {
+  try {
+    const raw = localStorage.getItem(LEGACY_VEHICLE_DEFINITIONS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as VehicleDefinition[]) : [];
+    return Array.isArray(parsed) ? parsed.map(migrateVehicleDefinition) : [];
+  } catch {
+    return [];
   }
-  return null;
-}
-
-/** 新增一筆載具定義並寫入 localStorage（與載具編輯器共用） */
-export function appendVehicleDefinitions(definitions: VehicleDefinition[]): void {
-  const list = [...loadVehicleDefinitions(), ...definitions.map(migrateVehicleDefinition)];
-  persistVehicleDefinitions(list);
-}
-
-/** 圖台載具容器：建立空白載具並回傳 id */
-export function createBlankVehicleForContainer(name = '圖台載具'): string {
-  const id = newVehicleId('vc');
-  const now = Date.now();
-  appendVehicleDefinitions([
-    {
-      id,
-      name,
-      width: 300,
-      height: 106,
-      backgroundColor: 'transparent',
-      elements: [],
-      previewData: {
-        vehicle_code: 'PMS01',
-        trip_code: 'D0950',
-        overall_health: 'OK',
-      },
-      createdAt: now,
-      updatedAt: now,
-    },
-  ]);
-  return id;
-}
-
-/** 解析圖台綁定的載具定義（id → 名稱 → 預設範例） */
-export function resolveMapPlatformVehicleDefinition(opts: {
-  vehicleDefinitionId?: string;
-  vehicleDefinitionName?: string;
-  useDefaultVehicleDefinition?: boolean;
-}): VehicleDefinition | null {
-  const { vehicleDefinitionId, vehicleDefinitionName, useDefaultVehicleDefinition } = opts;
-  const byRef = resolveVehicleDefinition(vehicleDefinitionId, vehicleDefinitionName);
-  if (byRef) return byRef;
-  if (useDefaultVehicleDefinition || vehicleDefinitionName?.trim()) {
-    return resolveDefaultMapVehicleDefinition();
-  }
-  return null;
 }

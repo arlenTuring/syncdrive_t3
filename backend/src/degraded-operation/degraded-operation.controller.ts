@@ -22,11 +22,67 @@ import {
   UpdateExecutionContentDto,
 } from './degraded-operation.dto';
 import { DegradedOperationService } from './degraded-operation.service';
+import { DegradedReplayService } from '../degraded-replay/degraded-replay.service';
 
 @ApiTags('Degraded Operation')
 @Controller('syncdrive-api/degraded-operation')
 export class DegradedOperationController {
-  constructor(private readonly service: DegradedOperationService) {}
+  constructor(
+    private readonly service: DegradedOperationService,
+    private readonly replay: DegradedReplayService,
+  ) {}
+
+  /*
+   * 歷史紀錄與回放：全部唯讀。不改營運時鐘、不寫訂單、不送 MQTT、不下發指令。
+   * 跟本模組其他端點一樣只在內部 port 開放（ExternalPortGuard），對外 port 一律 404。
+   */
+
+  @Get('executions')
+  @ApiOperation({ summary: '歷史降級紀錄（依開始時間新到舊，分頁）' })
+  history(@Query('page') page?: string, @Query('page_size') pageSize?: string) {
+    return this.replay.listHistory({
+      page: Number(page),
+      pageSize: Number(pageSize),
+    });
+  }
+
+  @Get('executions/:id')
+  @ApiOperation({ summary: '單筆降級紀錄詳情與參數變更紀錄' })
+  historyDetail(@Param('id') id: string) {
+    return this.replay.detail(id);
+  }
+
+  @Get('executions/:id/replay')
+  @ApiOperation({ summary: '回放 metadata：時段、地圖版本、保存範圍與缺段' })
+  replayMeta(@Param('id') id: string) {
+    return this.replay.replayMeta(id);
+  }
+
+  @Get('executions/:id/replay/map')
+  @ApiOperation({ summary: '降級開始時保存的地圖（當時版本）' })
+  replayMap(@Param('id') id: string) {
+    return this.replay.replayMap(id);
+  }
+
+  @Get('executions/:id/replay/snapshot')
+  @ApiOperation({
+    summary: '指定營運時刻的重建起點（各串流在該時刻以前最後一筆）',
+  })
+  replaySnapshot(@Param('id') id: string, @Query('at') at?: string) {
+    return this.replay.snapshot(id, at);
+  }
+
+  @Get('executions/:id/replay/frames')
+  @ApiOperation({ summary: '一段營運時間內的回放資料（有界分段）' })
+  replayFrames(
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('after_seq') afterSeq?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.replay.frames(id, { from, to, after_seq: afterSeq, limit });
+  }
 
   @Get('status')
   @ApiOperation({ summary: '取得目前場域營運模式' })

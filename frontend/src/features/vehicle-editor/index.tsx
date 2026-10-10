@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Bus, Copy, Download, Pencil, Redo2, Save, Undo2, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { VariableProvider } from '../dashboard/VariableContext';
@@ -9,6 +9,8 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { VehicleList } from './VehicleList';
 import { VehicleWorkspace } from './VehicleWorkspace';
 import { useVehicleEditor } from './useVehicleEditor';
+import { VehicleDefinitionConflictError, type VehicleModelReference } from './api/vehicleDefinitionsApi';
+import type { VehicleDefinition } from './types';
 import { VEHICLE_NUDGE_SHIFT_STEP, VEHICLE_NUDGE_STEP } from './utils/vehicleNudge';
 
 function isTextEditingTarget(target: EventTarget | null): boolean {
@@ -18,10 +20,35 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
-export default function VehicleEditor() {
+/** 引用說明（刪除被擋下時列給使用者看） */
+export function describeVehicleModelReference(ref: VehicleModelReference): string {
+  if (ref.kind === 'default') return '系統預設模型';
+  if (ref.kind === 'map') return `地圖 ${ref.mapId}`;
+  return `儀表板「${ref.planeName}」${ref.label ? `的「${ref.label}」` : ''}`;
+}
+
+/**
+ * 車輛模型管理（圖資管理 → 車輛模型）：模型清單、新增、編輯、複製、刪除、匯入匯出。
+ * 編輯器本體、元件、素材、資料綁定、預覽與編輯歷史都是既有的 vehicle-editor。
+ */
+export default function VehicleEditor({
+  renderUsage,
+  onModelsChanged,
+  initialVehicleId = null,
+}: {
+  renderUsage?: (vehicle: VehicleDefinition) => ReactNode;
+  /** 清單變了（父層重抓引用與預設設定用） */
+  onModelsChanged?: (models: VehicleDefinition[]) => void;
+  /** 一進來就打開這個模型（從儀表板「前往圖資管理編輯」） */
+  initialVehicleId?: string | null;
+} = {}) {
   const { t } = useTranslation();
   const {
     vehicles,
+    loadState,
+    syncState,
+    reloadFromServer,
+    takeServerVersion,
     activeVehicle,
     activeVehicleId,
     setActiveVehicleId,
@@ -62,7 +89,43 @@ export default function VehicleEditor() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'ok'>('idle');
   const [importStatus, setImportStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [listMessage, setListMessage] = useState<string | null>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const readOnly = loadState !== 'ready';
+  const onModelsChangedRef = useRef(onModelsChanged);
+  useEffect(() => {
+    onModelsChangedRef.current = onModelsChanged;
+  });
+  const modelKey = vehicles.map((v) => `${v.id}:${v.serverVersion ?? ''}`).join('|');
+  useEffect(() => {
+    if (loadState === 'ready') onModelsChangedRef.current?.(vehicles);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelKey, loadState]);
+  const openedInitial = useRef(false);
+  useEffect(() => {
+    if (openedInitial.current || !initialVehicleId || loadState !== 'ready') return;
+    openedInitial.current = true;
+    if (vehicles.some((v) => v.id === initialVehicleId)) {
+      setActiveVehicleId(initialVehicleId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 後端清單讀到之後只開一次
+      setView('editor');
+    }
+  }, [initialVehicleId, loadState, vehicles, setActiveVehicleId]);
+
+  const handleDelete = async (id: string) => {
+    setListMessage(null);
+    try {
+      await deleteVehicle(id);
+    } catch (error) {
+      if (error instanceof VehicleDefinitionConflictError && error.references?.length) {
+        setListMessage(
+          `${error.message}：${error.references.map(describeVehicleModelReference).join('、')}`,
+        );
+      } else {
+        setListMessage(error instanceof Error ? error.message : '刪除失敗');
+      }
+    }
+  };
 
   const toggleEditMode = useCallback(() => {
     setIsEditMode((v) => {
@@ -221,9 +284,39 @@ export default function VehicleEditor() {
       <div className="flex h-full min-h-0 w-full flex-col bg-[#0a0f1a]">
         <VehicleList
           vehicles={vehicles}
+          readOnly={readOnly}
+          renderUsage={renderUsage}
+          banner={
+            loadState !== 'ready' || listMessage ? (
+              <div
+                role="status"
+                className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${
+                  listMessage || loadState === 'offline'
+                    ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                    : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                }`}
+              >
+                <span>
+                  {listMessage ??
+                    (loadState === 'loading'
+                      ? '讀取後端模型中…（讀到之前不能修改）'
+                      : '連不上後端：只顯示此瀏覽器的快取，不能修改')}
+                </span>
+                {loadState === 'offline' ? (
+                  <button type="button" className="underline" onClick={() => void reloadFromServer()}>
+                    重試
+                  </button>
+                ) : listMessage ? (
+                  <button type="button" onClick={() => setListMessage(null)}>
+                    關閉
+                  </button>
+                ) : null}
+              </div>
+            ) : null
+          }
           onSelect={handleSelectVehicle}
           onCreate={() => setShowNewDialog(true)}
-          onDelete={deleteVehicle}
+          onDelete={handleDelete}
           onDuplicate={duplicateVehicle}
           onExportOne={(id) => exportVehiclesJson([id])}
           onExportAll={() => exportVehiclesJson()}
@@ -271,6 +364,11 @@ export default function VehicleEditor() {
               {activeVehicle.width}×{activeVehicle.height}
             </span>
           </div>
+          <SyncBadge
+            state={syncState[activeVehicle.id]}
+            unsaved={activeVehicle.serverVersion === undefined}
+            onTakeServer={() => takeServerVersion(activeVehicle.id)}
+          />
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -338,6 +436,8 @@ export default function VehicleEditor() {
             )}
             <button
               type="button"
+              disabled={readOnly || syncState[activeVehicle.id]?.status === 'conflict'}
+              title={readOnly ? '後端模型還沒讀到，不能修改' : undefined}
               onClick={toggleEditMode}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 isEditMode
@@ -428,4 +528,31 @@ export default function VehicleEditor() {
         </div>
       </VariableProvider>
   );
+}
+
+function SyncBadge({
+  state,
+  unsaved,
+  onTakeServer,
+}: {
+  state: ReturnType<typeof useVehicleEditor>['syncState'][string] | undefined;
+  unsaved: boolean;
+  onTakeServer: () => void;
+}) {
+  if (state?.status === 'conflict') {
+    return (
+      <span className="flex items-center gap-2 rounded-md bg-red-500/15 px-2 py-1 text-[11px] text-red-200">
+        {state.message}
+        <button type="button" className="underline" onClick={onTakeServer}>
+          {state.current ? '改用伺服器版本' : '移除本機副本'}
+        </button>
+      </span>
+    );
+  }
+  if (state?.status === 'error')
+    return <span className="rounded-md bg-red-500/15 px-2 py-1 text-[11px] text-red-200">未存到後端：{state.message}</span>;
+  if (state?.status === 'saving') return <span className="text-[11px] text-zinc-500">儲存中…</span>;
+  if (state?.status === 'saved') return <span className="text-[11px] text-emerald-400">已存到後端</span>;
+  if (unsaved) return <span className="text-[11px] text-amber-300">尚未存到後端</span>;
+  return null;
 }

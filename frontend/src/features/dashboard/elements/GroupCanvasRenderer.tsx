@@ -3,6 +3,7 @@ import type { CanvasElementProps } from '../types';
 import { useWidgetData } from './useWidgetData';
 import { resolveBuiltinGroupSql } from '../utils/resolveBuiltinGroupSql';
 import { VariableProvider } from '../VariableContext';
+import { canvasBackgroundCss } from '../constants/backgroundImages';
 import { WidgetRenderer } from './WidgetRenderer';
 import { computeGroupTileLayout, getTemplateDesignSize, getTemplateUniformScale } from './groupTileLayout';
 import { EditModeProvider } from '../context/EditModeContext';
@@ -333,6 +334,24 @@ function TemplateInstance({
               overflow: 'hidden',
             }}
           >
+            {element.backgroundImage ? (
+              // 樣板背景（子畫布背景圖）：在設計座標裡跟子元件一起縮放，最底層、不攔截點擊
+              <div
+                aria-hidden
+                data-template-background
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: canvasBackgroundCss(
+                    'transparent',
+                    element.backgroundImage,
+                    element.backgroundImageFit ?? 'contain',
+                  ),
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              />
+            ) : null}
             {effectiveChildren.map((child) => (
               <div
                 key={child.id}

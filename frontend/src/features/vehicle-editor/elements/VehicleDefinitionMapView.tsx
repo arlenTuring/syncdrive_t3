@@ -102,7 +102,6 @@ export function VehicleDefinitionMapView({
   liveData,
   displayWidth,
   displayHeight,
-  fitMode = 'contain',
   layoutMode = 'fill-container',
   livePayloadOnly = false,
   mapHeadingRad,
@@ -113,7 +112,6 @@ export function VehicleDefinitionMapView({
   liveData?: Record<string, unknown>;
   displayWidth: number;
   displayHeight: number;
-  fitMode?: 'contain' | 'stretch';
   layoutMode?: VehicleMapLayoutMode;
   livePayloadOnly?: boolean;
   mapHeadingRad?: number | null;
@@ -141,17 +139,11 @@ export function VehicleDefinitionMapView({
     },
   };
 
-  const sx = fitMode === 'stretch' ? scaleX : uniformScale;
-  const sy = fitMode === 'stretch' ? scaleY : uniformScale;
-  const scalePart = fitMode === 'stretch' ? `scale(${sx}, ${sy})` : `scale(${sx})`;
+  // 一律等比：車身、輪胎、門、車號不會被拉長或壓扁（顯示框比例跟車身不同時取較小的倍率）
+  const scalePart = `scale(${uniformScale})`;
 
   if (layoutMode === 'rear-axle-pivot') {
-    const pivot = computeVehicleRearAxleAnchorPx(
-      definition,
-      displayWidth,
-      displayHeight,
-      fitMode,
-    );
+    const pivot = computeVehicleRearAxleAnchorPx(definition, displayWidth, displayHeight);
     const pivotRotateDeg = mapVehiclePivotRotateDeg(
       mapHeadingRad,
       landscape,

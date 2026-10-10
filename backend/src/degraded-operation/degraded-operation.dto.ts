@@ -97,6 +97,10 @@ export class AdjustExecutionDto {
   version!: number;
 }
 
+/**
+ * 本次執行的內容：只有名稱與說明。等級與速限屬於降級參數，只能經「調整降級參數」
+ * （AdjustExecutionDto）變更；這裡即使收到 level／speed_limit_kmh 也不會讀取。
+ */
 export class UpdateExecutionContentDto {
   @IsString()
   name!: string;
@@ -104,11 +108,6 @@ export class UpdateExecutionContentDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @IsIn(DEGRADED_LEVELS)
-  level!: number;
 
   @Type(() => Number)
   @IsInt()

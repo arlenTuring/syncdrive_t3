@@ -8,7 +8,6 @@ import { ComponentPalette } from './ComponentPalette';
 import { SettingsModal } from './settings/SettingsModal';
 import { DashboardList } from './DashboardList';
 import { Plus, Monitor, LayoutGrid, Save, Settings, Copy, Pencil, ArrowLeft, Undo2, Redo2, Paintbrush, LogOut } from 'lucide-react';
-import { VehicleEditorEmbed } from '../vehicle-editor/VehicleEditorEmbed';
 import type {
   CanvasElementProps,
   ChildWidget,
@@ -99,12 +98,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   const [editingTemplateGroupId, setEditingTemplateGroupId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateEditSnapshot, setTemplateEditSnapshot] = useState<CanvasElementProps | null>(null);
-  /** 圖台內載具容器：進入內嵌載具編輯器 */
-  /** 載具容器內嵌編輯（與儀表板畫布選取分離，僅由此狀態驅動 UI） */
-  const [editingVehicleContainer, setEditingVehicleContainer] = useState<{
-    canvasId: string;
-    childId: string;
-  } | null>(null);
   /** 進入子畫布編輯當下的群組快照，供「不儲存退出」還原 */
   const [groupEditSnapshot, setGroupEditSnapshot] = useState<CanvasElementProps | null>(null);
   const [showGroupExitDialog, setShowGroupExitDialog] = useState(false);
@@ -276,39 +269,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
   const isEditingTemplate = !!editingTemplateGroupId && !!editingTemplateId;
 
-  const enterEditVehicleContainer = useCallback((canvasId: string, childId: string) => {
-    setEditingVehicleContainer({ canvasId, childId });
-    setIsEditMode(true);
-    selectElement(null);
-  }, [selectElement]);
-
-  /** 離開載具編輯：還原至剛才的載具容器選取 */
-  const exitEditVehicleContainer = useCallback(() => {
-    const keep = editingVehicleContainer;
-    setEditingVehicleContainer(null);
-    if (keep) {
-      selectChild(keep.canvasId, keep.childId);
-      selectElement(keep.canvasId);
-    }
-    setSaveStatus('ok');
-    setTimeout(() => setSaveStatus('idle'), 1500);
-  }, [editingVehicleContainer, selectChild, selectElement]);
-
-  const editingVehicleContainerWidget = useMemo(() => {
-    if (!editingVehicleContainer || !activePlane) return null;
-    const canvas = activePlane.elements.find((e) => e.id === editingVehicleContainer.canvasId);
-    const child = canvas?.children.find((c) => c.id === editingVehicleContainer.childId);
-    if (!child || child.type !== 'vehicle-container') return null;
-    return child;
-  }, [editingVehicleContainer, activePlane?.elements]);
-
-  /** 容器已被刪除時自動離開載具編輯 */
-  useEffect(() => {
-    if (editingVehicleContainer && !editingVehicleContainerWidget) {
-      setEditingVehicleContainer(null);
-    }
-  }, [editingVehicleContainer, editingVehicleContainerWidget]);
-
   /** Tab 清單欄位單元格子畫布編輯狀態 */
   const [editingTabListCell, setEditingTabListCell] = useState<{
     canvasId: string;
@@ -418,9 +378,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
       const tag = target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (target.isContentEditable) return;
-
-      // 載具容器內嵌編輯：快捷鍵由 VehicleEditorEmbed 處理，避免 Delete 誤刪容器本身
-      if (editingVehicleContainer) return;
 
       const isMod = e.metaKey || e.ctrlKey;
       if (!isMod && e.key.toLowerCase() === 'e') { e.preventDefault(); toggleEditMode(); return; }
@@ -537,7 +494,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   }, [
     view,
     isEditMode,
-    editingVehicleContainer,
     editingGroupId,
     copySelected,
     pasteClipboard,
@@ -733,7 +689,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   let displaySelectedElementId = selectedElementId;
 
   if (editingGroup && subcanvasEdit && dualSubcanvas) {
-    const { editW, editH, laneW, laneH, gapW } = dualSubcanvas;
+    const { editW, editH, laneW, laneH, gapW, designW, designH } = dualSubcanvas;
     displayPlane = {
       id: 'template-plane-dual',
       name: t('dashboard.editorChrome.editDualName', { label: editingGroup.label }),
@@ -747,6 +703,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           y: 0,
           width: laneW,
           height: laneH,
+          backgroundImageArea: { width: designW, height: designH },
           isGroup: false,
           opacity: 100,
           label: t('dashboard.dualCanvas.defaultData'),
@@ -759,6 +716,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           y: 0,
           width: laneW,
           height: laneH,
+          backgroundImageArea: { width: designW, height: designH },
           isGroup: false,
           opacity: 100,
           label: t('dashboard.dualCanvas.normalData'),
@@ -770,7 +728,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     };
     displaySelectedElementId = dualEditFocusId;
   } else if (editingGroup && subcanvasEdit) {
-    const { editW, editH } = subcanvasEdit;
+    const { editW, editH, designW, designH } = subcanvasEdit;
     displayPlane = {
       id: 'template-plane',
       name: t('dashboard.editorChrome.editGroupTemplate', { label: editingGroup.label }),
@@ -783,6 +741,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         y: 0,
         width: editW,
         height: editH,
+        // 編輯區比樣板大：背景圖只畫在左上角的樣板設計尺寸內，跟執行時每張卡片一致
+        backgroundImageArea: { width: designW, height: designH },
         isGroup: false,
         opacity: 100,
         label: t('dashboard.editorChrome.labelTemplate', { label: editingGroup.label }),
@@ -1078,6 +1038,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         y: 0,
         width: editW,
         height: editH,
+        backgroundImageArea: {
+          width: editingTemplateGroup.templateWidth || editingTemplateGroup.width,
+          height: editingTemplateGroup.templateHeight || editingTemplateGroup.height,
+        },
         isGroup: false, // 編輯單一樣板內容時關閉群組渲染（不然會遞迴跑一次泛用群組管線）
         genericGroup: undefined,
         label: `${editingTemplateGroup.label} · ${editingTemplateDef?.name ?? ''}`,
@@ -1103,8 +1067,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
     <FormatPainterProvider value={formatPainterApi}>
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
 
-      {/* ── 頂部工具列（載具內嵌編輯時由 VehicleEditorEmbed 自帶單一工具列） ── */}
-      {!editingVehicleContainer && (
+      {/* ── 頂部工具列 ── */}
       <header className="flex items-center gap-3 px-4 h-12 bg-zinc-900 border-b border-zinc-800 shrink-0 z-20">
         
         {editingTabListCell && editingTabListCellInfo ? (
@@ -1327,7 +1290,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
         <div className="flex-1" />
 
-        {activePlane && !editingGroup && !editingVehicleContainer && (
+        {activePlane && !editingGroup && (
           <>
             <ImportTemplateButton
               variant="button"
@@ -1421,7 +1384,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           </div>
         ) : null)}
       </header>
-      )}
 
       {/* ── 主要內容 ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -1434,25 +1396,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           />
         )}
         <VariableProvider variables={previewGroup ? groupPreviewVariables : {}}>
-        {editingVehicleContainer && editingVehicleContainerWidget ? (
-          <div className="flex min-h-0 flex-1">
-            <VehicleEditorEmbed
-              vehicleId={editingVehicleContainerWidget.vehicleDefinitionId}
-              startInEditMode
-              embedded={{
-                containerLabel: editingVehicleContainerWidget.label,
-                onExit: exitEditVehicleContainer,
-              }}
-              onVehicleIdChange={(id) => {
-                updateChildWidget(
-                  editingVehicleContainer.canvasId,
-                  editingVehicleContainer.childId,
-                  { vehicleDefinitionId: id },
-                );
-              }}
-            />
-          </div>
-        ) : displayPlane ? (
+        {displayPlane ? (
           <PlaneWorkspace
             key={
               editingTabListCell
@@ -1600,8 +1544,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           </div>
         )}
 
-        {/* 屬性面板（載具內嵌編輯時由 VehicleEditorEmbed 自帶） */}
-        {!editingVehicleContainer && (
+        {/* 屬性面板 */}
         <PropertiesPanel
           isEditMode={isEditMode || !!editingGroup || isEditingTemplate || !!editingTabListCell}
           activePlane={activePlane}
@@ -1691,23 +1634,16 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             const targetId = editingGroup ? editingGroupId : selectedElement?.id;
             if (targetId) enterTemplateEditMode(targetId, templateId);
           }}
-          onEnterEditVehicleContainer={() => {
-            if (selectedElement && selectedChild?.type === 'vehicle-container') {
-              enterEditVehicleContainer(selectedElement.id, selectedChild.id);
-            }
-          }}
           onEnterEditTabListCell={(tabId, columnId) => {
             if (selectedElement && selectedChild) {
               enterEditTabListCell(selectedElement.id, selectedChild.id, tabId, columnId);
             }
           }}
         />
-        )}
         </VariableProvider>
       </div>
 
       {/* ── 底部元件工具欄 ── */}
-      {!editingVehicleContainer && (
       <ComponentPalette
         isEditMode={isEditMode || !!editingGroup || isEditingTabCanvas || isEditingTemplate || !!editingTabListCell}
         hasActiveCanvas={!!displayPlane && !!displaySelectedElementId}
@@ -1729,7 +1665,6 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           }
         }}
       />
-      )}
 
       {/* Dialog */}
       {showNewDialog && (

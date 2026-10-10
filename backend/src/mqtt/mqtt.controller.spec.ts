@@ -24,6 +24,7 @@ describe('MqttController', () => {
       eventsGateway as any,
       mqttService as any,
       telemetryWriteQueue as any,
+      { capture: jest.fn() } as any,
     );
     const payload = {
       line_kind: 'MAINLINE',
@@ -68,6 +69,7 @@ describe('MqttController', () => {
       eventsGateway as any,
       mqttService as any,
       telemetryWriteQueue as any,
+      { capture: jest.fn() } as any,
     );
     const payload: Record<string, unknown> = { vehicle_code: 'PMS-05', trip_code: 'D1413' };
     const context = { getTopic: () => 'v1/vtms/PMS-05/telemetry/update' };
@@ -98,6 +100,7 @@ describe('MqttController', () => {
       eventsGateway as any,
       mqttService as any,
       telemetryWriteQueue as any,
+      { capture: jest.fn() } as any,
     );
     const payload = { slot_id: 'M3' };
     const context = { getTopic: () => 'v1/vtms/PSD-T3-01/telemetry/update' };

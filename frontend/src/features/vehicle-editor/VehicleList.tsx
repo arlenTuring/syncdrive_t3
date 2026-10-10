@@ -10,7 +10,9 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { VehicleDefinitionMapView } from './elements/VehicleDefinitionMapView';
 import type { VehicleDefinition } from './types';
 
 export function VehicleList({
@@ -22,11 +24,20 @@ export function VehicleList({
   onExportOne,
   onExportAll,
   onImportFile,
+  banner,
+  renderUsage,
+  readOnly = false,
 }: {
   vehicles: VehicleDefinition[];
+  /** 清單上方的狀態列（載入中、離線、刪除被擋下的原因…） */
+  banner?: ReactNode;
+  /** 名稱下方：這個模型是不是預設、被哪些地圖／元件使用 */
+  renderUsage?: (vehicle: VehicleDefinition) => ReactNode;
+  /** 後端還沒回來或離線：只看不改 */
+  readOnly?: boolean;
   onSelect: (id: string) => void;
   onCreate: () => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onDuplicate: (id: string) => void;
   onExportOne: (id: string) => void;
   onExportAll: () => void;
@@ -97,8 +108,9 @@ export function VehicleList({
             </button>
             <button
               type="button"
+              disabled={readOnly}
               onClick={onCreate}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-40"
             >
               <Plus size={14} />
               {t('vehicleEditor.list.create')}
@@ -113,10 +125,12 @@ export function VehicleList({
           </div>
         </div>
 
+        {banner}
         <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-950/80 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                <th className="px-4 py-3">預覽</th>
                 <th className="px-4 py-3">{t('vehicleEditor.list.colName')}</th>
                 <th className="hidden px-4 py-3 sm:table-cell">{t('vehicleEditor.list.colCanvas')}</th>
                 <th className="hidden px-4 py-3 md:table-cell">{t('vehicleEditor.list.colElements')}</th>
@@ -127,7 +141,7 @@ export function VehicleList({
             <tbody>
               {vehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
                     {t('vehicleEditor.list.empty')}
                   </td>
                 </tr>
@@ -137,6 +151,12 @@ export function VehicleList({
                     key={v.id}
                     className="group border-b border-zinc-800/80 transition-colors last:border-b-0 hover:bg-zinc-800/40"
                   >
+                    <td className="px-4 py-3">
+                      {/* 縮圖用跟地圖同一個 renderer、同樣等比顯示，看到的比例就是地圖上的比例 */}
+                      <div className="flex h-10 w-28 items-center justify-center overflow-hidden rounded bg-zinc-950">
+                        <VehicleDefinitionMapView definition={v} displayWidth={104} displayHeight={34} />
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
@@ -152,6 +172,8 @@ export function VehicleList({
                         </span>
                         <span>{t('vehicleEditor.list.elementCount', { count: v.elements.length })}</span>
                       </div>
+                      <div className="mt-0.5 font-mono text-[10px] text-zinc-600">{v.id}</div>
+                      {renderUsage ? <div className="mt-1">{renderUsage(v)}</div> : null}
                     </td>
                     <td className="hidden px-4 py-3 font-mono text-xs text-zinc-500 sm:table-cell">
                       <span className="inline-flex items-center gap-1">
@@ -181,8 +203,9 @@ export function VehicleList({
                         <button
                           type="button"
                           title={t('vehicleEditor.list.duplicate')}
+                          disabled={readOnly}
                           onClick={() => onDuplicate(v.id)}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-cyan-500/15 hover:text-cyan-300"
+                          className="rounded-lg p-2 text-zinc-400 hover:bg-cyan-500/15 hover:text-cyan-300 disabled:opacity-30"
                         >
                           <Copy size={14} />
                         </button>
@@ -197,10 +220,11 @@ export function VehicleList({
                         <button
                           type="button"
                           title={t('vehicleEditor.list.delete')}
+                          disabled={readOnly}
                           onClick={() => {
-                            if (confirm(t('common.confirmDelete', { name: v.name }))) onDelete(v.id);
+                            if (confirm(t('common.confirmDelete', { name: v.name }))) void onDelete(v.id);
                           }}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-400"
+                          className="rounded-lg p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30"
                         >
                           <Trash2 size={14} />
                         </button>

@@ -1,6 +1,7 @@
 import { Gauge, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { saveDegradedDraft, type ExecutionResponse } from "./api";
+import { DegradedIcon } from "./DegradedIcons";
 import {
   DegradedPlanForm,
   draftFromPlan,
@@ -131,6 +132,10 @@ export function AdjustExecutionDialog({
   );
 }
 
+/**
+ * 本次降級的內容：只改名稱與說明。等級與速限屬於降級參數，只能從「調整降級參數」改；
+ * 這裡的速限只顯示目前值。草稿也只存名稱與說明——舊草稿裡的 level 不讀、不送。
+ */
 export function ExecutionContentDialog({
   execution,
   onClose,
@@ -138,14 +143,13 @@ export function ExecutionContentDialog({
 }: {
   execution: ExecutionResponse;
   onClose: () => void;
-  onSubmit: (name: string, description: string, level: number) => Promise<void>;
+  onSubmit: (name: string, description: string) => Promise<void>;
 }) {
   const [name, setName] = useState(execution.name);
   const [description, setDescription] = useState(execution.description);
-  const [level, setLevel] = useState(execution.level);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const valid = Boolean(name.trim()) && [1, 2, 3].includes(level);
+  const valid = Boolean(name.trim());
   useEffect(() => {
     const timer = window.setTimeout(
       () =>
@@ -153,12 +157,11 @@ export function ExecutionContentDialog({
           execution_id: execution.execution_id,
           name,
           description,
-          level,
         }).catch(() => undefined),
       500,
     );
     return () => window.clearTimeout(timer);
-  }, [description, execution.execution_id, level, name]);
+  }, [description, execution.execution_id, name]);
   const input =
     "w-full rounded-xl bg-[#252b34] px-4 py-3 outline-none focus:ring-1 focus:ring-blue-500";
   return (
@@ -168,12 +171,10 @@ export function ExecutionContentDialog({
           event.preventDefault();
           if (!valid) return;
           setSaving(true);
-          void onSubmit(name.trim(), description.trim(), level).catch(
-            (reason) => {
-              setError(reason instanceof Error ? reason.message : "儲存失敗");
-              setSaving(false);
-            },
-          );
+          void onSubmit(name.trim(), description.trim()).catch((reason) => {
+            setError(reason instanceof Error ? reason.message : "儲存失敗");
+            setSaving(false);
+          });
         }}
       >
         <div className="space-y-4 px-6 pb-6">
@@ -195,26 +196,17 @@ export function ExecutionContentDialog({
               className={`${input} min-h-28`}
             />
           </label>
-          <label className="block">
-            <span className="mb-1 block">
-              <b className="text-red-400">*</b>計畫等級
-            </span>
-            <select
-              value={level}
-              onChange={(event) => setLevel(Number(event.target.value))}
-              className={input}
-            >
-              <option value={1}>Level 1</option>
-              <option value={2}>Level 2</option>
-              <option value={3}>Level 3</option>
-            </select>
-          </label>
-          <div className="rounded-xl bg-[#222831] p-5 text-center text-zinc-400">
-            速限{" "}
-            <b className="ml-3 text-2xl font-normal text-white">
-              {execution.speed_limit_kmh}
-            </b>{" "}
-            km/h
+          <div className="border-t border-zinc-700 pt-4">
+            <div className="flex items-center justify-center gap-3 rounded-xl bg-[#222831] p-5">
+              <DegradedIcon name="speed" className="size-8" />
+              <div className="text-left">
+                <span className="block text-sm text-zinc-400">速限</span>
+                <b className="text-3xl font-normal text-white">
+                  {execution.speed_limit_kmh}
+                </b>
+                <small className="ml-1.5 text-zinc-400">km/h</small>
+              </div>
+            </div>
           </div>
           {error ? <p className="text-sm text-red-300">{error}</p> : null}
         </div>

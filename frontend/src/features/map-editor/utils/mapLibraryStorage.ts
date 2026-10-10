@@ -734,6 +734,20 @@ async function mergePlatformFromBuiltinPath(
 }
 
 /** 圖台／儀表板：解析地圖並強制合併 Track refField（MQTT 定位必需） */
+/**
+ * 已經拿到手的地圖文件 → 圖台用的解析結果（跟 resolveParsedMapForPlatform 從後端拿到文件
+ * 之後的處理一樣）。歷史回放用它畫當時保存的那一份，不去讀現在的地圖。
+ */
+export async function parseMapDocumentForPlatform(mapId: string, document: unknown) {
+  const resolvedMapId = resolveMapId(mapId)
+  const builtinMeta = BUILTIN_MAPS.find((m) => m.id === resolvedMapId && m.path)
+  let parsed = applyRefFieldZeroPolicyToParsed(parseMapFileJson(document))
+  if (builtinMeta?.path) {
+    parsed = await mergePlatformFromBuiltinPath(parsed, builtinMeta.path)
+  }
+  return parsed
+}
+
 export async function resolveParsedMapForPlatform(mapId: string) {
   const resolvedMapId = resolveMapId(mapId)
   const builtinMeta = BUILTIN_MAPS.find((m) => m.id === resolvedMapId && m.path)

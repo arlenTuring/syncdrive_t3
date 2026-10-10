@@ -14,16 +14,17 @@ import type {
   AlertBannerWidget, AlertRule, AlertTriggerMode, AlertDisplayMode,
   UnitTelemetryCardWidget,
   VehicleContainerWidget,
-  RouteActionIconRule,
-  RouteActionMatchOp,
   TabListWidget,
   TabListTab,
   TabListColumn,
 } from './types';
-import {
-  buildVehicleBehaviorActionRules,
-  VEHICLE_BEHAVIOR_ACTION_CATALOG,
-} from '../vehicle-editor/constants/behaviorActionCatalog';
+import { BUILTIN_BACKGROUND_IMAGES, canvasBackgroundCss } from './constants/backgroundImages';
+import { OBSTACLE_DIRECTION_LABELS } from './utils/obstacleDirection';
+import { OBSTACLE_DIRECTIONS, type ObstacleDirection, type ObstacleDirectionBinding, type ObstacleRingWidget } from './types';
+import { VehicleBehaviorSettingsFields } from '../vehicle-editor/model/VehicleBehaviorSettingsFields';
+import { useVehicleModelList } from '../vehicle-editor/model/useVehicleModelList';
+import { useMapVehicleModel } from '../vehicle-editor/model/useMapVehicleModel';
+import { requestOpenVehicleModels } from '../../lib/vehicleModelNavigation';
 import { WidgetDataBindingContext, WidgetDataBindingSettings } from './elements/WidgetDataBindingSettings';
 import { createEmptyAlertRule, coerceAlertRule, getEditorAlertRules } from './utils/alertTrigger';
 import { newSeriesId, resolveLineChartSeries, syncSeriesToLegacyFields } from './elements/lineChartSeries';
@@ -31,8 +32,8 @@ import * as LucideIcons from 'lucide-react';
 import { 
   Layers, Trash2, Settings, Type, Image, TrendingUp, Database, 
   Gauge, LayoutGrid, Plus, X, Palette,
-  Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, AlertTriangle, CircleOff, Monitor, Bus, Zap, List, Edit3,
-  AlignLeft, AlignCenter, AlignRight
+  Square, Tag, Hash, AlignJustify, Clock, BarChart2, Map, AlertTriangle, CircleOff, Monitor, Zap, List, Edit3,
+  AlignLeft, AlignCenter, AlignRight, ExternalLink,
 } from 'lucide-react';
 import { getAvailableMaps, getAvailableMapsAsync } from './elements/mapCanvasStorage';
 import { RouteProgressSettings } from './route-progress/RouteProgressSettings';
@@ -559,8 +560,43 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           <option value="default">{t('dashboard.properties.widgets.gauge.variantDefault')}</option>
           <option value="semi-arc">{t('dashboard.properties.widgets.gauge.variantSemiArc')}</option>
           <option value="ring">{t('dashboard.properties.widgets.gauge.variantRing')}</option>
+          <option value="band">數字＋水平色帶</option>
         </select>
       </Field>
+      {w.gaugeVariant === 'band' || w.gaugeVariant === 'semi-arc' ? (
+        <Field label="色帶方向">
+          <select
+            value={w.arcVariant ?? 'speed'}
+            onChange={e => onUpdate({ arcVariant: e.target.value as GaugeWidget['arcVariant'] })}
+            className={selectCls}
+          >
+            <option value="speed">速度：低綠 → 高紅</option>
+            <option value="load">電量：低紅 → 高綠</option>
+          </select>
+        </Field>
+      ) : null}
+      {w.gaugeVariant === 'band' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="小數位數">
+            <NumberInput
+              min={0}
+              max={4}
+              value={w.gaugeDecimals ?? 1}
+              onChange={n => onUpdate({ gaugeDecimals: Math.max(0, Math.min(4, Math.round(n))) })}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="色帶高度（px）">
+            <NumberInput
+              min={2}
+              max={24}
+              value={w.gaugeBandHeight ?? 6}
+              onChange={n => onUpdate({ gaugeBandHeight: Math.max(2, n) })}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      ) : null}
       
       <div className="grid grid-cols-3 gap-1.5">
         <Field label={t('dashboard.properties.min')}><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
@@ -1553,6 +1589,141 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   );
 }
 
+/**
+ * 八方向障礙指示：共用一個 MQTT 來源／topic（topic 用 ${vehicle_code} 跟著群組的每台車），
+ * 每個方向各自一條 JSON 路徑與判定方式。沒填路徑的方向顯示「未知」，不會變紅。
+ */
+function ObstacleRingSettings({
+  w,
+  onUpdate,
+  onDelete,
+}: {
+  w: ObstacleRingWidget;
+  onUpdate: (p: Partial<ObstacleRingWidget>) => void;
+  onDelete: () => void;
+}) {
+  const patchDirection = (direction: ObstacleDirection, patch: Partial<ObstacleDirectionBinding>) =>
+    onUpdate({
+      directions: {
+        ...w.directions,
+        [direction]: { ...(w.directions?.[direction] ?? { path: '', mode: 'boolean' }), ...patch },
+      },
+    });
+  return (
+    <div className="space-y-4">
+      <SH icon={<AlertTriangle size={13} />} label="八方向障礙指示" color="#fb7185" />
+      <p className="text-[10px] leading-relaxed text-zinc-500">
+        方向以卡片上的車頭（朝上）為準。只有資料明確表示偵測到才變紅；沒填路徑、沒資料、斷線、過期或值看不懂都顯示為半透明（未知），不當成安全。
+        字串 "false" 視為沒有偵測到。
+      </p>
+      <DataBindingSettings w={w} onUpdate={onUpdate} />
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="點大小">
+          <NumberInput min={2} max={40} value={w.dotSize ?? 8} onChange={n => onUpdate({ dotSize: Math.max(2, n) })} className={inputCls} />
+        </Field>
+        <Field label="無障礙（灰）">
+          <input type="color" value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+        </Field>
+        <Field label="有障礙（紅）">
+          <input type="color" value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+        </Field>
+      </div>
+      <div className="space-y-2">
+        {OBSTACLE_DIRECTIONS.map((direction) => {
+          const binding = w.directions?.[direction] ?? { path: '', mode: 'boolean' as const };
+          return (
+            <div key={direction} className="space-y-1 rounded border border-zinc-700/60 bg-zinc-800/30 p-2">
+              <div className="flex items-center gap-2">
+                <span className="w-8 shrink-0 text-[11px] font-semibold text-zinc-300">{OBSTACLE_DIRECTION_LABELS[direction]}</span>
+                <input
+                  value={binding.path}
+                  onChange={e => patchDirection(direction, { path: e.target.value })}
+                  placeholder="JSON 路徑（未設定＝未知）"
+                  className={`${inputCls} font-mono`}
+                  style={{ fontSize: 10 }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                <select
+                  value={binding.mode}
+                  onChange={e => patchDirection(direction, { mode: e.target.value as ObstacleDirectionBinding['mode'] })}
+                  className={selectCls}
+                  style={{ fontSize: 10 }}
+                >
+                  <option value="boolean">布林：true＝偵測到</option>
+                  <option value="distance">距離：≤ 門檻＝偵測到</option>
+                </select>
+                {binding.mode === 'distance' ? (
+                  <input
+                    type="number"
+                    value={binding.threshold ?? ''}
+                    onChange={e => patchDirection(direction, { threshold: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    placeholder="門檻（單位依協議）"
+                    className={inputCls}
+                    style={{ fontSize: 10 }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <PositionFields widget={w as ChildWidget} onUpdate={onUpdate as (p: Partial<ChildWidget>) => void} />
+      <DeleteBtn onDelete={onDelete} />
+    </div>
+  );
+}
+
+/**
+ * 背景圖片：從內建背景清單挑一張，或「無背景圖片」。圖片疊在背景顏色上、等比完整呈現。
+ * 群組（子畫布）選的背景會畫在每一張樣板卡片上。
+ */
+function BackgroundImagePicker({
+  value,
+  backgroundColor,
+  isGroup,
+  onChange,
+}: {
+  value: string;
+  backgroundColor: string;
+  isGroup: boolean;
+  onChange: (url: string) => void;
+}) {
+  const options = [{ id: '', label: '無背景圖片', url: '', width: 339, height: 191 }, ...BUILTIN_BACKGROUND_IMAGES];
+  return (
+    <Field label="背景圖片">
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="背景圖片">
+        {options.map((option) => {
+          const selected = (value || '') === option.url;
+          return (
+            <button
+              key={option.id || 'none'}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              title={option.label}
+              onClick={() => onChange(option.url)}
+              className={`rounded-md border p-1 text-left ${selected ? 'border-cyan-500 ring-1 ring-cyan-500/40' : 'border-zinc-700 hover:border-zinc-500'}`}
+            >
+              <div
+                className="w-full rounded"
+                style={{
+                  aspectRatio: `${option.width} / ${option.height}`,
+                  background: canvasBackgroundCss(backgroundColor, option.url, 'contain'),
+                }}
+              />
+              <span className="mt-1 block truncate text-[10px] text-zinc-400">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {isGroup ? (
+        <p className="mt-1 text-[10px] text-zinc-500">群組：背景圖畫在每一張樣板卡片上，背景顏色仍是整個群組的底色。</p>
+      ) : null}
+    </Field>
+  );
+}
+
 function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterTemplateEditMode }: {
   el: CanvasElementProps;
   onUpdate: (p: Partial<CanvasElementProps>) => void;
@@ -1628,6 +1799,14 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <Field label={t('dashboard.properties.height')}><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
       <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+      {el.canvasKind !== 'map-platform' ? (
+        <BackgroundImagePicker
+          value={el.backgroundImage ?? ''}
+          backgroundColor={el.backgroundColor}
+          isGroup={!!el.isGroup}
+          onChange={(url) => onUpdate({ backgroundImage: url, backgroundImageFit: 'contain' })}
+        />
+      ) : null}
       <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
 
       {isShiftCenter && (
@@ -2420,38 +2599,33 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
   );
 }
 
+/**
+ * 載具容器：儀表板只「使用」模型，不在這裡製作。模型在圖資管理 → 車輛模型新增與編輯。
+ *
+ * - 一般畫布上的載具容器（獨立展示）：選一個既有模型、資料綁定、行為圖示。
+ * - 圖台上的載具容器：這張地圖在圖資管理設定過車輛模型，就以那邊為準（唯讀顯示）；
+ *   還沒設定的舊資料才繼續用這個容器上的模型與尺寸（可到圖資管理遷移）。
+ */
 function VehicleContainerSettings({
   w,
+  mapId,
   onUpdate,
   onDelete,
-  onEnterEdit,
 }: {
   w: VehicleContainerWidget;
+  /** 容器在圖台上時那張地圖的 ID */
+  mapId: string | null;
   onUpdate: (p: Partial<VehicleContainerWidget>) => void;
   onDelete: () => void;
-  onEnterEdit?: () => void;
 }) {
   const { t } = useTranslation();
-  const rules = w.actionIconRules ?? [];
-
-  const updateRule = (idx: number, patch: Partial<RouteActionIconRule>) => {
-    const next = [...rules];
-    next[idx] = { ...next[idx], ...patch };
-    onUpdate({ actionIconRules: next });
-  };
-
-  const ACTION_MATCH_OPS: { value: RouteActionMatchOp; label: string }[] = [
-    { value: 'eq', label: t('dashboard.properties.widgets.vehicleContainer.matchEq') },
-    { value: 'gte', label: '≥' },
-    { value: 'gt', label: '>' },
-    { value: 'present', label: t('dashboard.properties.widgets.vehicleContainer.matchPresent') },
-  ];
+  const { models, error } = useVehicleModelList();
+  const mapModel = useMapVehicleModel(mapId);
+  const managedByMap = !!mapId && mapModel.resolution?.source === 'map';
+  const current = models?.find((m) => m.id === w.vehicleDefinitionId) ?? null;
 
   return (
     <div className="space-y-3">
-      <p className="text-[10px] leading-relaxed text-zinc-500">
-        {t('dashboard.properties.widgets.vehicleContainer.editHint')}
-      </p>
       <Field label={t('dashboard.properties.widgets.vehicleContainer.showLabel')}>
         <input
           value={w.label ?? ''}
@@ -2460,158 +2634,71 @@ function VehicleContainerSettings({
           placeholder={t('dashboard.properties.widgets.vehicleContainer.labelPlaceholder')}
         />
       </Field>
-      <button
-        type="button"
-        onClick={onEnterEdit}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 py-2.5 text-xs font-semibold text-white hover:bg-amber-500"
-      >
-        <Bus size={14} />
-        {t('dashboard.properties.widgets.vehicleContainer.editStyle')}
-      </button>
+
+      {managedByMap ? (
+        <div className="space-y-2 rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-[11px] text-sky-100">
+          <p>這張地圖的車輛外觀由圖資管理設定（模型、顯示尺寸、行為圖示）。</p>
+          <p className="text-sky-200/80">
+            目前使用：{mapModel.resolution?.definition?.name ?? mapModel.resolution?.setting?.definitionKey}
+            {mapModel.resolution?.setting
+              ? `（${mapModel.resolution.setting.displayWidthPx}×${mapModel.resolution.setting.displayHeightPx}）`
+              : ''}
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              requestOpenVehicleModels({
+                definitionKey: mapModel.resolution?.setting?.definitionKey ?? null,
+                mapId,
+              })
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-2 text-xs font-semibold text-white hover:bg-sky-500"
+          >
+            <ExternalLink size={13} />
+            前往圖資管理編輯
+          </button>
+        </div>
+      ) : (
+        <>
+          <Field label="車輛模型">
+            <select
+              value={w.vehicleDefinitionId ?? ''}
+              onChange={(e) => onUpdate({ vehicleDefinitionId: e.target.value || undefined })}
+              className={selectCls}
+            >
+              <option value="">（未選擇）</option>
+              {(models ?? []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+              {w.vehicleDefinitionId && models && !current ? (
+                <option value={w.vehicleDefinitionId}>（找不到模型 {w.vehicleDefinitionId}）</option>
+              ) : null}
+            </select>
+          </Field>
+          {error ? <p className="text-[10px] text-red-300">模型清單讀取失敗：{error}</p> : null}
+          {mapId ? (
+            <p className="text-[10px] leading-relaxed text-amber-300/90">
+              這張地圖還沒在圖資管理設定車輛模型，暫用這個容器的模型與尺寸。可到圖資管理 → 車輛模型 → 遷移，把它搬成地圖設定。
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => requestOpenVehicleModels({ definitionKey: w.vehicleDefinitionId ?? null, mapId })}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-600 py-2 text-xs text-zinc-200 hover:border-zinc-400"
+          >
+            <ExternalLink size={13} />
+            前往圖資管理編輯
+          </button>
+        </>
+      )}
 
       <SH icon={<Zap size={14} className="text-violet-400" />} label={t('dashboard.properties.widgets.vehicleContainer.actions')} color="#a78bfa" />
       <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />
-      <div className="grid grid-cols-3 gap-2">
-        <Field label={t('dashboard.properties.widgets.vehicleContainer.offsetX')}>
-          <NumberInput
-            value={w.behaviorOffsetX ?? 0}
-            onChange={(n) => onUpdate({ behaviorOffsetX: n })}
-            className={inputCls}
-          />
-        </Field>
-        <Field label={t('dashboard.properties.widgets.vehicleContainer.offsetY')}>
-          <NumberInput
-            value={w.behaviorOffsetY ?? -28}
-            onChange={(n) => onUpdate({ behaviorOffsetY: n })}
-            className={inputCls}
-          />
-        </Field>
-        <Field label={t('dashboard.properties.widgets.vehicleContainer.iconSize')}>
-          <input
-            type="range"
-            min={8}
-            max={64}
-            step={1}
-            value={w.behaviorIconSize ?? 20}
-            onChange={(e) => onUpdate({ behaviorIconSize: Number(e.target.value) })}
-            className="w-full accent-violet-500"
-          />
-          <div className="mt-1 flex items-center gap-2">
-            <NumberInput
-              min={8}
-              max={64}
-              value={w.behaviorIconSize ?? 20}
-              onChange={(n) =>
-                onUpdate({
-                  behaviorIconSize: Math.min(64, Math.max(8, n || 20)),
-                })
-              }
-              className={inputCls}
-            />
-            <span className="shrink-0 text-[9px] text-zinc-500">{t('dashboard.properties.widgets.vehicleContainer.iconSizeHint')}</span>
-          </div>
-        </Field>
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-zinc-400">{t('dashboard.properties.widgets.vehicleContainer.actionRules')}</span>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => onUpdate({ actionIconRules: buildVehicleBehaviorActionRules('operation_action') })}
-              className="rounded bg-zinc-800 px-2 py-0.5 text-[9px] text-zinc-400 hover:text-amber-400"
-            >
-              {t('dashboard.properties.widgets.vehicleContainer.catalog11')}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onUpdate({
-                  actionIconRules: [
-                    ...rules,
-                    {
-                      id: `act_${Date.now()}`,
-                      sourceVarKey: 'operation_action',
-                      matchOp: 'eq',
-                      threshold: 'charging',
-                      iconFile: 'behaviors/charging.svg',
-                    },
-                  ],
-                })
-              }
-              className="rounded p-1 text-amber-500 hover:bg-zinc-800"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        </div>
-        {rules.length === 0 && (
-          <p className="text-[9px] text-zinc-600">
-            {t('dashboard.properties.widgets.vehicleContainer.rulesHint')}
-          </p>
-        )}
-        {rules.map((rule, i) => (
-          <div key={rule.id} className="space-y-1.5 rounded border border-zinc-700/50 bg-zinc-800/30 p-2">
-            <div className="flex gap-1">
-              <select
-                value={rule.iconFile}
-                onChange={(e) => {
-                  const cat = VEHICLE_BEHAVIOR_ACTION_CATALOG.find((c) => c.iconFile === e.target.value);
-                  updateRule(i, {
-                    iconFile: e.target.value,
-                    threshold: cat?.code ?? rule.threshold,
-                    label: cat?.label ?? rule.label,
-                  });
-                }}
-                className={selectCls}
-                style={{ fontSize: 10 }}
-              >
-                {VEHICLE_BEHAVIOR_ACTION_CATALOG.map((c) => (
-                  <option key={c.code} value={c.iconFile}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => onUpdate({ actionIconRules: rules.filter((_, j) => j !== i) })}
-                className="p-1 text-zinc-500 hover:text-red-400"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-            <input
-              value={rule.sourceVarKey}
-              onChange={(e) => updateRule(i, { sourceVarKey: e.target.value })}
-              className={inputCls}
-              placeholder={t('dashboard.properties.widgets.vehicleContainer.varKeyPlaceholder')}
-              style={{ fontSize: 10 }}
-            />
-            <div className="grid grid-cols-2 gap-1">
-              <select
-                value={rule.matchOp}
-                onChange={(e) => updateRule(i, { matchOp: e.target.value as RouteActionMatchOp })}
-                className={selectCls}
-                style={{ fontSize: 10 }}
-              >
-                {ACTION_MATCH_OPS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={rule.threshold ?? ''}
-                onChange={(e) => updateRule(i, { threshold: e.target.value })}
-                className={inputCls}
-                placeholder={t('dashboard.properties.widgets.vehicleContainer.thresholdPlaceholder')}
-                style={{ fontSize: 10 }}
-                disabled={rule.matchOp === 'present'}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+      {managedByMap ? null : (
+        <VehicleBehaviorSettingsFields value={w} onChange={onUpdate} header={<></>} />
+      )}
 
       <PositionFields widget={w as ChildWidget} onUpdate={onUpdate as (p: Partial<ChildWidget>) => void} />
       <DeleteBtn onDelete={onDelete} />
@@ -3303,7 +3390,6 @@ interface Props {
   onEnterEditGroupMode?: (groupId: string) => void;
   /** 泛用群組：進入編輯指定樣板的子畫布（只在群組被選取、還沒進入子畫布編輯時可用） */
   onEnterTemplateEditMode?: (templateId: string) => void;
-  onEnterEditVehicleContainer?: () => void;
   onEnterEditTabListCell?: (tabId: string, columnId: string) => void;
   /** 雙畫板子畫布：選取中間閘道設定區 */
   dualGateSettingsActive?: boolean;
@@ -3327,7 +3413,6 @@ export function PropertiesPanel({
   onUpdateChild, onDeleteChild,
   onEnterEditGroupMode,
   onEnterTemplateEditMode,
-  onEnterEditVehicleContainer,
   onEnterEditTabListCell,
   dualGateSettingsActive,
   dataContextGroup = null,
@@ -3445,6 +3530,7 @@ export function PropertiesPanel({
               case 'segment-bar':    return <SegmentBarSettings {...props as any} />;
               case 'clock':          return <ClockSettings {...props as any} />;
               case 'station-eta':    return <StationEtaSettings {...props as any} />;
+              case 'obstacle-ring':  return <ObstacleRingSettings {...props as any} />;
               case 'empty-state':    return <EmptyStateSettings {...props as any} />;
               case 'map-canvas':     return <MapCanvasSettings {...props as any} />;
               case 'unit-telemetry-card': return <UnitTelemetrySettings {...props as any} />;
@@ -3462,9 +3548,11 @@ export function PropertiesPanel({
                 return (
                   <VehicleContainerSettings
                     w={selectedChild as VehicleContainerWidget}
+                    mapId={
+                      selectedElement?.canvasKind === 'map-platform' ? (selectedElement.mapId ?? null) : null
+                    }
                     onUpdate={onUpdateChild as (p: Partial<VehicleContainerWidget>) => void}
                     onDelete={onDeleteChild}
-                    onEnterEdit={onEnterEditVehicleContainer}
                   />
                 );
               default:

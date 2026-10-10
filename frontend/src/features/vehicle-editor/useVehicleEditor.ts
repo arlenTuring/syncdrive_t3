@@ -3,19 +3,17 @@ import { buildExportFilename } from '../../lib/exportFilename';
 import { normalizeDegrees } from '../map-editor/utils/rotation';
 import { VEHICLE_DEFINITIONS_STORAGE_KEY } from '../../lib/canvasCacheReset';
 import {
+  deleteVehicleDefinition,
   fetchVehicleDefinitions,
-  saveVehicleDefinitions,
+  saveVehicleDefinition,
+  VehicleDefinitionConflictError,
 } from './api/vehicleDefinitionsApi';
-import { MAP_TRACK_VEHICLE_HEIGHT, MAP_TRACK_VEHICLE_WIDTH } from './constants/palette';
-import {
-  createUserRestoredVtmsVehicle,
-  USER_RESTORED_VEHICLE_ID,
-} from './constants/userRestoredVtmsVehicle';
 import { useVehicleHistory, type VehicleEditorSnapshot } from './hooks/useVehicleHistory';
 import { createVehicleElement } from './utils/createElement';
 import { roundVehicleNudgeCoord } from './utils/vehicleNudge';
 import { enrichPatchWithIconFit, fitNewIconElement } from './utils/elementIconFit';
 import { migrateVehicleDefinition } from './utils/migrateVehicleDefinition';
+import { stashLegacyVehicleCache } from './storage/vehicleDefinitionStorage';
 import { newVehicleId } from './utils/id';
 import {
   cloneVehicleDefinition,
@@ -31,90 +29,53 @@ import type {
 } from './types';
 
 const SAVE_DEBOUNCE_MS = 500;
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 export type VehicleUpdateElementOptions = {
   recordHistory?: boolean;
 };
 
-function wasReplacedByGenericTemplate(v: VehicleDefinition): boolean {
-  if (v.id !== USER_RESTORED_VEHICLE_ID) return false;
-  if (v.width === MAP_TRACK_VEHICLE_WIDTH && v.height === MAP_TRACK_VEHICLE_HEIGHT) return true;
-  const body = v.elements.find((el) => el.type === 'body');
-  if (body && body.y === 0 && body.width >= 400) return true;
-  return false;
-}
+/** 每個模型跟後端的同步狀態 */
+export type VehicleSyncState =
+  | { status: 'saving' }
+  | { status: 'saved'; at: number }
+  | { status: 'conflict'; message: string; current: VehicleDefinition | null }
+  | { status: 'error'; message: string };
 
-function mergeRestoredUserVehicle(list: VehicleDefinition[]): VehicleDefinition[] {
-  const restored = createUserRestoredVtmsVehicle();
-  const idx = list.findIndex((v) => v.id === USER_RESTORED_VEHICLE_ID);
-  if (idx < 0) return [...list, restored];
-  if (wasReplacedByGenericTemplate(list[idx]!)) {
-    const next = [...list];
-    next[idx] = restored;
-    return next;
-  }
-  return list;
-}
+export type VehicleListLoadState = 'loading' | 'ready' | 'offline';
 
-function loadVehicles(): VehicleDefinition[] {
+function readCache(): VehicleDefinition[] {
   try {
     const raw = localStorage.getItem(VEHICLE_DEFINITIONS_STORAGE_KEY);
-    if (!raw) return [migrateVehicleDefinition(createUserRestoredVtmsVehicle())];
-    const parsed = JSON.parse(raw) as VehicleDefinition[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return [migrateVehicleDefinition(createUserRestoredVtmsVehicle())];
-    }
-    return mergeRestoredUserVehicle(parsed).map(migrateVehicleDefinition);
+    const parsed = raw ? (JSON.parse(raw) as VehicleDefinition[]) : [];
+    return Array.isArray(parsed) ? parsed.map(migrateVehicleDefinition) : [];
   } catch {
-    return [migrateVehicleDefinition(createUserRestoredVtmsVehicle())];
+    return [];
   }
 }
 
-function loadAndPersistVehicles(): VehicleDefinition[] {
-  const next = loadVehicles();
-  flushVehiclesSave(next);
-  return next;
-}
-
-function saveVehicles(vehicles: VehicleDefinition[]) {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    flushVehiclesSave(vehicles);
-  }, SAVE_DEBOUNCE_MS);
-}
-
-/**
- * <strong>後端是真相，localStorage 只是離線快取。</strong>
- *
- * 載具定義原本只存在瀏覽器（<code>syncdrive_vehicle_definitions</code>）：一個人畫好
- * 的車輛外觀別人看不到，換一台電腦、清一次快取就沒了。它是圖台與車輛監控畫面共用的
- * 呈現資產，TP13C §1.4 明訂「任一帳號所見內容一致」，所以搬進 vehicle_definitions。
- *
- * 快取沒有拿掉，因為兩件事都要成立：後端連不上時畫面仍要能開；而編輯器是重度互動
- * 介面，每一次拖曳都打後端不切實際。所以寫入是「先寫快取、再送後端（沿用既有的
- * 500 毫秒 debounce）」，讀取是「先給快取讓畫面立刻有東西、再用後端覆蓋」。
- *
- * 後端寫入失敗<strong>不擋畫面</strong>：使用者的編輯已經在快取裡，下一次成功的
- * 儲存會把整份清單補上去（整批覆寫語意，不會只補一半）。
- */
-export function flushVehiclesSave(vehicles: VehicleDefinition[]) {
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = undefined;
-  }
+function writeCache(vehicles: VehicleDefinition[]) {
   try {
     localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, JSON.stringify(vehicles));
   } catch {
     /* ignore quota */
   }
-  void saveVehicleDefinitions(vehicles).catch(() => {
-    /* 後端暫時不可用：快取已寫入，下一次儲存會整批補上 */
-  });
 }
 
+/*
+ * <strong>後端是真相，逐筆存。</strong>
+ *
+ * 以前這裡一開編輯器就把瀏覽器快取整批推上後端（整批取代、沒列到的刪掉），還會塞進或
+ * 換掉一個內建範例模型——一台快取過期的瀏覽器就能蓋掉別人剛存的模型。現在：
+ * - 清單以後端為準；後端回來之前不給編輯（快取只用來在載入中先畫出畫面）。
+ * - 每個模型自己 debounce，存的時候帶它從後端拿到的版本（serverVersion）；後端已經是
+ *   別的版本就回 409，這裡標成衝突、不覆蓋，讓使用者選擇載入伺服器版本。
+ * - 本機才有的舊模型不會自動上傳，改在「此瀏覽器的舊模型」由使用者比對後匯入。
+ */
 export function useVehicleEditor() {
-  const [vehicles, setVehicles] = useState<VehicleDefinition[]>(() => loadAndPersistVehicles());
+  const [vehicles, setVehicles] = useState<VehicleDefinition[]>(() => readCache());
+  const [loadState, setLoadState] = useState<VehicleListLoadState>('loading');
+  const [syncState, setSyncState] = useState<Record<string, VehicleSyncState>>({});
+  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
@@ -124,48 +85,26 @@ export function useVehicleEditor() {
   const selectedElementIdsRef = useRef(selectedElementIds);
   const clipboardRef = useRef<VehicleElement | null>(null);
 
-  /**
-   * 開啟時用後端內容覆蓋快取。
-   *
-   * 後端空的（第一次跑、或還沒有人存過）就不覆蓋——那代表尚未遷移，直接沿用本機
-   * 既有內容，並且下一次儲存會把它整批送上去，等於一次自動遷移。
-   */
-  useEffect(() => {
-    let cancelled = false;
-    void fetchVehicleDefinitions()
-      .then((remote) => {
-        if (cancelled) return;
-        /**
-         * 伺服器是空的＝還沒遷移過，主動把本機那份推上去。
-         *
-         * 原本只寫「下一次儲存會整批送上去」，但那是被動的——使用者不去編輯載具
-         * 就永遠不會觸發，資料庫會一直是空的。只在伺服器確實是空的時候推，永遠不拿
-         * 本機舊快取覆蓋伺服器上已有的內容。
-         */
-        if (remote.length === 0) {
-          const local = vehiclesRef.current;
-          if (local.length > 0) {
-            void saveVehicleDefinitions(local).catch(() => {
-              /* 後端暫時不可用：下一次儲存仍會補上 */
-            });
-          }
-          return;
-        }
-        const migrated = mergeRestoredUserVehicle(remote).map(migrateVehicleDefinition);
-        setVehicles(migrated);
-        try {
-          localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, JSON.stringify(migrated));
-        } catch {
-          /* ignore quota */
-        }
-      })
-      .catch(() => {
-        /* 後端不可用：沿用快取，畫面照常運作 */
-      });
-    return () => {
-      cancelled = true;
-    };
+  const reloadFromServer = useCallback(async () => {
+    try {
+      const remote = (await fetchVehicleDefinitions()).map(migrateVehicleDefinition);
+      stashLegacyVehicleCache(remote);
+      setVehicles(remote);
+      writeCache(remote);
+      setSyncState({});
+      setLoadState('ready');
+      return remote;
+    } catch {
+      // 後端不可用：快取照常顯示但不給存（存了也送不上去，還可能跟別人衝突）
+      setLoadState('offline');
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 後端讀取是非同步，回來之後才寫狀態
+    void reloadFromServer();
+  }, [reloadFromServer]);
 
   vehiclesRef.current = vehicles;
   activeVehicleIdRef.current = activeVehicleId;
@@ -176,10 +115,91 @@ export function useVehicleEditor() {
   const selectedElement =
     activeVehicle?.elements.find((e) => e.id === selectedElementId) ?? null;
 
-  const commit = useCallback((next: VehicleDefinition[]) => {
-    setVehicles(next);
-    saveVehicles(next);
+  const setSync = useCallback((id: string, state: VehicleSyncState | null) => {
+    setSyncState((current) => {
+      const next = { ...current };
+      if (state) next[id] = state;
+      else delete next[id];
+      return next;
+    });
   }, []);
+
+  /** 存一個模型（帶它的 serverVersion）；成功後把新版本號寫回清單 */
+  const saveNow = useCallback(
+    async (id: string) => {
+      saveTimers.current.delete(id);
+      const vehicle = vehiclesRef.current.find((v) => v.id === id);
+      if (!vehicle) return;
+      setSync(id, { status: 'saving' });
+      try {
+        const saved = await saveVehicleDefinition(vehicle, vehicle.serverVersion ?? null);
+        setVehicles((current) => {
+          const next = current.map((v) =>
+            v.id === id ? { ...v, serverVersion: saved.serverVersion } : v,
+          );
+          writeCache(next);
+          return next;
+        });
+        setSync(id, { status: 'saved', at: Date.now() });
+      } catch (error) {
+        if (error instanceof VehicleDefinitionConflictError) {
+          setSync(id, { status: 'conflict', message: error.message, current: error.current });
+        } else {
+          setSync(id, {
+            status: 'error',
+            message: error instanceof Error ? error.message : '儲存失敗',
+          });
+        }
+      }
+    },
+    [setSync],
+  );
+
+  const scheduleSave = useCallback(
+    (id: string) => {
+      const timer = saveTimers.current.get(id);
+      if (timer) clearTimeout(timer);
+      saveTimers.current.set(
+        id,
+        setTimeout(() => void saveNow(id), SAVE_DEBOUNCE_MS),
+      );
+    },
+    [saveNow],
+  );
+
+  /** 寫進清單；有變的那幾個模型排程存檔（清單本身不整批送） */
+  const commit = useCallback(
+    (next: VehicleDefinition[]) => {
+      const before = new Map(vehiclesRef.current.map((v) => [v.id, v]));
+      vehiclesRef.current = next;
+      setVehicles(next);
+      writeCache(next);
+      for (const vehicle of next) {
+        if (before.get(vehicle.id) !== vehicle) scheduleSave(vehicle.id);
+      }
+    },
+    [scheduleSave],
+  );
+
+  /** 衝突時：放棄本機修改，改用伺服器上的版本 */
+  const takeServerVersion = useCallback(
+    (id: string) => {
+      const state = syncState[id];
+      const current = state?.status === 'conflict' ? state.current : null;
+      const timer = saveTimers.current.get(id);
+      if (timer) clearTimeout(timer);
+      saveTimers.current.delete(id);
+      setVehicles((list) => {
+        const next = current
+          ? list.map((v) => (v.id === id ? migrateVehicleDefinition(current) : v))
+          : list.filter((v) => v.id !== id);
+        writeCache(next);
+        return next;
+      });
+      setSync(id, null);
+    },
+    [setSync, syncState],
+  );
 
   const getSnapshot = useCallback(() => {
     const id = activeVehicleIdRef.current;
@@ -253,17 +273,30 @@ export function useVehicleEditor() {
     [commit],
   );
 
+  /**
+   * 刪除：先問後端（仍被地圖、預設設定或儀表板引用就拒絕，錯誤裡帶引用清單），
+   * 後端刪成功才從清單拿掉。還沒存上後端的新模型直接拿掉。
+   */
   const deleteVehicle = useCallback(
-    (vehicleId: string) => {
+    async (vehicleId: string) => {
+      const vehicle = vehiclesRef.current.find((v) => v.id === vehicleId);
+      if (!vehicle) return;
+      const timer = saveTimers.current.get(vehicleId);
+      if (timer) clearTimeout(timer);
+      saveTimers.current.delete(vehicleId);
+      if (vehicle.serverVersion !== undefined) await deleteVehicleDefinition(vehicleId);
       const next = vehiclesRef.current.filter((v) => v.id !== vehicleId);
-      commit(next.length > 0 ? next : [migrateVehicleDefinition(createUserRestoredVtmsVehicle())]);
-      if (activeVehicleId === vehicleId) {
+      vehiclesRef.current = next;
+      setVehicles(next);
+      writeCache(next);
+      setSync(vehicleId, null);
+      if (activeVehicleIdRef.current === vehicleId) {
         setActiveVehicleId(null);
         setSelectedElementId(null);
         setSelectedElementIds([]);
       }
     },
-    [commit, activeVehicleId],
+    [setSync],
   );
 
   const addElement = useCallback(
@@ -529,8 +562,11 @@ export function useVehicleEditor() {
     (vehicleId: string) => {
       const source = vehiclesRef.current.find((v) => v.id === vehicleId);
       if (!source) return null;
-      const duplicate = cloneVehicleDefinition(source);
-      commit([...vehiclesRef.current, duplicate]);
+      // 複本是新模型：新 ID、沒有伺服器版本
+      const { serverVersion: _version, ...rest } = cloneVehicleDefinition(source);
+      void _version;
+      commit([...vehiclesRef.current, rest]);
+      const duplicate = rest;
       return duplicate.id;
     },
     [commit],
@@ -550,7 +586,6 @@ export function useVehicleEditor() {
         list,
         buildExportFilename(label, { kind: 'vehicle-template' }),
       );
-      flushVehiclesSave(vehiclesRef.current);
     },
     [],
   );
@@ -560,8 +595,10 @@ export function useVehicleEditor() {
       const parsed = parseVehicleDefinitionsJson(raw);
       if (parsed.length === 0) return [] as string[];
       const existingIds = new Set(vehiclesRef.current.map((v) => v.id));
+      // 匯入一律當新模型：同 ID 已存在就換新 ID，不覆蓋既有模型
       const toAdd = parsed.map((v) => {
-        const migrated = migrateVehicleDefinition(v);
+        const { serverVersion: _version, ...migrated } = migrateVehicleDefinition(v);
+        void _version;
         return existingIds.has(migrated.id) ? cloneVehicleDefinition(migrated) : migrated;
       });
       commit([...vehiclesRef.current, ...toAdd]);
@@ -579,9 +616,13 @@ export function useVehicleEditor() {
     [importVehiclesFromJson],
   );
 
+  /** 離開編輯器時把還在 debounce 的修改立刻送出 */
   const flushSave = useCallback(() => {
-    flushVehiclesSave(vehiclesRef.current);
-  }, []);
+    for (const [id, timer] of saveTimers.current) {
+      clearTimeout(timer);
+      void saveNow(id);
+    }
+  }, [saveNow]);
 
   const duplicateSelectedElement = useCallback(() => {
     if (!copySelectedElement()) return false;
@@ -590,6 +631,10 @@ export function useVehicleEditor() {
 
   return {
     vehicles,
+    loadState,
+    syncState,
+    reloadFromServer,
+    takeServerVersion,
     activeVehicle,
     activeVehicleId,
     setActiveVehicleId,

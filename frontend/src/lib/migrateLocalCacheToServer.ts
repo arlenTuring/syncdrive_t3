@@ -6,16 +6,11 @@ import {
   fetchDashboardPlanes,
   saveDashboardPlanes,
 } from '../features/dashboard/api/dashboardPlanesApi';
-import {
-  fetchVehicleDefinitions,
-  saveVehicleDefinitions,
-} from '../features/vehicle-editor/api/vehicleDefinitionsApi';
+import { fetchVehicleDefinitions } from '../features/vehicle-editor/api/vehicleDefinitionsApi';
 import type { DashboardPlane } from '../features/dashboard/types';
-import type { VehicleDefinition } from '../features/vehicle-editor/types';
 import { migrateVehicleDefinition } from '../features/vehicle-editor/utils/migrateVehicleDefinition';
+import { stashLegacyVehicleCache } from '../features/vehicle-editor/storage/vehicleDefinitionStorage';
 
-/** 載具定義快取被後端內容換掉時發出；圖台聽到就重新套用車輛外觀 */
-export const VEHICLE_DEFINITIONS_UPDATED_EVENT = 'syncdrive:vehicle-definitions-updated';
 
 /**
  * 本機快取 → 伺服器的一次性遷移
@@ -70,12 +65,16 @@ export function migrateLocalCacheToServer(): void {
       /* 後端不可用：下次啟動或下次存檔再補 */
     }
 
+    /*
+     * 車輛模型：只把後端那份寫回快取，<strong>不再自動把本機快取推上去</strong>。
+     *
+     * 以前後端空的時候會把快取整批送上去；快取裡可能是別台機器早就改掉的舊版本，或內建
+     * 範例。現在本機才有的模型要在圖資管理 → 車輛模型 → 「此瀏覽器的舊模型」逐一比對、
+     * 由使用者決定匯入，不在背景替人決定。
+     */
     try {
       const remoteVehicles = await fetchVehicleDefinitions();
-      if (remoteVehicles.length === 0) {
-        const local = readCache<VehicleDefinition>(VEHICLE_DEFINITIONS_STORAGE_KEY);
-        if (local.length > 0) await saveVehicleDefinitions(local);
-      } else {
+      if (remoteVehicles.length > 0) {
         /*
          * 伺服器有就<strong>以伺服器為準寫回快取</strong>。
          *
@@ -85,11 +84,12 @@ export function migrateLocalCacheToServer(): void {
          * 本機與 GCP 的資料表已經一模一樣，GCP 畫面上的車還是縮成一小塊、車號擠在
          * 一起。
          */
+        // 覆寫之前先把本機才有的舊模型另存，留給圖資管理匯入（不在這裡替人上傳）
+        stashLegacyVehicleCache(remoteVehicles);
         const next = remoteVehicles.map(migrateVehicleDefinition);
         const serialized = JSON.stringify(next);
         if (window.localStorage.getItem(VEHICLE_DEFINITIONS_STORAGE_KEY) !== serialized) {
           window.localStorage.setItem(VEHICLE_DEFINITIONS_STORAGE_KEY, serialized);
-          window.dispatchEvent(new Event(VEHICLE_DEFINITIONS_UPDATED_EVENT));
         }
       }
     } catch {

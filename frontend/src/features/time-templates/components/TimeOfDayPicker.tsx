@@ -92,9 +92,12 @@ type TimePickerPanelProps = {
   second: number;
   onHourChange: (n: number) => void;
   onMinuteChange: (n: number) => void;
-  onSecondChange: (n: number) => void;
-  onNow: () => void;
+  onSecondChange?: (n: number) => void;
+  /** 沒給就不顯示「此刻」（例如要以營運時鐘為準、不能拿瀏覽器時間的地方） */
+  onNow?: () => void;
   onConfirm: () => void;
+  /** false：只選時、分（24 小時制） */
+  showSeconds?: boolean;
 };
 
 export function TimePickerPanel({
@@ -106,9 +109,14 @@ export function TimePickerPanel({
   onSecondChange,
   onNow,
   onConfirm,
+  showSeconds = true,
 }: TimePickerPanelProps) {
   return (
-    <div className="relative w-[190px] rounded-xl bg-[#18181B] shadow-[0px_4px_24px_rgba(98,116,142,0.2)]">
+    <div
+      className={`relative rounded-xl bg-[#18181B] shadow-[0px_4px_24px_rgba(98,116,142,0.2)] ${
+        showSeconds ? 'w-[190px]' : 'w-[136px]'
+      }`}
+    >
       <div
         className="absolute -top-2 left-6 size-0 border-x-8 border-b-8 border-x-transparent border-b-[#27272A]"
         aria-hidden
@@ -118,24 +126,30 @@ export function TimePickerPanel({
           <TimeColumn max={23} value={hour} onChange={onHourChange} />
           <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
           <TimeColumn max={59} value={minute} onChange={onMinuteChange} />
-          <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
-          <TimeColumn
-            max={50}
-            value={second}
-            onChange={onSecondChange}
-            step={SCHEDULE_TIME_ALIGN_SECONDS}
-          />
+          {showSeconds && onSecondChange ? (
+            <>
+              <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
+              <TimeColumn
+                max={50}
+                value={second}
+                onChange={onSecondChange}
+                step={SCHEDULE_TIME_ALIGN_SECONDS}
+              />
+            </>
+          ) : null}
         </div>
       </div>
       <div className="h-px w-full bg-[rgba(212,212,212,0.15)]" />
-      <div className="flex items-center justify-between px-2 py-2">
-        <button
-          type="button"
-          onClick={onNow}
-          className="rounded-lg px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-[#51A2FF] hover:bg-[#51A2FF]/10"
-        >
-          此刻
-        </button>
+      <div className={`flex items-center px-2 py-2 ${onNow ? 'justify-between' : 'justify-end'}`}>
+        {onNow ? (
+          <button
+            type="button"
+            onClick={onNow}
+            className="rounded-lg px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-[#51A2FF] hover:bg-[#51A2FF]/10"
+          >
+            此刻
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onConfirm}

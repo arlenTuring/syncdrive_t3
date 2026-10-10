@@ -3197,10 +3197,8 @@ const enUS: DeepStringify<typeof zhTW> = {
           zoomOut: 'Zoom out',
         },
         vehicleContainer: {
-          editHint: 'While editing, only this template shows on the map (yellow frame). At runtime the platform clones it per MQTT vehicle.',
           showLabel: 'Display label',
           labelPlaceholder: 'Vehicle',
-          editStyle: 'Edit vehicle style',
           actions: 'Behavior actions',
           offsetX: 'Offset X',
           offsetY: 'Offset Y',
@@ -3315,6 +3313,10 @@ const enUS: DeepStringify<typeof zhTW> = {
         vehicleContainer: {
           label: 'Vehicle template',
           description: 'Map vehicle look & behavior (applied to all live vehicles at runtime)',
+        },
+        obstacleRing: {
+          label: 'Obstacle ring (8 directions)',
+          description: 'Eight indicator dots around a vehicle, each bound to its own field',
         },
         tabList: {
           label: 'Tab list table',

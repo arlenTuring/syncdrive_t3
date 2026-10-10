@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import type { CanvasElementProps, ChildWidget, WidgetType } from './types';
 import { WidgetRenderer } from './elements/WidgetRenderer';
-import { VEHICLE_DEFINITIONS_UPDATED_EVENT } from '../../lib/migrateLocalCacheToServer';
 import { GroupCanvasRenderer } from './elements/GroupCanvasRenderer';
 import { MapPlatformLayer } from './elements/MapPlatformLayer';
 import { BindingWarningIcon } from './components/BindingWarningIcon';
@@ -34,9 +33,8 @@ import {
 } from '../../lib/elementResize';
 import { RotatedElementResizeHandles } from '../../lib/RotatedElementResizeHandles';
 import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
-import {
-  resolveMapVehicleTemplate,
-} from './utils/resolveMapVehicleTemplate';
+import { useCanvasMapVehicleTemplate } from './utils/resolveMapVehicleTemplate';
+import { canvasBackgroundCss } from './constants/backgroundImages';
 import { isTabCanvas } from './utils/tabCanvas';
 
 const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
@@ -366,19 +364,9 @@ export function CanvasElement({
   }
 
   const isMapPlatform = element.canvasKind === 'map-platform';
-  // 載具定義快取被後端內容換掉時重新套用（見 migrateLocalCacheToServer）
-  const [vehicleDefinitionsVersion, setVehicleDefinitionsVersion] = useState(0);
-  useEffect(() => {
-    if (!isMapPlatform) return;
-    const bump = () => setVehicleDefinitionsVersion((v) => v + 1);
-    window.addEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
-    return () => window.removeEventListener(VEHICLE_DEFINITIONS_UPDATED_EVENT, bump);
-  }, [isMapPlatform]);
-  const vehicleTemplate = useMemo(
-    () => (isMapPlatform ? resolveMapVehicleTemplate(element) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [element, isMapPlatform, vehicleDefinitionsVersion],
-  );
+  // 車輛模型：圖資管理的地圖設定為準（共用解析，模型或設定一改就更新）；這張地圖還沒設定時
+  // 才退回這個圖台元件上舊的載具容器樣板，再沒有才用系統預設模型
+  const vehicleTemplate = useCanvasMapVehicleTemplate(element, isMapPlatform);
   const boxShadow = isEditMode && isSelected
     ? (canDropCanvas ? '0 0 0 2px #06b6d4, 0 0 12px rgba(6,182,212,0.25)' : '0 0 0 4px #ef4444, 0 0 20px rgba(239,68,68,0.5)')
     : isMapPlatform
@@ -604,11 +592,14 @@ export function CanvasElement({
           width: '100%', height: '100%', borderRadius: 4, position: 'relative',
           overflow: isEditMode ? 'visible' : 'hidden',
           opacity: (element.opacity / 100) * dimOpacity,
+          // 群組的背景圖畫在每一個樣板 slot 上（GroupCanvasRenderer），外框只畫底色
           background: isMapPlatform
             ? 'transparent'
-            : element.backgroundImage
-              ? `url(${element.backgroundImage}) center/cover no-repeat`
-              : element.backgroundColor,
+            : canvasBackgroundCss(
+                element.backgroundColor,
+                element.isGroup || element.backgroundImageArea ? '' : element.backgroundImage,
+                element.backgroundImageFit ?? 'cover',
+              ),
           boxShadow,
           transition: (isDraggingCanvas || isResizingCanvas) ? 'none' : 'box-shadow 0.12s ease, opacity 0.2s ease',
         }}
@@ -698,6 +689,22 @@ export function CanvasElement({
         {isDragOver && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 999, background: 'rgba(34,211,238,0.04)', border: '2px dashed rgba(34,211,238,0.4)', borderRadius: 4, pointerEvents: 'none' }} />
         )}
+
+        {!isMapPlatform && element.backgroundImageArea && element.backgroundImage ? (
+          <div
+            data-template-background
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: element.backgroundImageArea.width,
+              height: element.backgroundImageArea.height,
+              zIndex: 0,
+              pointerEvents: 'none',
+              background: canvasBackgroundCss('transparent', element.backgroundImage, element.backgroundImageFit ?? 'contain'),
+            }}
+          />
+        ) : null}
 
         {isMapPlatform && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
@@ -1069,6 +1076,7 @@ const color =  {
     'tab-list': '#8b5cf6',
     'shift-list': '#8b5cf6',
     'station-eta': '#34d399',
+    'obstacle-ring': '#fb7185',
   }[child.type] || '#94a3b8';
   const label = {
     text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB',
@@ -1084,6 +1092,7 @@ const color =  {
     'tab-list': 'TABS',
     'shift-list': 'SHIFTS',
     'station-eta': 'ETA',
+    'obstacle-ring': 'OBS',
   }[child.type] || 'WIDGET';
 
   const rotationDeg = child.rotationDeg ?? 0;

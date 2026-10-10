@@ -49,6 +49,14 @@ export class VehicleDefinition {
   @Column({ name: 'preview_data', type: 'jsonb', nullable: true })
   previewData: any;
 
+  /** 後軸中心距車尾端的比例（0＝車尾、1＝車頭）；圖台以後軸為錨點，沒有時由尾燈估算 */
+  @Column({
+    name: 'rear_axle_from_tail_ratio',
+    type: 'double precision',
+    nullable: true,
+  })
+  rearAxleFromTailRatio: number | null;
+
   @Column({ type: 'int', default: 1 })
   version: number;
 

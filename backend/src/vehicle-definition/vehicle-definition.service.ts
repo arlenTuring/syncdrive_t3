@@ -1,20 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { VehicleDefinition } from '../database/entities/vehicle-definition.entity';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import {
+  MapVehicleSettingsService,
+  VEHICLE_MODEL_TAG,
+} from './map-vehicle-settings.service';
 
 /**
- * 載具外觀定義（TP13C §1.4 主檔 · vehicle_definitions）。
+ * 車輛外觀模型（TP13C §1.4 主檔 · vehicle_definitions），圖資管理 → 車輛模型。
  *
- * <strong>為什麼要有這一支。</strong>載具定義原本只存在瀏覽器
- * <code>localStorage['syncdrive_vehicle_definitions']</code>：一個人畫好的車輛外觀
- * 別人看不到，換一台電腦、清一次快取就沒了。而它是圖台與車輛監控畫面共用的呈現
- * 資產，文件明訂「任一帳號所見內容一致」。
+ * <h3>逐筆存取，不再整批取代</h3>
+ * 原本是 PUT 整份清單、沒出現的就刪掉，而編輯器一開就把瀏覽器快取整批推上來——
+ * 一台快取過期的瀏覽器就能蓋掉、甚至刪掉別人剛存的模型。現在：
+ * - 新增／修改逐筆，修改要帶 baseVersion，跟伺服器目前版本不同就 409，不覆蓋別人的新版本。
+ * - 內容沒變不遞增版本。
+ * - 刪除前檢查引用（地圖設定、預設模型、儀表板元件），有引用就拒絕，不留下失效引用。
  *
- * <strong>覆寫語意採整批取代（replaceAll）。</strong>載具編輯器在畫布上是一次操作
- * 一整份清單（新增、刪除、改名、改元件樹都在同一個 state），逐筆 PATCH 會讓前端
- * 得自己追蹤哪一筆變了；整批送出則與編輯器的心智模型一致，也不會出現「刪除沒同步」
- * 這種殘留。清單本身很小（個位數載具），整批寫入的成本可以忽略。
+ * 模型的對外身分是 definitionKey（前端的 id）：圖台元件、地圖設定綁的都是它。
  */
 export type VehicleDefinitionPayload = {
   definitionKey: string;
@@ -25,15 +34,20 @@ export type VehicleDefinitionPayload = {
   backgroundColor?: string | null;
   elements: unknown;
   previewData?: unknown;
+  rearAxleFromTailRatio?: number | null;
   version?: number | null;
   createdBy?: string | null;
 };
+
+const KEY_PATTERN = /^[A-Za-z0-9._-]{1,120}$/;
 
 @Injectable()
 export class VehicleDefinitionService {
   constructor(
     @InjectRepository(VehicleDefinition)
     private readonly repository: Repository<VehicleDefinition>,
+    private readonly mapSettings: MapVehicleSettingsService,
+    private readonly invalidation: DatasourceInvalidationService,
   ) {}
 
   async list(): Promise<VehicleDefinition[]> {
@@ -49,62 +63,114 @@ export class VehicleDefinitionService {
   }
 
   /**
-   * 整批取代：送進來的清單就是完整結果，沒出現在清單裡的舊資料一併刪除。
+   * 新增或修改一個模型。
    *
-   * 用 definitionKey 對位而不是 id——前端在 localStorage 時代就是用自己的
-   * key 在引用載具（圖台元件綁的是那個 key），換成資料庫之後那些引用必須繼續有效，
-   * 所以 key 是對外的身分，資料庫的 uuid 只是內部主鍵。
+   * baseVersion：前端拿到的那一版。已存在的模型一定要帶，且必須等於伺服器目前版本；
+   * 不存在的模型不帶（或 0）。同 ID 不同內容時由前端先比對、讓使用者決定，這裡不替人蓋。
    */
-  async replaceAll(
-    items: VehicleDefinitionPayload[],
+  async upsert(
+    definitionKey: string,
+    payload: VehicleDefinitionPayload,
+    baseVersion: number | null,
     updatedBy?: string,
-  ): Promise<VehicleDefinition[]> {
+  ): Promise<VehicleDefinition> {
+    const key = String(definitionKey ?? '').trim();
+    if (!KEY_PATTERN.test(key)) throw new BadRequestException('模型 ID 格式不正確');
+    if (!Array.isArray(payload?.elements))
+      throw new BadRequestException('模型內容缺少元件清單');
+    const prior = await this.repository.findOne({ where: { definitionKey: key } });
+    if (prior) {
+      if (baseVersion === null || baseVersion === undefined) {
+        throw new ConflictException({
+          message: `已有同 ID 的模型「${prior.name}」，請先比對內容再決定`,
+          current: prior,
+        });
+      }
+      if (Number(baseVersion) !== Number(prior.version)) {
+        throw new ConflictException({
+          message: `模型「${prior.name}」已被更新為第 ${prior.version} 版，請重新載入再修改`,
+          current: prior,
+        });
+      }
+      if (sameContent(prior, payload)) return prior;
+    } else if (baseVersion) {
+      throw new ConflictException({ message: `模型 ${key} 已被刪除`, current: null });
+    }
     const now = Date.now();
-    const incomingKeys = items
-      .map((item) => item.definitionKey?.trim())
-      .filter((key): key is string => Boolean(key));
-
-    const existing = incomingKeys.length
-      ? await this.repository.find({
-          where: { definitionKey: In(incomingKeys) },
-        })
-      : [];
-    const existingByKey = new Map(
-      existing.map((row) => [row.definitionKey, row]),
-    );
-
-    const saved: VehicleDefinition[] = [];
-    for (const item of items) {
-      const key = item.definitionKey?.trim();
-      if (!key) continue;
-      const prior = existingByKey.get(key);
-      const row =
-        prior ?? this.repository.create({ definitionKey: key, createdAt: now });
-      row.name = item.name ?? key;
-      row.vehicleModel = item.vehicleModel ?? undefined!;
-      row.width = item.width ?? undefined!;
-      row.height = item.height ?? undefined!;
-      row.backgroundColor = item.backgroundColor ?? undefined!;
-      row.elements = item.elements ?? [];
-      row.previewData = item.previewData ?? undefined!;
-      // 版本號由伺服器遞增，前端不必自己維護；沒有舊資料就從 1 起算
-      row.version = prior ? (prior.version ?? 0) + 1 : (item.version ?? 1);
-      row.createdBy =
-        prior?.createdBy ?? item.createdBy ?? updatedBy ?? undefined!;
-      row.updatedAt = now;
-      saved.push(await this.repository.save(row));
-    }
-
-    // 這一批沒提到的，代表在編輯器裡被刪掉了
-    const keepKeys = saved.map((row) => row.definitionKey);
-    const stale = await this.repository.find();
-    const removable = stale.filter(
-      (row) => !keepKeys.includes(row.definitionKey),
-    );
-    if (removable.length > 0) {
-      await this.repository.remove(removable);
-    }
-
-    return this.list();
+    const row =
+      prior ?? this.repository.create({ definitionKey: key, createdAt: now });
+    row.name = String(payload.name ?? '').trim() || key;
+    row.vehicleModel = payload.vehicleModel ?? undefined!;
+    row.width = payload.width ?? undefined!;
+    row.height = payload.height ?? undefined!;
+    row.backgroundColor = payload.backgroundColor ?? undefined!;
+    row.elements = payload.elements;
+    row.previewData = payload.previewData ?? undefined!;
+    row.rearAxleFromTailRatio =
+      typeof payload.rearAxleFromTailRatio === 'number' &&
+      Number.isFinite(payload.rearAxleFromTailRatio)
+        ? payload.rearAxleFromTailRatio
+        : null;
+    row.version = prior ? (prior.version ?? 0) + 1 : 1;
+    row.createdBy = prior?.createdBy ?? payload.createdBy ?? updatedBy ?? undefined!;
+    row.updatedAt = now;
+    const saved = await this.repository.save(row);
+    this.invalidation.emit([VEHICLE_MODEL_TAG], 'vehicle_model_saved');
+    return saved;
   }
+
+  /** 刪除：有任何引用就拒絕，回傳引用清單讓使用者先改掉 */
+  async remove(definitionKey: string) {
+    const row = await this.findOne(definitionKey);
+    const references = await this.mapSettings.references(definitionKey);
+    if (references.length > 0) {
+      throw new ConflictException({
+        message: `模型「${row.name}」仍被 ${references.length} 處使用，請先改用其他模型`,
+        references,
+      });
+    }
+    await this.repository.remove(row);
+    this.invalidation.emit([VEHICLE_MODEL_TAG], 'vehicle_model_deleted');
+    return { deleted: true, definitionKey };
+  }
+
+  references(definitionKey: string) {
+    return this.mapSettings.references(definitionKey);
+  }
+}
+
+/** 內容比對：只看外觀資料，不看版本與時間 */
+function sameContent(row: VehicleDefinition, payload: VehicleDefinitionPayload) {
+  const pick = (value: {
+    name?: unknown;
+    vehicleModel?: unknown;
+    width?: unknown;
+    height?: unknown;
+    backgroundColor?: unknown;
+    elements?: unknown;
+    previewData?: unknown;
+    rearAxleFromTailRatio?: unknown;
+  }) =>
+    stableStringify({
+      name: value.name ?? null,
+      vehicleModel: value.vehicleModel ?? null,
+      width: value.width ?? null,
+      height: value.height ?? null,
+      backgroundColor: value.backgroundColor ?? null,
+      elements: value.elements ?? [],
+      previewData: value.previewData ?? null,
+      rearAxleFromTailRatio: value.rearAxleFromTailRatio ?? null,
+    });
+  return pick(row) === pick(payload);
+}
+
+export function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
 }
