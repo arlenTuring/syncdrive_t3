@@ -58,6 +58,29 @@ function confirmedDwellPatch(vehiclePhase: string, stationId: string | null, rep
     : {};
 }
 
+/**
+ * 每一段（以目標站為鍵）的距離分母：這張單在這一段觀測到的最大「到目標站距離」。
+ * 車端每秒回報多次、一進入新的一段就會回報，第一筆就是整段的長度；之後只會變小，所以只取最大值，
+ * 不隨輪詢或後來的回報重設。班次卡的進度用「1 − 目前距離／這個分母」——距離是實際位置，
+ * 不像 ETA 會隨速度、停等、倍速改變。
+ */
+export function mergeLegDistanceMax(
+  previous: unknown,
+  target: string | null,
+  distanceM: unknown,
+): Record<string, number> {
+  const next: Record<string, number> = {};
+  if (previous && typeof previous === 'object' && !Array.isArray(previous)) {
+    for (const [key, value] of Object.entries(previous as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) next[key] = value;
+    }
+  }
+  if (target && typeof distanceM === 'number' && Number.isFinite(distanceM) && distanceM > 0) {
+    next[target] = Math.max(next[target] ?? 0, Math.round(distanceM * 10) / 10);
+  }
+  return next;
+}
+
 export type OperationCurrentLeg = {
   target_station_id?: string;
   distance_to_target_m?: number;
@@ -984,6 +1007,7 @@ export class OrderService {
       vehicle_phase: payload.vehicle_phase ?? null,
       current_leg: currentLeg ?? null,
       leg_eta_max: legEtaMax,
+      leg_distance_max_m: mergeLegDistanceMax(prevPayload.leg_distance_max_m, legTarget, currentLeg?.distance_to_target_m),
       segment_index: segmentIndex,
       segment_remain_pct: segmentRemainPct,
       route_progress: routeProgress,
@@ -1304,6 +1328,7 @@ export class OrderService {
       vehicle_phase: payload.vehicle_phase ?? 'AWAITING_DEPARTURE',
       current_leg: currentLeg ?? null,
       leg_eta_max: legEtaMax,
+      leg_distance_max_m: mergeLegDistanceMax(prevPayload.leg_distance_max_m, legTarget, currentLeg?.distance_to_target_m),
       operation_action: payload.operation_action ?? null,
       route_progress: 0,
       segment_index: 0,

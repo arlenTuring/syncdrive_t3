@@ -14,6 +14,7 @@ import { OrderService } from '../order/order.service';
 import { dispatchConfig } from './dispatch.config';
 import {
   dispatchDecision,
+  dropDuplicateOrderIds,
   fillMissingEndpoints,
   localMidnight,
   planDispatches,
@@ -167,6 +168,17 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    * 排序是「第 N 列 → 第 N 台」這個對應的前提，所以不能省：資料庫回傳順序沒有
    * 保證，不排的話重啟後同一列可能換一台車。
    */
+  /**
+   * 某營運日採用的班表內容與車隊：時間線第 N 列由車隊第 N 台擔任（跟下單同一套，見 vehicleForRow）。
+   * 營運分佈用它看「此刻在計畫上做什麼」（例如月台上等下一班，那種等待不會產生訂單）。
+   */
+  async dailyPlanTimeline(day: string): Promise<{ shiftId: string; body: Record<string, unknown>; fleet: string[] } | null> {
+    const adoption = await this.ensureDailyPlan(day);
+    if (!adoption) return null;
+    const source = await this.operationShiftService.getShiftTrips(adoption.shift_id);
+    return { shiftId: source.shiftId, body: source.body, fleet: await this.loadFleet() };
+  }
+
   private async loadFleet(): Promise<string[]> {
     const vehicles = await this.vehicleRepository.find({
       where: { isActive: true },
@@ -436,10 +448,13 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    const unique = dropDuplicateOrderIds(planned);
+    skipped.push(...unique.skipped);
+
     return {
       shiftId: deployed.shiftId,
       shiftName: deployed.shiftName,
-      planned,
+      planned: unique.planned,
       skipped,
     };
   }
@@ -612,6 +627,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         [DAILY_PLAN_PAYLOAD_KEYS.shiftId]: shiftId,
         [DAILY_PLAN_PAYLOAD_KEYS.planDigest]: plan.planDigest,
         [DAILY_PLAN_PAYLOAD_KEYS.tripCode]: item.tripCode,
+        ...(item.planBlockId ? { [DAILY_PLAN_PAYLOAD_KEYS.blockId]: item.planBlockId } : {}),
         // 站點 ID 屬於哪張圖：現行站名依「同一張圖、同一個站點 ID」解析最新保存的名稱
         ...(plan.mapId ? { plan_map_id: plan.mapId } : {}),
         planned_depart_at: item.departAt,

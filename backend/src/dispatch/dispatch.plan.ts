@@ -1,5 +1,6 @@
 import type { TimetableTripDto } from '../operation-shift/timetable/expand-timetable';
 import type { YardMove } from './dispatch.yard-moves';
+import type { BlockPurpose } from './dispatch.service-purpose';
 import type { YardTask } from './dispatch.yard-tasks';
 
 /**
@@ -38,6 +39,11 @@ export type PlannedDispatch = {
   /** 協議 §三：[YYMMDD]-[trip_code] */
   orderId: string;
   tripCode: string;
+  /**
+   * 班表卡的 block id：內部身份。顯示代號（E021830）每天重複、只在同一份計畫內唯一；
+   * 訂單另記這張卡是哪一張，追查時不只靠代號。
+   */
+  planBlockId?: string | null;
   vehicleCode: string;
   timelineRow: number;
   taskType: string;
@@ -60,6 +66,8 @@ export type PlannedDispatch = {
    */
   transitionPurpose?: 'yard_exit' | 'yard_entry' | 'standby' | 'hold' | null;
   transitionFacility?: string | null;
+  /** 這張任務服務的用途（營運／整備／待命）與服務對象的任務類型；營運分佈依它分類 */
+  servicePurpose?: BlockPurpose | null;
 };
 
 /**
@@ -210,6 +218,7 @@ export function planDispatches(args: {
       maintenance: null,
       orderId: buildOrderId(trip.trip_code, departAt),
       tripCode: trip.trip_code,
+      planBlockId: trip.block_id,
       vehicleCode,
       timelineRow: trip.timeline_row,
       taskType: trip.task_type,
@@ -300,6 +309,7 @@ export function planYardMoves(args: {
       },
       orderId: buildOrderId(move.tripCode, departAt),
       tripCode: move.tripCode,
+      planBlockId: move.blockId,
       vehicleCode,
       timelineRow: move.timelineRow,
       taskType: 'dispatch',
@@ -307,6 +317,7 @@ export function planYardMoves(args: {
       routeCode: null,
       routeName: move.label,
       transitionPurpose: move.direction === 'exit' ? 'yard_exit' : 'yard_entry',
+      servicePurpose: move.servicePurpose ?? null,
       // 設施那一端：出廠是起點、入廠是終點（讓站移動只記了設施端，也在這裡）
       transitionFacility: (move.direction === 'exit' ? move.origin : move.destination)?.name ?? null,
       departAt,
@@ -384,6 +395,7 @@ export function planYardTasks(args: {
       },
       orderId: buildOrderId(task.tripCode, departAt),
       tripCode: task.tripCode,
+      planBlockId: task.blockId,
       vehicleCode,
       timelineRow: task.timelineRow,
       taskType: 'maintenance',
@@ -392,6 +404,7 @@ export function planYardTasks(args: {
       routeName: task.cardLabel,
       // 待命、暫停（含暫停放、提早進廠等待）是過渡；其他整備任務沒有過渡用途
       transitionPurpose: task.taskType === 'standby' ? 'standby' : task.taskType === 'idle' ? 'hold' : null,
+      servicePurpose: task.servicePurpose ?? null,
       transitionFacility: task.yardSlotId,
       departAt,
       arriveAt,
@@ -476,4 +489,35 @@ export function dispatchDecision(args: {
   if (lead > leadSeconds * 1000) return 'wait';
   if (lead < -catchUpSeconds * 1000) return 'expired';
   return 'dispatch';
+}
+
+/**
+ * 同一份計畫展開出兩張同編號的單（同一個顯示代號）：一張都不發，列出衝突。
+ *
+ * 新規則的代號是「代號＋列號＋HHMM」，同一份班表內本來就唯一；發布時也會再檢查，
+ * 這裡是最後一道保護——訂單編號是主鍵，發出去就會互相覆蓋（串單）。不偷偷加列號或秒數。
+ */
+export function dropDuplicateOrderIds(planned: PlannedDispatch[]): {
+  planned: PlannedDispatch[];
+  skipped: Array<{ tripCode: string; reason: string }>;
+} {
+  const byId = new Map<string, PlannedDispatch[]>();
+  for (const item of planned) byId.set(item.orderId, [...(byId.get(item.orderId) ?? []), item]);
+  const skipped: Array<{ tripCode: string; reason: string }> = [];
+  const kept: PlannedDispatch[] = [];
+  for (const item of planned) {
+    const same = byId.get(item.orderId)!;
+    if (same.length === 1) {
+      kept.push(item);
+      continue;
+    }
+    const others = same
+      .map((other) => `第 ${other.timelineRow} 列 ${other.vehicleCode} ${other.cardLabel}`)
+      .join('、');
+    skipped.push({
+      tripCode: item.tripCode,
+      reason: `代號衝突：${item.tripCode} 同一份班表出現 ${same.length} 次（${others}），未發訂單，請調整代號或計畫安排`,
+    });
+  }
+  return { planned: kept, skipped };
 }

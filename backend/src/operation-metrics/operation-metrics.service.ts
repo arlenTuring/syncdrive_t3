@@ -15,6 +15,7 @@ import { DELAY_TOLERANCE_MS, localMidnight, operatingDayOf, operatingDayStart } 
 import {
   buildCapacityTrend,
   DAY_MINUTES,
+  capacitySampleMs,
   formatClock,
   formatHeadway,
   mergeDepartureLeads,
@@ -167,19 +168,24 @@ export class OperationMetricsService {
   }
 
   /** 運能趨勢上方四個數值 */
-  async getCapacitySummary(now = this.clock.now()) {
+  async getCapacitySummary(clockNow = this.clock.now()) {
+    // 跟趨勢圖「現在」那一列同一個採樣時刻（取到營運分鐘），兩個 API 各自輪詢也對得上
+    const now = capacitySampleMs(clockNow);
     const ctx = await this.loadCapacityContext(now);
-    const today = ctx.days.find((day) => day.isCurrent)!;
+    const { today } = ctx;
     const nowMinute = (now - today.dayStart) / 60_000;
     const segments = today.segments ?? [];
     const current = segmentAt(segments, nowMinute);
     const next = nextSegment(segments, nowMinute);
     const vehicles = await this.maintenanceDistributionService.getVehicleDistribution();
-    const standby = vehicles.find((row) => row.status_code === 'STANDBY')?.vehicle_count ?? 0;
+    // 可調度：營運分佈裡標成可調度的車（待命中、而且沒有計畫中卻還沒下單的任務）——不直接用待命中的總數
+    const standby = vehicles.flatMap((row) => row.vehicles).filter((vehicle) => vehicle.dispatchable).length;
     const live = ctx.actualAt(now);
     return {
       // 跟運能趨勢圖「現在」那一點同一個算法、同一個營運時刻；算不出來（沒有實際資料）就是 null
       live_val: live,
+      /** 即時數值的採樣時刻（營運時間）；跟趨勢圖 now_ms 相同時兩個數字一定一樣 */
+      live_at_ms: now,
       target_val: current?.pphpd ?? 0,
       avail_val: roundTo(standby * perVehiclePphpd(today.body, ctx.vehicleCapacity), 10),
       avail_hint: `可調度${standby}輛`,
@@ -198,7 +204,8 @@ export class OperationMetricsService {
    * 灰線＝部署班表綁定的時間模板各時段的預期運能；藍線＝實際發車換算的運能，只到現在。
    * 規則見 operation-metrics.ts buildCapacityTrend。
    */
-  async getCapacityTrend(now = this.clock.now()) {
+  async getCapacityTrend(clockNow = this.clock.now()) {
+    const now = capacitySampleMs(clockNow);
     const ctx = await this.loadCapacityContext(now);
     return buildCapacityTrend({
       now,
@@ -254,9 +261,23 @@ export class OperationMetricsService {
     const today = await this.loadCapacityDay(day, true);
     const previousDay = operatingDayOf(today.dayStart - 12 * 60 * 60 * 1000);
     const yesterday = await this.loadCapacityDay(previousDay, false);
-    // 明天：班表是日循環，預期運能沿用今天部署中的模板（只用在灰線；實際值一律不跨日複製）
-    const tomorrow = { ...today, day: operatingDayOf(today.dayStart + 36 * 60 * 60 * 1000), dayStart: today.dayStart + DAY_MS, isCurrent: false };
-    const days = [yesterday, today, tomorrow];
+    /*
+     * 灰線（預期運能）整個視窗都用「今天部署班表引用的時間模板」：模板是日循環，跟上方目標數值、
+     * 下段數值同一份。不用前一天自己採用的班表——那一天沒有每日計畫時（例如部署機重播只跑了今天）
+     * 午夜前就整段沒有灰線。實際值另外只用各日自己的真實訂單，不跨日複製。
+     */
+    const templateDay = (dayStart: number, day: string) => ({
+      day,
+      dayStart,
+      isCurrent: false,
+      segments: today.segments,
+      templateIssue: today.templateIssue,
+    });
+    const days = [
+      templateDay(yesterday.dayStart, yesterday.day),
+      today,
+      templateDay(today.dayStart + DAY_MS, operatingDayOf(today.dayStart + 36 * 60 * 60 * 1000)),
+    ];
 
     const vehicleCapacity = Number(today.templateBody?.vehicleCapacity) || 0;
     const dataIssue = today.templateIssue
@@ -312,7 +333,7 @@ export class OperationMetricsService {
       return roundTo(pphpdAt(actualLeads, Math.round((ts - today.dayStart) / 1000), vehicleCapacity), 10);
     };
 
-    return { days, vehicleCapacity, dataIssue, actualAt };
+    return { today, days, vehicleCapacity, dataIssue, actualAt };
   }
 
   /** 每日計畫的班表內容：跟部署中是同一份就用它的快取，否則讀那一份 */

@@ -10,6 +10,13 @@ export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const MAINTENANCE_STEP_COUNT = 7;
 
 /**
+ * 表單資料版本。
+ * - 1：舊版。調度任務廢除前（2026-08-10，8 步）與之後（7 步）都寫 1，分不出步驟編號。
+ * - 2：步驟號一律是目前的 7 步編號，讀回不換算。
+ */
+export const MAINTENANCE_EDITOR_VERSION = 2;
+
+/**
  * 把舊草稿存的步驟號換算成現在的步驟號。
  *
  * 調度任務原本是第 5 步，廢除後第 6～8 步各往前遞補一格。舊草稿裡存的
@@ -18,12 +25,24 @@ export const MAINTENANCE_STEP_COUNT = 7;
  * 舊 1–4 不動；舊 5（調度，已廢）落到現在的第 5 步（行檢）——那一步本來就是
  * 它的下一步；舊 6→5、7→6、8→7。
  */
-function migrateStoredStep(raw: unknown): CreateMaintenanceTaskStep {
+function migrateStoredStep(raw: unknown, legacyEightSteps: boolean): CreateMaintenanceTaskStep {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1;
   const old = Math.round(raw);
   if (old < 1) return 1;
-  const next = old <= 4 ? old : Math.max(5, old - 1);
+  const next = !legacyEightSteps || old <= 4 ? old : Math.max(5, old - 1);
   return Math.min(MAINTENANCE_STEP_COUNT, next) as CreateMaintenanceTaskStep;
+}
+
+/**
+ * 存的步驟號是不是舊的 8 步編號。
+ *
+ * 不能只看 editorVersion：調度任務廢除後到 v2 之前，存檔照樣寫 editorVersion 1，但步驟號已經是
+ * 7 步編號；以前一律換算，結果每存一次、再打開就往前掉一格（7→6→5…，卡在第六步之前）。
+ * 可靠的證據是舊版才寫的調度區段 parking：有它才是 8 步編號。
+ */
+function isLegacyEightStepBody(body: Record<string, unknown>): boolean {
+  const version = typeof body.editorVersion === 'number' ? body.editorVersion : 1;
+  return version < MAINTENANCE_EDITOR_VERSION && Object.prototype.hasOwnProperty.call(body, 'parking');
 }
 
 export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
@@ -204,6 +223,11 @@ export type MaintenanceTaskCreateDraft = {
   mobile: MaintenanceTaskMobileDraft;
   currentStep: CreateMaintenanceTaskStep;
   maxReachedStep: CreateMaintenanceTaskStep;
+  /**
+   * 表單「完成建立」的時刻（ISO）。這是設定流程走完、按下完成並存檔成功，
+   * 跟發布狀態（草稿／已發布）或車輛實際整備完成都不同。未完成為 null。
+   */
+  editorCompletedAt: string | null;
 };
 
 export function emptyMaintenanceTaskChargingDraft(): MaintenanceTaskChargingDraft {
@@ -391,11 +415,25 @@ export function emptyMaintenanceTaskCreateDraft(): MaintenanceTaskCreateDraft {
     mobile: emptyMaintenanceTaskMobileDraft(),
     currentStep: 1,
     maxReachedStep: 1,
+    editorCompletedAt: null,
   };
 }
 
 function parseWaypointCode(raw: unknown): string {
   return typeof raw === 'string' ? raw.trim() : '';
+}
+
+/** 設施列的識別（地圖設施 ID）與後端標的「地圖上找不到」 */
+function parseEquipmentIdentity(row: Record<string, unknown>): Pick<MaintenanceFacilityEquipmentRow, 'equipmentId' | 'unresolved'> {
+  return {
+    ...(typeof row.equipmentId === 'string' && row.equipmentId.trim() ? { equipmentId: row.equipmentId.trim() } : {}),
+    ...(row.unresolved === true ? { unresolved: true } : {}),
+  };
+}
+
+/** 存檔用：設施列一律帶地圖設施 ID（識別）；名稱只是快照 */
+function serializeEquipmentIdentity(row: MaintenanceFacilityEquipmentRow): { equipmentId?: string } {
+  return row.equipmentId ? { equipmentId: row.equipmentId } : {};
 }
 
 function parseFacilityEquipmentRows(
@@ -413,6 +451,7 @@ function parseFacilityEquipmentRows(
     if (!mapCode && !parseWaypointCode(row.waypointCode)) continue;
     rows.push({
       id,
+      ...parseEquipmentIdentity(row),
       mapCode,
       waypointCode: parseWaypointCode(row.waypointCode),
     });
@@ -459,6 +498,7 @@ function parseEquipmentRows(raw: unknown): ChargingEquipmentRow[] {
     }
     rows.push({
       id,
+      ...parseEquipmentIdentity(row),
       mapCode,
       chargeRateKwhPerMin,
       waypointCode: parseWaypointCode(row.waypointCode),
@@ -619,6 +659,10 @@ function parseStationDurationDraft(
       typeof section.operationDurationMinutes === 'string'
         ? section.operationDurationMinutes
         : '',
+    // 以前存檔沒寫這個欄位；沒有就沿用預設（跟排班端 resolveMaintenanceOccupancySeconds 一致：跟模板）
+    ...(typeof section.durationFollowTemplate === 'boolean'
+      ? { durationFollowTemplate: section.durationFollowTemplate }
+      : {}),
   });
 }
 
@@ -635,11 +679,13 @@ export function serializeMaintenanceTaskBody(
   draft: MaintenanceTaskCreateDraft,
 ): Record<string, unknown> {
   return {
-    editorVersion: 1,
+    editorVersion: MAINTENANCE_EDITOR_VERSION,
     version: draft.basic.version,
     remarks: draft.basic.remarks,
     currentStep: draft.currentStep,
     maxReachedStep: draft.maxReachedStep,
+    editorStatus: draft.editorCompletedAt ? 'completed' : 'editing',
+    editorCompletedAt: draft.editorCompletedAt,
     charging: {
       stepEnabled: draft.charging.stepEnabled,
       triggerPercent: draft.charging.triggerPercent,
@@ -648,6 +694,7 @@ export function serializeMaintenanceTaskBody(
       upperLimitDetectionEnabled: draft.charging.upperLimitDetectionEnabled,
       equipmentRows: draft.charging.equipmentRows.map((row) => ({
         id: row.id,
+        ...serializeEquipmentIdentity(row),
         mapCode: row.mapCode,
         chargeRateKwhPerMin: row.chargeRateKwhPerMin,
         ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
@@ -662,6 +709,7 @@ export function serializeMaintenanceTaskBody(
       operationDurationMinutes: draft.carWash.operationDurationMinutes,
       equipmentRows: draft.carWash.equipmentRows.map((row) => ({
         id: row.id,
+        ...serializeEquipmentIdentity(row),
         mapCode: row.mapCode,
         ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
       })),
@@ -670,6 +718,7 @@ export function serializeMaintenanceTaskBody(
       stepEnabled: draft.maintenance.stepEnabled,
       equipmentRows: draft.maintenance.equipmentRows.map((row) => ({
         id: row.id,
+        ...serializeEquipmentIdentity(row),
         mapCode: row.mapCode,
         ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
       })),
@@ -686,6 +735,7 @@ export function serializeMaintenanceTaskBody(
       stepEnabled: draft.preTrip.stepEnabled,
       equipmentRows: draft.preTrip.equipmentRows.map((row) => ({
         id: row.id,
+        ...serializeEquipmentIdentity(row),
         mapCode: row.mapCode,
         ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
       })),
@@ -695,10 +745,12 @@ export function serializeMaintenanceTaskBody(
       stepEnabled: draft.mobile.stepEnabled,
       equipmentRows: draft.mobile.equipmentRows.map((row) => ({
         id: row.id,
+        ...serializeEquipmentIdentity(row),
         mapCode: row.mapCode,
         ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
       })),
       operationDurationMinutes: draft.mobile.operationDurationMinutes,
+      durationFollowTemplate: draft.mobile.durationFollowTemplate !== false,
     },
   };
 }
@@ -707,15 +759,20 @@ export function buildMaintenanceTaskDraftFromStored(
   name: string,
   body: Record<string, unknown>,
 ): MaintenanceTaskCreateDraft {
-  const currentStep = migrateStoredStep(body.currentStep);
+  const legacy = isLegacyEightStepBody(body);
+  const currentStep = migrateStoredStep(body.currentStep, legacy);
   const maxReachedStepRaw =
     typeof body.maxReachedStep === 'number'
-      ? migrateStoredStep(body.maxReachedStep)
+      ? migrateStoredStep(body.maxReachedStep, legacy)
       : currentStep;
-  const maxReachedStep = Math.max(
-    currentStep,
-    Math.min(MAINTENANCE_STEP_COUNT, Math.max(1, maxReachedStepRaw)),
-  ) as CreateMaintenanceTaskStep;
+  const editorCompletedAt =
+    body.editorStatus === 'completed' && typeof body.editorCompletedAt === 'string' && body.editorCompletedAt
+      ? body.editorCompletedAt
+      : null;
+  // 完成建立過的任務：每一步都已確認過，全部可以直接點開
+  const maxReachedStep = (editorCompletedAt
+    ? MAINTENANCE_STEP_COUNT
+    : Math.max(currentStep, Math.min(MAINTENANCE_STEP_COUNT, Math.max(1, maxReachedStepRaw)))) as CreateMaintenanceTaskStep;
 
   return {
     basic: {
@@ -730,6 +787,7 @@ export function buildMaintenanceTaskDraftFromStored(
     mobile: parseMobileDraft(body),
     currentStep,
     maxReachedStep,
+    editorCompletedAt,
   };
 }
 
@@ -821,21 +879,34 @@ export function isPreTripStepComplete(preTrip: MaintenanceTaskPreTripDraft): boo
 }
 
 export function isMobileStepComplete(mobile: MaintenanceTaskMobileDraft): boolean {
-  return isStationDurationStepComplete(mobile);
+  return stationDurationIncompleteReason(mobile, { durationMayFollowTemplate: true }) === null;
 }
 
 export function isStationDurationStepComplete(task: StationDurationTaskDraft): boolean {
+  return stationDurationIncompleteReason(task) === null;
+}
+
+/**
+ * 站點＋時長類步驟（行檢、待命）還缺什麼；完整時回 null。
+ * 待命可以「依照排班調度決定時長」（畫面上會把作業時長欄位收起來），這時不要求作業時長——
+ * 以前照樣要求，勾著這個選項的待命步驟永遠過不了。
+ */
+export function stationDurationIncompleteReason(
+  task: StationDurationTaskDraft,
+  options: { durationMayFollowTemplate?: boolean } = {},
+): string | null {
   const normalized = normalizeStationDurationDraft(task);
-  if (!normalized.stepEnabled) return true;
-
-  if (normalized.equipmentRows.length === 0) return false;
-  if (!isPositiveInteger(normalized.operationDurationMinutes)) return false;
-
-  for (const row of normalized.equipmentRows) {
-    if (!isFacilityEquipmentRowReady(row)) return false;
+  if (!normalized.stepEnabled) return null;
+  if (normalized.equipmentRows.length === 0) return '至少要載入一個設施';
+  if (normalized.equipmentRows.some((row) => !isFacilityEquipmentRowReady(row))) return '有設施列還沒選設施';
+  if (normalized.equipmentRows.some((row) => row.unresolved)) {
+    return '有設施在目前地圖上找不到，請改選或刪除該列';
   }
-
-  return true;
+  const followsTemplate = options.durationMayFollowTemplate === true && normalized.durationFollowTemplate !== false;
+  if (!followsTemplate && !isPositiveInteger(normalized.operationDurationMinutes)) {
+    return '請填單次作業時長（正整數分鐘）';
+  }
+  return null;
 }
 
 export function isCreateMaintenanceTaskStepComplete(
@@ -856,6 +927,19 @@ export function isCreateMaintenanceTaskStepComplete(
   if (step === 5) return isPreTripStepComplete(draft.preTrip);
   if (step === 6) return isMobileStepComplete(draft.mobile);
   return true;
+}
+
+/** 某一步還不能算完成的原因（給畫面顯示；完整時回 null）。判斷跟 isCreateMaintenanceTaskStepComplete 同一套 */
+export function createMaintenanceTaskStepIncompleteReason(
+  step: CreateMaintenanceTaskStep,
+  draft: MaintenanceTaskCreateDraft,
+  options?: { nameUniqueOk?: boolean },
+): string | null {
+  if (step === 5) return stationDurationIncompleteReason(draft.preTrip);
+  if (step === 6) return stationDurationIncompleteReason(draft.mobile, { durationMayFollowTemplate: true });
+  if (isCreateMaintenanceTaskStepComplete(step, draft, options)) return null;
+  if (step === 1) return '請填寫名稱與版本（名稱不可重複）';
+  return '這一步還有必填欄位或設施沒有設定完成';
 }
 
 export function formatMaintenanceCycleCondition(row: MaintenanceCycleConditionRow): string {

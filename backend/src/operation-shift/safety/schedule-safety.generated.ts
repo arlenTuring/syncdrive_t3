@@ -618,6 +618,65 @@ function findJunctionConflictsForBlocks(passes, blockIds, bufferSeconds) {
   return out;
 }
 
+// src/features/shift-list/utils/cardCode.ts
+var TRANSITION_CARD_CODE_META = {
+  entry: { label: "\u5165\u5834", description: "\u6574\u5099\u524D\u5F9E\u8F49\u4E58\u7AD9\u958B\u9032\u6574\u5099\u8A2D\u65BD\u7684\u7A7A\u8ECA\u79FB\u52D5" },
+  exit: { label: "\u51FA\u5834", description: "\u6574\u5099\u5B8C\u6210\u5F8C\u5F9E\u6574\u5099\u8A2D\u65BD\u958B\u5230\u8F49\u4E58\u7AD9\u7684\u7A7A\u8ECA\u79FB\u52D5" },
+  hold: { label: "\u66AB\u505C\uFF0F\u505C\u7559", description: "\u5361\u7247\u4E4B\u9593\u8ECA\u505C\u5728\u539F\u5730\uFF08\u6708\u53F0\u6216\u683C\u4F4D\uFF09\u3001\u66AB\u505C\u653E\u8207\u63D0\u65E9\u9032\u5EE0\u7B49\u5F85" }
+};
+var SECTION_LABEL = {
+  charging: "\u5145\u96FB",
+  carWash: "\u6D17\u8ECA",
+  maintenance: "\u4FDD\u990A",
+  preTrip: "\u884C\u6AA2",
+  mobile: "\u5F85\u547D"
+};
+var SECTION_KEY_BY_TASK_TYPE = {
+  charging: "charging",
+  washing: "carWash",
+  servicing: "maintenance",
+  inspection: "preTrip",
+  standby: "mobile"
+};
+function normalizeCardCode(raw) {
+  return typeof raw === "string" ? raw.trim().toUpperCase() : "";
+}
+function isValidCardCode(code) {
+  return /^[A-Z]{1,2}$/.test(code);
+}
+function formatRow(row) {
+  return String(Math.max(0, Math.floor(row))).padStart(2, "0");
+}
+function formatHhmm(minute) {
+  const total = Math.max(0, Math.floor(minute));
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}${String(mm).padStart(2, "0")}`;
+}
+function cardCodeKind(block) {
+  const source = block.source ?? "";
+  const taskType = block.taskType ?? "";
+  if (source === "yard_entry_move") return { group: "transition", key: "entry", label: TRANSITION_CARD_CODE_META.entry.label };
+  if (source === "yard_exit_move") return { group: "transition", key: "exit", label: TRANSITION_CARD_CODE_META.exit.label };
+  if (taskType === "idle" && (source === "hold" || source === "transition")) {
+    return { group: "transition", key: "hold", label: TRANSITION_CARD_CODE_META.hold.label };
+  }
+  const section = SECTION_KEY_BY_TASK_TYPE[taskType];
+  if (section && source !== "entry_service") return { group: "maintenance", key: section, label: SECTION_LABEL[section] };
+  return null;
+}
+function codeFor(kind, settings) {
+  return kind.group === "maintenance" ? normalizeCardCode(settings.sectionCodes?.[kind.key]) : normalizeCardCode(settings.transitionCodes[kind.key]);
+}
+function cardDisplayCode(block, settings) {
+  const kind = cardCodeKind(block);
+  if (!kind) return null;
+  const code = codeFor(kind, settings);
+  const row = Number(block.timelineRow);
+  if (!isValidCardCode(code) || !Number.isInteger(row) || row < 1) return "----";
+  return `${code}${formatRow(row)}${formatHhmm(block.plannedStartMinute)}`;
+}
+
 // src/features/shift-list/utils/maintenanceSectionCode.ts
 function emptyMaintenanceSectionCodeBySection() {
   return {
@@ -693,7 +752,10 @@ function buildScheduleBlockTripCode(args) {
   }
   return `${prefix}${timelineRowToColumnCode(args.timelineRow)}${time}`;
 }
-function resolveGeneratedBlockTripCode(block, index = 0, sectionCodes) {
+function resolveGeneratedBlockTripCode(block, index = 0, sectionCodes, transitionCodes) {
+  if (transitionCodes && cardCodeKind(block)) {
+    return cardDisplayCode(block, { sectionCodes, transitionCodes }) ?? "----";
+  }
   if (block.source && block.source in MOVE_CARD_DIRECTION_BY_SOURCE) {
     return buildScheduleBlockTripCode({
       prefixCode: resolveMoveCardPrefix(block),
@@ -1673,7 +1735,7 @@ function validateStationBerthCollisions(timelines, selectedRoutes, errors, optio
   const tripCodeOf = (occ) => {
     const block = blockById.get(occ.blockId);
     if (!block) return occ.routeCode ?? "\u6B63\u7DDA";
-    return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null);
+    return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null, options?.transitionCodes ?? null);
   };
   const labelOf = (occ) => `${tripCodeOf(occ)}\uFF08\u6642\u9593\u7DDA ${occ.timelineRow}\uFF09 ${formatMinuteHms(occ.blockStartMinute)}\u2013${formatMinuteHms(occ.blockEndMinute)}`;
   const peakConcurrentAtStation = (stationId) => {

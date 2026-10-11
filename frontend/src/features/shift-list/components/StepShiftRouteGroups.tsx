@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { TransitionCardCodesBar } from './TransitionCardCodesBar';
+import type { MaintenanceSectionCodeBySection, MaintenanceSectionCodeKey } from '../utils/maintenanceSectionCode';
 import i18n from '../../../i18n';
 import {
   AlertTriangle,
@@ -83,6 +85,10 @@ type StepShiftRouteGroupsProps = {
   ) => void;
   timeTemplateId: string;
   creationMode?: ShiftScheduleCreationMode;
+  /** 整備任務步驟的設定：過渡卡代號檢查要比對整備代號與哪些區塊有啟用 */
+  maintenanceSkipped?: boolean;
+  maintenanceSectionCodes?: MaintenanceSectionCodeBySection | null;
+  maintenanceSectionEnabled?: Partial<Record<MaintenanceSectionCodeKey, boolean>>;
 };
 
 const DWELL_INPUT_CLASS =
@@ -686,6 +692,9 @@ export function StepShiftRouteGroups({
   onChange,
   timeTemplateId,
   creationMode = 'parametric',
+  maintenanceSkipped = false,
+  maintenanceSectionCodes = null,
+  maintenanceSectionEnabled = {},
 }: StepShiftRouteGroupsProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -1872,6 +1881,15 @@ export function StepShiftRouteGroups({
               onRemoveTag={removeServiceDirectionTag}
             />
           ) : null}
+
+          <TransitionCardCodesBar
+            codes={draft.transitionCardCodes ?? null}
+            onChange={(transitionCardCodes) => onChange((prev) => ({ ...prev, transitionCardCodes }))}
+            maintenanceSkipped={maintenanceSkipped}
+            sectionCodes={maintenanceSectionCodes}
+            sectionEnabled={maintenanceSectionEnabled}
+            routeCodes={draft.selectedRoutes.map((route) => route.routeCode)}
+          />
 
           <div className="space-y-3">
             {primaryRoutes.map((route) => renderConfiguredCard(route))}

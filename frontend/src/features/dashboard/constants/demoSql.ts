@@ -813,31 +813,30 @@ SELECT
       0
     )
   END AS segment_index,
-  -- 這一段還剩幾 %。引擎算出來的值會超過 100（實測 121，因為 eta 比這段的基準還長），
-  -- 夾回 0–100 再送出去，免得進度條倒著長。
-  LEAST(100, GREATEST(0, CASE
+  /*
+   * 這一段還剩幾 %：跟班次卡 MQTT 的算法同一套——「到目標站距離／這一段觀測到的最大距離」
+   * （payload.leg_distance_max_m，後端從這一段第一則回報記下）。距離是實際位置；ETA 會隨速度、
+   * 停等與倍速改變，而且分母（排班營運秒數）跟車端 ETA（倍速下的實際秒數）基準不同，不能拿來當進度。
+   * 還沒有距離分母時是 NULL（未知），畫面保留最後有效位置，不跳回起點也不跳到終點。
+   */
+  CASE
     WHEN o.status = 'PENDING' THEN 100
-    WHEN o.status = 'FAULTED' THEN COALESCE(FLOOR((o.payload->>'segment_remain_pct')::numeric)::int, 100)
-    ELSE COALESCE(
-      FLOOR((o.payload->>'segment_remain_pct')::numeric)::int,
-      CASE
-        WHEN jsonb_typeof(o.payload->'current_leg') = 'object'
-          AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0
-          AND COALESCE((o.payload->'current_leg'->>'distance_to_target_m')::numeric, 0) <= 0
-        THEN 0
-        WHEN COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, 0) <= 0 THEN 100
-        WHEN COALESCE(
-          (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric,
-          0
-        ) > 0 THEN ROUND(
-          (o.payload->'current_leg'->>'eta_seconds')::numeric
-          / (o.payload->'leg_eta_max'->>(o.payload->'current_leg'->>'target_station_id'))::numeric
-          * 100
-        )::int
-        ELSE 100
-      END
-    )
-  END)) AS segment_remain_pct,
+    WHEN jsonb_typeof(o.payload->'current_leg') = 'object'
+      AND COALESCE((o.payload->'current_leg'->>'distance_to_target_m')::numeric, -1) = 0
+      AND COALESCE((o.payload->'current_leg'->>'eta_seconds')::numeric, -1) <= 0
+    THEN 0
+    WHEN COALESCE((o.payload->'leg_distance_max_m'->>(o.payload->'current_leg'->>'target_station_id'))::numeric, 0) > 0
+      AND (o.payload->'current_leg'->>'distance_to_target_m') IS NOT NULL
+    THEN LEAST(100, GREATEST(0, ROUND(
+      (o.payload->'current_leg'->>'distance_to_target_m')::numeric
+      / (o.payload->'leg_distance_max_m'->>(o.payload->'current_leg'->>'target_station_id'))::numeric
+      * 100
+    )))::int
+    ELSE NULL
+  END AS segment_remain_pct,
+  o.payload->'current_leg'->>'target_station_id' AS current_target_station_id,
+  (o.payload->'current_leg'->>'distance_to_target_m')::numeric AS current_distance_m,
+  COALESCE(o.payload->'leg_distance_max_m', '{}'::jsonb)::text AS leg_distance_max_m,
   /*
    * 下一站。
    *

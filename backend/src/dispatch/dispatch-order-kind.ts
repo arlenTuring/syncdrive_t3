@@ -89,6 +89,13 @@ export function dispatchOrderFields(item: PlannedDispatch): {
       card_label: item.cardLabel,
       route_code: item.routeCode,
       route_name: item.routeName,
+      // 這張任務服務的用途：營運分佈依它分營運中／整備中／待命中（展開時就知道，不靠下一張單猜）
+      ...(item.servicePurpose
+        ? {
+            service_purpose: item.servicePurpose.purpose,
+            serves_task_type: item.servicePurpose.servesTaskType,
+          }
+        : {}),
       // 過渡卡顯示用（trip_code、order_id 不變）
       ...(businessLineKind(item) === 'TRANSITION'
         ? {

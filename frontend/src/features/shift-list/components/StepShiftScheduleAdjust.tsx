@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { cardCodeSettingsFingerprint, checkPlanCardCodes } from '../utils/cardCodeCheck';
+import type { TransitionCardCodes } from '../utils/cardCode';
 import {
   ScheduleEngineCancelledError,
   type ScheduleEngineProgress,
@@ -196,6 +198,7 @@ function resolveFeasibilityIssueTripCode(
   issue: FeasibilityIssue,
   plan: GeneratedSchedulePlan | null,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
+  transitionCodes?: TransitionCardCodes | null,
 ): string {
   const fromDetail = issue.detail?.tripCode;
   if (typeof fromDetail === 'string' && fromDetail.trim()) return fromDetail.trim();
@@ -209,7 +212,7 @@ function resolveFeasibilityIssueTripCode(
   if (blockId) {
     const found = findPlanBlock(plan, blockId);
     if (found) {
-      return resolveGeneratedBlockTripCode(found.block, found.index, sectionCodes);
+      return resolveGeneratedBlockTripCode(found.block, found.index, sectionCodes, transitionCodes);
     }
   }
 
@@ -549,12 +552,14 @@ function IssueGroupCard({
   group,
   plan,
   sectionCodes,
+  transitionCodes,
   defaultExpanded,
   onIssueClick,
 }: {
   group: IssueGroupModel;
   plan: GeneratedSchedulePlan | null;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
   defaultExpanded: boolean;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
@@ -610,7 +615,7 @@ function IssueGroupCard({
             <div className="mt-1 truncate text-[11px] opacity-70">
               {group.issues
                 .slice(0, 3)
-                .map((issue) => resolveFeasibilityIssueTripCode(issue, plan, sectionCodes))
+                .map((issue) => resolveFeasibilityIssueTripCode(issue, plan, sectionCodes, transitionCodes))
                 .join(' · ')}
               {group.issues.length > 3 ? t('shiftList.scheduleAdjust.moreIssues', { count: group.issues.length - 3 }) : ''}
             </div>
@@ -628,7 +633,7 @@ function IssueGroupCard({
           <p className="text-[11px] leading-relaxed opacity-80">{meta.guidance}</p>
           <ul className="space-y-1.5">
             {group.issues.map((issue, index) => {
-              const tripCode = resolveFeasibilityIssueTripCode(issue, plan, sectionCodes);
+              const tripCode = resolveFeasibilityIssueTripCode(issue, plan, sectionCodes, transitionCodes);
               const jumpable =
                 plan != null && resolveFeasibilityIssueJumpBlockId(issue, plan) != null;
               const rowKey = `${group.key}-${index}-${tripCode}-${issue.message}`;
@@ -679,11 +684,13 @@ function FeasibilityMessages({
   report,
   plan,
   sectionCodes,
+  transitionCodes,
   onIssueClick,
 }: {
   report: ShiftScheduleFeasibilityReport;
   plan: GeneratedSchedulePlan | null;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
   const { t } = useTranslation();
@@ -865,6 +872,7 @@ function FeasibilityMessages({
                   group={group}
                   plan={plan}
                   sectionCodes={sectionCodes}
+                  transitionCodes={transitionCodes}
                   defaultExpanded={
                     layer === 'hard' || (layer !== 'policy' && group.issues.length === 1)
                   }
@@ -1575,9 +1583,11 @@ export function StepShiftScheduleAdjust({
         draft.routeGroups.collisionProtectionSeconds
         ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
       sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+      transitionCodes: draft.routeGroups.transitionCardCodes ?? null,
     });
   }, [
     draft.maintenanceTask.sectionCodeBySection,
+    draft.routeGroups.transitionCardCodes,
     plan,
     intervals,
     attributes,
@@ -1595,8 +1605,25 @@ export function StepShiftScheduleAdjust({
         draft.routeGroups.collisionProtectionSeconds
         ?? SHIFT_SCHEDULE_DEFAULT_COLLISION_PROTECTION_SECONDS,
       sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+    }) + `|${cardCodeSettingsFingerprint(draft.routeGroups.transitionCardCodes)}`,
+    [
+      draft.routeGroups.selectedRoutes,
+      draft.routeGroups.collisionProtectionSeconds,
+      draft.maintenanceTask.sectionCodeBySection,
+      draft.routeGroups.transitionCardCodes,
+    ],
+  );
+  // 班次代號檢查（設定＋展開後重複）：畫面即時列出；發布檢查時併進結果擋發布
+  const cardCodeCheck = useMemo(
+    () => checkPlanCardCodes({
+      plan,
+      transitionCodes: draft.routeGroups.transitionCardCodes,
+      sectionCodes: draft.maintenanceTask.skipped ? null : draft.maintenanceTask.sectionCodeBySection,
+      sectionEnabled: draft.maintenanceTask.sectionEnabled,
+      maintenanceSkipped: draft.maintenanceTask.skipped,
+      routeCodes: draft.routeGroups.selectedRoutes.map((route) => route.routeCode),
     }),
-    [draft.routeGroups.selectedRoutes, draft.routeGroups.collisionProtectionSeconds, draft.maintenanceTask.sectionCodeBySection],
+    [plan, draft.routeGroups.transitionCardCodes, draft.routeGroups.selectedRoutes, draft.maintenanceTask],
   );
   const publishState = resolveSchedulePublishState(publishCheck, plan, {
     settingsFingerprint: publishSettingsFingerprint,
@@ -1619,7 +1646,18 @@ export function StepShiftScheduleAdjust({
         sectionCodes: draft.maintenanceTask.sectionCodeBySection,
         topology: catalog.pointTopology,
       });
-      const record = toPublishCheckRecord(result, new Date().toISOString());
+      const checked = toPublishCheckRecord(result, new Date().toISOString());
+      // 設定指紋跟畫面上的比對值一致（含過渡卡代號）；代號衝突也擋發布
+      const codeProblems = cardCodeCheck.lines.length;
+      const record = {
+        ...checked,
+        settingsFingerprint: publishSettingsFingerprint,
+        publishSafe: checked.publishSafe && codeProblems === 0,
+        publishBlockingCount: checked.publishBlockingCount + codeProblems,
+        publishBlockingByCode: codeProblems > 0
+          ? { ...checked.publishBlockingByCode, CARD_CODE: codeProblems }
+          : checked.publishBlockingByCode,
+      };
       setPublishCheck(record);
       // 檢查結果要跟著班表存起來，清單欄位才讀得到
       const base = draft.scheduleOutput;
@@ -1986,6 +2024,7 @@ export function StepShiftScheduleAdjust({
                   minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
                   hideStrategyBuffers={isManual}
                   sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                  transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
                   showTemplateTasks
                   interactiveEdit={isManual}
                   onDropTaskType={isManual ? handleDropTaskType : undefined}
@@ -2004,11 +2043,28 @@ export function StepShiftScheduleAdjust({
                 selectedBlock={selectedBlock}
                 selectedRoutes={draft.routeGroups.selectedRoutes}
                 sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
                 onApplyBlock={handleApplySelectedBlock}
                 onApplyDwells={handleApplyDwells}
               />
             ) : null}
           </div>
+
+          {cardCodeCheck.lines.length > 0 ? (
+            <div
+              className="shrink-0 rounded-xl border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-200"
+              data-card-code-issues={cardCodeCheck.lines.length}
+            >
+              <div className="mb-1 font-semibold text-red-300">
+                班次代號檢查未通過（禁止發布／採用；草稿可保存）：請調整代號或計畫安排
+              </div>
+              <ul className="list-disc space-y-0.5 pl-4">
+                {cardCodeCheck.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {report && !isManual ? (
             <div className="max-h-[300px] shrink-0 overflow-y-auto rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-2">
@@ -2019,6 +2075,7 @@ export function StepShiftScheduleAdjust({
                 report={report}
                 plan={plan}
                 sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
                 onIssueClick={handleIssueClick}
               />
             </div>

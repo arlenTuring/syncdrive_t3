@@ -1,5 +1,7 @@
 import type { MapAreaObject } from '../types/area';
 import type { FacilityObject } from '../types/facility';
+import type { VehicleDefinition } from '../../vehicle-editor/types';
+import { fitVehicleMarkerSize } from '../../vehicle-editor/utils/vehicleContentBounds';
 import { resolveFacilityAreaSize } from '../utils/facilityAreaCoords';
 import {
   getTrackGenLatPerBox,
@@ -15,6 +17,29 @@ import {
  */
 export const DEFAULT_MAP_VEHICLE_DISPLAY_WIDTH_PX = 60;
 export const DEFAULT_MAP_VEHICLE_DISPLAY_HEIGHT_PX = 10;
+
+/**
+ * 地圖上一台車的 marker 寬高（地圖座標 px）——即時監控、降級頁、圖資預覽、回放共用。
+ *
+ * 只吃車輛模型與圖資管理保存的顯示尺寸，<strong>不吃格位、軌道或設施</strong>：使用者把調度區、
+ * 整備區、充電區放大縮小，是為了容納已設定好的車，設施尺寸不能反過來決定車身。放不下就照實
+ * 畫出來（車身凸出格位），讓使用者再調設施。整張圖的縮放由圖台外層 transform 等比處理，
+ * 不改這裡的值。車身一律等比（見 fitVehicleMarkerSize）。
+ */
+export function resolveMapVehicleMarkerSize(
+  definition: VehicleDefinition | null,
+  displayWidthPx: number,
+  displayHeightPx: number,
+  fallback: { width: number; height: number },
+): { width: number; height: number } {
+  if (!definition) return { width: fallback.width, height: fallback.height };
+  const fitted = fitVehicleMarkerSize(
+    definition,
+    Math.max(4, displayWidthPx),
+    Math.max(2, displayHeightPx),
+  );
+  return { width: fitted.width, height: fitted.height };
+}
 
 /**
  * 這一塊「一公尺畫幾像素」——沿線與橫向各一個。

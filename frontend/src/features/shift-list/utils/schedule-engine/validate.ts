@@ -3,6 +3,7 @@ import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../../time-templates/types/editor';
+import type { TransitionCardCodes } from '../cardCode';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import {
@@ -981,6 +982,7 @@ export function validateStationBerthCollisions(
     warnings?: FeasibilityIssue[];
     /** 整備區塊代號，用來把班次代號（如 PTN1120）算出來寫進訊息 */
     sectionCodes?: MaintenanceSectionCodeBySection | null;
+    transitionCodes?: TransitionCardCodes | null;
   },
 ): void {
   const collisionProtectionSeconds = options?.collisionProtectionSeconds;
@@ -1000,7 +1002,7 @@ export function validateStationBerthCollisions(
   const tripCodeOf = (occ: StationBerthOccupancy): string => {
     const block = blockById.get(occ.blockId);
     if (!block) return occ.routeCode ?? '正線';
-    return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null);
+    return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null, options?.transitionCodes ?? null);
   };
   /**
    * 訊息一律用<strong>班次卡的起訖</strong>，不要用站位佔用窗——
@@ -1267,6 +1269,7 @@ export function validateYardExitContinuity(args: {
    */
   yardExitStationOptionsByTaskType: Partial<Record<string, string[]>>;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
   errors: FeasibilityIssue[];
 }): void {
   const { timelines, selectedRoutes, yardExitStationOptionsByTaskType, errors } = args;
@@ -1347,7 +1350,7 @@ export function validateYardExitContinuity(args: {
         message:
           `時間線 ${timeline.row}：「${yard.label}」做完後車停在`
           + `「${allowedOrigins.map(stationLabel).join('」或「')}」，`
-          + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null)}`
+          + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null, args.transitionCodes ?? null)}`
           + `（${sourceLabel}）是從「${stationLabel(originStationId)}」發車，`
           + '車不在那裡開不了',
         detail: {

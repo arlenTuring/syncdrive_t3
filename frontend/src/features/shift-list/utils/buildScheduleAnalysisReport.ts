@@ -5,6 +5,7 @@ import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../time-templates/types/editor';
+import type { TransitionCardCodes } from './cardCode';
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import {
   resolveInterTripGapSeconds,
@@ -443,6 +444,7 @@ export function buildScheduleAnalysisReport(args: {
   successorPolicy?: RouteSuccessorPolicy | null;
   /** 整備區塊代號，用來把班次代號算出來（畫面上看到的就是代號） */
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
 }): ScheduleAnalysisReport {
   const {
     plan,
@@ -686,6 +688,7 @@ export function buildScheduleAnalysisReport(args: {
     plan,
     selectedRoutes,
     args.sectionCodes ?? null,
+    args.transitionCodes ?? null,
   );
 
   const appliedRetimes: AppliedRetimeItem[] = plan.timelines
@@ -694,7 +697,7 @@ export function buildScheduleAnalysisReport(args: {
     .map((block) => ({
       blockId: block.id,
       timelineRow: block.timelineRow,
-      tripCode: resolveGeneratedBlockTripCode(block, 0, args.sectionCodes ?? null),
+      tripCode: resolveGeneratedBlockTripCode(block, 0, args.sectionCodes ?? null, args.transitionCodes ?? null),
       blockBefore: block.conflictRetime!.blockBefore,
       blockStartMinute: block.plannedStartMinute,
       blockEndMinute: block.plannedEndMinute,
@@ -727,6 +730,7 @@ function collectAppliedSlackAdjustments(
   plan: GeneratedSchedulePlan,
   selectedRoutes: ShiftScheduleSelectedRoute[],
   sectionCodes: MaintenanceSectionCodeBySection | null,
+  transitionCodes: TransitionCardCodes | null,
 ): AppliedSlackAdjustmentItem[] {
   const items: AppliedSlackAdjustmentItem[] = [];
   for (const timeline of plan.timelines) {
@@ -740,7 +744,7 @@ function collectAppliedSlackAdjustments(
       items.push({
         blockId: block.id,
         timelineRow: timeline.row,
-        tripCode: resolveGeneratedBlockTripCode(block, 0, sectionCodes),
+        tripCode: resolveGeneratedBlockTripCode(block, 0, sectionCodes, transitionCodes),
         blockStartMinute: block.plannedStartMinute,
         blockEndMinute: block.plannedEndMinute,
         blockBefore: adjustment.blockBefore,

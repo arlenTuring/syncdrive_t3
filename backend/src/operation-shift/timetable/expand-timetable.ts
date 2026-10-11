@@ -14,6 +14,7 @@ import {
   type TimetableStationStop,
 } from './build-station-stops';
 import { resolveTimetableTripCode } from './trip-code';
+import { readCardCodeSettings } from '../card-code';
 import {
   buildStationAliasIndexFromMapDocument,
   collectWaypointIdsFromMapDocument,
@@ -356,6 +357,7 @@ export function expandTimetableTrips(args: {
   const routes = parseSelectedRoutes(args.body);
   const blocks = extractPlanBlocks(args.body);
   const passengerOnly = args.passengerOnly === true;
+  const codeSettings = readCardCodeSettings(args.body);
   const trips: TimetableTripDto[] = [];
 
   let tripIndex = 0;
@@ -369,7 +371,7 @@ export function expandTimetableTrips(args: {
 
     const route = resolveRouteForBlock(block, routes);
     const stops = buildTimetableStationStops(block, route);
-    const tripCode = resolveTimetableTripCode(block, tripIndex);
+    const tripCode = resolveTimetableTripCode(block, tripIndex, codeSettings);
     tripIndex += 1;
 
     trips.push({

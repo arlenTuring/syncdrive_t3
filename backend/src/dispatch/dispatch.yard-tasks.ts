@@ -1,3 +1,5 @@
+import { servicePurposeByBlock, type BlockPurpose } from './dispatch.service-purpose';
+import { cardCodeKind, cardDisplayCode, readCardCodeSettings } from '../operation-shift/card-code';
 'use strict';
 
 /**
@@ -45,10 +47,12 @@ const YARD_TASK_TYPES = new Set([
 
 export type YardTask = {
   blockId: string;
+  /** 這張卡服務的用途（暫停看接下來那張任務），見 dispatch.service-purpose.ts */
+  servicePurpose?: BlockPurpose;
   /** 班表卡的任務類型（charging、inspection、servicing、standby、idle），原封保留 */
   taskType: string;
   timelineRow: number;
-  /** 供 order_id 使用的短碼，同一份班表內穩定 */
+  /** 班次代號（新班表：整備代號＋列號＋HHMM；舊班表：MT-格位-R列-秒）；同一份班表內唯一，order_id 由它組成 */
   tripCode: string;
   /** 卡片上的說法（充電、行檢、待命、暫停放…） */
   cardLabel: string;
@@ -95,12 +99,10 @@ export function maintenanceMetaForSlot(yardSlotId: string): {
 }
 
 /**
- * 短碼：格位 ＋ 時間線列 ＋ 起始秒。
- *
- * 與空車移動同一套理由：block id 帶著產生時的時戳，重算一次班表就整批換號；
- * 列、格位與分鐘是計畫本身的內容，重算幾次都一樣。
+ * 舊班表（沒有過渡卡代號設定）的短碼：格位 ＋ 時間線列 ＋ 起始秒。
+ * 新班表用整備代號＋列號＋HHMM（見 operation-shift/card-code.ts）；這個只留給舊班表，已執行的訂單不改主鍵。
  */
-function buildTripCode(
+function buildLegacyTripCode(
   slotId: string,
   row: number,
   startMinute: number,
@@ -125,6 +127,8 @@ export function extractYardTasks(body: Record<string, unknown>): {
   if (!Array.isArray(timelines)) return { tasks, skipped };
 
   const configuredLabels = asRecord(body.maintenanceSectionCardLabelBySection);
+  const codeSettings = readCardCodeSettings(body);
+  const purposes = servicePurposeByBlock(body);
   const labelKeyByTaskType: Record<string, string> = {
     charging: 'charging',
     inspection: 'preTrip',
@@ -167,15 +171,29 @@ export function extractYardTasks(body: Record<string, unknown>): {
       }
 
       const row = num(block.timelineRow) ?? 1;
+      let tripCode = buildLegacyTripCode(yardSlotId, row, startMinute);
+      if (codeSettings.version === 2) {
+        const code = cardDisplayCode(block, codeSettings);
+        if (!code) {
+          const kind = cardCodeKind(block);
+          skipped.push({
+            blockId,
+            reason: kind ? `待補設定：「${kind.label}」卡沒有代號，未發整備訂單` : `卡片種類 ${taskType}／${str(block.source) ?? '—'} 沒有對應的代號設定，未發整備訂單`,
+          });
+          continue;
+        }
+        tripCode = code;
+      }
       const meta = maintenanceMetaForSlot(yardSlotId);
       const labelKey = labelKeyByTaskType[taskType];
       const configuredLabel = labelKey ? str(configuredLabels?.[labelKey]) : null;
 
       tasks.push({
         blockId,
+        servicePurpose: purposes.get(blockId),
         taskType,
         timelineRow: row,
-        tripCode: buildTripCode(yardSlotId, row, startMinute),
+        tripCode,
         cardLabel: str(block.source) === 'hold'
           ? '暫停'
           : configuredLabel ?? str(block.label) ?? meta.label,

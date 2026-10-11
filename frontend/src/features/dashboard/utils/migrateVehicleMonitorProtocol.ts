@@ -1,3 +1,4 @@
+import { OPERATION_DISTRIBUTION_TITLE } from './operationDistribution';
 import type { DashboardPlane, ChildWidget, TextWidget, RouteProgressWidget, StatusBadgeWidget, SlotGridWidget, CanvasElementProps, ColorBlockWidget, MaintenanceDistributionWidget } from '../types';
 import { createWidget } from '../types';
 import {
@@ -301,7 +302,7 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
           children: patchMaintenanceCardTemplateDefaults(el.children ?? []),
         };
       }
-      if (el.label === '車輛分佈' && el.isGroup) {
+      if ((el.label === '車輛分佈' || el.label === OPERATION_DISTRIBUTION_TITLE) && el.isGroup) {
         return {
           ...el,
           children: patchVehicleDistributionSegmentBar(el.children ?? []),
@@ -428,7 +429,7 @@ export function needsDashboardRuntimePatch(plane: DashboardPlane): boolean {
   if (mainline && !(mainline.sqlQuery ?? '').includes("payload->>'card_label'")) {
     return true;
   }
-  const distribution = plane.elements.find((el) => el.label === '車輛分佈' && el.isGroup);
+  const distribution = plane.elements.find((el) => (el.label === '車輛分佈' || el.label === OPERATION_DISTRIBUTION_TITLE) && el.isGroup);
   if (distribution) {
     const segment = (distribution.children ?? []).find((child) => child.type === 'segment-bar');
     if (segment && !((segment as { sqlQuery?: string }).sqlQuery ?? '').includes('ss.last_updated')) {

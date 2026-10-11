@@ -25,6 +25,7 @@ import {
   type TimetableTripDto,
 } from './timetable/expand-timetable';
 import { formatSecondToHms } from './timetable/clock';
+import { checkShiftCardCodes, describeCardCodeConflict, formatHhmm } from './card-code';
 import {
   loadMapDocumentForShift,
   resolveMapIdFromShiftBody,
@@ -271,6 +272,39 @@ export class OperationShiftService {
     if (!result.publishSafe) {
       throw new BadRequestException(describeSafetyFailure(result));
     }
+    const codeProblem = this.cardCodeProblem(body);
+    if (codeProblem) throw new BadRequestException(codeProblem);
+  }
+
+  /**
+   * 整備／過渡卡代號檢查（規則見 card-code.ts）：設定缺漏、不同用途共用代號、跟正線路線代號撞號，
+   * 以及完整展開後最終代號重複。舊班表（沒有過渡卡代號設定）不檢查，照原本的代號執行。
+   */
+  private cardCodeProblem(body: Record<string, unknown>): string | null {
+    const passenger = expandTimetableTrips({
+      body,
+      range: { fromSecond: 0, toSecond: Number.MAX_SAFE_INTEGER },
+      passengerOnly: true,
+    }).map((trip) => {
+      const minute = trip.card_start_second / 60;
+      const hhmm = formatHhmm(minute);
+      return {
+        code: trip.trip_code,
+        kind: '正線',
+        blockId: trip.block_id,
+        timelineRow: trip.timeline_row,
+        plannedStartMinute: minute,
+        time: `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`,
+      };
+    });
+    const report = checkShiftCardCodes(body, passenger);
+    if (report.version !== 2) return null;
+    const lines = [
+      ...report.configIssues.map((issue) => issue.message),
+      ...report.conflicts.map((conflict) => `代號重複 ${describeCardCodeConflict(conflict)}`),
+    ];
+    if (lines.length === 0) return null;
+    return `班次代號檢查未通過，請調整代號或計畫安排：${lines.join('；')}`;
   }
 
   /** 班表綁定地圖的路網；班表沒記地圖、或地圖已不存在就回 null（由安全檢查報缺資料） */

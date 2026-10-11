@@ -70,10 +70,8 @@ import {
   computeRearAxleAreaLocalForBodyCenterAt,
   computeRearAxleAreaLocalForIconBodyCenterAt,
 } from '../../vehicle-editor/utils/vehicleRearAxleAnchor';
-import {
-  fitVehicleMarkerSize,
-  isLandscapeVehicleDefinition,
-} from '../../vehicle-editor/utils/vehicleContentBounds';
+import { isLandscapeVehicleDefinition } from '../../vehicle-editor/utils/vehicleContentBounds';
+import { resolveMapVehicleMarkerSize } from './resolveMapVehicleTrackSizing';
 import {
   MapVehicleBehaviorOverlay,
   type MapVehicleBehaviorConfig,
@@ -751,11 +749,12 @@ export function MapAreaVehicleOverlay({
          * 以前這裡用 stretch 各軸獨立縮，理由是沿線與橫向的比例尺不同；但車的外觀不該承擔
          * 示意圖兩軸壓縮率的差別——那樣車身、輪胎、車號全被擠扁。地圖縮放由整張圖等比處理。
          */
-        const markerSize = vehicleDefinition
-          ? fitVehicleMarkerSize(vehicleDefinition, displayW, displayH)
-          : null;
-        const markerW = markerSize ? markerSize.width : iconSpec.width;
-        const markerH = markerSize ? markerSize.height : iconSpec.height;
+        const { width: markerW, height: markerH } = resolveMapVehicleMarkerSize(
+          vehicleDefinition,
+          displayW,
+          displayH,
+          iconSpec,
+        );
 
         const headingRad = readVehicleHeadingRad(vehicle.payload);
         const steeringRad = readVehicleSteeringAngleRad(vehicle.payload);

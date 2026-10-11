@@ -24,6 +24,7 @@ import { useVariables, type VariableMap } from '../VariableContext';
 import { getByPath } from '../utils/jsonPath';
 import { resolveRouteStations } from '../route-progress/resolveStations';
 import { useAnimatedTrackPercent, mqttPayloadIsFresh } from '../route-progress/useAnimatedTrackPercent';
+import { recallLegProgress } from '../route-progress/legProgress';
 import { readOrderStatus } from '../route-progress/orderStatus';
 import { resolveActionIconUrl } from '../route-progress/resolveActionIcon';
 import { resolveVehicleIconBgColor } from '../vehicle-operation-actions';
@@ -826,9 +827,20 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
     sqlRow,
     rawValue,
     progressMqttPayload,
-    { mqttOnly: isShiftCardTrack },
+    { mqttOnly: isShiftCardTrack, rawShiftPayload: isShiftCardTrack ? fleetShiftPayload : null },
   );
   const isPending = readOrderStatus(variables as Record<string, unknown>, sqlRow, mqttPayload) === 'PENDING';
+  /*
+   * 班次卡的資料狀態：車端回報暫停（車隊資料流已因逾時移除這台車）時，車停在最後有效位置並標示，
+   * 不跳回起點；還沒有任何回報時用 SQL 的同一套距離進度。
+   */
+  const legNow = isShiftCardTrack ? recallLegProgress(String(variables.shift_key ?? '')) : undefined;
+  // 車隊共用資料流超過有效時間沒收到這台車的訊息就會移除它；內容沒變（停站）不算暫停
+  const progressState = !isShiftCardTrack || isPending || !legNow
+    ? undefined
+    : legNow.reportTs != null && !fleetShiftPayload
+      ? 'stale'
+      : legNow.basis === 'held' ? 'live' : legNow.basis;
 
   const actionIconUrl = useMemo(
     () =>
@@ -1009,7 +1021,16 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
   }
 
   return previewWrap(
-    <div className="relative flex h-full w-full flex-col justify-center">
+    <div
+      className="relative flex h-full w-full flex-col justify-center"
+      data-progress-state={progressState}
+      title={progressState === 'stale' ? '車端回報暫停，顯示最後有效位置' : undefined}
+    >
+      {progressState === 'stale' ? (
+        <span className="pointer-events-none absolute right-0 top-0 z-30 rounded bg-zinc-900/80 px-1 text-[10px] leading-4 text-amber-300/90">
+          資料暫停
+        </span>
+      ) : null}
       <RouteTrackView
         widget={widget}
         stations={renderStations}

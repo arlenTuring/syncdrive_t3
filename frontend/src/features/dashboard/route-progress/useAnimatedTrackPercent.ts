@@ -5,6 +5,14 @@ import { readOrderStatus } from './orderStatus';
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import { extrapolateLegEtaSeconds } from '../utils/simClock';
 import { useSimClockFrame } from '../utils/simClockFrame';
+import {
+  advanceLegProgress,
+  legReportFromPayload,
+  parseLegDistanceMax,
+  recallLegProgress,
+  rememberLegProgress,
+  type LegProgressState,
+} from './legProgress';
 
 export function mqttPayloadIsFresh(
   payload: Record<string, unknown> | null,
@@ -116,9 +124,39 @@ function useSmoothMqttProgress(
 }
 
 export type AnimatedTrackPercentOptions = {
-  /** 班次卡：僅 MQTT current_leg，不讀 SQL segment／route_progress */
+  /** 班次卡：以單號＋段落推進（legProgress.ts），不在 MQTT 與 SQL 兩套算法之間切換 */
   mqttOnly?: boolean;
+  /** 班次卡：這台車最新的 operation/update（不先濾新鮮度——順序與單號由 legProgress 判斷） */
+  rawShiftPayload?: Record<string, unknown> | null;
 };
+
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 班次卡這張單目前的段落進度（純計算＋依單號記住）；沒有單號時回 null */
+export function shiftCardLegProgress(
+  orderId: string,
+  stations: RouteStation[],
+  variables: Record<string, unknown>,
+  sqlRow: Record<string, unknown> | null,
+  rawPayload: Record<string, unknown> | null,
+): LegProgressState | null {
+  if (!orderId || stations.length === 0) return null;
+  const next = advanceLegProgress(recallLegProgress(orderId), {
+    orderId,
+    stations,
+    report: legReportFromPayload(rawPayload),
+    backendLegDistanceMax: parseLegDistanceMax(sqlRow?.leg_distance_max_m ?? variables.leg_distance_max_m),
+    sql: {
+      segmentIndex: numOrNull(sqlRow?.segment_index ?? variables.segment_index),
+      remainPct: numOrNull(sqlRow?.segment_remain_pct ?? variables.segment_remain_pct),
+    },
+  });
+  return rememberLegProgress(next);
+}
 
 /**
  * 正線／整備軌道進度：
@@ -159,6 +197,19 @@ export function useAnimatedTrackPercent(
     lastMqttRef.current = mqttTarget;
   }
 
+  // 班次卡：同一張單、同一段的距離進度（見 legProgress.ts）；不再用 ETA 比值，也不在 SQL／MQTT 間換算法
+  const shiftOrderId = mqttOnly ? String(variables.shift_key ?? '').trim() : '';
+  const legState = shiftOrderId
+    ? shiftCardLegProgress(shiftOrderId, stations, variables, sqlRow, options?.rawShiftPayload ?? mqttPayload)
+    : null;
+  const legSmoothed = useSmoothMqttProgress(
+    legState?.percent,
+    legState !== null && isProcessing,
+    shiftOrderId || rowKey,
+    legState?.percent ?? origin,
+    speedMultiplier,
+  );
+
   const hasLiveMqtt =
     isProcessing
     && mqttPayload !== null
@@ -190,6 +241,10 @@ export function useAnimatedTrackPercent(
 
   if (isPending) {
     return origin;
+  }
+  if (legState) {
+    // 故障：停在最後有效位置；執行中：平滑移到段落進度（換單時 rowKey＝單號，重新起算）
+    return isProcessing ? legSmoothed : legState.percent;
   }
   if (isFaulted) {
     return lastMqttRef.current ?? origin;

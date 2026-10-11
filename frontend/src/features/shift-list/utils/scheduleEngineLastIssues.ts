@@ -104,6 +104,7 @@ function resolveIssueTripCode(
           found.block,
           found.index,
           sectionCodes,
+          draft.routeGroups.transitionCardCodes ?? null,
         );
       }
     }

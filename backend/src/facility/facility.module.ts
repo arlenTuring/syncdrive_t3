@@ -4,6 +4,7 @@ import { FacilitySlot } from '../database/entities/facility-slot.entity';
 import { MaintenanceTaskModule } from '../maintenance-task/maintenance-task.module';
 import { MapModule } from '../map/map.module';
 import { OperationShiftModule } from '../operation-shift/operation-shift.module';
+import { DispatchModule } from '../dispatch/dispatch.module';
 import { FacilityService } from './facility.service';
 import { FacilityController } from './facility.controller';
 import { MaintenanceDistributionController } from './maintenance-distribution.controller';
@@ -15,6 +16,7 @@ import { MaintenanceDistributionService } from './maintenance-distribution.servi
     OperationShiftModule,
     MaintenanceTaskModule,
     MapModule,
+    DispatchModule,
   ],
   providers: [FacilityService, MaintenanceDistributionService],
   controllers: [FacilityController, MaintenanceDistributionController],

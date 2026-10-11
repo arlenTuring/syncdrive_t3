@@ -1,5 +1,6 @@
 import {
   buildCapacityTrend,
+  capacitySampleMs,
   type CapacityDay,
   formatHeadway,
   mergeDepartureLeads,
@@ -113,6 +114,23 @@ describe('buildCapacityTrend', () => {
     ]);
     // 時間戳排序，不是 HH:mm 字串
     expect(rows.map((row) => row.ts)).toEqual([...rows.map((row) => row.ts)].sort((a, b) => a - b));
+  });
+
+  it('samples "now" at the operating minute so the summary and the trend endpoint read the same moment', () => {
+    // 兩個 API 在同一營運分鐘內各自被呼叫（10 倍速重播下相差 20 秒營運時間）
+    const minute = day0 + (18 * 60 + 22) * 60_000;
+    const summaryAt = minute + 5_000;
+    const trendAt = minute + 25_000;
+    expect(capacitySampleMs(summaryAt)).toBe(minute);
+    expect(capacitySampleMs(trendAt)).toBe(minute);
+    // 實際運能在兩次呼叫之間多了一筆發車：用採樣時刻算，兩邊仍是同一個數
+    const actualAt = (ts: number) => (ts >= minute + 15_000 ? 1110 : 1090);
+    const rows = build(trendAt, actualAt);
+    const nowRow = rows.find((row) => row.is_now)!;
+    expect(nowRow.ts).toBe(minute);
+    expect(nowRow.now_ms).toBe(minute);
+    expect(nowRow.actual_util).toBe(actualAt(capacitySampleMs(summaryAt)));
+    expect(rows.every((row) => row.now_ms === minute)).toBe(true);
   });
 
   it('blue line stops at now, keeps 0, leaves gaps as null and marks the now row', () => {

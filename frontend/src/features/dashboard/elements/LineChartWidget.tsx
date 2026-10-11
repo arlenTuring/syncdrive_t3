@@ -15,6 +15,7 @@ import {
   buildChartScales,
   chartPlotSize,
   formatAxisValue,
+  formatTimeMinutes,
   hourTickOffsets,
   makeScale,
   parseYDataValue,
@@ -28,7 +29,8 @@ import {
   resolveHighlightTime,
   resolveLineChartSeries,
 } from './lineChartSeries';
-import { useChartNow } from './useChartNow';
+import { clockMinutes, useChartNow } from './useChartNow';
+import { chartNowToleranceMs, resolveChartNowAnchor } from './chartNowAnchor';
 
 const HEADER_H = 28;
 const FONT = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
@@ -91,8 +93,17 @@ function UnifiedLineChart({
   const pad = resolveChartPadding(widget);
   const { cw, ch } = chartPlotSize(width, height, pad);
   const liveTime = isLiveTimeAxis(widget);
-  const { nowMs, nowMin } = useChartNow(liveTime, 2_000);
+  const { nowMs: clockNowMs, nowMin: clockNowMin, rate } = useChartNow(liveTime, 2_000);
   const clipId = `chart-clip-${useId().replace(/:/g, '')}`;
+  /*
+   * 一次渲染只用一個「現在」：資料帶採樣時刻（is_now／now_ms）而且跟營運時鐘對得上時就用它，
+   * 虛線、端點、刻度、色帶都照它算；對不上就用營運時鐘並標示資料時間（見 chartNowAnchor.ts）。
+   */
+  const nowAnchor = liveTime
+    ? resolveChartNowAnchor(data, clockNowMs, chartNowToleranceMs(rate, widget.refreshInterval))
+    : null;
+  const nowMs = nowAnchor ? nowAnchor.anchorMs : clockNowMs;
+  const nowMin = nowAnchor && nowAnchor.status === 'fresh' ? clockMinutes(nowMs) : clockNowMin;
   const scales = buildChartScales(data, widget, yFields, nowMin, nowMs);
   const xScale = makeScale(scales.xView.min, scales.xView.max, cw);
   const yScale = makeScale(scales.yView.min, scales.yView.max, ch);
@@ -111,7 +122,12 @@ function UnifiedLineChart({
   let nowPoint: { x: number; y: number } | null = null;
   const nowSeries = seriesList.find(series => series.nowEndpoint) ?? primary;
   const nowColor = nowSeries?.color ?? primaryColor;
-  if (liveTime && nowSeries) {
+  if (liveTime && nowSeries && nowAnchor && nowAnchor.status !== 'none') {
+    // 後端標了「現在」那一列：端點就是它（值是 null 就不畫，不補 0）；比時鐘還新的不畫
+    const row = data[nowAnchor.nowRowIndex];
+    const yv = nowAnchor.status === 'ahead' || !row ? null : parseYDataValue(row[nowSeries.yField], scales.yUnit);
+    if (yv !== null) nowPoint = { x: scales.xs[nowAnchor.nowRowIndex] ?? 0, y: yv };
+  } else if (liveTime && nowSeries) {
     data.forEach((row, i) => {
       const yv = parseYDataValue(row[nowSeries.yField], scales.yUnit);
       const xv = scales.xs[i] ?? i;
@@ -334,8 +350,22 @@ function UnifiedLineChart({
             strokeDasharray="4 3"
           />
         )}
+        {nowAnchor && (nowAnchor.status === 'stale' || nowAnchor.status === 'ahead') && nowX >= 0 && nowX <= cw && (
+          <text
+            x={nowX + 4}
+            y={ch - 6}
+            fill="#FDC700"
+            fontSize={axisFs}
+            fontFamily={FONT}
+            data-chart-now-status={nowAnchor.status}
+          >
+            {nowAnchor.status === 'stale'
+              ? `資料時間 ${formatTimeMinutes(clockMinutes(nowAnchor.dataNowMs ?? nowMs), '24h', 'hm')}・落後 ${Math.round(nowAnchor.lagMs / 60_000)} 分`
+              : '資料時間與營運時鐘不一致'}
+          </text>
+        )}
         {nowEndpoint && xScale(nowEndpoint.x) >= 0 && xScale(nowEndpoint.x) <= cw && (
-          <g data-chart-now-endpoint={nowEndpoint.y}>
+          <g data-chart-now-endpoint={nowEndpoint.y} data-chart-now-status={nowAnchor?.status ?? 'none'}>
             <circle cx={xScale(nowEndpoint.x)} cy={yPix(nowEndpoint.y)} r={5} fill={nowColor} />
             <rect x={xScale(nowEndpoint.x) - 28} y={yPix(nowEndpoint.y) - 32} width={56} height={22} rx={8} fill={calloutFill} />
             <text

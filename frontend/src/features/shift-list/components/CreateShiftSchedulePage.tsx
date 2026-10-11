@@ -736,6 +736,9 @@ export function CreateShiftSchedulePage({
                     draft={draft.routeGroups}
                     timeTemplateId={draft.timeTemplate.templateId}
                     creationMode={draft.creationMode}
+                    maintenanceSkipped={draft.maintenanceTask.skipped}
+                    maintenanceSectionCodes={draft.maintenanceTask.sectionCodeBySection}
+                    maintenanceSectionEnabled={draft.maintenanceTask.sectionEnabled}
                     onChange={(routeGroups) =>
                       updateDraft((prev) => {
                         const nextRouteGroups =

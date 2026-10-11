@@ -247,7 +247,7 @@ export type CapacityTrendRow = {
   segment_color: string | null;
   /** 這一列是「現在」（跟即時數值同一個時刻、同一個算法） */
   is_now: boolean;
-  /** 後端算這份資料時的營運時刻 */
+  /** 這份資料的「現在」採樣時刻（營運時間，取到整分鐘，見 capacitySampleMs）；整張圖以它為時間基準 */
   now_ms: number;
   /**
    * 異常標記：只有真實的異常事件才標。目前沒有接到這類資料來源，一律 false／null。
@@ -267,6 +267,17 @@ export type CapacityTrendRow = {
  *   同一份時段資料。模板合法的 0 照畫；模板缺失／無效就是 null 並回報 data_issue。
  * - 藍線（actual_util）：只到現在；actualAt 回 null（沒有實際資料）的地方斷開，不補 0。
  */
+/**
+ * 「現在」採樣時刻：營運時間取到整分鐘。
+ *
+ * 運能摘要（即時數值）與趨勢圖的「現在」那一點是兩個 API、各自輪詢；加速重播時兩次請求差幾秒，
+ * 營運時間就差幾十秒，一筆發車剛好落在中間，兩個數字就不一樣（實測摘要 1090、端點 1110）。
+ * 兩邊都用同一個採樣時刻算，同一分鐘內一定相同；不同分鐘就回傳各自的採樣時刻，畫面看得出來。
+ */
+export function capacitySampleMs(now: number): number {
+  return Math.floor(now / 60_000) * 60_000;
+}
+
 export function buildCapacityTrend(args: {
   now: number;
   days: CapacityDay[];
@@ -278,7 +289,9 @@ export function buildCapacityTrend(args: {
   dataIssue: string | null;
   formatTime: (ts: number) => string;
 }): CapacityTrendRow[] {
-  const { now, days, pastMinutes, futureMinutes, bucketMinutes, actualAt, dataIssue, formatTime } = args;
+  const { days, pastMinutes, futureMinutes, bucketMinutes, actualAt, dataIssue, formatTime } = args;
+  // 「現在」那一列與摘要的即時數值同一個採樣時刻
+  const now = capacitySampleMs(args.now);
   const bucketMs = bucketMinutes * 60_000;
   const from = now - pastMinutes * 60_000;
   const to = now + futureMinutes * 60_000;

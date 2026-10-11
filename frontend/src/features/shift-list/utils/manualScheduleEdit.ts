@@ -1,4 +1,5 @@
 import { resolveBlockDwellSlackBreakdown, resolveBlockStationExtraDwellSeconds } from './buildBlockStationDepartures';
+import { cardCodeKind, cardDisplayCode, type TransitionCardCodes } from './cardCode';
 import {
   clampScheduleMinute,
   snapScheduleMinuteUnbounded,
@@ -160,8 +161,13 @@ export function resolveManualBlockTripCode(args: {
     'taskType' | 'timelineRow' | 'plannedStartMinute' | 'routeCode'
   >;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  /** 有過渡卡代號＝新規則（代號＋列號＋HHMM，見 cardCode.ts） */
+  transitionCodes?: TransitionCardCodes | null;
 }): string {
-  const { block, sectionCodes } = args;
+  const { block, sectionCodes, transitionCodes } = args;
+  if (transitionCodes && cardCodeKind(block)) {
+    return cardDisplayCode(block, { sectionCodes, transitionCodes }) ?? '----';
+  }
   if (block.taskType === 'passenger') {
     return buildScheduleBlockTripCode({
       prefixCode: block.routeCode,

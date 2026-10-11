@@ -95,6 +95,8 @@ export const DAILY_PLAN_PAYLOAD_KEYS = {
   shiftId: 'plan_shift_id',
   planDigest: 'plan_digest',
   tripCode: 'plan_trip_code',
+  /** 班表卡 block id：代號只在同一份計畫內唯一，追查時以它為準 */
+  blockId: 'plan_block_id',
 } as const;
 
 export function dailyPlanSettingKey(day: string): string {

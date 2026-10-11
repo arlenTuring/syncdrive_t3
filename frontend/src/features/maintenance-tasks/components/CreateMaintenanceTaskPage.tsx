@@ -14,6 +14,7 @@ import {
   emptyMaintenanceTaskCreateDraft,
   isCarWashStepComplete,
   isCreateMaintenanceTaskStepComplete,
+  createMaintenanceTaskStepIncompleteReason,
   isMaintenanceStepComplete,
   MAINTENANCE_STEP_COUNT,
   isChargingStepComplete,
@@ -295,22 +296,32 @@ export function CreateMaintenanceTaskPage({
   draftRef.current = draft;
   savedTaskIdRef.current = savedTaskId;
 
-  const persistDraft = useCallback(async (): Promise<string | null> => {
-    const currentDraft = draftRef.current;
+  /**
+   * 存檔一律排隊、照呼叫順序送出：每一次送的是呼叫當下那份草稿。以前自動存檔與「完成」可能同時在飛，
+   * 晚回來的舊內容會蓋掉剛存好的完成狀態。
+   */
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const persistDraft = useCallback(async (snapshot?: MaintenanceTaskCreateDraft): Promise<string | null> => {
+    const currentDraft = snapshot ?? draftRef.current;
     const payload = {
       name: resolveMaintenanceTaskDraftName(currentDraft.basic.name),
       body: serializeMaintenanceTaskBody(currentDraft),
     };
-    const existingId = savedTaskIdRef.current ?? editTaskId;
-    if (existingId) {
-      await updateMaintenanceTaskDraft(existingId, payload);
-      return existingId;
-    }
-    const created = await createMaintenanceTaskDraft(payload);
-    setSavedTaskId(created.task_id);
-    savedTaskIdRef.current = created.task_id;
-    onSavedDraft?.();
-    return created.task_id;
+    const run = async () => {
+      const existingId = savedTaskIdRef.current ?? editTaskId;
+      if (existingId) {
+        await updateMaintenanceTaskDraft(existingId, payload);
+        return existingId;
+      }
+      const created = await createMaintenanceTaskDraft(payload);
+      setSavedTaskId(created.task_id);
+      savedTaskIdRef.current = created.task_id;
+      onSavedDraft?.();
+      return created.task_id;
+    };
+    const next = saveQueue.current.catch(() => undefined).then(run);
+    saveQueue.current = next;
+    return next;
   }, [editTaskId, onSavedDraft]);
 
   const runAutoSave = useCallback(async () => {
@@ -348,7 +359,11 @@ export function CreateMaintenanceTaskPage({
     (value: MaintenanceTaskCreateDraft | ((prev: MaintenanceTaskCreateDraft) => MaintenanceTaskCreateDraft)) => {
       isDirty.current = true;
       setHydrated(true);
-      setDraft(value);
+      // 改了設定內容：之前的「完成建立」不再代表目前內容，要重新走到檢視按完成
+      setDraft((prev) => {
+        const next = typeof value === 'function' ? value(prev) : value;
+        return next === prev || !next.editorCompletedAt ? next : { ...next, editorCompletedAt: null };
+      });
     },
     [],
   );
@@ -492,24 +507,69 @@ export function CreateMaintenanceTaskPage({
 
   const handleNext = () => {
     if (!canGoNext) return;
-    if (draft.currentStep >= 8) return;
+    if (draft.currentStep >= MAINTENANCE_STEP_COUNT) return;
     goToStep((draft.currentStep + 1) as CreateMaintenanceTaskStep);
   };
 
+  /** 每一步都完整才能完成建立；不完整時指出第幾步缺什麼 */
+  const firstIncompleteStep = (current: MaintenanceTaskCreateDraft) => {
+    for (const item of CREATE_MAINTENANCE_TASK_STEPS) {
+      if (item.step === MAINTENANCE_STEP_COUNT) continue;
+      const reason = createMaintenanceTaskStepIncompleteReason(item.step, current, { nameUniqueOk: true });
+      if (reason) return { step: item.step, reason };
+    }
+    return null;
+  };
+
+  /**
+   * 完成建立：把「完成」連同完整內容明確存進後端，存成功才返回。
+   * 存檔失敗就留在這一頁顯示錯誤，不宣稱完成。這是表單設定完成，不是車輛整備完成。
+   */
   const handleComplete = useCallback(async () => {
     if (!previewReachedBottom || loading || loadError || completing) return;
+    const incomplete = firstIncompleteStep(draftRef.current);
+    if (incomplete) {
+      setSaveError(`第 ${incomplete.step} 步：${incomplete.reason}`);
+      return;
+    }
     setCompleting(true);
     setSaveError(null);
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    const completed: MaintenanceTaskCreateDraft = {
+      ...draftRef.current,
+      currentStep: MAINTENANCE_STEP_COUNT as CreateMaintenanceTaskStep,
+      maxReachedStep: MAINTENANCE_STEP_COUNT as CreateMaintenanceTaskStep,
+      editorCompletedAt: new Date().toISOString(),
+    };
     try {
-      await flushAutoSave();
+      await persistDraft(completed);
+      skipAutoSaveOnce.current = true;
+      setDraft(completed);
+      isDirty.current = false;
+      setLastSavedAt(new Date());
+      setAutoSaveStatus('saved');
       onSavedDraft?.();
       onBack();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setAutoSaveStatus('error');
+      setSaveError(`完成建立沒有存進去：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setCompleting(false);
     }
-  }, [completing, flushAutoSave, loadError, loading, onBack, onSavedDraft, previewReachedBottom]);
+  }, [completing, loadError, loading, onBack, onSavedDraft, persistDraft, previewReachedBottom]);
+
+  /** 目前這一步不能前進的原因（顯示在下一步按鈕旁，不只是把按鈕變灰） */
+  const currentStepReason =
+    draft.currentStep < MAINTENANCE_STEP_COUNT && !loading && !loadError && !canGoNext
+      ? draft.currentStep === 1 && nameUniqueState === 'duplicate'
+        ? '名稱已存在，請換一個'
+        : createMaintenanceTaskStepIncompleteReason(draft.currentStep, draft, {
+            nameUniqueOk: nameUniqueState !== 'duplicate',
+          })
+      : null;
 
   const nameUniqueOk =
     nameUniqueState === 'unique'
@@ -609,6 +669,7 @@ export function CreateMaintenanceTaskPage({
 
         <footer className="flex shrink-0 flex-col gap-1 border-t border-zinc-800/80 px-8 py-4">
           {saveError && <p className="text-xs text-red-400">{saveError}</p>}
+          {!saveError && currentStepReason && <p className="text-xs text-amber-400/90">{currentStepReason}</p>}
           <div className="flex items-center justify-end gap-4">
             <button
               type="button"

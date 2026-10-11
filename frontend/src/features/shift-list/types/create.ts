@@ -204,6 +204,18 @@ export type ShiftScheduleTimeTemplateDraft = {
   emptyIntervalMainlineSlackSeconds: string;
 };
 
+import {
+  emptyTransitionCardCodes,
+  findCardCodeConfigIssues,
+  normalizeCardCode,
+  parseTransitionCardCodes,
+  type TransitionCardCodes,
+} from '../utils/cardCode';
+
+function normalizeTransitionCardCodes(codes: TransitionCardCodes): TransitionCardCodes {
+  return { entry: normalizeCardCode(codes.entry), exit: normalizeCardCode(codes.exit), hold: normalizeCardCode(codes.hold) };
+}
+
 import type { TaskTypeKey } from '../../time-templates/types/editor';
 import {
   resolveRouteTravelTimesFromBody,
@@ -427,6 +439,11 @@ export type ShiftScheduleRouteGroupsDraft = {
    * 生成前重算資料指紋比對；舊草稿沒有這一欄＝尚未檢查。
    */
   dataCheck?: ScheduleDataCheckRecord | null;
+  /**
+   * 過渡卡代號（入場、出場、暫停／停留；1～2 個大寫英文字母）。班次代號＝代號＋計畫開始 HHMM
+   * （見 utils/cardCode.ts）。null＝舊班表還沒設定：照原本的代號顯示並標示待補設定。
+   */
+  transitionCardCodes?: TransitionCardCodes | null;
 };
 
 export type ScheduleDataCheckRecord = {
@@ -529,6 +546,7 @@ export function emptyShiftScheduleCreateDraft(
       serviceDirectionTags: [],
       routeRelationGraph: emptyShiftRouteRelationGraph(),
       throughAnchors: emptyShiftRouteThroughAnchorsDraft(),
+      transitionCardCodes: emptyTransitionCardCodes(),
     },
     actionSettings: emptyShiftScheduleActionSettingsDraft(),
     scheduleOutput: null,
@@ -937,6 +955,10 @@ export function serializeShiftScheduleBody(
     throughAnchors:
       draft.routeGroups.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft(),
     routeGroupsDataCheck: draft.routeGroups.dataCheck ?? null,
+    // 沒設定過（舊班表）就不寫：後端依有沒有這一欄決定用新代號或舊代號
+    ...(draft.routeGroups.transitionCardCodes
+      ? { transitionCardCodes: normalizeTransitionCardCodes(draft.routeGroups.transitionCardCodes) }
+      : {}),
     actionSettings: draft.actionSettings,
     scheduleOutput: draft.scheduleOutput,
     currentStep: draft.currentStep,
@@ -1227,6 +1249,7 @@ export function buildShiftScheduleDraftFromStored(
       ),
       throughAnchors: parseShiftRouteThroughAnchorsDraft(body.throughAnchors),
       dataCheck: parseScheduleDataCheckRecord(body.routeGroupsDataCheck),
+      transitionCardCodes: parseTransitionCardCodes(body.transitionCardCodes),
     },
     actionSettings,
     scheduleOutput: parseShiftScheduleStoredOutput(body.scheduleOutput),
@@ -1280,6 +1303,20 @@ export function isCreateShiftScheduleStepComplete(
   }
   if (step === 4) {
     const routes = draft.routeGroups.selectedRoutes;
+    // 過渡卡代號：有設定就必須合法（舊班表沒有這一欄＝待補設定，照舊代號，不擋）
+    const transitionCodes = draft.routeGroups.transitionCardCodes;
+    if (
+      transitionCodes
+      && findCardCodeConfigIssues({
+        sectionCodes: draft.maintenanceTask.sectionCodeBySection,
+        sectionEnabled: draft.maintenanceTask.sectionEnabled,
+        transitionCodes,
+        maintenanceSkipped: draft.maintenanceTask.skipped,
+        routeCodes: routes.map((route) => route.routeCode),
+      }).length > 0
+    ) {
+      return false;
+    }
     if (draft.creationMode === 'manual') {
       return (
         routes.length > 0

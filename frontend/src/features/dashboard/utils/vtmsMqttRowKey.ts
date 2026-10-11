@@ -16,6 +16,9 @@ export function operationRowKey(row: Record<string, unknown>): string {
     row.line_kind,
     leg?.target_station_id,
     leg?.eta_seconds,
+    // 距離是班次卡進度的依據：倍速下 ETA 是整數秒、好幾則都一樣，只有距離在變；
+    // 少了它，這些回報會被當成「沒變」丟掉，畫面停住、時間戳過期，就退到另一套算法來回跳
+    leg?.distance_to_target_m,
     row.badge_label,
   ].join('|');
 }

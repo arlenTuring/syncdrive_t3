@@ -71,6 +71,17 @@ export class StationEtaService {
     }));
     const tripStates = new Map<string, TripState>();
     if (adoption) {
+      /*
+       * 班次代號只在「同一營運日、同一份計畫」內唯一（E021830 每天都有）；重播時再限定這一次執行，
+       * 同一天跑過的前幾輪不會跟這一輪串在一起（跟運能統計同一個條件）。
+       */
+      const params: unknown[] = [day, adoption.shift_id, adoption.plan_digest];
+      const replay = this.clock.replayRun();
+      let runFilter = '';
+      if (replay?.runId) {
+        params.push(replay.runId);
+        runFilter = `AND payload->>'plan_run_id' = $${params.length}`;
+      }
       const rows: Array<{ trip_code: string; status: string; closed_reason: string | null; last_dwell_station_id: string | null }> = await this.dataSource.query(
         `SELECT COALESCE(payload->>'plan_trip_code', trip_code) AS trip_code, status::text AS status,
                 payload->>'closed_reason' AS closed_reason,
@@ -79,8 +90,9 @@ export class StationEtaService {
          WHERE payload->>'operating_day' = $1
            AND payload->>'plan_shift_id' = $2
            AND payload->>'plan_digest' = $3
+           ${runFilter}
          ORDER BY created_at ASC`,
-        [day, adoption.shift_id, adoption.plan_digest],
+        params,
       );
       // 同一班重發：以最後一張為準
       for (const row of rows) tripStates.set(row.trip_code, {

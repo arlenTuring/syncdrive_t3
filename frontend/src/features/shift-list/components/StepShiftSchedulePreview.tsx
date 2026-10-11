@@ -858,6 +858,8 @@ export function StepShiftSchedulePreview({
                     selectedRoutes={draft.routeGroups.selectedRoutes}
                     minimumRecoveryTimeSeconds={draft.routeGroups.minimumRecoveryTimeSeconds}
                     hideStrategyBuffers={draft.creationMode === 'manual'}
+                    sectionCodes={draft.maintenanceTask.skipped ? null : draft.maintenanceTask.sectionCodeBySection}
+                    transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
                     zoom={gridZoom}
                   />
                 ) : (

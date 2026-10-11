@@ -1,4 +1,5 @@
 import { SlidersHorizontal, Tag } from 'lucide-react';
+import type { TransitionCardCodes } from '../utils/cardCode';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -129,12 +130,14 @@ function ManualBlockSettingsForm({
   block,
   selectedRoutes,
   sectionCodes,
+  transitionCodes = null,
   onApply,
   onApplyDwells,
 }: {
   block: GeneratedScheduleBlock;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   sectionCodes: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
   onApply: (next: ManualBlockApplyPayload) => void;
   onApplyDwells: (next: ManualBlockDwellPayload) => void;
 }) {
@@ -185,8 +188,9 @@ function ManualBlockSettingsForm({
             ?? block.routeCode,
         },
         sectionCodes,
+        transitionCodes,
       }),
-    [block, routeId, sectionCodes, selectedRoutes],
+    [block, routeId, sectionCodes, transitionCodes, selectedRoutes],
   );
 
   const dwellTotalSeconds = useMemo(
@@ -498,12 +502,14 @@ export function ManualScheduleEditorSidebar({
   selectedBlock,
   selectedRoutes,
   sectionCodes,
+  transitionCodes = null,
   onApplyBlock,
   onApplyDwells,
 }: {
   selectedBlock: GeneratedScheduleBlock | null;
   selectedRoutes: ShiftScheduleSelectedRoute[];
   sectionCodes: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
   onApplyBlock: (next: ManualBlockApplyPayload) => void;
   onApplyDwells: (next: ManualBlockDwellPayload) => void;
 }) {
@@ -535,6 +541,7 @@ export function ManualScheduleEditorSidebar({
             block={selectedBlock}
             selectedRoutes={selectedRoutes}
             sectionCodes={sectionCodes}
+            transitionCodes={transitionCodes}
             onApply={onApplyBlock}
             onApplyDwells={onApplyDwells}
           />

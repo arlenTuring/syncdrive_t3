@@ -263,17 +263,21 @@ export function plannedYardTasksNow(
 }
 
 /**
- * 車輛分佈
- * ========
+ * 營運分佈：每台車此刻只歸一類——營運中、整備中、待命中。
  *
- * 每台車此刻歸哪一類，跟整備分佈用同一套判斷，兩塊才不會互相矛盾：
+ * 依「此刻有效的那張任務」的<strong>用途</strong>分，不看車速、訂單是否還沒開始、停在哪一格、
+ * 卡片文字或代號開頭：
  *
- * 1. 有進行中的訂單：正線（MAINLINE／TEST）→ 營運中；空車移動（出入廠、讓站）→ 整備中；
- *    整備訂單照它的整備區塊——待命 → 待命中，其餘 → 整備中。
- * 2. 沒有進行中的訂單：整備分佈裡亮在「待命以外」某一類的車（停在格位裡、照班表正在
- *    整備）→ 整備中；其他 → 待命中。
+ * <table>
+ *   <tr><td>正線班次（MAINLINE；人工測試 TEST 照舊算營運）</td><td>營運中</td></tr>
+ *   <tr><td>充電、洗車、保養、行檢</td><td>整備中</td></tr>
+ *   <tr><td>過渡任務（出廠、入廠、暫停、待命）</td><td>依它服務的用途（payload.service_purpose，
+ *     排班展開時決定；舊單由同一份班表時間線補算）：營運→營運中、整備→整備中、待命→待命中</td></tr>
+ *   <tr><td>此刻沒有有效任務</td><td>待命中</td></tr>
+ * </table>
  *
- * 舊版的「整備中」讀 slot_statuses 示範表，接真車或模擬器時永遠不會變。
+ * 「此刻有效」由呼叫端判定（執行中且仍有回報、或計畫時間窗涵蓋此刻）；已結束、取消、過期的單
+ * 不傳進來。「營運中」是承接營運任務，不等於正在載客。
  */
 export type VehicleDistributionStatus = 'IN_SERVICE' | 'MAINTENANCE' | 'STANDBY';
 
@@ -281,57 +285,92 @@ export type VehicleDistributionRow = {
   status_code: VehicleDistributionStatus;
   pct: number;
   vehicle_count: number;
+  /**
+   * 這一類的車與歸類原因。dispatchable＝此刻沒有承接任何任務、也不是「計畫有任務但還沒訂單」，
+   * 可以臨時調度去營運（運能摘要的「可調度」數量看它，不直接拿待命中的總數）。
+   */
+  vehicles: Array<{ vehicle_code: string; reason: string; dispatchable: boolean }>;
 };
 
 const STATUS_ORDER: VehicleDistributionStatus[] = ['IN_SERVICE', 'MAINTENANCE', 'STANDBY'];
 
+export type CurrentVehicleTask = {
+  vehicleCode: string;
+  orderId: string;
+  tripCode: string | null;
+  /** 業務分類（order-business-kind）：MAINLINE／TRANSITION／MAINTENANCE／TEST */
+  businessKind: string | null;
+  /** 原任務子類型（passenger、charging、standby、idle、dispatch…） */
+  taskType: string | null;
+  /** 過渡任務服務的用途；舊單沒存時由呼叫端從班表時間線補 */
+  servicePurpose: 'operation' | 'maintenance' | 'standby' | null;
+  /** 補算來源，寫進原因 */
+  purposeSource: 'order' | 'shift' | null;
+  /**
+   * 沒有有效訂單時，每日計畫此刻的那張卡（訂單欄位此時為空）。
+   * ordersExpected：這種卡本來就該有訂單（載客、場區整備、出入廠）——有計畫沒訂單，照實標示，不拿計畫冒充實際。
+   */
+  planBlock?: { taskType: string; ordersExpected: boolean };
+};
+
+const TASK_WORD: Record<string, string> = {
+  passenger: '載客', charging: '充電', washing: '洗車', servicing: '保養', inspection: '行檢',
+  standby: '待命', idle: '暫停', dispatch: '空車移動',
+};
+
+const PURPOSE_WORD = { operation: '營運', maintenance: '整備', standby: '待命' } as const;
+const PURPOSE_STATUS = { operation: 'IN_SERVICE', maintenance: 'MAINTENANCE', standby: 'STANDBY' } as const;
+
+export function classifyVehicle(task: CurrentVehicleTask | undefined): { status: VehicleDistributionStatus; reason: string } {
+  if (!task) return { status: 'STANDBY', reason: '此刻沒有有效任務' };
+  if (task.planBlock) {
+    const word = TASK_WORD[task.planBlock.taskType] ?? task.planBlock.taskType;
+    if (task.planBlock.ordersExpected) {
+      return { status: 'STANDBY', reason: `每日計畫此刻是「${word}」，但沒有有效訂單` };
+    }
+    if (task.servicePurpose) {
+      return {
+        status: PURPOSE_STATUS[task.servicePurpose],
+        reason: `每日計畫：${word}（不產生訂單的等待），服務${PURPOSE_WORD[task.servicePurpose]}`,
+      };
+    }
+    return { status: 'STANDBY', reason: `每日計畫此刻是「${word}」，用途不明` };
+  }
+  const kind = (task.businessKind ?? '').toUpperCase();
+  const label = `${task.tripCode ?? task.orderId}（${TASK_WORD[task.taskType ?? ''] ?? task.taskType ?? '未知任務'}）`;
+  if (kind === 'MAINLINE' || kind === 'TEST') return { status: 'IN_SERVICE', reason: `正線任務 ${label}` };
+  if (kind === 'MAINTENANCE') return { status: 'MAINTENANCE', reason: `整備任務 ${label}` };
+  if (kind === 'TRANSITION') {
+    const from = task.purposeSource === 'shift' ? '（用途由班表時間線補算）' : '';
+    if (task.servicePurpose === 'operation') return { status: 'IN_SERVICE', reason: `過渡 ${label} 服務營運${from}` };
+    if (task.servicePurpose === 'maintenance') return { status: 'MAINTENANCE', reason: `過渡 ${label} 服務整備${from}` };
+    if (task.servicePurpose === 'standby') return { status: 'STANDBY', reason: `過渡 ${label} 服務待命${from}` };
+    return { status: 'STANDBY', reason: `過渡 ${label} 用途不明（訂單與班表都沒有），不算營運或整備` };
+  }
+  return { status: 'STANDBY', reason: `任務 ${label} 分類不明（${task.businessKind ?? '無'}）` };
+}
+
 export function buildVehicleDistribution(args: {
   fleetCodes: string[];
-  /** 進行中的訂單（每台車最新一筆） */
-  processingOrders: Array<{
-    vehicleCode: string;
-    lineKind: string | null;
-    kind: string | null;
-    taskType: string | null;
-    cardLabel: string | null;
-  }>;
-  /** 同一時刻的整備分佈（已依訂單／班表判定好每格的車算哪一類） */
-  maintenance: MaintenanceDistribution;
+  /** 每台車此刻有效的那一張任務（沒有就不放） */
+  currentTasks: CurrentVehicleTask[];
 }): VehicleDistributionRow[] {
-  const sectionByLabel = new Map(args.maintenance.categories.map((category) => [category.label, category.key] as const));
-  const orderByVehicle = new Map(args.processingOrders.map((order) => [order.vehicleCode, order]));
-  const inMaintenanceSlot = new Set<string>();
-  for (const category of args.maintenance.categories) {
-    if (category.key === 'mobile') continue;
-    for (const slot of category.slots) {
-      if (slot.occupied && slot.vehicleCode) inMaintenanceSlot.add(slot.vehicleCode);
-    }
-  }
-
-  const statusOf = (vehicleCode: string): VehicleDistributionStatus => {
-    const order = orderByVehicle.get(vehicleCode);
-    if (order) {
-      const lineKind = (order.lineKind ?? '').toUpperCase();
-      if (lineKind === 'MAINLINE' || lineKind === 'TEST') return 'IN_SERVICE';
-      if (order.kind === 'movement') return 'MAINTENANCE';
-      const section = (order.taskType ? SECTION_BY_TASK_TYPE[order.taskType] : undefined)
-        ?? (order.cardLabel ? sectionByLabel.get(order.cardLabel.trim()) : undefined);
-      return section === 'mobile' ? 'STANDBY' : 'MAINTENANCE';
-    }
-    return inMaintenanceSlot.has(vehicleCode) ? 'MAINTENANCE' : 'STANDBY';
-  };
-
-  const counts = new Map<VehicleDistributionStatus, number>();
+  const taskByVehicle = new Map(args.currentTasks.map((task) => [task.vehicleCode, task]));
+  const groups = new Map<VehicleDistributionStatus, VehicleDistributionRow['vehicles']>();
   const fleet = [...new Set(args.fleetCodes.filter(Boolean))];
   for (const code of fleet) {
-    const status = statusOf(code);
-    counts.set(status, (counts.get(status) ?? 0) + 1);
+    const task = taskByVehicle.get(code);
+    const { status, reason } = classifyVehicle(task);
+    const list = groups.get(status) ?? [];
+    list.push({ vehicle_code: code, reason, dispatchable: status === 'STANDBY' && !task?.planBlock?.ordersExpected });
+    groups.set(status, list);
   }
   return STATUS_ORDER
-    .filter((status) => (counts.get(status) ?? 0) > 0)
+    .filter((status) => (groups.get(status)?.length ?? 0) > 0)
     .map((status) => ({
       status_code: status,
-      pct: Math.round((1000 * (counts.get(status) ?? 0)) / Math.max(1, fleet.length)) / 10,
-      vehicle_count: counts.get(status) ?? 0,
+      pct: Math.round((1000 * (groups.get(status)?.length ?? 0)) / Math.max(1, fleet.length)) / 10,
+      vehicle_count: groups.get(status)?.length ?? 0,
+      vehicles: groups.get(status) ?? [],
     }));
 }

@@ -190,7 +190,7 @@ function vehicleDistributionWidget(x: number, y: number, w: number, h: number): 
     id: cid(),
     width: w,
     height: h,
-    title: '車輛分佈',
+    title: '營運分佈',
     titleIconImage: ICON.vehicleDistribution,
     statusField: 'status_code',
     pctField: 'pct',
@@ -1342,7 +1342,7 @@ const elements: CanvasElementProps[] = [
   },
   {
     id: cid(), type: 'canvas', x: LEFT_X, y: VEH_Y, width: LEFT_W, height: VEH_DIST_PANEL_H,
-    label: '車輛分佈', backgroundColor: '#18181B', backgroundImage: '', opacity: 100, children: [],
+    label: '營運分佈', backgroundColor: '#18181B', backgroundImage: '', opacity: 100, children: [],
   },
   {
     id: cid(), type: 'canvas', x: RIGHT_X, y: BOT_Y, width: RIGHT_W, height: MAP_H,

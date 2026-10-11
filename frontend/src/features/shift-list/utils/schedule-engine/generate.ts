@@ -1956,6 +1956,7 @@ function generateShiftScheduleOnce(
       // 碰撞保護不足是「該拉開但沒拉開」，不是物理上兩台車疊在一起：走警告不擋生成
       warnings,
       sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+      transitionCodes: input.draft.routeGroups.transitionCardCodes ?? null,
     },
   );
   // 殘留衝突的搜尋結果寫進訊息：試過幾個候選、代表性的拒絕原因、是否因運算預算停止。
@@ -2000,6 +2001,7 @@ function generateShiftScheduleOnce(
     // 驗證問的是「車實際停在哪」，跟輪的相位無關，所以用 validate 版（含保養／行檢）
     yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
+    transitionCodes: input.draft.routeGroups.transitionCardCodes ?? null,
     errors,
   });
   /**

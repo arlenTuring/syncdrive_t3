@@ -15,6 +15,7 @@
 #   ./deploy/vm.sh health              跑完整健康檢查
 #   ./deploy/vm.sh check               檢查儀表板存的查詢是不是新版、訂單筆數
 #   ./deploy/vm.sh rollback            回到上一個通過健康檢查的版本
+#   ./deploy/vm.sh verify              唯讀：本機／GitHub／部署機的程式版本與實際映像
 #   ./deploy/vm.sh ssh                 直接登入 VM
 #   ./deploy/vm.sh map [mapId]         把本機改好的圖資送上 34（預設送本機使用中那一張；不用 git、不用重建）
 #
@@ -92,6 +93,17 @@ case "$cmd" in
     log "34：重啟 ${containers}"
     # 用 docker restart：沿用現在跑的映像，不重建、不換版本
     on_vm "sudo docker restart ${containers} >/dev/null && echo '已重啟，等待就緒…' && sleep 10 && sudo ./deploy/healthcheck.sh"
+    ;;
+
+  verify)
+    # 唯讀：本機、GitHub、部署機三方的程式版本，以及部署機實際跑的映像與前端資產
+    git -C "$ROOT" fetch -q origin main 2>/dev/null || true
+    log "本機 HEAD：$(git -C "$ROOT" log --oneline -1)$( [ -n "$(git -C "$ROOT" status --porcelain -- backend/src frontend/src | head -1)" ] && echo '（有未提交的程式修改，不會隨 synccode 上去）')"
+    log "GitHub main：$(git -C "$ROOT" log --oneline -1 origin/main)"
+    on_vm "echo \"部署機程式：\$(git log --oneline -1)\"; \
+           echo \"最後健康版本：\$(sudo cat deploy/.state/last-good-tag 2>/dev/null || echo 無紀錄)\"; \
+           sudo docker ps --filter name=syncdrive_ --format '{{.Names}}  {{.Image}}  {{.Status}}'; \
+           echo \"前端資產：\$(sudo docker exec syncdrive_web sh -c 'ls /usr/share/nginx/html/assets | grep -E ^index-.*js\$' 2>/dev/null)\""
     ;;
 
   status)

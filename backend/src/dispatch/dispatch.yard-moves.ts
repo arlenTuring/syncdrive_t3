@@ -1,3 +1,5 @@
+import { cardDisplayCode, readCardCodeSettings, TRANSITION_CARD_CODE_LABEL } from '../operation-shift/card-code';
+import { servicePurposeByBlock, type BlockPurpose } from './dispatch.service-purpose';
 /**
  * 從班表計畫裡抽出<strong>空車移動</strong>卡（整備出廠、整備入廠、讓站移動／返回）。
  *
@@ -35,6 +37,8 @@ export type YardMoveEndpoint = {
 
 export type YardMove = {
   blockId: string;
+  /** 這段移動服務的用途（接下來那張任務是營運、整備或待命），見 dispatch.service-purpose.ts */
+  servicePurpose?: BlockPurpose;
   timelineRow: number;
   /** 供 order_id 使用的短碼，同一份班表內穩定 */
   tripCode: string;
@@ -70,7 +74,8 @@ function num(value: unknown): number | null {
 }
 
 /**
- * 短碼：方向 ＋ 時間線列 ＋ 起始分鐘。
+ * 舊班表（沒有過渡卡代號設定）的短碼：方向 ＋ 時間線列 ＋ 起始分鐘。
+ * 新班表用入場／出場代號＋列號＋HHMM（見 operation-shift/card-code.ts），這個只留給舊班表。
  *
  * 用「列＋分鐘」而不是 block id：block id 帶著產生時的時戳，同一份班表重新產生就
  * 全部換過，訂單編號會跟著全變。列與分鐘則是<strong>計畫本身的內容</strong>——同一
@@ -78,7 +83,7 @@ function num(value: unknown): number | null {
  *
  * 不會撞號：一台車不可能在同一分鐘做兩趟同方向的移動。
  */
-function buildTripCode(
+function buildLegacyTripCode(
   direction: 'OUT' | 'IN',
   row: number,
   startMinute: number,
@@ -101,6 +106,8 @@ export function extractYardMoves(body: Record<string, unknown>): {
   const moves: YardMove[] = [];
   const skipped: Array<{ blockId: string; reason: string }> = [];
   if (!Array.isArray(timelines)) return { moves, skipped };
+  const purposes = servicePurposeByBlock(body);
+  const codeSettings = readCardCodeSettings(body);
 
   for (const timeline of timelines) {
     const tl = asRecord(timeline);
@@ -150,11 +157,24 @@ export function extractYardMoves(body: Record<string, unknown>): {
       // 出廠是從設施開往站點，入廠反過來。方向錯＝車開反方向。
       const outbound = source === 'yard_exit_move';
       const row = num(block.timelineRow) ?? 1;
+      let tripCode = buildLegacyTripCode(outbound ? 'OUT' : 'IN', row, startMinute);
+      if (codeSettings.version === 2) {
+        const code = cardDisplayCode(block, codeSettings);
+        if (!code) {
+          skipped.push({
+            blockId,
+            reason: `待補設定：「${TRANSITION_CARD_CODE_LABEL[outbound ? 'exit' : 'entry']}」卡沒有代號，未發移動訂單`,
+          });
+          continue;
+        }
+        tripCode = code;
+      }
 
       moves.push({
         blockId,
+        servicePurpose: purposes.get(blockId),
         timelineRow: row,
-        tripCode: buildTripCode(outbound ? 'OUT' : 'IN', row, startMinute),
+        tripCode,
         label: str(block.label) ?? (outbound ? '整備出廠' : '整備入廠'),
         direction: outbound ? 'exit' : 'entry',
         sectionCode: str(block.yardExitSectionCode),

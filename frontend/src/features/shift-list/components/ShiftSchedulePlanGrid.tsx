@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { cardCodeKind, type TransitionCardCodes } from '../utils/cardCode';
 import i18n from '../../../i18n';
 import { Info, AlertTriangle, Trash2, CopyPlus } from 'lucide-react';
 import {
@@ -794,8 +795,9 @@ function resolveBlockCode(
   block: GeneratedScheduleBlock,
   index: number,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
+  transitionCodes?: TransitionCardCodes | null,
 ): string {
-  return resolveGeneratedBlockTripCode(block, index, sectionCodes);
+  return resolveGeneratedBlockTripCode(block, index, sectionCodes, transitionCodes);
 }
 
 function ScheduleIntervalBackground({
@@ -1006,6 +1008,7 @@ function ShiftScheduleBlockBar({
   selectedRoutes = [],
   minimumRecoveryTimeSeconds = null,
   sectionCodes = null,
+  transitionCodes = null,
   interactiveEdit = false,
   hideStrategyBuffers = false,
   previousPassengerBlock = null,
@@ -1031,6 +1034,8 @@ function ShiftScheduleBlockBar({
   selectedRoutes?: ShiftScheduleSelectedRoute[];
   minimumRecoveryTimeSeconds?: number | null;
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  /** 過渡卡代號；有設定＝整備／過渡卡用「代號＋列號＋HHMM」（見 utils/cardCode.ts） */
+  transitionCodes?: TransitionCardCodes | null;
   interactiveEdit?: boolean;
   hideStrategyBuffers?: boolean;
   /** 同列前一正線卡；關節站時刻對齊用 */
@@ -1109,10 +1114,15 @@ function ShiftScheduleBlockBar({
       || block.source === 'transition'
       || block.taskType === 'dispatch'
       || block.source === 'dispatch');
-  const code = resolveBlockCode(block, blockIndex, sectionCodes);
+  const code = resolveBlockCode(block, blockIndex, sectionCodes, transitionCodes);
   // 卡面／hover 徽章顯示的短代號（不含列碼與時刻），例 MI／WO／TI；
   // 調度視為整備任務的第六種類型，跟其餘五種共用同一套「代號＋I/O」規則。
-  const moveCardPrefix = isMoveCard ? resolveMoveCardPrefix(block) : null;
+  const moveCardKind = transitionCodes ? cardCodeKind(block) : null;
+  const moveCardPrefix = isMoveCard
+    ? moveCardKind?.group === 'transition'
+      ? transitionCodes?.[moveCardKind.key] || null
+      : resolveMoveCardPrefix(block)
+    : null;
   const timeLabel = formatBlockTimeRange(block);
   const selectable =
     block.source === 'template_bar'
@@ -1702,6 +1712,8 @@ export type ShiftSchedulePlanGridProps = {
   hideStrategyBuffers?: boolean;
   /** Step 2 整備區塊代號；非正線班次代號用 */
   sectionCodes?: MaintenanceSectionCodeBySection | null;
+  /** 路線群組的過渡卡代號；有設定＝新代號規則（代號＋列號＋HHMM） */
+  transitionCodes?: TransitionCardCodes | null;
   /** 手動製作：隱藏時間模板任務列（僅留空白時間軸） */
   showTemplateTasks?: boolean;
   /** 手動製作：允許拖放／拖曳／縮放班次卡 */
@@ -1738,6 +1750,7 @@ export function ShiftSchedulePlanGrid({
   minimumRecoveryTimeSeconds = null,
   hideStrategyBuffers = false,
   sectionCodes = null,
+  transitionCodes = null,
   showTemplateTasks = true,
   interactiveEdit = false,
   onDropTaskType,
@@ -1969,6 +1982,7 @@ export function ShiftSchedulePlanGrid({
                           selectedRoutes={selectedRoutes}
                           minimumRecoveryTimeSeconds={minimumRecoveryTimeSeconds}
                           sectionCodes={sectionCodes}
+                          transitionCodes={transitionCodes}
                           interactiveEdit={interactiveEdit}
                           hideStrategyBuffers={hideStrategyBuffers}
                           previousPassengerBlock={entry.previousPassengerBlock}

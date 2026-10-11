@@ -5,7 +5,7 @@ import {
   patchDashboardRuntimeFixes,
 } from './migrateVehicleMonitorProtocol';
 import { upgradeSystemQueries } from './systemQueries';
-import { ensureTransitionShiftTemplate } from './shiftCardTemplates';
+import { ensureTransitionShiftTemplate, alignShiftCardLayouts } from './shiftCardTemplates';
 import { EVENT_CENTER_LIST_SQL } from '../constants/demoSql';
 import { STATION_ETA_INVALIDATE_TAGS, STATION_ETA_URL, type StationEtaWidget, type TabListWidget, type TextWidget } from '../types';
 
@@ -181,8 +181,9 @@ export function migratePlane(plane: DashboardPlane): DashboardPlane {
     : compatible;
   // 每次都跑：只換「確定是系統舊版原文」的 SQL（含泛用群組內部來源），其他不動；第二次跑不會再變
   const upgraded = upgradeSystemQueries(patched).plane;
-  // 班次群組補上獨立的過渡班次卡（已經有就不動）
-  return switchEventCarouselKey(ensureTransitionShiftTemplate(upgraded).plane);
+  // 班次群組補上獨立的過渡班次卡（已經有就不動）；三種班次卡統一成「班次在前、車號在底列中間」
+  const withTransition = ensureTransitionShiftTemplate(upgraded).plane;
+  return switchEventCarouselKey(alignShiftCardLayouts(withTransition).plane);
 }
 
 /**

@@ -159,10 +159,24 @@ if [ -n "$API_BASE" ]; then
     fi
     unset creds web_user web_pass
   fi
-  log "升級儀表板裡存的舊系統查詢：先試跑"
+  # 升級腳本用的是<strong>本機</strong>的查詢定義（frontend/src）。本機版本跟 VM 部署的不同、或本機
+  # 有未提交的修改時，會把部署機程式還不認得的查詢寫進它的儀表板——那就跳過，不要硬寫。
+  deployed_sha="$(remote "cd $REMOTE_DIR && git rev-parse HEAD" 2>/dev/null | tr -d '\r' | tail -1)"
+  local_sha="$(git -C "$ROOT" rev-parse HEAD)"
+  local_dirty="$(git -C "$ROOT" status --porcelain -- frontend/src frontend/scripts | head -1)"
+  if [ "$deployed_sha" != "$local_sha" ] || [ -n "$local_dirty" ]; then
+    log "跳過儀表板升級：本機 $(git -C "$ROOT" rev-parse --short HEAD)$( [ -n "$local_dirty" ] && echo '（frontend 有未提交修改）') 與部署機 ${deployed_sha:0:7} 不是同一版"
+    log "  要升級：本機切到部署機那一版（git checkout ${deployed_sha:0:7}，且 frontend 沒有未提交修改）後，用 --no-deploy 重跑這支"
+    API_BASE=""
+  fi
+fi
+if [ -n "$API_BASE" ]; then
+  log "升級儀表板裡存的舊系統查詢（本機與部署機同為 $(git -C "$ROOT" rev-parse --short HEAD)）：先試跑"
   (cd "$ROOT/frontend" && npx tsx scripts/upgrade-dashboard-real-data.ts "$API_BASE" --dry-run)
   log "正式寫入"
   (cd "$ROOT/frontend" && npx tsx scripts/upgrade-dashboard-real-data.ts "$API_BASE")
 fi
 
+log "同步結果（部署機實際狀態）"
+remote "cd $REMOTE_DIR && echo \"  程式：\$(git log --oneline -1)\" && echo \"  最後健康版本：\$(sudo cat deploy/.state/last-good-tag 2>/dev/null || echo 無)\" && sudo docker ps --filter name=syncdrive_backend --filter name=syncdrive_web --format '  {{.Names}} {{.Image}} {{.Status}}'" || true
 log "完成。之後更新：本機再跑一次 ./deploy/git-sync.sh，或在 VM 上 cd $REMOTE_DIR && sudo ./deploy/deploy.sh --pull"

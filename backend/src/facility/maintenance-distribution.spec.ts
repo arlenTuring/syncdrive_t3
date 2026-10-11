@@ -117,36 +117,57 @@ describe('plannedYardTasksNow', () => {
   });
 });
 
-describe('buildVehicleDistribution', () => {
-  it('正線訂單＝營運中、空車移動與整備＝整備中、待命訂單＝待命中；沒有訂單時看整備分佈', () => {
-    const maintenance = build(
-      [{ vehicleCode: 'PMS05', facilityId: '147' }, { vehicleCode: 'PMS06', facilityId: '132' }],
-      [],
-    );
-    // PMS05 停在 E1、沒有訂單 → 班表也沒排 → 待命清單有 E1 → 待命；改用班表排的充電
-    const withPlan = buildMaintenanceDistribution({
-      shift, maintenanceBody, facilities,
-      vehicleLocations: [{ vehicleCode: 'PMS05', facilityId: '147' }, { vehicleCode: 'PMS06', facilityId: '132' }],
-      currentTasks: [],
-      plannedTasks: [{ vehicleCode: 'PMS05', taskType: 'charging' }],
-    });
+describe('buildVehicleDistribution（營運分佈）', () => {
+  const task = (vehicleCode: string, businessKind: string, taskType: string, servicePurpose: 'operation' | 'maintenance' | 'standby' | null = null, purposeSource: 'order' | 'shift' | null = servicePurpose ? 'order' : null) =>
+    ({ vehicleCode, orderId: `O-${vehicleCode}`, tripCode: `T-${vehicleCode}`, businessKind, taskType, servicePurpose, purposeSource });
+
+  it('依任務用途分：正線＝營運、整備＝整備、過渡依服務的用途、沒有有效任務＝待命', () => {
     const rows = buildVehicleDistribution({
-      fleetCodes: ['PMS01', 'PMS02', 'PMS03', 'PMS04', 'PMS05', 'PMS06'],
-      processingOrders: [
-        { vehicleCode: 'PMS01', lineKind: 'MAINLINE', kind: 'passenger', taskType: null, cardLabel: null },
-        { vehicleCode: 'PMS02', lineKind: 'MAINTENANCE', kind: 'movement', taskType: null, cardLabel: null },
-        { vehicleCode: 'PMS03', lineKind: 'MAINTENANCE', kind: 'maintenance', taskType: 'standby', cardLabel: '待命' },
-        { vehicleCode: 'PMS04', lineKind: 'MAINTENANCE', kind: 'maintenance', taskType: null, cardLabel: '洗車' },
+      fleetCodes: ['PMS01', 'PMS02', 'PMS03', 'PMS04', 'PMS05', 'PMS06', 'PMS07', 'PMS08'],
+      currentTasks: [
+        task('PMS01', 'MAINLINE', 'passenger'),
+        task('PMS02', 'TRANSITION', 'dispatch', 'operation'), // 出廠，接著跑正線
+        task('PMS03', 'TRANSITION', 'idle', 'operation'), // 接班前的必要等待
+        task('PMS04', 'TRANSITION', 'dispatch', 'maintenance'), // 入廠去充電
+        task('PMS05', 'MAINTENANCE', 'charging'),
+        task('PMS06', 'TRANSITION', 'idle', 'maintenance', 'shift'), // 舊單：用途由班表補算
+        task('PMS07', 'TRANSITION', 'standby', 'standby'),
+        // PMS08：此刻沒有有效任務（就算整天的單都預先建好也不算營運）
       ],
-      maintenance: withPlan,
     });
-    expect(rows).toEqual([
-      { status_code: 'IN_SERVICE', pct: 16.7, vehicle_count: 1 },
-      { status_code: 'MAINTENANCE', pct: 50, vehicle_count: 3 },
-      { status_code: 'STANDBY', pct: 33.3, vehicle_count: 2 },
+    expect(rows.map((row) => [row.status_code, row.vehicle_count, row.vehicles.map((v) => v.vehicle_code)])).toEqual([
+      ['IN_SERVICE', 3, ['PMS01', 'PMS02', 'PMS03']],
+      ['MAINTENANCE', 3, ['PMS04', 'PMS05', 'PMS06']],
+      ['STANDBY', 2, ['PMS07', 'PMS08']],
     ]);
-    // 沒有班表計畫時，停在 E1 的車算待命
-    const standbyOnly = buildVehicleDistribution({ fleetCodes: ['PMS05'], processingOrders: [], maintenance });
-    expect(standbyOnly).toEqual([{ status_code: 'STANDBY', pct: 100, vehicle_count: 1 }]);
+    expect(rows.reduce((sum, row) => sum + row.vehicle_count, 0)).toBe(8);
+    expect(rows[1].vehicles[2].reason).toContain('班表時間線補算');
+    expect(rows[2].vehicles[1].reason).toBe('此刻沒有有效任務');
+    expect(rows.flatMap((row) => row.vehicles).filter((v) => v.dispatchable).map((v) => v.vehicle_code)).toEqual(['PMS07', 'PMS08']);
+  });
+
+  it('沒有訂單時看每日計畫：月台等下一班＝營運中；該有訂單卻沒有的照實標示待命', () => {
+    const plan = (vehicleCode: string, taskType: string, ordersExpected: boolean, servicePurpose: 'operation' | 'maintenance' | 'standby' | null) =>
+      ({ vehicleCode, orderId: '', tripCode: null, businessKind: null, taskType, servicePurpose, purposeSource: 'shift' as const, planBlock: { taskType, ordersExpected } });
+    const rows = buildVehicleDistribution({
+      fleetCodes: ['PMS01', 'PMS02'],
+      currentTasks: [plan('PMS01', 'idle', false, 'operation'), plan('PMS02', 'passenger', true, 'operation')],
+    });
+    expect(rows.map((row) => [row.status_code, row.vehicles.map((v) => v.reason)])).toEqual([
+      ['IN_SERVICE', ['每日計畫：暫停（不產生訂單的等待），服務營運']],
+      ['STANDBY', ['每日計畫此刻是「載客」，但沒有有效訂單']],
+    ]);
+    // 計畫上有任務的車不算可調度
+    expect(rows[1].vehicles[0].dispatchable).toBe(false);
+  });
+
+  it('過渡任務用途不明時不硬算營運或整備，並寫出原因；同一台車只算一次', () => {
+    const rows = buildVehicleDistribution({
+      fleetCodes: ['PMS01', 'PMS01'],
+      currentTasks: [task('PMS01', 'TRANSITION', 'dispatch', null)],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status_code: 'STANDBY', vehicle_count: 1, pct: 100 });
+    expect(rows[0].vehicles[0].reason).toContain('用途不明');
   });
 });

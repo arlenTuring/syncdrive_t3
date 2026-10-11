@@ -1,4 +1,5 @@
 import type { ScheduleEngineTaskType } from '../../time-templates/types/editor';
+import { cardCodeKind, cardDisplayCode, type TransitionCardCodes } from './cardCode';
 
 /**
  * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
@@ -285,7 +286,16 @@ export function resolveGeneratedBlockTripCode(
   },
   index = 0,
   sectionCodes?: MaintenanceSectionCodeBySection | null,
+  /**
+   * 班表的過渡卡代號（路線群組步驟）。有設定＝新規則：整備卡與過渡卡一律「代號＋列號＋HHMM」
+   * （見 cardCode.ts，後端同一份規則）；沒有（舊班表）＝下面原本的代號。
+   */
+  transitionCodes?: TransitionCardCodes | null,
 ): string {
+  if (transitionCodes && cardCodeKind(block)) {
+    return cardDisplayCode(block, { sectionCodes, transitionCodes }) ?? '----';
+  }
+
   // 移動小卡共用一套規則：該段整備自己的區段代號 + I/O 尾綴
   // （充電 E → EI／EO、行檢 P → PI／PO、待命 S → SI／SO）。
   // 沒有固定的 MI／MO 這種東西——代號跟著任務類型走。
