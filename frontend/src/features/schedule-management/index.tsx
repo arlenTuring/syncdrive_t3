@@ -14,6 +14,8 @@ import {
   Settings2,
   Wrench,
   Activity,
+  ShieldCheck,
+  UserRoundCog,
 } from 'lucide-react';
 import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
 import MapEditorApp from '../map-editor';
@@ -27,6 +29,9 @@ import DispatchSchedulingApp from '../dispatch-scheduling';
 import PsdControlApp from '../psd-control';
 import VirtualFenceManagementApp from '../virtual-fence-management';
 import SystemFoundationApp from '../system-foundation';
+import { AccountManagementPage } from '../access-control/AccountManagementPage';
+import { RoleManagementPage } from '../access-control/RoleManagementPage';
+import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
   OPEN_VEHICLE_MODELS_EVENT,
@@ -136,6 +141,12 @@ function useWorkspaceChrome(
         icon: <Settings2 className="size-4 text-sky-400" aria-hidden />,
       };
     }
+    if (view === 'account-management') {
+      return { title: '帳號管理中心', icon: <UserRoundCog className="size-4 text-sky-400" aria-hidden /> };
+    }
+    if (view === 'role-management') {
+      return { title: '角色管理設定', icon: <ShieldCheck className="size-4 text-sky-400" aria-hidden /> };
+    }
     if (view === 'time-templates') {
       return {
         title: t('nav.modules.schedule'),
@@ -165,6 +176,7 @@ export default function ScheduleManagementApp({
   initialView = 'shift-records',
 }: ScheduleManagementAppProps) {
   const [view, setView] = useState<string>(initialView);
+  const { user } = useAuth();
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
   const [trajectoryMounted, setTrajectoryMounted] = useState(initialView === 'trajectory');
   const [adminMode, setAdminMode] = useState(readAdminModePreference);
@@ -276,6 +288,7 @@ export default function ScheduleManagementApp({
             setView('shift-records');
           }
         }}
+        permissions={user?.permissions ?? []}
       />
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {activeModulePage ? (
@@ -344,6 +357,20 @@ export default function ScheduleManagementApp({
         || view === 'maintenance-tasks' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             {scheduleContent}
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'account-management' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="帳號管理中心載入失敗">
+              <AccountManagementPage onOpenRoles={() => setView('role-management')} />
+            </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'role-management' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="角色管理設定載入失敗"><RoleManagementPage /></ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 

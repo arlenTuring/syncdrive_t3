@@ -48,8 +48,8 @@ export class PermissionChangeLog {
   @Column({ type: 'jsonb', name: 'after_value', nullable: true })
   afterValue: any;
 
-  @Column({ name: 'source_ip', nullable: true })
-  sourceIp: string;
+  @Column({ name: 'source_ip', type: 'varchar', nullable: true })
+  sourceIp: string | null;
 
   @Column({ name: 'created_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
   createdAt: number;

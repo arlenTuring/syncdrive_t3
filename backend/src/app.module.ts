@@ -38,6 +38,7 @@ import { RolePermission } from './database/entities/role-permission.entity';
 import { AccountRole } from './database/entities/account-role.entity';
 import { LoginLog } from './database/entities/login-log.entity';
 import { PermissionChangeLog } from './database/entities/permission-change-log.entity';
+import { AccountSession } from './database/entities/account-session.entity';
 import { SystemSetting } from './database/entities/system-setting.entity';
 import { Notification } from './database/entities/notification.entity';
 // 營運全景圖台版面——原僅存於瀏覽器 localStorage，改為伺服器端保存
@@ -78,6 +79,7 @@ import { DegradedOperationExecution } from './database/entities/degraded-operati
 import { DegradedOperationEvent } from './database/entities/degraded-operation-event.entity';
 import { DegradedOperationDraft } from './database/entities/degraded-operation-draft.entity';
 import { DegradedOperationModule } from './degraded-operation/degraded-operation.module';
+import { AccessControlModule } from './access-control/access-control.module';
 import {
   DegradedReplayFrame,
   DegradedReplayMap,
@@ -109,7 +111,7 @@ import {
           // 後勤管理層：帳號、角色、功能權限與其綁定關係
           Account, Role, Permission, RolePermission, AccountRole,
           // 後勤管理層：登入登出與權限異動稽核
-          LoginLog, PermissionChangeLog,
+          LoginLog, PermissionChangeLog, AccountSession,
           // 後勤管理層：系統參數與全域通知
           SystemSetting, Notification,
           // 營運核心層：全景圖台版面
@@ -179,6 +181,7 @@ import {
     SystemHealthModule,
     DataAdminModule,
     DegradedOperationModule,
+    AccessControlModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

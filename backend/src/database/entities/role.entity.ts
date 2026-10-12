@@ -18,7 +18,7 @@ export class Role {
   displayName: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description: string | null;
 
   // 系統內建角色，不可刪除
   @Column({ name: 'is_system', default: false })

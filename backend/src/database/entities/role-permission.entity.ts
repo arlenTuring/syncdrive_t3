@@ -10,10 +10,10 @@ export class RolePermission {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'role_id' })
+  @Column({ name: 'role_id', type: 'uuid' })
   roleId: string;
 
-  @Column({ name: 'permission_id' })
+  @Column({ name: 'permission_id', type: 'uuid' })
   permissionId: string;
 
   @Column({ name: 'created_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })

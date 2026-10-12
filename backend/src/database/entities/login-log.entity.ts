@@ -18,8 +18,8 @@ export class LoginLog {
   id: string;
 
   // 登入失敗時帳號可能不存在，故 accountId 可為空
-  @Column({ name: 'account_id', nullable: true })
-  accountId: string;
+  @Column({ name: 'account_id', type: 'varchar', nullable: true })
+  accountId: string | null;
 
   @Column({ name: 'account_name' })
   accountName: string;
@@ -27,15 +27,15 @@ export class LoginLog {
   @Column({ type: 'enum', enum: LoginEventType, name: 'event_type' })
   eventType: LoginEventType;
 
-  @Column({ name: 'source_ip', nullable: true })
-  sourceIp: string;
+  @Column({ name: 'source_ip', type: 'varchar', nullable: true })
+  sourceIp: string | null;
 
   @Column({ name: 'user_agent', type: 'text', nullable: true })
-  userAgent: string;
+  userAgent: string | null;
 
   // 失敗原因（密碼錯誤、帳號停用、帳號鎖定等）
   @Column({ name: 'failure_reason', type: 'text', nullable: true })
-  failureReason: string;
+  failureReason: string | null;
 
   @Column({
     name: 'created_at',

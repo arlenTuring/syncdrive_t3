@@ -10,15 +10,15 @@ export class AccountRole {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'account_id' })
+  @Column({ name: 'account_id', type: 'uuid' })
   accountId: string;
 
-  @Column({ name: 'role_id' })
+  @Column({ name: 'role_id', type: 'uuid' })
   roleId: string;
 
   // 綁定操作人員
-  @Column({ name: 'assigned_by', nullable: true })
-  assignedBy: string;
+  @Column({ name: 'assigned_by', type: 'uuid', nullable: true })
+  assignedBy: string | null;
 
   @Column({ name: 'created_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
   createdAt: number;

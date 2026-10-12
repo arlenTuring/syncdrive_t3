@@ -11,12 +11,15 @@ export type ShellView =
   | 'maintenance-tasks'
   | 'map'
   | 'trajectory'
-  | 'system-foundation';
+  | 'system-foundation'
+  | 'account-management'
+  | 'role-management';
 
 export type ShellNavItem = {
   id: ShellView;
   label: string;
   enabled: boolean;
+  requiredPermission?: string;
 };
 
 /** @deprecated use ShellView — kept for schedule subviews */
@@ -58,6 +61,11 @@ export const SCHEDULE_NAV_ITEMS: ShellNavItem[] = [
 
 export const VEHICLE_NAV_ITEMS: ShellNavItem[] = [
   { id: 'trajectory', label: 'nav.items.trajectory', enabled: true },
+];
+
+export const PERMISSION_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'account-management', label: '帳號管理中心', enabled: true, requiredPermission: 'access.accounts.view' },
+  { id: 'role-management', label: '角色管理設定', enabled: true, requiredPermission: 'access.roles.view' },
 ];
 
 export type ShellModuleGroup = {
@@ -107,7 +115,7 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   { id: 'service', label: 'nav.modules.service', enabled: false },
   { id: 'media', label: 'nav.modules.media', enabled: false },
   // 系統基礎模組只從右上角齒輪進入，側欄不另設入口
-  { id: 'permission', label: 'nav.modules.permission', enabled: false },
+  { id: 'permission', label: 'nav.modules.permission', enabled: true, items: PERMISSION_NAV_ITEMS },
 ];
 
 export function isScheduleSubView(view: ShellView): view is ScheduleSubView {

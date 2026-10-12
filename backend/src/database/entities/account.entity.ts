@@ -24,19 +24,28 @@ export class Account {
   @Column({ name: 'display_name' })
   displayName: string;
 
-  @Column({ nullable: true })
-  email: string;
+  @Column({ type: 'varchar', nullable: true })
+  email: string | null;
 
   // 密碼雜湊（bcrypt/argon2），不存明文
-  @Column({ name: 'password_hash', nullable: true })
-  passwordHash: string;
+  @Column({ name: 'password_hash', type: 'varchar', nullable: true })
+  passwordHash: string | null;
 
   @Column({ type: 'enum', enum: AccountStatus, default: AccountStatus.ACTIVE })
   status: AccountStatus;
 
+  @Column({ name: 'failed_login_count', default: 0 })
+  failedLoginCount: number;
+
+  @Column({ name: 'locked_until', type: 'bigint', nullable: true, transformer: { to: (v: number) => v, from: (v: string) => (v == null ? null : Number(v)) } })
+  lockedUntil: number | null;
+
+  @Column({ name: 'deleted_at', type: 'bigint', nullable: true, transformer: { to: (v: number) => v, from: (v: string) => (v == null ? null : Number(v)) } })
+  deletedAt: number | null;
+
   // 最後登入時間（Unix Epoch ms，13 位）
   @Column({ name: 'last_login_at', type: 'bigint', nullable: true, transformer: { to: (v: number) => v, from: (v: string) => (v == null ? null : Number(v)) } })
-  lastLoginAt: number;
+  lastLoginAt: number | null;
 
   @Column({ name: 'created_at', type: 'bigint', default: () => 'EXTRACT(EPOCH FROM NOW()) * 1000', transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
   createdAt: number;

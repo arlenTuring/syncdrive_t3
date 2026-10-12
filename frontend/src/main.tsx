@@ -4,11 +4,12 @@ import './i18n'
 import './index.css'
 import App from './App.tsx'
 import { LocaleBootstrap } from './i18n/LocaleBootstrap'
+import { AuthProvider } from './features/access-control/AuthContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LocaleBootstrap>
-      <App />
+      <AuthProvider><App /></AuthProvider>
     </LocaleBootstrap>
   </StrictMode>,
 )

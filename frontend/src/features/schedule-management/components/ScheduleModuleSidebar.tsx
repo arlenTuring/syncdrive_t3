@@ -19,7 +19,9 @@ import {
   Route,
   Send,
   Settings,
+  ShieldCheck,
   Trash2,
+  UserRoundCog,
   Wrench,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -43,6 +45,7 @@ type ScheduleModuleSidebarProps = {
   onAddModuleDashboard?: (moduleId: string) => void;
   onRenameModuleDashboard?: (pageId: string, label: string) => void;
   onRemoveModuleDashboard?: (pageId: string) => void;
+  permissions?: string[];
 };
 
 const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
@@ -57,6 +60,8 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'shift-list': List,
   'maintenance-tasks': Wrench,
   trajectory: Route,
+  'account-management': UserRoundCog,
+  'role-management': ShieldCheck,
 };
 
 function groupIcon(groupId: string) {
@@ -76,6 +81,7 @@ function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return isSiteView(activeView);
   if (groupId === 'vehicle') return activeView === 'trajectory';
   if (groupId === 'operations') return isOperationsView(activeView);
+  if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
   if (groupId === 'schedule') {
     return (
       activeView === 'shift-records'
@@ -124,6 +130,7 @@ export function ScheduleModuleSidebar({
   onAddModuleDashboard,
   onRenameModuleDashboard,
   onRemoveModuleDashboard,
+  permissions = [],
 }: ScheduleModuleSidebarProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
@@ -261,7 +268,11 @@ export function ScheduleModuleSidebar({
           const isOpen = expanded[group.id] ?? false;
           const GroupIcon = groupIcon(group.id);
           const dashPages = moduleDashboardPages.filter((page) => page.moduleId === group.id);
-          const hasBuiltinItems = Boolean(group.items?.length);
+          const visibleItems = group.items?.filter(
+            (item) => !item.requiredPermission || permissions.includes(item.requiredPermission),
+          ) ?? [];
+          if (group.id === 'permission' && visibleItems.length === 0) return null;
+          const hasBuiltinItems = visibleItems.length > 0;
           const hasDashPages = dashPages.length > 0;
           const hasChildren = hasBuiltinItems || hasDashPages;
           const groupActive =
@@ -295,7 +306,7 @@ export function ScheduleModuleSidebar({
                         onViewChange(group.navigateTo);
                         return;
                       }
-                      const first = group.items?.find((item) => item.enabled);
+                      const first = visibleItems.find((item) => item.enabled);
                       if (group.enabled && first) {
                         onViewChange(first.id);
                         setExpanded((prev) => ({ ...prev, [group.id]: true }));
@@ -366,8 +377,8 @@ export function ScheduleModuleSidebar({
 
               {!collapsed && canExpand && isOpen && (
                 <div className="mt-0.5 space-y-0.5 pb-1 pl-3">
-                  {group.enabled && group.items
-                    ? group.items.map((item) => {
+                  {group.enabled && visibleItems.length
+                    ? visibleItems.map((item) => {
                         const Icon = SUB_ICONS[item.id] ?? ClipboardList;
                         const active = activeView === item.id;
                         const itemLabel = t(item.label);

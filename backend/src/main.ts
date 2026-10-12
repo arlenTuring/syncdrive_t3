@@ -55,7 +55,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: bodyLimit }));
 
   // 啟用 CORS（來源由 CORS_ORIGIN 控制，預設開發全開）
-  app.enableCors({ origin: resolveCorsOrigin() });
+  app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
 
   // 全域請求驗證：transform 將 plain object 轉為 DTO 實例並對有 class-validator
   // 裝飾的 DTO 執行驗證。此處刻意「不」全域啟用 whitelist/forbidNonWhitelisted，
