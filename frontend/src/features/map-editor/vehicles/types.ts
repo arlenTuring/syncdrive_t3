@@ -62,4 +62,9 @@ export interface AreaVehicleLive {
    */
   sourceAt?: number
   isDemo?: boolean
+  /**
+   * 位置是模擬時鐘逐幀外推出來的（useSimExtrapolatedVehicles）：渲染層不再補間。
+   * 其他車（真車、協力廠商、沒有模擬時間欄位的車）一律走遙測補間。
+   */
+  simExtrapolated?: boolean
 }

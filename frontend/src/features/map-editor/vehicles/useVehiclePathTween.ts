@@ -48,8 +48,15 @@ export function useVehiclePathTween(index: TrackGenIndex | undefined, durationMs
   animatingRef.current = false
 
   const resolve = useCallback(
-    (vehicleId: string, target: PathPose, teleport: boolean, sampleMs?: number | null): PathPose => {
-      if (!index || !(durationMs > 0)) return target
+    (
+      vehicleId: string,
+      target: PathPose,
+      teleport: boolean,
+      sampleMs?: number | null,
+      /** 這台車的位置已經逐幀算好（模擬外推）：直接用，不補間 */
+      noTween = false,
+    ): PathPose => {
+      if (!index || !(durationMs > 0) || noTween) return target
       const now = performance.now()
       const signature = poseSignature(target)
       const states = statesRef.current

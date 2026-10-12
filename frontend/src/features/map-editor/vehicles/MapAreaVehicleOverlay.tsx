@@ -700,6 +700,8 @@ export function MapAreaVehicleOverlay({
                 !prevPosNow,
                 // 遙測時間戳：有的話照車端時間緩衝播放，送達時間抖動不會讓車走走停停
                 readTelemetrySampleMs(vehicle.payload as Record<string, unknown> | undefined),
+                // 模擬外推的車位置已經逐幀算好，不再補間
+                vehicle.simExtrapolated === true,
               )
             : null;
         const displayFacility =
@@ -907,7 +909,8 @@ export function MapAreaVehicleOverlay({
           // 解決「走一段突然卡住再繼續」。left/top 補間是 layout-bound，會被 re-render/long task 卡住。
           transform: `translate3d(${left}px, ${top}px, 0)`,
           zIndex,
-          ...(livePositionTweenMs > 0
+          // 模擬外推的車每一幀已經是正確位置，不疊 CSS 補間
+          ...(livePositionTweenMs > 0 && !vehicle.simExtrapolated
             ? teleported || pathPose
               ? // 沿路徑補間的車位置每一幀由程式算，不能再疊 CSS 補間（會變成雙重補間、
                 // 又走回弦的直線）

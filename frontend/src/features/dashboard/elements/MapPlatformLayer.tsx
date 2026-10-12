@@ -54,18 +54,18 @@ export function MapPlatformLayer({
   const { liveById, areaVehicles: mqttVehicles } = useMapMqttLive(areas);
   const { paused, transportPaused, running, speedMultiplier } = useDemoSimulationPlayback();
   const simPlaybackActive = running && !paused && !transportPaused;
-  /** 模擬中：存滿 3 幀 MQTT 後從第 1 幀 lerp 播放；暫停／逐幀瞬間定位；非模擬用 CSS 補間 */
   /*
-   * 位置補間的時長。
+   * 位置補間的時長（真實遙測）。模擬播放中帶模擬時間欄位的車由模擬時鐘逐幀外推
+   * （useSimExtrapolatedVehicles，標 simExtrapolated），渲染層對那些車不補間；其他車一律補間。
    *
-   * 原本寫成「沒在播放、又沒暫停才補 1200 毫秒」。可是暫停狀態來自示範模擬的播放
-   * context，而中心端已經不再啟動示範模擬，沒有任何地方提供這個 context——拿到的是
-   * 預設值：paused = true。於是 `paused` 永遠成立，補間永遠是 0，車每秒瞬移一次。
-   *
-   * 「示範模擬正在跑」才由模擬的時鐘逐幀補（見 useSimExtrapolatedVehicles），補間交給
-   * 它；其餘（真實遙測）一律補間，不看 paused。
+   * 不能看整張圖的 running／paused 決定：
+   * - 以前寫「沒在播放、又沒暫停才補」，paused 拿到的是預設值 true，補間永遠是 0。
+   * - 2026-10-12 之前是「running 就整張圖不補間」。可是營運時鐘停在重播模式（重播結束、暫停）時
+   * running 一直是 true、外推卻沒在跑（simPlaybackActive＝false），真車（協力廠商 PMS99，一秒一筆）
+   * 兩邊都沒動，每秒瞬移一格；就算重播正在跑，外推也只處理帶模擬時間欄位的車，真車一樣沒補間。
+   * 改成逐車判斷：被外推的車標 simExtrapolated，渲染層對它不補間；其他車一律補間。
    */
-  const liveTweenMs = running ? 0 : 1200;
+  const liveTweenMs = 1200;
 
   const areaVehiclesRaw = useMemo(() => {
     if (isEditMode) return [];

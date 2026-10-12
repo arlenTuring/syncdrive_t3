@@ -293,6 +293,7 @@ export function useSimExtrapolatedVehicles(
       xM: frameAt.xM,
       yM: frameAt.yM,
       payload,
+      simExtrapolated: true,
     });
   }
 
