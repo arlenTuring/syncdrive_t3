@@ -105,7 +105,6 @@ export function TextWidgetView({ widget }: { widget: TextWidget }) {
     const hasLocContext = mqttData.data !== null
       || telemetryMqttData.data !== null
       || variables.segment_label !== undefined
-      || variables.yard_slot_id !== undefined
       || variables.line_kind !== undefined
       || variables.trip_code !== undefined;
     if (hasLocContext) {

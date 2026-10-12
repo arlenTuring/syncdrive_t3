@@ -21,7 +21,7 @@ export function maintTypeLabelFromSlot(slotId: string): string {
 
 /** 整備班表列：前端依 MQTT 覆寫的欄位與其來源（屬性面板的資料來源說明照這份顯示） */
 export const MAINTENANCE_ROW_FIELD_ORIGINS: Record<string, string> = {
-  next_station: 'MQTT operation/update 的 yard_slot_id；沒有 MQTT 時用 SQL',
+  next_station: 'SQL',
   maint_type_label: 'MQTT maint_type_label；沒有 MQTT 時用 SQL',
   eta_remain: 'MQTT current_leg.eta_seconds；沒有 MQTT 時用 SQL',
   status_label: 'SQL；SQL 沒給時依 order_status 判定（PENDING 停留中、PROCESSING 進行中）',
@@ -77,8 +77,6 @@ export function enrichMaintenanceShiftFields(
   const next = { ...row };
   next.line_kind = 'MAINTENANCE';
 
-  const mqttSlot = String(mqttPayload?.yard_slot_id ?? '').trim();
-  if (mqttSlot) next.next_station = mqttSlot;
   if (mqttPayload?.maint_type_label) next.maint_type_label = mqttPayload.maint_type_label;
   if (legEtaSeconds !== undefined) next.eta_remain = formatMaintEtaSeconds(legEtaSeconds);
 

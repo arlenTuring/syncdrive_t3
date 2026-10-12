@@ -252,11 +252,7 @@ function resolveFacilityCenterById(mapId, facilityId) {
   return { xM: hit.centerXM, yM: hit.centerYM };
 }
 
-/**
- * 座標 → 場區格位（矩形命中測試）。用來取代車端回報 yard_slot_id：
- * 車輛回報自己的 local_pose.position，中心端自行比對目前落在哪個格位範圍內。
- * 沒有命中（例如車輛在正線軌道上）回 null。
- */
+
 function findFacilityAtPoint(mapId, xM, yM) {
   if (typeof xM !== 'number' || !Number.isFinite(xM)) return null;
   if (typeof yM !== 'number' || !Number.isFinite(yM)) return null;

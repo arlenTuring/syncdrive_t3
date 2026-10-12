@@ -51,9 +51,9 @@ function transitionLabelSql(o: string): string {
   return `CASE
     WHEN NULLIF(TRIM(${o}.payload->>'transition_label'), '') IS NOT NULL THEN TRIM(${o}.payload->>'transition_label')
     WHEN COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), ${o}.payload->>'task_type') = 'standby'
-      THEN TRIM(CONCAT('待命 ', COALESCE(NULLIF(${o}.payload->>'yard_slot_id', ''), ${o}.maint_station, '')))
+      THEN TRIM(CONCAT('待命 ', COALESCE(${o}.maint_station, '')))
     WHEN COALESCE(NULLIF(${o}.payload->>'maintenance_task_type', ''), ${o}.payload->>'task_type') = 'idle'
-      THEN TRIM(CONCAT('暫停 ', COALESCE(NULLIF(${o}.payload->>'yard_slot_id', ''), ${o}.maint_station, '')))
+      THEN TRIM(CONCAT('暫停 ', COALESCE(${o}.maint_station, '')))
     ELSE '過渡'
   END`;
 }
@@ -495,7 +495,6 @@ SELECT
   NULL::text AS status_communication,
   NULL::text AS status_chassis,
   COALESCE(NULLIF(TRIM(m.segment_label), ''), '—') AS segment_label,
-  CASE WHEN m.location_kind = 'FACILITY' THEN NULLIF(TRIM(m.segment_label), '') END AS yard_slot_id,
   m.demo_speed::numeric AS demo_speed,
   m.demo_load::numeric AS demo_load
 FROM vehicles v
@@ -1027,15 +1026,15 @@ SELECT
   CASE o.status WHEN 'PROCESSING' THEN '#00BC7D' WHEN 'FAULTED' THEN '#f87171' ELSE '#a1a1aa' END AS status_color,
   CASE o.status WHEN 'PROCESSING' THEN '#009966' WHEN 'FAULTED' THEN 'rgba(239,68,68,0.75)' ELSE 'rgba(113,113,122,0.45)' END AS card_border_color,
   COALESCE(NULLIF(m.segment_label, ''), '—') AS st_a,
-  COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), '—') AS st_b,
-  COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), '—') AS st_c,
+  COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.maint_station, ''), '—') AS st_b,
+  COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.maint_station, ''), '—') AS st_c,
   json_build_array(
     json_build_object('name', COALESCE(NULLIF(m.segment_label, ''), '—'), 'remain_pct', 0),
-    json_build_object('name', COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), '—'), 'remain_pct', 100)
+    json_build_object('name', COALESCE(NULLIF(o.maint_station, ''), NULLIF(o.maint_station, ''), '—'), 'remain_pct', 100)
   )::text AS route_stations,
   COALESCE((o.payload->>'segment_index')::int, 0) AS segment_index,
   COALESCE((o.payload->>'segment_remain_pct')::int, CASE WHEN o.status = 'PENDING' THEN 100 ELSE 0 END) AS segment_remain_pct,
-  COALESCE(NULLIF(o.next_station, ''), NULLIF(o.maint_station, ''), NULLIF(o.payload->>'yard_slot_id', ''), '—') AS next_station,
+  COALESCE(NULLIF(o.next_station, ''), NULLIF(o.maint_station, ''), NULLIF(o.maint_station, ''), '—') AS next_station,
   '整備站點' AS station_label,
   CASE WHEN o.status = 'PENDING' THEN '預計開始' ELSE '完成預估' END AS eta_label,
   COALESCE(NULLIF(o.eta_remain, ''), '—') AS eta_remain,

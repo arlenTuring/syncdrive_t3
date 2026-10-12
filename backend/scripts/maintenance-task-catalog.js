@@ -48,7 +48,6 @@ const TASK_DEFS = {
   },
 };
 
-/** yard_slot_id 首碼 → 任務類型鍵（可被 fleet_task 覆寫） */
 const SLOT_PREFIX_TASK = {
   E: 'charge',
   P: 'park',
@@ -72,7 +71,7 @@ function slotTaskKey(yardSlotId) {
   return SLOT_PREFIX_TASK[prefix] ?? null;
 }
 
-function resolveTaskKey({ fleet_task: fleetTask, yard_slot_id: yardSlotId }) {
+function resolveTaskKey({ fleet_task: fleetTask, track: yardSlotId }) {
   // 格位 ID 優先於 fleet_task（充電完成變 standby 時仍應顯示充電格）
   const fromSlot = slotTaskKey(yardSlotId);
   if (fromSlot) return fromSlot;
@@ -104,7 +103,7 @@ function resolveMaintenanceTaskMeta(motion = {}) {
 }
 
 function maintenanceTripCode(motion, meta) {
-  const slot = motion.yard_slot_id;
+  const slot = motion.track;
   if (typeof slot === 'string' && slot.length > 0) {
     return `S${slot.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase().padEnd(4, '0')}`;
   }

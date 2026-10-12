@@ -643,7 +643,6 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
             stations,
             transition_purpose: payload.transition_purpose ?? null,
             transition_facility: payload.transition_facility ?? null,
-            yard_slot_id: payload.yard_slot_id ?? null,
           },
         });
       }

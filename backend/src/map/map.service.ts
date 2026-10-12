@@ -462,11 +462,7 @@ export class MapService implements OnModuleInit {
     return mapFieldEquipment.resolveFacilityCenterById(mapId, facilityId);
   }
 
-  /**
-   * 座標 → 場區格位（矩形命中測試）。取代車端回報 yard_slot_id：
-   * 車輛回報 local_pose.position，中心端自行比對落在哪個格位範圍內。
-   * 沒有命中（例如車輛在正線軌道上）回 null。
-   */
+
   findFacilityAtPoint(
     mapId: string,
     xM: number,

@@ -204,40 +204,6 @@ describe('MqttService', () => {
     });
   });
 
-  describe('enrichWithFacilityLocation：yard_slot_id 改由座標判定', () => {
-    it('車端已帶 yard_slot_id 時不覆蓋', async () => {
-      const payload = { yard_slot_id: 'H1', vehicle_phase: 'IDLE' };
-      const result = await service.enrichWithFacilityLocation('PMS01', payload);
-      expect(result).toBe(payload);
-      expect(redisServiceMock.getTelemetry).not.toHaveBeenCalled();
-    });
-
-    it('沒有 yard_slot_id 時，用最近一次 telemetry 座標比對格位', async () => {
-      redisServiceMock.getTelemetry.mockResolvedValueOnce({
-        local_pose: { position: { x: 52, y: 62 } },
-      });
-      mapServiceMock.findFacilityAtPoint.mockReturnValueOnce({
-        mapCode: 'H2',
-        equipmentId: '195',
-        equipmentKind: 'yard_slot',
-      });
-      const payload = { vehicle_phase: 'IDLE' };
-      const result = await service.enrichWithFacilityLocation('PMS01', payload);
-      expect(result).toMatchObject({ yard_slot_id: 'H2' });
-      expect(mapServiceMock.findFacilityAtPoint).toHaveBeenCalledWith('map-test', 52, 62);
-    });
-
-    it('座標沒有落在任何格位範圍內（正線軌道）時不補值', async () => {
-      redisServiceMock.getTelemetry.mockResolvedValueOnce({
-        local_pose: { position: { x: 500, y: 200 } },
-      });
-      mapServiceMock.findFacilityAtPoint.mockReturnValueOnce(null);
-      const payload = { vehicle_phase: 'TRANSITING' };
-      const result = await service.enrichWithFacilityLocation('PMS01', payload);
-      expect(result).not.toHaveProperty('yard_slot_id');
-    });
-  });
-
   it('每筆 telemetry 將後端判定的位置寫入車輛快照', async () => {
     mapServiceMock.findVehicleLocationAtPoint.mockReturnValueOnce({
       kind: 'TRACK', label: 'D03', objectId: 'track-d03',

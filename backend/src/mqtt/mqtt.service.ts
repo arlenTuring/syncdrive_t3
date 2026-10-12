@@ -72,6 +72,9 @@ export class MqttService {
   async updateVehicleLivePosition(vehicleCode: string, payload: Record<string, unknown>): Promise<void> {
     const position = (payload as { local_pose?: { position?: { x?: unknown; y?: unknown } } })
       ?.local_pose?.position;
+    delete payload.segment_label;
+    delete payload.location_kind;
+    delete payload.location_object_id;
     const x = Number(position?.x);
     const y = Number(position?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -82,6 +85,9 @@ export class MqttService {
     const location = this.mapService.findVehicleLocationAtPoint(mapId, x, y, {
       speedMps: Number.isFinite(velocity) ? velocity : null,
     });
+    payload.segment_label = location?.label ?? null;
+    payload.location_kind = location?.kind ?? null;
+    payload.location_object_id = location?.objectId ?? null;
     const battery = Number((payload as { energy?: { battery_level?: unknown } }).energy?.battery_level);
     const timestamp = Number(payload.timestamp);
     await this.dataSource.query(
@@ -133,39 +139,6 @@ export class MqttService {
       this.lastVehiclePositionInvalidationAt = now;
       this.vehiclePositionDirty = false;
       this.datasourceInvalidation.emitVehiclePosition(vehicleCode);
-    }
-  }
-
-  /**
-   * operation/update 不再要求車端回報 yard_slot_id：改由中心端用車輛最近一次
-   * telemetry/update 回報的 local_pose.position 比對場區格位範圍。車輛停在
-   * 正線軌道（座標不落在任何格位範圍內）時，維持不補值——語意與舊版
-   * 「車輛停於正線時省略此欄位」相同。
-   *
-   * 若車端仍帶了 yard_slot_id（舊版車端／模擬器相容），保留原值不覆蓋。
-   */
-  async enrichWithFacilityLocation(
-    vehicleCode: string,
-    payload: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
-    if (this.nonEmptyString(payload?.yard_slot_id)) {
-      return payload;
-    }
-    try {
-      const telemetry = await this.redisService.getTelemetry(vehicleCode);
-      const position = (telemetry as { local_pose?: { position?: { x?: unknown; y?: unknown } } } | null)
-        ?.local_pose?.position;
-      const x = typeof position?.x === 'number' ? position.x : null;
-      const y = typeof position?.y === 'number' ? position.y : null;
-      if (x == null || y == null) return payload;
-
-      const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
-      const hit = this.mapService.findFacilityAtPoint(mapId, x, y);
-      if (!hit) return payload;
-      return { ...payload, yard_slot_id: hit.mapCode };
-    } catch (err) {
-      this.logger.debug(`facility location lookup skipped for ${vehicleCode}: ${(err as Error)?.message}`);
-      return payload;
     }
   }
 
@@ -475,7 +448,7 @@ export class MqttService {
     if (!slot_id) return;
 
     // 使用 Upsert 模式更新格位狀態
-    const slotStatus = await this.slotStatusRepository.findOne({ where: { slotId: slot_id } }) || 
+    const slotStatus = await this.slotStatusRepository.findOne({ where: { slotId: slot_id } }) ||
                        this.slotStatusRepository.create({ slotId: slot_id });
 
     slotStatus.status = status;

@@ -83,10 +83,8 @@ export function resolveExecutionStatus(order: OperationOrder): {
 export function buildRouteLabel(order: OperationOrder): string {
   const lineKind = String(order.lineKind ?? '').toUpperCase();
   if (lineKind === 'MAINTENANCE') {
-    const payload = order.payload ?? {};
     const slot =
-      String(payload.yard_slot_id ?? '').trim()
-      || String(order.nextStation ?? '').trim()
+      String(order.nextStation ?? '').trim()
       || String(order.maintStation ?? '').trim()
       || '—';
     return `S2W→${slot}`;

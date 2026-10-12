@@ -166,7 +166,7 @@ describe('前端不再自己生資料', () => {
   });
 
   it('車輛徽章：沒有訂單也沒有任務標籤時不看格位字母猜任務', () => {
-    const badge = resolveVehicleMonitorBadge({ segment_label: 'E1', yard_slot_id: 'E1' }, {});
+    const badge = resolveVehicleMonitorBadge({ segment_label: 'E1' }, {});
     assert.equal(badge.label, '');
   });
 

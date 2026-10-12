@@ -13,16 +13,7 @@ function positiveNumber(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/**
- * 班表綁定的整備任務 → 依格位代號查充電參數。
- *
- * 充電設備列的 <code>mapCode</code> 就是場區格位代號（E1…E4），跟整備訂單的
- * <code>yard_slot_id</code> 同一套命名，所以直接對格位。查不到的原因一律寫進
- * <code>error</code>，不補預設速率——速率錯了，車端算出來的電量就是假的。
- *
- * @param task 整備任務（null 表示班表沒綁或找不到）
- * @param lookupError 取不到整備任務時的原因
- */
+
 export function buildChargingLookup(
   task: { id: string; body: Record<string, unknown> } | null,
   lookupError: string | null = null,
@@ -87,7 +78,6 @@ export function maintenancePayloadFields(
 ): Record<string, unknown> {
   if (!maintenance) return {};
   return {
-    yard_slot_id: maintenance.yardSlotId,
     // 作業內容看班表卡的任務類型，不看卡片文字或格位字首
     maintenance_task_type: maintenance.taskType,
     ...(maintenance.charging

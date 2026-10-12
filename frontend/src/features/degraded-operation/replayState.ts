@@ -182,7 +182,7 @@ export function orderOverrideFrom(state: ReplayState): {
     metaById[orderId] = {
       transitionPurpose: str(frame.payload.transition_purpose),
       transitionFacility: str(frame.payload.transition_facility),
-      yardSlotId: str(frame.payload.yard_slot_id),
+      yardSlotId: null,
     };
   }
   return { stationsById, metaById };

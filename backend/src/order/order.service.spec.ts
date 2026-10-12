@@ -391,7 +391,7 @@ describe('applyOperationMqttUpdate：車端回報不得吃掉中心端的任務�
     }
   });
 
-  it('車端完全不送 line_kind/route_id/yard_slot_id 時，整備分類仍以訂單記錄為準', async () => {
+  it('車端完全不送 line_kind/route_id 時，整備分類仍以訂單記錄為準', async () => {
     const order = existingOrder();
     order.lineKind = 'MAINTENANCE';
     order.routeId = undefined;

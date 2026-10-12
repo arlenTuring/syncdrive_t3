@@ -162,13 +162,6 @@ export type OperationMqttPayload = {
     payload?: Record<string, unknown>;
   };
   maint_type_label?: string;
-  /**
-   * 車端一般不需要主動回報：中心端會用車輛最近一次 telemetry/update 的
-   * local_pose.position 比對場區格位範圍自動判定（見
-   * MqttService.enrichWithFacilityLocation）。仍保留此欄位供舊車端／
-   * 模擬器相容——若車端已帶值，中心端不會覆蓋。
-   */
-  yard_slot_id?: string;
   timestamp?: number;
 };
 
@@ -439,7 +432,6 @@ export class OrderService {
           OR o.vehicle_code ILIKE :kw
           OR COALESCE(o.next_station, '') ILIKE :kw
           OR COALESCE(o.maint_station, '') ILIKE :kw
-          OR COALESCE(o.payload->>'yard_slot_id', '') ILIKE :kw
           OR (
             -- 與 order-list.util buildRouteLabel 一致：看訂單記錄的路線，不看班次代號開頭
             COALESCE(NULLIF(o.payload->>'route_name', ''), CASE o.route_id
@@ -452,7 +444,7 @@ export class OrderService {
             o.line_kind = 'MAINTENANCE'
             AND CONCAT(
               'S2W→',
-              COALESCE(NULLIF(TRIM(o.payload->>'yard_slot_id'), ''), o.next_station, '')
+              COALESCE(o.next_station, '')
             ) ILIKE :kw
           )
           OR EXISTS (
@@ -1224,7 +1216,6 @@ export class OrderService {
     snap: MaintenanceOrderLifecycleSnapshot,
   ): Promise<OperationOrder> {
     const payloadPatch = {
-      yard_slot_id: snap.yardSlotId ?? null,
       segment_index: snap.segmentIndex,
       segment_remain_pct: Math.max(0, 100 - snap.routeProgress),
       route_progress: snap.routeProgress,

@@ -313,7 +313,6 @@ export function patchShiftPanelsSimulationSql(plane: DashboardPlane): DashboardP
   };
 }
 
-/** 位置列：訂單 yard_slot_id（E1）；正線無格位時 fallback SQL segment_label */
 export function patchVehicleMonitorLocationMqtt(plane: DashboardPlane): DashboardPlane {
   return {
     ...plane,

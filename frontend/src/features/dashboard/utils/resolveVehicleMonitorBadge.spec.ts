@@ -42,7 +42,7 @@ describe('resolveVehicleMonitorBadge: categories come from the deployed schedule
 
   it('does not guess a maintenance label from location or phase when the schedule has no category', () => {
     expect(resolveVehicleMonitorBadge(
-      row({ maint_type_label: '充電', yard_slot_id: 'E4' }),
+      row({ maint_type_label: '充電' }),
       { operation: { order_status: 'PROCESSING', vehicle_phase: 'CHARGING' } },
     )).toMatchObject({ label: '', kind: 'none' });
   });

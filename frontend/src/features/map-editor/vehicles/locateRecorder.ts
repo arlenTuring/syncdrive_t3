@@ -104,7 +104,6 @@ export function pickLocateRaw(payload: Record<string, unknown> | undefined): Rec
     'order_id',
     'trip_code',
     'status',
-    'yard_slot_id',
     'x',
     'y',
     'heading',

@@ -97,43 +97,10 @@ export type VehiclePlacementAcrossAreas = {
 export function isYardVehiclePayload(
   payload: Record<string, unknown> | undefined,
 ): boolean {
-  if (!payload) return false;
-  const yardSlot = payload.yard_slot_id ?? payload.yardSlotId;
-  if (typeof yardSlot === 'string' && yardSlot.trim()) return true;
-  const leg = payload.current_leg;
-  if (leg === 'yard') return true;
-  const trip = payload.trip_code ?? payload.tripCode;
-  if (trip === 'YARD') return true;
-  const segment = payload.segment_label;
-  if (typeof segment === 'string') {
-    const label = segment.trim();
-    /*
-     * 這裡也曾經漏掉調度區的 D。清單式的比對每加一個分區就要回來補一次，補漏了
-     * 也不會報錯——只是那一區的車不被當成場區車，定位鏈直接走空。改用同一支形狀
-     * 判定，實際是不是停車格由圖資認定（見 isYardParkableFacilityId）。
-     */
-    if (isYardParkableFacilityId(label)) return true;
-    return (
-      label.startsWith('充電 ') ||
-      label.startsWith('充電等候 ') ||
-      label.startsWith('臨停 ') ||
-      label.startsWith('整備 ')
-    );
-  }
-  return false;
+  return payload?.location_kind === 'FACILITY' && parseYardSlotFromPayload(payload) != null;
 }
 
-/**
- * 落在分區裡的車：照分區的場域範圍反算圖面位置。
- *
- * <h3>為什麼需要這一步</h3>
- * 場區（整備、調度、充電）底下沒有軌道，所以軌道那條路查不到。車停著時靠 telemetry
- * 帶的 yard_slot_id 對到格位，但<strong>正在開進去的時候不帶那個欄位</strong>——車還
- * 沒停好，說不出自己在哪一格。於是那幾秒鐘定位失敗，圖台只能沿用上一幀，車看起來卡
- * 在別的地方不動（實測一台進整備區的車被畫在八百公尺外的正線旁邊）。
- *
- * 分區本來就記著「這塊圖面＝現場哪一塊」，把那個對應反過來用就是了。
- */
+
 function locateInZonePartition(
   areas: MapAreaObject[],
   xM: number,
@@ -768,7 +735,7 @@ export function resolveVehiclePlacementAcrossAreas(
   if (preferYard) {
     return resolveYardFacilityPlacement(
       areas,
-      options?.yardSlotId ? { yard_slot_id: options.yardSlotId } : options?.payload,
+      options?.yardSlotId ? { segment_label: options.yardSlotId, location_kind: 'FACILITY' } : options?.payload,
     );
   }
 
@@ -782,7 +749,6 @@ export function resolveVehiclePlacementAcrossAreas(
 
   if (onTrack) return onTrack;
 
-  // 場區底下沒有軌道：開進去的那幾秒沒有 yard_slot_id，照分區的對應反算
   const inZone = locateInZonePartition(areas, xM, yM);
   if (inZone) return inZone;
 

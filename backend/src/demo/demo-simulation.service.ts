@@ -45,12 +45,8 @@ const FACILITY_TO_MAINT_SLOT: Record<string, string> = {
 const TRACK_OR_FACILITY_RE = /^([DU]\d{1,2}|E\d+|P[1-4]|H\d+|M\d+|W\d+)$/i;
 
 function trackOrFacilityFromMotion(motion: {
-  yard_slot_id?: string | null;
   track?: string;
 }): string | null {
-  if (typeof motion.yard_slot_id === 'string' && motion.yard_slot_id.trim()) {
-    return motion.yard_slot_id.trim();
-  }
   const trackPart =
     typeof motion.track === 'string' ? motion.track.replace(/→.*/, '').trim() : '';
   if (trackPart && TRACK_OR_FACILITY_RE.test(trackPart)) return trackPart;
@@ -735,8 +731,7 @@ export class DemoSimulationService {
           fleet_task?: string;
           leg?: string;
           dwelling?: boolean;
-          yard_slot_id?: string | null;
-          cycleIndex?: number;
+                  cycleIndex?: number;
           legDepartMs?: number;
           station?: string;
         } | null;
@@ -779,9 +774,9 @@ export class DemoSimulationService {
         if (maintMeta) {
           if (!isMainlineFleetMotion(motion)) {
             const tripCode = maintCatalog.maintenanceTripCode(motion, maintMeta);
-            const yardRoute = yardRouteFromSlot(motion.yard_slot_id);
+            const yardRoute = yardRouteFromSlot(motion.track);
             const yardSlotId =
-              typeof motion.yard_slot_id === 'string' ? motion.yard_slot_id.trim().toUpperCase() : '';
+              typeof motion.track === 'string' ? motion.track.trim().toUpperCase() : '';
             maintenanceSnapshots.push({
               vehicleCode: vehicleId,
               orderId: maintCatalog.maintenanceDemoOrderId(vehicleId, yardSlotId),
@@ -792,7 +787,7 @@ export class DemoSimulationService {
               maintTypeColor: String(maintMeta.maint_type_color ?? '#FD9A00'),
               iconBgColor: String(maintMeta.icon_bg_color ?? '#51A2FF'),
               progressMarkerIcon: String(maintMeta.progress_marker_icon ?? 'Zap'),
-              yardSlotId: motion.yard_slot_id ?? null,
+              yardSlotId: motion.track ?? null,
               maintStation: typeof motion.station === 'string' ? motion.station : null,
               segmentIndex: yardRoute.segmentIndex,
               routeProgress: yardRoute.routeProgress,
@@ -874,7 +869,6 @@ export class DemoSimulationService {
     }
   }
 
-  /** 整備分佈：依模擬 yard_slot_id 與整備訂單同步 slot_statuses */
   private async syncMaintenanceDistributionSlots(
     maintenanceSnapshots: ReadonlyArray<MaintenanceOrderLifecycleSnapshot>,
     motion: MaintenanceSlotMotionContext | null,
@@ -898,7 +892,7 @@ export class DemoSimulationService {
             motion.motionSimStartMs,
             { managed: true },
           ) ?? motion.getVehicleYardMotion?.(vehicleId);
-        const yardSlotId = pub?.yard_slot_id;
+        const yardSlotId = pub?.leg === 'yard' ? pub.track : null;
         const facilityId =
           typeof yardSlotId === 'string' ? yardSlotId.trim().toUpperCase() : '';
         if (!facilityId) continue;
@@ -917,12 +911,12 @@ export class DemoSimulationService {
     const orderRows = (await this.dataSource.query(`
       SELECT
         o.vehicle_code,
-        NULLIF(TRIM(o.payload->>'yard_slot_id'), '') AS yard_slot_id,
+        NULLIF(TRIM(o.next_station), '') AS next_station,
         o.maint_type_label
       FROM operation_orders o
       WHERE o.line_kind = 'MAINTENANCE'
         AND o.status IN ('PENDING', 'PROCESSING')
-        AND NULLIF(TRIM(o.payload->>'yard_slot_id'), '') IS NOT NULL
+        AND NULLIF(TRIM(o.next_station), '') IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM operation_orders ml
           WHERE ml.vehicle_code = o.vehicle_code
@@ -933,14 +927,14 @@ export class DemoSimulationService {
               0
             ) >= 1
         )
-    `)) as Array<{ vehicle_code: string; yard_slot_id: string; maint_type_label: string | null }>;
+    `)) as Array<{ vehicle_code: string; next_station: string; maint_type_label: string | null }>;
 
     for (const row of orderRows) {
       const vehicleId = String(row.vehicle_code ?? '').trim().toUpperCase();
       if (assignmentByVehicle.has(vehicleId)) continue;
       ingest(
         vehicleId,
-        String(row.yard_slot_id ?? '').trim().toUpperCase(),
+        String(row.next_station ?? '').trim().toUpperCase(),
         String(row.maint_type_label ?? '').includes('充電'),
       );
     }

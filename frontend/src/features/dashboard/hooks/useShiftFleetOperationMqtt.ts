@@ -17,7 +17,6 @@ function operationRowKey(row: Record<string, unknown>): string {
     row.vehicle_code,
     row.order_id,
     row.trip_code,
-    row.yard_slot_id,
     row.maint_type_label,
     row.vehicle_phase,
     row.operation_action,

@@ -2678,7 +2678,6 @@ function getVehicleYardMotion(vehicleId) {
     tripCode: 'YARD',
     directionLabel: station,
     track: slotId ?? station,
-    yard_slot_id: vehicle.yardSlot?.slotId ?? null,
     ...(typeof vehicle.yardSlot?.subIndex === 'number'
       ? { yard_sub_index: vehicle.yardSlot.subIndex }
       : {}),
@@ -2699,7 +2698,6 @@ function getVehiclePublishMotion(vehicleId, elapsedMs, simStartMs, options = {})
     return {
       ...trackMotion,
       fleet_task: 'shift_run',
-      yard_slot_id: null,
     };
   }
   return getVehicleYardMotion(vehicleId);

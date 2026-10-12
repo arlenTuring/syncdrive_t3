@@ -80,7 +80,6 @@ function mergeOperationContext(
     badge_kind: variables.badge_kind,
     badge_detail: variables.badge_detail,
     vehicle_phase: variables.vehicle_phase,
-    yard_slot_id: variables.yard_slot_id,
     segment_label: variables.segment_label,
   };
   if (!operation) return base;

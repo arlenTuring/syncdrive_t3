@@ -47,8 +47,8 @@ export class MqttController {
     if (!vehicleCode || !data) return;
     if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
-    await this.redisService.setTelemetry(vehicleCode, data);
     await this.mqttService.updateVehicleLivePosition(vehicleCode, data);
+    await this.redisService.setTelemetry(vehicleCode, data);
     if (this.mqttService.shouldPersistTelemetry(vehicleCode)) {
       this.telemetryWriteQueue.enqueue(vehicleCode, data);
     }
@@ -95,14 +95,12 @@ export class MqttController {
     if (!vehicleCode || !data) return;
     if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
-    const enriched = await this.mqttService.enrichWithFacilityLocation(vehicleCode, data);
+    await this.redisService.setOperationUpdate(vehicleCode, data);
+    await this.mqttService.syncOperationOrderFromLive(vehicleCode, data);
 
-    await this.redisService.setOperationUpdate(vehicleCode, enriched);
-    await this.mqttService.syncOperationOrderFromLive(vehicleCode, enriched);
-
-    this.replayRecorder.capture('operation', vehicleCode, null, enriched);
-    this.eventsGateway.broadcastOperation(vehicleCode, enriched);
-    this.eventsGateway.broadcastMqttMessage(topic, enriched);
+    this.replayRecorder.capture('operation', vehicleCode, null, data);
+    this.eventsGateway.broadcastOperation(vehicleCode, data);
+    this.eventsGateway.broadcastMqttMessage(topic, data);
   }
 
   @MessagePattern('v1/vtms/+/command/ack')

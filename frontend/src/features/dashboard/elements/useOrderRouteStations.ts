@@ -62,7 +62,7 @@ export function useOrderRouteStations(vehicles: readonly AreaVehicleLive[]): Rec
           metaCache.set(id, {
             transitionPurpose: str(payload.transition_purpose),
             transitionFacility: str(payload.transition_facility),
-            yardSlotId: str(payload.yard_slot_id),
+            yardSlotId: null,
           });
         })
         .catch(() => {

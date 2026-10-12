@@ -29,13 +29,6 @@ export function parseYardSlotFromPayload(
 ): { slotId: string; subIndex?: number } | null {
   if (!payload) return null
 
-  const explicit = payload.yard_slot_id ?? payload.yardSlotId
-  if (typeof explicit === 'string' && explicit.trim()) {
-    const slotId = explicit.trim()
-    if (!isYardParkableFacilityId(slotId)) return null
-    return { slotId }
-  }
-
   const segment = payload.segment_label
   if (typeof segment === 'string') {
     const trimmed = segment.trim()

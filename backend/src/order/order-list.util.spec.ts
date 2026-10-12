@@ -45,7 +45,7 @@ describe('order-list.util', () => {
       ...baseOrder,
       lineKind: 'MAINTENANCE',
       tripCode: 'CHG-01',
-      payload: { yard_slot_id: 'E3' },
+      nextStation: 'E3',
     } as never);
     expect(label).toBe('S2W→E3');
   });

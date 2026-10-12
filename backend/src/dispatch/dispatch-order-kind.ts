@@ -81,7 +81,6 @@ export function dispatchOrderFields(item: PlannedDispatch): {
       : {}),
     payload: {
       kind: item.kind,
-      // 整備分佈的 SQL 讀 payload->>'yard_slot_id' 判斷哪一格被佔著
       ...maintenancePayloadFields(item.maintenance),
       timeline_row: item.timelineRow,
       // 原任務子類型（充電、保養、待命…），卡片與分類都看這個，不看卡片文字

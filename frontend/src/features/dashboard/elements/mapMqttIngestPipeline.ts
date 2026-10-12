@@ -219,21 +219,7 @@ export function mergeOperationFields(
       ? { operation_actions: opActions }
       : {}),
     current_leg: leg ?? telemetryPayload.current_leg,
-    ...(telemetryPayload.yard_slot_id != null && telemetryPayload.yard_slot_id !== ''
-      ? { yard_slot_id: telemetryPayload.yard_slot_id }
-      : {}),
-    /*
-     * 營運訊息的格位標記只在<strong>沒有更新的遙測</strong>時才算數。
-     *
-     * 遙測與營運是兩條各自到達的訊息：車離開格位、開始跑任務之後，最後一筆待命的營運訊息
-     * 還留在快取裡，帶著舊的 yard_slot_id。遙測已經比它新（而且不帶格位）時，那個標記早就
-     * 作廢了——不擋掉的話，車在正線上也會被畫到那一格。
-     */
-    ...(operation.yard_slot_id != null
-      && operation.yard_slot_id !== ''
-      && !operationMarkerIsStale(telemetryPayload, operation)
-      ? { yard_slot_id: operation.yard_slot_id }
-      : {}),
+
   };
 }
 

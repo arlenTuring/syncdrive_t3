@@ -5,9 +5,9 @@ import { resolveVehicleMonitorBadge } from './resolveVehicleMonitorBadge';
 describe('vehicle monitor live truth', () => {
   it('uses the backend-persisted location instead of recalculating from MQTT', () => {
     expect(resolveVehicleLocationLabel({
-      telemetry: { yard_slot_id: 'E2' },
-      operation: { yard_slot_id: 'E2', line_kind: 'MAINTENANCE' },
-      variables: { segment_label: 'D1', yard_slot_id: 'E2', badge_kind: 'maintenance' },
+      telemetry: { },
+      operation: { line_kind: 'MAINTENANCE' },
+      variables: { segment_label: 'D1', badge_kind: 'maintenance' },
     })).toBe('D1');
   });
 

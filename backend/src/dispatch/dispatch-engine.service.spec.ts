@@ -64,14 +64,15 @@ type CreatedOrder = {
   order_id: string;
   trip_code: string;
   vehicle_code: string;
+  maint_station?: string;
   line_kind: string;
   planned_start?: number;
   maint_type_label?: string;
   payload: {
     kind: string;
-    yard_slot_id?: string;
     route_name: string | null;
     card_label?: string;
+    transition_facility?: string;
     shift_name: string;
     origin: { id: string; name: string; kind: string } | null;
     destination: { id: string; name: string; kind: string } | null;
@@ -381,8 +382,8 @@ describe('空車移動', () => {
       order.payload.route_name?.startsWith('整備入廠'),
     )!;
     // 出廠：場區端是起點；入廠：場區端是終點
-    expect(out.payload.yard_slot_id).toBe('E3');
-    expect(into.payload.yard_slot_id).toBe('H1');
+    expect(out.payload.transition_facility).toBe('E3');
+    expect(into.payload.transition_facility).toBe('H1');
   });
 
   it('order_id 用列與分鐘組出來，重算班表也不會換號', async () => {
@@ -606,9 +607,8 @@ describe('整備班次', () => {
     const order = created[0];
     expect(order.line_kind).toBe('MAINTENANCE');
     expect(order.trip_code).toBe(`MT-E3-R1-${(12 * 60 + 1) * 60}`);
-    // 整備分佈的 SQL 讀 payload 的格位
     expect(
-      (order.payload as unknown as { yard_slot_id?: string }).yard_slot_id,
+      order.maint_station,
     ).toBe('E3');
   });
 
