@@ -1,7 +1,6 @@
 import {
   Bell,
   ChevronDown,
-  LogIn,
   LogOut,
   Settings,
   User,
@@ -17,7 +16,6 @@ import {
   type AppLocale,
 } from '../../../i18n/localePreference';
 import { useAuth } from '../../access-control/AuthContext';
-import { LoginDialog } from '../../access-control/LoginDialog';
 
 type ShellAccountToolbarProps = {
   notificationCount?: number;
@@ -39,7 +37,6 @@ export function ShellAccountToolbar({
   const { t, i18n } = useTranslation();
   const auth = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const currentLocale: AppLocale = isAppLocale(i18n.language)
@@ -97,7 +94,7 @@ export function ShellAccountToolbar({
         <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
         <button
           type="button"
-          onClick={() => auth.user ? setSettingsOpen((open) => !open) : setLoginOpen(true)}
+          onClick={() => setSettingsOpen((open) => !open)}
           aria-expanded={settingsOpen}
           aria-controls={panelId}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#1f1f22] pl-2 pr-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 hover:text-white"
@@ -109,7 +106,7 @@ export function ShellAccountToolbar({
           <span className="max-w-[7rem] truncate font-medium">
             {auth.loading ? '讀取中…' : auth.user?.display_name ?? '登入'}
           </span>
-          {auth.user ? <ChevronDown className="size-3.5 text-zinc-500" /> : <LogIn className="size-3.5 text-zinc-500" />}
+          <ChevronDown className="size-3.5 text-zinc-500" />
         </button>
         <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
         <button
@@ -150,7 +147,6 @@ export function ShellAccountToolbar({
           </div>
         ) : null}
       </div>
-      {loginOpen ? <LoginDialog onClose={() => setLoginOpen(false)} /> : null}
     </>
   );
 }
