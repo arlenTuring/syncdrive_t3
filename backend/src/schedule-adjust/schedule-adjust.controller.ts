@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ScheduleAdjustStatus } from '../database/entities/schedule-adjust-request.entity';
+import { RequirePermission } from '../access-control/access.guard';
 import {
   ScheduleAdjustService,
   type CreateScheduleAdjustInput,
@@ -24,6 +25,7 @@ function toStatus(value?: string): ScheduleAdjustStatus | undefined {
 
 @ApiTags('Schedule Adjust Requests')
 @Controller('syncdrive-api/schedule-adjust')
+@RequirePermission('operations.shift-deployment.view')
 export class ScheduleAdjustController {
   constructor(private readonly service: ScheduleAdjustService) {}
 
@@ -40,12 +42,14 @@ export class ScheduleAdjustController {
   }
 
   @Post()
+  @RequirePermission('operations.shift-deployment.adjust')
   @ApiOperation({ summary: '送出班表調整申請（進入待核准）' })
   async create(@Body() body: CreateScheduleAdjustInput) {
     return this.service.create(body);
   }
 
   @Patch(':id/review')
+  @RequirePermission('operations.shift-deployment.review')
   @ApiOperation({ summary: '核准／駁回／套用／取消一筆請求' })
   async review(
     @Param('id') id: string,
@@ -59,6 +63,7 @@ export class ScheduleAdjustController {
   }
 
   @Patch('pending/resolve')
+  @RequirePermission('operations.shift-deployment.revoke', 'operations.shift-deployment.review')
   @ApiOperation({ summary: '把目前待核准的那一筆結案（不指定狀態時記為取消）' })
   async resolvePending(
     @Body() body: { status?: string; reviewedBy?: string; reviewNote?: string },

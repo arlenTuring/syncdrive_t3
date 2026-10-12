@@ -5,9 +5,11 @@ import {
   MaintenanceTaskUsageStatus,
 } from '../database/entities/maintenance-task.entity';
 import { MaintenanceTaskService } from './maintenance-task.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Maintenance Tasks')
 @Controller('syncdrive-api/maintenance-task')
+@RequirePermission('schedule.maintenance.view')
 export class MaintenanceTaskController {
   constructor(private readonly maintenanceTaskService: MaintenanceTaskService) {}
 
@@ -59,6 +61,7 @@ export class MaintenanceTaskController {
   }
 
   @Post('draft')
+  @RequirePermission('schedule.maintenance.create')
   @ApiOperation({ summary: '建立整備任務草稿' })
   async createDraft(@Body() body: { name?: string; body?: Record<string, unknown> }) {
     return this.maintenanceTaskService.createDraft({
@@ -68,6 +71,7 @@ export class MaintenanceTaskController {
   }
 
   @Patch('detail/:id')
+  @RequirePermission('schedule.maintenance.edit')
   @ApiOperation({ summary: '更新整備任務草稿' })
   async updateDraft(
     @Param('id') id: string,
@@ -80,6 +84,7 @@ export class MaintenanceTaskController {
   }
 
   @Delete('detail/:id')
+  @RequirePermission('schedule.maintenance.delete')
   @ApiOperation({ summary: '刪除整備任務' })
   async deleteTask(@Param('id') id: string) {
     await this.maintenanceTaskService.deleteTask(id);

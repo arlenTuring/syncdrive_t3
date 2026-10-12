@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import {
   MapVehicleSettingsService,
   type MapVehicleSetting,
@@ -27,6 +28,7 @@ import {
  */
 @ApiTags('Vehicle Definitions')
 @Controller('syncdrive-api/vehicle-definitions')
+@RequirePermission('site.map.view', 'vehicle.registry.view')
 export class VehicleDefinitionController {
   constructor(private readonly service: VehicleDefinitionService) {}
 
@@ -49,6 +51,7 @@ export class VehicleDefinitionController {
   }
 
   @Put(':definitionKey')
+  @RequirePermission('site.map.edit', 'vehicle.registry.edit')
   @ApiOperation({
     summary: '新增或修改一個模型（修改要帶 baseVersion；版本不符回 409，不覆蓋）',
   })
@@ -66,6 +69,7 @@ export class VehicleDefinitionController {
   }
 
   @Delete(':definitionKey')
+  @RequirePermission('site.map.edit', 'vehicle.registry.delete')
   @ApiOperation({ summary: '刪除模型（仍被引用時拒絕）' })
   async remove(@Param('definitionKey') definitionKey: string) {
     return this.service.remove(definitionKey);
@@ -74,6 +78,7 @@ export class VehicleDefinitionController {
 
 @ApiTags('Vehicle Definitions')
 @Controller('syncdrive-api/map-vehicle-settings')
+@RequirePermission('site.map.view')
 export class MapVehicleSettingsController {
   constructor(private readonly service: MapVehicleSettingsService) {}
 
@@ -84,6 +89,7 @@ export class MapVehicleSettingsController {
   }
 
   @Put()
+  @RequirePermission('site.map.edit')
   @ApiOperation({
     summary: '設定系統預設車輛模型與顯示尺寸（地圖沒有自己的設定時使用；defaultSetting=null 清除）',
   })
@@ -101,6 +107,7 @@ export class MapVehicleSettingsController {
   }
 
   @Post('migrations')
+  @RequirePermission('site.map.import')
   @ApiOperation({
     summary: '把儀表板載具容器的模型與尺寸搬成地圖設定（dry_run=1 只產生報告）',
   })
@@ -112,6 +119,7 @@ export class MapVehicleSettingsController {
   }
 
   @Post('migrations/:migrationId/rollback')
+  @RequirePermission('site.map.import')
   @ApiOperation({ summary: '回復一次遷移（只刪除遷移後沒被改過的設定）' })
   rollback(
     @Param('migrationId') migrationId: string,
@@ -127,6 +135,7 @@ export class MapVehicleSettingsController {
   }
 
   @Put(':mapId')
+  @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '設定某張地圖的車輛模型與顯示尺寸' })
   put(
     @Param('mapId') mapId: string,
@@ -137,6 +146,7 @@ export class MapVehicleSettingsController {
   }
 
   @Delete(':mapId')
+  @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '移除某張地圖的車輛模型設定（改用系統預設）' })
   remove(@Param('mapId') mapId: string) {
     return this.service.deleteSetting(mapId);

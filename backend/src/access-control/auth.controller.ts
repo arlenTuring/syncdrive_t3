@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './access.dto';
 import { readCookie } from './access.guard';
-import { SESSION_COOKIE, SESSION_TTL_MS } from './access.constants';
+import { CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './access.constants';
 
 @Controller('syncdrive-api/auth')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
@@ -17,12 +17,14 @@ export class AuthController {
       httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production',
       maxAge: SESSION_TTL_MS, path: '/',
     });
+    this.setCsrfCookie(res, result.csrf);
     return { user: result.user, csrf_token: result.csrf };
   }
 
   @Get('me')
-  async me(@Req() req: Request) {
-    const result = await this.auth.me(readCookie(req));
+  async me(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.auth.me(readCookie(req), readCookie(req, CSRF_COOKIE));
+    if (result) this.setCsrfCookie(res, result.csrf);
     return result ? { authenticated: true, user: result.user, csrf_token: result.csrf } : { authenticated: false, user: null };
   }
 
@@ -30,10 +32,18 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(readCookie(req), this.client(req));
     res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.clearCookie(CSRF_COOKIE, { path: '/' });
     return { logged_out: true };
   }
 
   private client(req: Request) {
     return { ip: req.ip, userAgent: req.header('user-agent') ?? undefined };
+  }
+
+  private setCsrfCookie(res: Response, token: string) {
+    res.cookie(CSRF_COOKIE, token, {
+      httpOnly: false, sameSite: 'strict', secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_TTL_MS, path: '/',
+    });
   }
 }

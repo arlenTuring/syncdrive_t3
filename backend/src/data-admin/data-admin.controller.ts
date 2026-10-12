@@ -1,11 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import type { Request } from 'express';
-import { DataAdminGuard } from './data-admin.guard';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { type AuthenticatedRequest, RequirePermission } from '../access-control/access.guard';
 import { DataAdminService, type ExecuteAdminQuery } from './data-admin.service';
 import { LiveDataResetService } from './live-data-reset.service';
 
 @Controller('syncdrive-api/data-admin')
-@UseGuards(DataAdminGuard)
+@RequirePermission('system.data-admin.view')
 export class DataAdminController {
   constructor(
     private readonly service: DataAdminService,
@@ -32,14 +31,16 @@ export class DataAdminController {
   }
 
   @Post('execute')
-  execute(@Body() body: ExecuteAdminQuery, @Req() request: Request) {
+  @RequirePermission('system.data-admin.execute')
+  execute(@Body() body: ExecuteAdminQuery, @Req() request: AuthenticatedRequest) {
     return this.service.execute(body, {
-      operatorId: String(request.headers['x-syncdrive-operator'] ?? 'unknown'),
+      operatorId: request.authUser!.id,
       sourceIp: request.ip,
     });
   }
 
   @Post('executions/:requestId/cancel')
+  @RequirePermission('system.data-admin.execute')
   cancel(@Param('requestId') requestId: string) {
     return this.service.cancel(requestId);
   }
@@ -50,11 +51,13 @@ export class DataAdminController {
   }
 
   @Post('live-reset/execute')
+  @RequirePermission('system.data-admin.execute')
   liveResetExecute(@Body() body: { vehicleCodes: string[] }) {
     return this.liveReset.execute(body.vehicleCodes);
   }
 
   @Post('live-reset/resume')
+  @RequirePermission('system.data-admin.execute')
   liveResetResume(@Body() body: { vehicleCodes: string[] }) {
     return this.liveReset.resume(body.vehicleCodes);
   }

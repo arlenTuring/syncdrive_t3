@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, BadRequestExcep
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { DatasourceService } from './datasource.service';
 import { DashboardDemoSeedService } from '../database/dashboard-demo-seed.service';
+import { RequirePermission } from '../access-control/access.guard';
 import {
   DatasourceDefinitionsService,
   type DataSourceDefinitionPayload,
@@ -9,6 +10,7 @@ import {
 
 @ApiTags('Datasource')
 @Controller('syncdrive-api/datasource')
+@RequirePermission('system.datasource.view')
 export class DatasourceController {
   constructor(
     private readonly datasourceService: DatasourceService,
@@ -23,6 +25,7 @@ export class DatasourceController {
   }
 
   @Put('definitions/:sourceKey')
+  @RequirePermission('system.datasource.manage')
   async saveDefinition(
     @Param('sourceKey') sourceKey: string,
     @Body() body: DataSourceDefinitionPayload,
@@ -31,6 +34,7 @@ export class DatasourceController {
   }
 
   @Delete('definitions/:sourceKey')
+  @RequirePermission('system.datasource.manage')
   async deleteDefinition(@Param('sourceKey') sourceKey: string) {
     await this.definitions.remove(sourceKey);
     return { ok: true };
@@ -61,6 +65,7 @@ export class DatasourceController {
 
   /** 執行 SELECT 查詢 */
   @Post('query')
+  @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '執行 SELECT 查詢並回傳結果（限 SELECT）' })
   @ApiBody({
     schema: {
@@ -86,6 +91,7 @@ export class DatasourceController {
 
   /** 寫入事件中心／班次中心示範資料（可重複執行） */
   @Post('seed-panels')
+  @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板事件／班次示範資料到資料庫' })
   async seedPanels() {
     return this.dashboardDemoSeed.reseedPanels();
@@ -93,6 +99,7 @@ export class DatasourceController {
 
   /** 寫入 11 台 PMS 車輛與調度訂單（車輛狀態列，可重複執行） */
   @Post('seed-vehicles')
+  @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板 PMS 車輛與調度訂單示範資料' })
   async seedVehicles() {
     return this.dashboardDemoSeed.reseedVehicles();
@@ -100,6 +107,7 @@ export class DatasourceController {
 
   /** 一次載入儀表板全部示範 SQL 種子 */
   @Post('seed-dashboard')
+  @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板全部示範資料（車輛 + 事件 + 運能 + 整備）' })
   async seedDashboard() {
     return this.dashboardDemoSeed.reseedAll();

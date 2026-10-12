@@ -23,9 +23,11 @@ import {
 } from './degraded-operation.dto';
 import { DegradedOperationService } from './degraded-operation.service';
 import { DegradedReplayService } from '../degraded-replay/degraded-replay.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Degraded Operation')
 @Controller('syncdrive-api/degraded-operation')
+@RequirePermission('operations.degraded.view')
 export class DegradedOperationController {
   constructor(
     private readonly service: DegradedOperationService,
@@ -113,6 +115,7 @@ export class DegradedOperationController {
   }
 
   @Post('plans')
+  @RequirePermission('operations.degraded.create')
   @ApiOperation({ summary: '建立降級計畫（不啟用、不下發速限）' })
   create(
     @Body() body: CreateDegradedOperationPlanDto,
@@ -124,6 +127,7 @@ export class DegradedOperationController {
   }
 
   @Patch('plans/:id')
+  @RequirePermission('operations.degraded.edit')
   @ApiOperation({ summary: '更新降級計畫（不啟用、不下發速限）' })
   update(
     @Param('id') id: string,
@@ -136,6 +140,7 @@ export class DegradedOperationController {
   }
 
   @Delete('plans/:id')
+  @RequirePermission('operations.degraded.delete')
   @ApiOperation({ summary: '刪除降級計畫（不解除執行狀態、不刪除歷史快照）' })
   remove(
     @Param('id') id: string,
@@ -147,6 +152,7 @@ export class DegradedOperationController {
   }
 
   @Post('executions')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '建立降級執行快照；控制流程未接通時不下發指令' })
   execute(
     @Body() body: ExecuteDegradedOperationDto,
@@ -161,6 +167,7 @@ export class DegradedOperationController {
   }
 
   @Post('executions/:id/cancel')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '取消待執行的降級預約' })
   cancel(
     @Param('id') id: string,
@@ -176,6 +183,7 @@ export class DegradedOperationController {
   }
 
   @Patch('executions/:id/parameters')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '調整目前降級執行參數（不修改來源範本）' })
   adjust(
     @Param('id') id: string,
@@ -191,6 +199,7 @@ export class DegradedOperationController {
   }
 
   @Patch('executions/:id/content')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '更新本次降級內容（不修改來源範本）' })
   content(
     @Param('id') id: string,
@@ -206,6 +215,7 @@ export class DegradedOperationController {
   }
 
   @Post('executions/:id/restore')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '完成安全確認並解除本次降級管理狀態' })
   restore(
     @Param('id') id: string,
@@ -227,6 +237,7 @@ export class DegradedOperationController {
   }
 
   @Post('drafts/:kind')
+  @RequirePermission('operations.degraded.edit')
   @ApiOperation({ summary: '保存目前操作者的降級表單草稿' })
   saveDraft(
     @Param('kind') kind: string,
@@ -237,6 +248,7 @@ export class DegradedOperationController {
   }
 
   @Post('events')
+  @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '記錄降級操作介面事件' })
   event(
     @Body() body: InteractionEventDto,

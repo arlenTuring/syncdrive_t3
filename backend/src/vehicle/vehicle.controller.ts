@@ -3,9 +3,11 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RedisService } from '../redis/redis.service';
 import { VTMS_VEHICLE_CODES } from '../common/vehicle-codes';
 import { VehicleService } from './vehicle.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('vehicles')
 @Controller('syncdrive-api/vehicles')
+@RequirePermission('vehicle.realtime.view', 'site.map.view', 'dashboard.monitor.view')
 export class VehicleController {
   constructor(
     private readonly redisService: RedisService,

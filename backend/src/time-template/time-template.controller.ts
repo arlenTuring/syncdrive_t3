@@ -2,9 +2,11 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TimeTemplatePublishStatus } from '../database/entities/time-template.entity';
 import { TimeTemplateService } from './time-template.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Time Templates')
 @Controller('syncdrive-api/time-template')
+@RequirePermission('schedule.time-template.view')
 export class TimeTemplateController {
   constructor(private readonly timeTemplateService: TimeTemplateService) {}
 
@@ -37,6 +39,7 @@ export class TimeTemplateController {
   }
 
   @Patch('detail/:id')
+  @RequirePermission('schedule.time-template.edit')
   @ApiOperation({ summary: '更新時間模板草稿' })
   async updateDraft(
     @Param('id') id: string,
@@ -49,6 +52,7 @@ export class TimeTemplateController {
   }
 
   @Delete('detail/:id')
+  @RequirePermission('schedule.time-template.delete')
   @ApiOperation({ summary: '刪除時間模板' })
   async deleteTemplate(@Param('id') id: string) {
     await this.timeTemplateService.deleteTemplate(id);
@@ -56,12 +60,14 @@ export class TimeTemplateController {
   }
 
   @Post('detail/:id/duplicate')
+  @RequirePermission('schedule.time-template.duplicate')
   @ApiOperation({ summary: '複製時間模板為新草稿（原名＋「 複製模板」）' })
   async duplicateDraft(@Param('id') id: string) {
     return this.timeTemplateService.duplicateAsNewDraft(id);
   }
 
   @Post('draft')
+  @RequirePermission('schedule.time-template.create')
   @ApiOperation({ summary: '建立時間模板草稿' })
   async createDraft(@Body() body: { name?: string; body?: Record<string, unknown> }) {
     return this.timeTemplateService.createDraft({
@@ -71,6 +77,7 @@ export class TimeTemplateController {
   }
 
   @Post('export')
+  @RequirePermission('schedule.time-template.export')
   @ApiOperation({ summary: '匯出時間模板 JSON（依 template_id 列表）' })
   async exportTemplates(@Body() body: { ids?: string[] }) {
     const ids = Array.isArray(body?.ids) ? body.ids : [];

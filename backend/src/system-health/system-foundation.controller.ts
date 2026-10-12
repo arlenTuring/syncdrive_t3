@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import {
   HttpsCertificateService,
   type HttpsCertificateStatus,
@@ -16,6 +17,7 @@ class RotateHttpsCertificateDto {
 
 @ApiTags('SystemFoundation')
 @Controller('syncdrive-api/system/foundation')
+@RequirePermission('system.foundation.view')
 export class SystemFoundationController {
   constructor(
     private readonly foundationSettings: SystemFoundationSettingsService,
@@ -29,6 +31,7 @@ export class SystemFoundationController {
   }
 
   @Put('settings')
+  @RequirePermission('system.foundation.edit')
   @ApiOperation({ summary: '儲存系統基礎設定（全系統共用）' })
   @ApiBody({ description: '系統基礎設定完整物件' })
   async putSettings(
@@ -46,6 +49,7 @@ export class SystemFoundationController {
   }
 
   @Put('ssl/certificate')
+  @RequirePermission('system.foundation.edit')
   @ApiOperation({
     summary: '上傳／輪替 HTTPS 憑證與私鑰（私鑰只寫入磁碟，回應不含私鑰）',
   })

@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import { Account, AccountStatus } from '../database/entities/account.entity';
 import { AccountRole } from '../database/entities/account-role.entity';
 import { AccountSession } from '../database/entities/account-session.entity';
@@ -7,7 +8,7 @@ import { Permission } from '../database/entities/permission.entity';
 import { PermissionChangeLog, PermissionChangeType, PermissionTargetType } from '../database/entities/permission-change-log.entity';
 import { RolePermission } from '../database/entities/role-permission.entity';
 import { Role } from '../database/entities/role.entity';
-import { ADMIN_PERMISSIONS, validPassword } from './access.constants';
+import { ACCESS_PERMISSIONS, ADMIN_PERMISSIONS, PERMISSION_BY_CODE, validPassword } from './access.constants';
 import { type AuthUser } from './auth.service';
 import { AccountQueryDto, CreateAccountDto, RoleQueryDto, SaveRoleDto } from './access.dto';
 import { hashPassword } from './password';
@@ -23,8 +24,9 @@ export class AccessService {
     const direction = query.direction === 'desc' ? 'DESC' : 'ASC';
     const keyword = query.keyword ? `%${query.keyword}%` : null;
     const offset = (query.page - 1) * query.page_size;
-    const params = [keyword, query.page_size, offset];
-    const filter = `a.deleted_at IS NULL AND ($1::text IS NULL OR a.account_name ILIKE $1 OR a.display_name ILIKE $1 OR EXISTS (
+    const params = [keyword, query.page_size, offset, query.role_id ?? null];
+    const filter = `a.deleted_at IS NULL AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM account_roles arf WHERE arf.account_id=a.id AND arf.role_id=$4))
+      AND ($1::text IS NULL OR a.account_name ILIKE $1 OR a.display_name ILIKE $1 OR EXISTS (
       SELECT 1 FROM account_roles ar2 JOIN roles r2 ON r2.id = ar2.role_id WHERE ar2.account_id = a.id AND r2.display_name ILIKE $1))`;
     const items = await this.dataSource.query(
       `SELECT a.id, a.account_name, a.display_name, a.status, a.created_at, a.updated_at,
@@ -33,7 +35,8 @@ export class AccessService {
        FROM accounts a LEFT JOIN account_roles ar ON ar.account_id = a.id LEFT JOIN roles r ON r.id = ar.role_id
        WHERE ${filter} GROUP BY a.id ORDER BY ${sort} ${direction}, a.id ASC LIMIT $2 OFFSET $3`, params,
     );
-    const [{ total }] = await this.dataSource.query(`SELECT COUNT(*)::int AS total FROM accounts a WHERE ${filter}`, [keyword]);
+    const countFilter = filter.replaceAll('$4', '$2');
+    const [{ total }] = await this.dataSource.query(`SELECT COUNT(*)::int AS total FROM accounts a WHERE ${countFilter}`, [keyword, query.role_id ?? null]);
     return { items: items.map(({ role_sort: _roleSort, ...item }) => item), total: Number(total), page: query.page, page_size: query.page_size };
   }
 
@@ -99,15 +102,33 @@ export class AccessService {
     });
   }
 
+  async updateAccountRoles(id: string, roleIds: string[], actor: AuthUser, client: AuditClient) {
+    if (new Set(roleIds).size !== roleIds.length) throw new BadRequestException('角色不可重複');
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext('access-control-admin-guard'))`);
+      const account = await manager.findOne(Account, { where: { id } });
+      if (!account || account.deletedAt) throw new NotFoundException('帳號不存在');
+      const roles = await this.allowedRoles(manager, roleIds, actor);
+      const before = (await manager.findBy(AccountRole, { accountId: id })).map((item) => item.roleId);
+      await manager.delete(AccountRole, { accountId: id });
+      await manager.insert(AccountRole, roles.map((role) => ({ accountId: id, roleId: role.id, assignedBy: actor.id, createdAt: Date.now() })));
+      if (await this.adminCount(manager) < 1) throw new ForbiddenException('此修改會讓系統失去有效最高管理者');
+      await manager.delete(AccountSession, { accountId: id });
+      await this.audit(manager, actor.id, PermissionTargetType.ACCOUNT_ROLE, id, PermissionChangeType.UPDATE,
+        { role_ids: before }, { role_ids: roleIds }, client.ip);
+    });
+    return this.account(id);
+  }
+
   async listRoles(query: RoleQueryDto) {
-    const sort = { role_code: 'r.role_code', display_name: 'r.display_name', user_count: 'user_count' }[query.sort_by];
+    const sort = { display_name: 'r.display_name', user_count: 'user_count' }[query.sort_by];
     const direction = query.direction === 'desc' ? 'DESC' : 'ASC';
     const keyword = query.keyword ? `%${query.keyword}%` : null;
     const items = await this.dataSource.query(
       `SELECT r.id, r.role_code, r.display_name, r.description, r.is_system, r.created_at, r.updated_at,
-        COUNT(DISTINCT ar.account_id)::int AS user_count,
+        COUNT(DISTINCT a.id)::int AS user_count,
         COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', p.id, 'code', p.permission_code, 'name', p.display_name, 'module', p.module)) FILTER (WHERE p.id IS NOT NULL), '[]') AS permissions
-       FROM roles r LEFT JOIN account_roles ar ON ar.role_id = r.id
+       FROM roles r LEFT JOIN account_roles ar ON ar.role_id = r.id LEFT JOIN accounts a ON a.id=ar.account_id AND a.deleted_at IS NULL
        LEFT JOIN role_permissions rp ON rp.role_id = r.id LEFT JOIN permissions p ON p.id = rp.permission_id
        WHERE ($1::text IS NULL OR r.role_code ILIKE $1 OR r.display_name ILIKE $1)
        GROUP BY r.id ORDER BY ${sort} ${direction}, r.id ASC LIMIT $2 OFFSET $3`,
@@ -132,12 +153,28 @@ export class AccessService {
     return this.dataSource.query(`SELECT id, permission_code AS code, module, display_name AS name, description FROM permissions ORDER BY module, display_name`);
   }
 
+  async permissionCatalog(actor: AuthUser) {
+    const rows = await this.dataSource.query(`SELECT id, permission_code AS code FROM permissions`);
+    const ids = new Map(rows.map((row: { id: string; code: string }) => [row.code, row.id]));
+    const mine = new Set(actor.permissions);
+    const modules = new Map<string, { key: string; name: string; pages: Map<string, any> }>();
+    for (const item of ACCESS_PERMISSIONS) {
+      const module = modules.get(item.moduleKey) ?? { key: item.moduleKey, name: item.module, pages: new Map() };
+      const page = module.pages.get(item.pageKey) ?? { key: item.pageKey, name: item.page, permissions: [] };
+      page.permissions.push({ id: ids.get(item.code), code: item.code, action: item.action, name: item.name,
+        requires: item.requires, grantable: mine.has(item.code), connected: item.connected !== false });
+      module.pages.set(item.pageKey, page);
+      modules.set(item.moduleKey, module);
+    }
+    return [...modules.values()].map((module) => ({ key: module.key, name: module.name, pages: [...module.pages.values()] }));
+  }
+
   async role(id: string) {
     const [role] = await this.dataSource.query(
       `SELECT r.id, r.role_code, r.display_name, r.description, r.is_system, r.created_at, r.updated_at,
-        COUNT(DISTINCT ar.account_id)::int AS user_count,
+        COUNT(DISTINCT a.id)::int AS user_count,
         COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id', p.id, 'code', p.permission_code, 'name', p.display_name, 'module', p.module)) FILTER (WHERE p.id IS NOT NULL), '[]') AS permissions
-       FROM roles r LEFT JOIN account_roles ar ON ar.role_id = r.id
+       FROM roles r LEFT JOIN account_roles ar ON ar.role_id = r.id LEFT JOIN accounts a ON a.id=ar.account_id AND a.deleted_at IS NULL
        LEFT JOIN role_permissions rp ON rp.role_id = r.id LEFT JOIN permissions p ON p.id = rp.permission_id
        WHERE r.id = $1 GROUP BY r.id`,
       [id],
@@ -151,8 +188,12 @@ export class AccessService {
       const permissions = await this.allowedPermissions(manager, input.permission_ids, actor);
       const now = Date.now();
       try {
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext(lower($1)))`, [input.display_name]);
+        if (await manager.createQueryBuilder(Role, 'r').where('LOWER(r.display_name)=LOWER(:name)', { name: input.display_name }).getExists()) {
+          throw new ConflictException('角色名稱已存在');
+        }
         const role = await manager.save(Role, manager.create(Role, {
-          roleCode: input.role_code, displayName: input.display_name, description: input.description ?? '',
+          roleCode: `ROLE_${randomUUID().replaceAll('-', '').toUpperCase()}`, displayName: input.display_name, description: '',
           isSystem: false, createdAt: now, updatedAt: now,
         }));
         if (permissions.length) await manager.insert(RolePermission, permissions.map((p) => ({ roleId: role.id, permissionId: p.id, createdAt: now })));
@@ -160,7 +201,7 @@ export class AccessService {
           { role_code: role.roleCode, display_name: role.displayName, description: role.description, permission_ids: permissions.map((p) => p.id) }, client.ip);
         return role.id;
       } catch (error) {
-        if ((error as { code?: string }).code === '23505') throw new ConflictException('角色代號已存在');
+        if ((error as { code?: string }).code === '23505') throw new ConflictException('角色名稱已存在');
         throw error;
       }
     });
@@ -172,21 +213,25 @@ export class AccessService {
       await manager.query(`SELECT pg_advisory_xact_lock(hashtext('access-control-admin-guard'))`);
       const role = await manager.findOne(Role, { where: { id } });
       if (!role) throw new NotFoundException('角色不存在');
-      if (input.role_code !== role.roleCode) throw new BadRequestException('角色代號為穩定識別，建立後不可變更');
+      if (input.expected_updated_at && input.expected_updated_at !== role.updatedAt) throw new ConflictException('角色已由其他使用者更新，請重新載入');
       const permissions = await this.allowedPermissions(manager, input.permission_ids, actor);
       const beforeIds = (await manager.findBy(RolePermission, { roleId: id })).map((r) => r.permissionId);
       const before = { role_code: role.roleCode, display_name: role.displayName, description: role.description, permission_ids: beforeIds };
       try {
-        await manager.update(Role, id, { displayName: input.display_name, description: input.description ?? '', updatedAt: Date.now() });
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext(lower($1)))`, [input.display_name]);
+        if (await manager.createQueryBuilder(Role, 'r').where('LOWER(r.display_name)=LOWER(:name) AND r.id<>:id', { name: input.display_name, id }).getExists()) {
+          throw new ConflictException('角色名稱已存在');
+        }
+        await manager.update(Role, id, { displayName: input.display_name, updatedAt: Date.now() });
       } catch (error) {
-        if ((error as { code?: string }).code === '23505') throw new ConflictException('角色代號已存在');
+        if ((error as { code?: string }).code === '23505') throw new ConflictException('角色名稱已存在');
         throw error;
       }
       await manager.delete(RolePermission, { roleId: id });
       if (permissions.length) await manager.insert(RolePermission, permissions.map((p) => ({ roleId: id, permissionId: p.id, createdAt: Date.now() })));
       if (await this.adminCount(manager) < 1) throw new ForbiddenException('此修改會讓系統失去有效最高管理者');
       await this.audit(manager, actor.id, PermissionTargetType.ROLE, id, PermissionChangeType.UPDATE, before,
-        { role_code: input.role_code, display_name: input.display_name, description: input.description ?? '', permission_ids: permissions.map((p) => p.id) }, client.ip);
+        { role_code: role.roleCode, display_name: input.display_name, description: role.description, permission_ids: permissions.map((p) => p.id) }, client.ip);
       const added = permissions.map((p) => p.id).filter((p) => !beforeIds.includes(p));
       const removed = beforeIds.filter((p) => !permissions.some((next) => next.id === p));
       if (added.length) await this.audit(manager, actor.id, PermissionTargetType.ROLE_PERMISSION, id, PermissionChangeType.GRANT, null, { permission_ids: added }, client.ip);
@@ -197,11 +242,12 @@ export class AccessService {
 
   async deleteRole(id: string, actor: AuthUser, client: AuditClient) {
     return this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext('access-control-admin-guard'))`);
       const role = await manager.findOne(Role, { where: { id } });
       if (!role) throw new NotFoundException('角色不存在');
       if (role.isSystem) throw new ForbiddenException('系統內建角色不可刪除');
-      const count = await manager.count(AccountRole, { where: { roleId: id } });
-      if (count) throw new ConflictException(`此角色仍綁定 ${count} 個帳號，無法刪除`);
+      const [{ count }] = await manager.query(`SELECT COUNT(DISTINCT a.id)::int AS count FROM account_roles ar JOIN accounts a ON a.id=ar.account_id AND a.deleted_at IS NULL WHERE ar.role_id=$1`, [id]);
+      if (Number(count)) throw new ConflictException(`此角色仍綁定 ${count} 個帳號，無法刪除`);
       const permissions = await manager.findBy(RolePermission, { roleId: id });
       await manager.delete(RolePermission, { roleId: id });
       await manager.delete(Role, id);
@@ -228,7 +274,26 @@ export class AccessService {
     if (permissions.length !== ids.length) throw new BadRequestException('包含不存在的權限');
     const mine = new Set(actor.permissions);
     if (permissions.some((p) => !mine.has(p.permissionCode))) throw new ForbiddenException('不可授予自己沒有的權限');
+    const selected = new Set(permissions.map((permission) => permission.permissionCode));
+    if (!permissions.some((permission) => PERMISSION_BY_CODE.get(permission.permissionCode)?.action === 'view')) {
+      throw new BadRequestException('角色至少需要一項檢視權限');
+    }
+    for (const permission of permissions) {
+      const required = PERMISSION_BY_CODE.get(permission.permissionCode)?.requires;
+      if (required && !selected.has(required)) throw new BadRequestException(`${permission.displayName} 必須同時包含所屬頁面的檢視權限`);
+    }
     return permissions;
+  }
+
+  private async account(id: string) {
+    const [account] = await this.dataSource.query(
+      `SELECT a.id, a.account_name, a.display_name, a.status, a.created_at, a.updated_at,
+       COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id',r.id,'code',r.role_code,'name',r.display_name)) FILTER (WHERE r.id IS NOT NULL),'[]') AS roles
+       FROM accounts a LEFT JOIN account_roles ar ON ar.account_id=a.id LEFT JOIN roles r ON r.id=ar.role_id
+       WHERE a.id=$1 AND a.deleted_at IS NULL GROUP BY a.id`, [id],
+    );
+    if (!account) throw new NotFoundException('帳號不存在');
+    return account;
   }
 
   private publicAccount(account: Account, roles: Role[]) {

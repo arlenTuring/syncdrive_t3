@@ -1,12 +1,14 @@
 import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { OperationMetricsService } from './operation-metrics.service';
 import { StationEtaService } from './station-eta.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 /**
  * 儀表板營運指標（規則見 operation-metrics.ts）。訂單狀態改變時後端會發
  * table:operation_orders／domain:shift_center 失效通知，前端據此重查。
  */
 @Controller('syncdrive-api/operation-metrics')
+@RequirePermission('dashboard.monitor.view', 'schedule.records.view')
 export class OperationMetricsController {
   constructor(
     private readonly operationMetricsService: OperationMetricsService,

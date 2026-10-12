@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import {
   DashboardPlaneService,
   type DashboardPlanePayload,
@@ -14,6 +15,7 @@ import {
  */
 @ApiTags('Dashboard Planes')
 @Controller('syncdrive-api/dashboard')
+@RequirePermission('dashboard.dashboard.view')
 export class DashboardPlaneController {
   constructor(private readonly service: DashboardPlaneService) {}
 
@@ -30,6 +32,7 @@ export class DashboardPlaneController {
   }
 
   @Put('planes')
+  @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '整批覆寫圖台版面（送進來的清單即為完整結果）' })
   async replacePlanes(
     @Body() body: { items?: DashboardPlanePayload[]; updatedBy?: string },
@@ -38,6 +41,7 @@ export class DashboardPlaneController {
   }
 
   @Put('planes/:planeId')
+  @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '新增或更新單一圖台版面（不刪除其他版面）' })
   async savePlane(
     @Param('planeId') planeId: string,
@@ -53,6 +57,7 @@ export class DashboardPlaneController {
   }
 
   @Put('module-pages')
+  @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '整批覆寫模組與版面對應' })
   async replacePages(
     @Body() body: { items?: ModuleDashboardPagePayload[]; updatedBy?: string },

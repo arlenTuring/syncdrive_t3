@@ -37,7 +37,7 @@ import {
   OPEN_VEHICLE_MODELS_EVENT,
   type OpenVehicleModelsDetail,
 } from '../../lib/vehicleModelNavigation';
-import { SIDEBAR_MODULE_GROUPS } from './types';
+import { SIDEBAR_MODULE_GROUPS, VIEW_PERMISSIONS } from './types';
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
 import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
 import { AttachModuleDashboardDialog } from './components/AttachModuleDashboardDialog';
@@ -176,13 +176,14 @@ export default function ScheduleManagementApp({
   initialView = 'shift-records',
 }: ScheduleManagementAppProps) {
   const [view, setView] = useState<string>(initialView);
-  const { user } = useAuth();
+  const auth = useAuth(); const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
   const [trajectoryMounted, setTrajectoryMounted] = useState(initialView === 'trajectory');
   const [adminMode, setAdminMode] = useState(readAdminModePreference);
   const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
+  const [accountRoleFilter,setAccountRoleFilter]=useState<string|null>(null);
   // 後端的對應拉回來之前不能回寫：初始值是這台瀏覽器的舊快取，一掛載就送出去會把
   // 其他人改好的對應（例如重新指定版面）蓋回舊值。
   const modulePagesSyncedRef = useRef(false);
@@ -257,8 +258,10 @@ export default function ScheduleManagementApp({
     onAdminModeChange: setAdminMode,
     supervisorApproval,
     onSupervisorApprovalChange: setSupervisorApproval,
-    onOpenSystemFoundation: () => setView('system-foundation'),
+    onOpenSystemFoundation: () => { if (auth.require('system.health.view')) setView('system-foundation'); },
   };
+  const requiredPermission = parseModuleDashboardViewId(view) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[view as ShellView];
+  const viewAllowed = !requiredPermission || auth.can(requiredPermission);
 
   const scheduleContent = (
     <>
@@ -273,7 +276,7 @@ export default function ScheduleManagementApp({
     <div className="flex h-full min-h-0 w-full bg-black">
       <ScheduleModuleSidebar
         activeView={view}
-        onViewChange={setView}
+        onViewChange={(next) => { const required = parseModuleDashboardViewId(next) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[next as ShellView]; if (!required || auth.require(required)) setView(next); }}
         adminMode={adminMode}
         moduleDashboardPages={modulePages}
         onAddModuleDashboard={setAttachModuleId}
@@ -291,6 +294,8 @@ export default function ScheduleManagementApp({
         permissions={user?.permissions ?? []}
       />
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {!viewAllowed ? <div className="flex flex-1 items-center justify-center text-zinc-400">權限不足</div> : null}
+        {viewAllowed ? <>
         {activeModulePage ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ModuleDashboardRuntimeView
@@ -363,14 +368,14 @@ export default function ScheduleManagementApp({
         {view === 'account-management' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="帳號管理中心載入失敗">
-              <AccountManagementPage onOpenRoles={() => setView('role-management')} />
+              <AccountManagementPage onOpenRoles={() => setView('role-management')} roleId={accountRoleFilter} onClearRoleFilter={()=>setAccountRoleFilter(null)} />
             </ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 
         {view === 'role-management' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="角色管理設定載入失敗"><RoleManagementPage /></ViewErrorBoundary>
+            <ViewErrorBoundary title="角色管理設定載入失敗"><RoleManagementPage onOpenAccounts={(roleId)=>{setAccountRoleFilter(roleId);setView('account-management');}} /></ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 
@@ -410,7 +415,7 @@ export default function ScheduleManagementApp({
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>
           </div>
-        ) : null}
+        ) : null}</> : null}
       </main>
 
       {attachModuleId ? (

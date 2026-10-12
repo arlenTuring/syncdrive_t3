@@ -267,11 +267,11 @@ export function ScheduleModuleSidebar({
           const groupLabel = t(group.label);
           const isOpen = expanded[group.id] ?? false;
           const GroupIcon = groupIcon(group.id);
-          const dashPages = moduleDashboardPages.filter((page) => page.moduleId === group.id);
+          const dashPages = permissions.includes('dashboard.dashboard.view') ? moduleDashboardPages.filter((page) => page.moduleId === group.id) : [];
           const visibleItems = group.items?.filter(
             (item) => !item.requiredPermission || permissions.includes(item.requiredPermission),
           ) ?? [];
-          if (group.id === 'permission' && visibleItems.length === 0) return null;
+          if (group.items && visibleItems.length === 0 && dashPages.length === 0) return null;
           const hasBuiltinItems = visibleItems.length > 0;
           const hasDashPages = dashPages.length > 0;
           const hasChildren = hasBuiltinItems || hasDashPages;

@@ -1,11 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UsePipes, ValidationPipe } from '@nestjs/common';
 import type { Request } from 'express';
 import { AccessService } from './access.service';
-import { AccountQueryDto, CreateAccountDto, ResetPasswordDto, RoleQueryDto, SaveRoleDto } from './access.dto';
-import { AccessGuard, type AuthenticatedRequest, RequirePermission } from './access.guard';
+import { AccountQueryDto, CreateAccountDto, ResetPasswordDto, RoleQueryDto, SaveRoleDto, UpdateAccountRolesDto } from './access.dto';
+import { type AuthenticatedRequest, RequirePermission } from './access.guard';
 
 @Controller('syncdrive-api/access-control')
-@UseGuards(AccessGuard)
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
 export class AccessController {
   constructor(private readonly access: AccessService) {}
@@ -26,6 +25,11 @@ export class AccessController {
   @Delete('accounts/:id') @RequirePermission('access.accounts.manage')
   deleteAccount(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.access.deleteAccount(id, req.authUser!, this.client(req));
+  }
+
+  @Patch('accounts/:id/roles') @RequirePermission('access.accounts.manage')
+  updateAccountRoles(@Param('id') id: string, @Body() body: UpdateAccountRolesDto, @Req() req: AuthenticatedRequest) {
+    return this.access.updateAccountRoles(id, body.role_ids, req.authUser!, this.client(req));
   }
 
   @Get('roles/options') @RequirePermission('access.accounts.manage')
@@ -54,6 +58,9 @@ export class AccessController {
 
   @Get('permissions') @RequirePermission('access.roles.view')
   permissions() { return this.access.permissionDictionary(); }
+
+  @Get('permissions/catalog') @RequirePermission('access.roles.view')
+  permissionCatalog(@Req() req: AuthenticatedRequest) { return this.access.permissionCatalog(req.authUser!); }
 
   private client(req: Request) { return { ip: req.ip }; }
 }

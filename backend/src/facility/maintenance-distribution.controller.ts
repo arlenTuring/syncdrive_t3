@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { MaintenanceDistributionService } from './maintenance-distribution.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @Controller('syncdrive-api/facility')
+@RequirePermission('dashboard.monitor.view', 'schedule.records.view')
 export class MaintenanceDistributionController {
   constructor(private readonly maintenanceDistributionService: MaintenanceDistributionService) {}
 

@@ -9,6 +9,7 @@ import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
 import { MapService } from '../map/map.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 /**
  * 即時調度引擎的內部維運介面。
@@ -18,6 +19,7 @@ import { MapService } from '../map/map.service';
  */
 @ApiTags('即時調度引擎')
 @Controller('syncdrive-api/dispatch')
+@RequirePermission('operations.shift-deployment.view', 'operations.dispatch.view')
 export class DispatchController {
   constructor(
     private readonly engine: DispatchEngineService,
@@ -42,6 +44,7 @@ export class DispatchController {
   }
 
   @Post('daily-plan/adopt')
+  @RequirePermission('operations.shift-deployment.deploy')
   @ApiOperation({
     summary: '部署每日計畫（明確切換該營運日採用的班表）',
     description:
@@ -92,6 +95,7 @@ export class DispatchController {
   }
 
   @Post('operating-clock')
+  @RequirePermission()
   @ApiOperation({
     summary: '推進營運時鐘（執行端用）',
     description:
@@ -203,6 +207,7 @@ export class DispatchController {
   }
 
   @Get('dry-run')
+  @RequirePermission('operations.dispatch.view')
   @ApiOperation({
     summary: '試跑一次檢查',
     description:
@@ -228,6 +233,7 @@ export class DispatchController {
   }
 
   @Post('enable')
+  @RequirePermission('operations.shift-deployment.deploy')
   @ApiOperation({
     summary: '線上開關',
     description:

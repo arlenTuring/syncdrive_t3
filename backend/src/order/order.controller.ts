@@ -19,6 +19,7 @@ import { IsInt, Min, Max, IsOptional, IsString } from 'class-validator';
 import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
+import { RequirePermission } from '../access-control/access.guard';
 
 class UpdateActionStatusDto {
   @ApiProperty({
@@ -113,6 +114,7 @@ export class OrderController {
   }
 
   @Get('list')
+  @RequirePermission('schedule.records.view')
   @ApiOperation({ summary: '班次運行紀錄列表（分頁、篩選）' })
   async listOrders(
     @Query('tab') tab?: string,
@@ -144,6 +146,7 @@ export class OrderController {
   }
 
   @Get('detail')
+  @RequirePermission('schedule.records.view')
   @ApiOperation({ summary: '班次運行紀錄詳情（含站點動作與 task_group）' })
   async orderDetail(@Query('id') id: string) {
     return this.orderService.getOrderDetail(id);
@@ -228,6 +231,7 @@ export class OrderController {
   }
 
   @Put('cancel/:id')
+  @RequirePermission('operations.shift-deployment.revoke')
   @ApiOperation({
     summary: '中心端主動取消訂單（內部用，不對外）',
     description:

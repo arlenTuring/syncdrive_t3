@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -273,6 +274,7 @@ async function overwriteLastIssuesArtifacts(
  */
 @ApiTags('Dev Log')
 @Controller('syncdrive-api/dev-log')
+@RequirePermission('schedule.shift-list.edit')
 export class DevLogController {
   @Post('schedule-engine')
   @HttpCode(200)

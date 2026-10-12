@@ -32,10 +32,11 @@ export type ScheduleSubView =
 export type ScheduleNavItem = ShellNavItem;
 
 export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'shift-deployment', label: 'nav.items.shift-deployment', enabled: true },
-  { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: true },
-  { id: 'dispatch-scheduling', label: 'nav.items.dispatch-scheduling', enabled: true },
-  { id: 'psd-control', label: 'nav.items.psd-control', enabled: true },
+  { id: 'shift-deployment', label: 'nav.items.shift-deployment', enabled: true, requiredPermission: 'operations.shift-deployment.view' },
+  { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: true, requiredPermission: 'operations.degraded.view' },
+  { id: 'virtual-fence', label: 'nav.items.virtual-fence', enabled: true, requiredPermission: 'operations.virtual-fence.view' },
+  { id: 'dispatch-scheduling', label: 'nav.items.dispatch-scheduling', enabled: true, requiredPermission: 'operations.dispatch.view' },
+  { id: 'psd-control', label: 'nav.items.psd-control', enabled: true, requiredPermission: 'operations.psd-control.view' },
 ];
 
 export function isOperationsView(view: string): boolean {
@@ -44,8 +45,7 @@ export function isOperationsView(view: string): boolean {
 
 /** 場域管理模組子選單（對齊 TP13C 場域管理） */
 export const SITE_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'map', label: 'nav.items.map', enabled: true },
-  { id: 'virtual-fence', label: 'nav.items.virtual-fence', enabled: true },
+  { id: 'map', label: 'nav.items.map', enabled: true, requiredPermission: 'site.map.view' },
 ];
 
 export function isSiteView(view: string): boolean {
@@ -53,14 +53,14 @@ export function isSiteView(view: string): boolean {
 }
 
 export const SCHEDULE_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'shift-records', label: 'nav.items.shift-records', enabled: true },
-  { id: 'time-templates', label: 'nav.items.time-templates', enabled: true },
-  { id: 'shift-list', label: 'nav.items.shift-list', enabled: true },
-  { id: 'maintenance-tasks', label: 'nav.items.maintenance-tasks', enabled: true },
+  { id: 'shift-records', label: 'nav.items.shift-records', enabled: true, requiredPermission: 'schedule.records.view' },
+  { id: 'time-templates', label: 'nav.items.time-templates', enabled: true, requiredPermission: 'schedule.time-template.view' },
+  { id: 'shift-list', label: 'nav.items.shift-list', enabled: true, requiredPermission: 'schedule.shift-list.view' },
+  { id: 'maintenance-tasks', label: 'nav.items.maintenance-tasks', enabled: true, requiredPermission: 'schedule.maintenance.view' },
 ];
 
 export const VEHICLE_NAV_ITEMS: ShellNavItem[] = [
-  { id: 'trajectory', label: 'nav.items.trajectory', enabled: true },
+  { id: 'trajectory', label: 'nav.items.trajectory', enabled: true, requiredPermission: 'vehicle.trajectory.view' },
 ];
 
 export const PERMISSION_NAV_ITEMS: ShellNavItem[] = [
@@ -126,3 +126,10 @@ export function isScheduleSubView(view: ShellView): view is ScheduleSubView {
     || view === 'maintenance-tasks'
   );
 }
+
+export const VIEW_PERMISSIONS: Partial<Record<ShellView, string>> = Object.fromEntries(
+  [...OPERATIONS_NAV_ITEMS, ...SITE_NAV_ITEMS, ...SCHEDULE_NAV_ITEMS, ...VEHICLE_NAV_ITEMS, ...PERMISSION_NAV_ITEMS]
+    .filter((item) => item.requiredPermission).map((item) => [item.id, item.requiredPermission!]),
+);
+VIEW_PERMISSIONS.dashboard = 'dashboard.dashboard.view';
+VIEW_PERMISSIONS['system-foundation'] = 'system.health.view';

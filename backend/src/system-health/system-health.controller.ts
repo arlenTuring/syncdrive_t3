@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import { MonitoringThresholdsService } from './monitoring-thresholds.service';
 import {
   type HealthHistoryRange,
@@ -12,6 +13,7 @@ import {
 
 @ApiTags('SystemHealth')
 @Controller('syncdrive-api/system/health')
+@RequirePermission('system.health.view')
 export class SystemHealthController {
   constructor(
     private readonly systemHealth: SystemHealthService,
@@ -77,6 +79,7 @@ export class SystemHealthController {
   }
 
   @Put('thresholds')
+  @RequirePermission('system.foundation.edit')
   @ApiOperation({
     summary: '儲存系統共用監測閾值設定（所有操作人員共用）',
   })

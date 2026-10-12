@@ -5,7 +5,7 @@ import { AuthService, type AuthUser } from './auth.service';
 import { SESSION_COOKIE } from './access.constants';
 
 export const REQUIRE_PERMISSION = 'access:permission';
-export const RequirePermission = (permission: string) => SetMetadata(REQUIRE_PERMISSION, permission);
+export const RequirePermission = (...permissions: string[]) => SetMetadata(REQUIRE_PERMISSION, permissions);
 
 export type AuthenticatedRequest = Request & { authUser?: AuthUser };
 
@@ -24,12 +24,13 @@ export class AccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const permission = this.reflector.getAllAndOverride<string>(REQUIRE_PERMISSION, [context.getHandler(), context.getClass()]);
+    const permissions = this.reflector.getAllAndOverride<string[]>(REQUIRE_PERMISSION, [context.getHandler(), context.getClass()]);
+    if (!permissions?.length) return true;
     const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     const session = await this.auth.authenticate(readCookie(request), request.header('x-csrf-token') ?? undefined, mutating);
     if (!session) throw new UnauthorizedException('請先登入');
     request.authUser = session.user;
-    if (permission && !session.user.permissions.includes(permission)) throw new ForbiddenException('沒有執行此操作的權限');
+    if (!permissions.some((permission) => session.user.permissions.includes(permission))) throw new ForbiddenException('權限不足');
     return true;
   }
 }

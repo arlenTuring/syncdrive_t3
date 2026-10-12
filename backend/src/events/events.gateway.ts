@@ -1,5 +1,7 @@
 import { WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { AuthService } from '../access-control/auth.service';
+import { readCookie } from '../access-control/access.guard';
 
 /** 與 REST 共用 CORS_ORIGIN 設定；留空或 '*' 代表全部放行（僅開發用）。 */
 function resolveSocketCorsOrigin(): string | string[] | boolean {
@@ -17,8 +19,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  handleConnection(_client: Socket) {
-    /* 連線數變動不記錄，避免 HMR／多頁籤洗版 */
+  constructor(private readonly auth: AuthService) {}
+
+  async handleConnection(client: Socket) {
+    const request = client.request as any;
+    const session = await this.auth.authenticate(readCookie(request));
+    if (!session) return client.disconnect(true);
+    const permissions = new Set(session.user.permissions);
+    if ([...permissions].some((code) => code.endsWith('.view'))) client.join('invalidate');
+    if (['dashboard.monitor.view','dashboard.dashboard.view','vehicle.realtime.view','vehicle.trajectory.view','operations.psd-control.view','site.map.view'].some((code) => permissions.has(code))) client.join('live');
+    if (permissions.has('events.events.view')) client.join('events');
   }
 
   handleDisconnect(_client: Socket) {
@@ -27,19 +37,19 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 供其他 Service 呼叫以推播資料給前端
   broadcastTelemetry(vehicleCode: string, payload: any) {
-    this.server.emit(`telemetry/${vehicleCode}`, payload);
+    this.server.to('live').emit(`telemetry/${vehicleCode}`, payload);
   }
 
   broadcastHealth(vehicleCode: string, payload: any) {
-    this.server.emit(`health/${vehicleCode}`, payload);
+    this.server.to('live').emit(`health/${vehicleCode}`, payload);
   }
 
   broadcastOperation(vehicleCode: string, payload: any) {
-    this.server.emit(`operation/${vehicleCode}`, payload);
+    this.server.to('live').emit(`operation/${vehicleCode}`, payload);
   }
 
   broadcastEvent(payload: any) {
-    this.server.emit('security_event', payload);
+    this.server.to('events').emit('security_event', payload);
   }
 
   /**
@@ -51,15 +61,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    *   前端 socket.on('mqtt/slot/status/E1', handler)
    */
   broadcastMqttMessage(topic: string, payload: any) {
-    this.server.emit(`mqtt/${topic}`, payload);
+    this.server.to('live').emit(`mqtt/${topic}`, payload);
   }
 
   /** SQL 元件：後端寫庫後推送失效標籤，前端訂閱者重查（取代輪詢） */
   broadcastDatasourceInvalidate(payload: { tags: string[]; at: number; reason?: string }) {
-    this.server.emit('datasource/invalidate', payload);
+    this.server.to('invalidate').emit('datasource/invalidate', payload);
   }
 
   broadcastLiveStateReset(payload: { vehicleCodes: string[]; at: number }) {
-    this.server.emit('live-state/reset', payload);
+    this.server.to('live').emit('live-state/reset', payload);
   }
 }

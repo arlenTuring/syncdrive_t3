@@ -2,9 +2,11 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MediaLibraryKind } from '../database/entities/media-library-item.entity';
 import { MediaLibraryService } from './media-library.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Media Library')
 @Controller('syncdrive-api/media-library')
+@RequirePermission('media.content.view')
 export class MediaLibraryController {
   constructor(private readonly mediaLibraryService: MediaLibraryService) {}
 

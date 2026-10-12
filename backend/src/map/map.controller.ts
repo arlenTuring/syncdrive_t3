@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MapService } from './map.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 class PublishMapLibraryDto {
   libraryId?: string;
@@ -30,6 +31,7 @@ class SetActiveMapLibraryDto {
 
 @ApiTags('Map')
 @Controller('syncdrive-api/map')
+@RequirePermission('site.map.view')
 export class MapController {
   constructor(private readonly mapService: MapService) {}
 
@@ -52,6 +54,7 @@ export class MapController {
   }
 
   @Put('library/active')
+  @RequirePermission('site.map.publish')
   @ApiOperation({ summary: '地圖庫：設為當前使用地圖（可同時發佈最新內容）' })
   @ApiHeader({
     name: 'X-Sync-Internal-Token',
@@ -73,6 +76,7 @@ export class MapController {
   }
 
   @Put('library/:mapId')
+  @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '地圖庫：發佈／更新地圖（地圖編輯器儲存時同步）' })
   @ApiHeader({
     name: 'X-Sync-Internal-Token',
@@ -89,6 +93,7 @@ export class MapController {
   }
 
   @Delete('library/:mapId')
+  @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '地圖庫：刪除已發佈的地圖（使用中的不給刪）' })
   @ApiHeader({
     name: 'X-Sync-Internal-Token',

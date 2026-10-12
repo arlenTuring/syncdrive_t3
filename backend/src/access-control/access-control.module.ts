@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Account } from '../database/entities/account.entity';
 import { AccountRole } from '../database/entities/account-role.entity';
@@ -17,6 +18,7 @@ import { AuthService } from './auth.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Account, Role, Permission, RolePermission, AccountRole, AccountSession, LoginLog, PermissionChangeLog])],
   controllers: [AuthController, AccessController],
-  providers: [AuthService, AccessService, AccessGuard],
+  providers: [AuthService, AccessService, { provide: APP_GUARD, useClass: AccessGuard }],
+  exports: [AuthService],
 })
 export class AccessControlModule {}

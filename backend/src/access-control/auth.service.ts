@@ -165,13 +165,14 @@ export class AuthService implements OnModuleInit {
     return { user: await this.userById(session.accountId), csrf: session.csrfHash };
   }
 
-  async me(token: string | null) {
+  async me(token: string | null, csrf?: string | null) {
     if (!token) return null;
     const session = await this.sessions.findOne({ where: { tokenHash: digest(token) } });
     if (!session || session.expiresAt <= Date.now()) return null;
-    const csrf = randomBytes(24).toString('base64url');
-    await this.sessions.update(session.id, { csrfHash: digest(csrf) });
-    return { user: await this.userById(session.accountId), csrf };
+    if (csrf && this.safeEqual(digest(csrf), session.csrfHash)) return { user: await this.userById(session.accountId), csrf };
+    const nextCsrf = randomBytes(24).toString('base64url');
+    await this.sessions.update(session.id, { csrfHash: digest(nextCsrf) });
+    return { user: await this.userById(session.accountId), csrf: nextCsrf };
   }
 
   async userById(id: string): Promise<AuthUser> {

@@ -28,9 +28,11 @@ import { OperationShiftService } from './operation-shift.service';
 import { ModuleRef } from '@nestjs/core';
 import { DispatchEngineService } from '../dispatch/dispatch-engine.service';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Operation Shifts')
 @Controller('syncdrive-api/operation-shift')
+@RequirePermission('schedule.shift-list.view')
 export class OperationShiftController {
   constructor(
     private readonly operationShiftService: OperationShiftService,
@@ -82,6 +84,7 @@ export class OperationShiftController {
   }
 
   @Get('timetable/trips')
+  @RequirePermission()
   @ExternalApi('班表計畫')
   @ApiOperation({
     summary: '取得班次清單與各站計畫時刻',
@@ -110,6 +113,7 @@ export class OperationShiftController {
   }
 
   @Get('timetable/station-etas')
+  @RequirePermission()
   @ExternalApi('班表計畫')
   @ApiOperation({
     summary: '取得各停靠點之計畫事件流',
@@ -150,6 +154,7 @@ export class OperationShiftController {
   }
 
   @Post('draft')
+  @RequirePermission('schedule.shift-list.create')
   @ApiOperation({ summary: '建立班表草稿' })
   async createDraft(
     @Body() body: { name?: string; body?: Record<string, unknown> },
@@ -161,12 +166,14 @@ export class OperationShiftController {
   }
 
   @Post('detail/:id/publish')
+  @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({ summary: '發布班表（供 timetable API 優先讀取）' })
   async publishShift(@Param('id') id: string) {
     return this.operationShiftService.publishShift(id);
   }
 
   @Post('detail/:id/deploy')
+  @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({
     summary: '部署班表為使用中（同時發布；其他使用中班表改為閒置）',
   })
@@ -200,18 +207,21 @@ export class OperationShiftController {
   }
 
   @Post('detail/:id/duplicate')
+  @RequirePermission('schedule.shift-list.duplicate')
   @ApiOperation({ summary: '以此複製新版班表草稿' })
   async duplicateDraft(@Param('id') id: string) {
     return this.operationShiftService.duplicateAsNewDraft(id);
   }
 
   @Post('detail/:id/duplicate-as-manual')
+  @RequirePermission('schedule.shift-list.duplicate')
   @ApiOperation({ summary: '參數生成班表複製成手動製作草稿' })
   async duplicateAsManualDraft(@Param('id') id: string) {
     return this.operationShiftService.duplicateAsManualDraft(id);
   }
 
   @Patch('detail/:id')
+  @RequirePermission('schedule.shift-list.edit')
   @ApiOperation({ summary: '更新班表草稿' })
   async updateDraft(
     @Param('id') id: string,
@@ -224,6 +234,7 @@ export class OperationShiftController {
   }
 
   @Delete('detail/:id')
+  @RequirePermission('schedule.shift-list.delete')
   @ApiOperation({ summary: '刪除班表' })
   async deleteShift(@Param('id') id: string) {
     await this.operationShiftService.deleteShift(id);

@@ -1,6 +1,6 @@
 import { AlertCircle, Eye, EyeOff, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { createAccount, fetchRoleOptions, resetPassword, type AccountRow, type RoleSummary } from './api';
+import { createAccount, fetchRoleOptions, resetPassword, updateAccountRoles, type AccountRow, type RoleSummary } from './api';
 import { dangerClass, fieldClass, Modal, passwordValid, primaryClass } from './Modal';
 
 export function CreateAccountDialog({ onClose, onSaved, onOpenRoles }: { onClose: () => void; onSaved: () => void; onOpenRoles: () => void }) {
@@ -34,6 +34,14 @@ export function ResetPasswordDialog({ account, onClose, onSaved }: { account: Ac
     {['新密碼', '確認新密碼'].map((label, index) => <label key={label} className="block text-zinc-300"><b className="text-red-400">*</b>{label}<span className="relative block"><input className={`${fieldClass} pr-12`} type={show ? 'text' : 'password'} value={index ? confirm : password} onChange={(e) => index ? setConfirm(e.target.value) : setPasswordValue(e.target.value)} autoComplete="new-password" placeholder="至少 8 個字元，需含大小寫字母及數字" />{index === 0 ? <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 mt-1 -translate-y-1/2 text-zinc-400" aria-label={show ? '隱藏密碼' : '顯示密碼'}>{show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button> : null}</span></label>)}
     {confirm && password !== confirm ? <p className="text-sm text-red-300">兩次密碼不一致</p> : null}{error ? <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{error}</p> : null}
   </div><footer className="flex justify-end gap-3 border-t border-zinc-700 px-7 py-5"><button type="button" onClick={onClose} className="px-5 text-zinc-300">取消</button><button className={primaryClass} disabled={!valid || busy}>{busy ? '儲存中…' : '儲存'}</button></footer></form></Modal>;
+}
+
+export function EditAccountRolesDialog({ account, onClose, onSaved }: { account: AccountRow; onClose: () => void; onSaved: () => void }) {
+  const [roles,setRoles]=useState<RoleSummary[]>([]); const [selected,setSelected]=useState(account.roles.map((role)=>role.id)); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [error,setError]=useState('');
+  useEffect(()=>{void fetchRoleOptions().then(setRoles).catch((reason:Error)=>setError(reason.message)).finally(()=>setLoading(false));},[]);
+  const toggle=(id:string)=>setSelected((current)=>current.includes(id)?current.filter((item)=>item!==id):current.length<3?[...current,id]:current);
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(selected.length<1||selected.length>3)return;setBusy(true);setError('');try{await updateAccountRoles(account.id,selected);onSaved();}catch(reason){setError(reason instanceof Error?reason.message:'儲存失敗');setBusy(false);}};
+  return <Modal title={`編輯角色 · ${account.account_name}`} onClose={onClose} busy={busy}><form onSubmit={submit}><div className="px-7 pb-6"><p className="mb-3 text-sm text-zinc-400">請選擇 1–3 個角色</p><div className="space-y-2 rounded-xl bg-[#232933] p-3">{loading?<p className="text-zinc-500">載入中…</p>:roles.map((role)=><label key={role.id} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${!selected.includes(role.id)&&selected.length>=3?'cursor-not-allowed opacity-40':'cursor-pointer hover:bg-white/5'}`}><input type="checkbox" checked={selected.includes(role.id)} disabled={!selected.includes(role.id)&&selected.length>=3} onChange={()=>toggle(role.id)}/>{role.name}</label>)}</div>{error?<p role="alert" className="mt-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{error}</p>:null}</div><footer className="flex justify-end gap-3 border-t border-zinc-700 px-7 py-5"><button type="button" onClick={onClose} className="px-5">取消</button><button className={primaryClass} disabled={loading||busy||selected.length<1}>{busy?'儲存中…':'儲存'}</button></footer></form></Modal>;
 }
 
 export function DeleteAccountDialog({ account, onClose, onDeleted }: { account: AccountRow; onClose: () => void; onDeleted: () => Promise<void> }) {

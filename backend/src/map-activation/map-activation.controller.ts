@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MapService } from '../map/map.service';
 import { MapActivationService } from './map-activation.service';
+import { RequirePermission } from '../access-control/access.guard';
 
 class ActivateMapDto {
   libraryId?: string;
@@ -13,6 +14,7 @@ class ActivateMapDto {
 
 @ApiTags('Map')
 @Controller('syncdrive-api/map-activation')
+@RequirePermission('site.map.view')
 export class MapActivationController {
   constructor(
     private readonly activation: MapActivationService,
@@ -28,6 +30,7 @@ export class MapActivationController {
   }
 
   @Post(':mapId')
+  @RequirePermission('site.map.publish')
   @ApiOperation({ summary: '設為主要地圖（檢查不過回 409，附檢查結果）' })
   @ApiHeader({
     name: 'X-Sync-Internal-Token',
