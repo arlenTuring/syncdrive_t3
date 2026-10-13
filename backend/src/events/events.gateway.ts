@@ -28,6 +28,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const permissions = new Set(session.user.permissions);
     if ([...permissions].some((code) => code.endsWith('.view'))) client.join('invalidate');
     if (['dashboard.monitor.view','dashboard.dashboard.view','vehicle.realtime.view','vehicle.trajectory.view','operations.psd-control.view','site.map.view'].some((code) => permissions.has(code))) client.join('live');
+    if (permissions.has('vehicle.realtime.view')) client.join('vehicle-realtime');
     if (permissions.has('events.events.view')) client.join('events');
   }
 
@@ -46,6 +47,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   broadcastOperation(vehicleCode: string, payload: any) {
     this.server.to('live').emit(`operation/${vehicleCode}`, payload);
+  }
+
+  /**
+   * 載具即時清單專用的中心端 envelope。payload 保持車端原樣；時間與持久化結果是
+   * 中心端 metadata，不回寫 MQTT，也不要求協力廠商新增欄位。
+   */
+  broadcastVehicleState(payload: {
+    vehicleCode: string;
+    stream: 'telemetry' | 'operation' | 'health';
+    dataAt: number;
+    receivedAt: number;
+    persisted: boolean;
+    payload: Record<string, unknown>;
+    derivedLocation?: { label: string | null; kind: string | null; objectId: string | null };
+  }) {
+    this.server.to('vehicle-realtime').emit('vehicle/state', payload);
   }
 
   broadcastEvent(payload: any) {

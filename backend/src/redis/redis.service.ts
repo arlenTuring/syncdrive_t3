@@ -60,26 +60,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return { keys, deleted: keys.length ? await this.client.del(...keys) : 0 };
   }
 
-  async setTelemetry(vehicleCode: string, payload: any) {
+  async setTelemetry(vehicleCode: string, payload: any): Promise<boolean> {
     // 規格書 §四 Anti-drift 硬性約束：驗證根層必填欄位
-    if (!payload.timestamp || !payload.global_pose || !payload.kinematics) {
+    if (!Number.isSafeInteger(Number(payload?.timestamp)) || Number(payload.timestamp) <= 0 || !payload.global_pose || !payload.kinematics) {
       this.logger.warn(
         `[Telemetry] Incomplete payload from ${vehicleCode}: missing timestamp, global_pose, or kinematics. Discarding.`
       );
-      return;
+      return false;
     }
     // 驗證 global_pose 座標齊全
     const gp = payload.global_pose;
     if (gp.latitude == null || gp.longitude == null) {
       this.logger.warn(`[Telemetry] Invalid global_pose from ${vehicleCode}: lat/lng is null. Discarding.`);
-      return;
+      return false;
     }
 
     const key = `vtms:telemetry:${vehicleCode}`;
+    const previous = await this.client.get(key);
+    if (!this.isNewerPayload(payload, previous)) return false;
     await this.client.set(key, JSON.stringify(payload));
+    return true;
   }
 
-  async setHealth(vehicleCode: string, payload: any): Promise<{ degraded: boolean, previousHealth: string }> {
+  async setHealth(vehicleCode: string, payload: any): Promise<{ degraded: boolean, previousHealth: string, accepted: boolean }> {
     const key = `vtms:health:${vehicleCode}`;
 
     /*
@@ -92,7 +95,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const validOverallHealth: readonly string[] = VEHICLE_REPORTED_HEALTH_VALUES;
     if (!validOverallHealth.includes(payload.overall_health)) {
       this.logger.warn(`[Health] Invalid overall_health value: '${payload.overall_health}' from ${vehicleCode}, discarding.`);
-      return { degraded: false, previousHealth: 'OK' };
+      return { degraded: false, previousHealth: 'OK', accepted: false };
+    }
+
+    if (!Number.isSafeInteger(Number(payload?.timestamp)) || Number(payload.timestamp) <= 0) {
+      this.logger.warn(`[Health] Invalid timestamp from ${vehicleCode}, discarding.`);
+      return { degraded: false, previousHealth: 'OK', accepted: false };
     }
 
     // 2. 驗證四大子系統是否齊全（規格書 §四 規定必須含 COMPUTING/SENSING/COMMUNICATION/CHASSIS）
@@ -101,7 +109,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const missingSubs = requiredSubsystems.filter(s => !receivedSubsystems.includes(s));
     if (missingSubs.length > 0) {
       this.logger.warn(`[Health] Missing subsystems from ${vehicleCode}: [${missingSubs.join(', ')}], discarding.`);
-      return { degraded: false, previousHealth: 'OK' };
+      return { degraded: false, previousHealth: 'OK', accepted: false };
     }
 
     // 3. 交叉驗算：若任一子系統為 ERROR，overall_health 必須為 ERROR（離線狀態除外）
@@ -118,6 +126,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     // 4. 與前一筆快取比較，偵測狀態劣化
     const previousStr = await this.client.get(key);
+    if (!this.isNewerPayload(payload, previousStr)) {
+      return { degraded: false, previousHealth: 'OK', accepted: false };
+    }
     let degraded = false;
     let previousHealth = 'OK';
 
@@ -138,7 +149,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     await this.client.set(key, JSON.stringify(payload));
     await this.markHeartbeat(vehicleCode, payload.timestamp ?? null);
-    return { degraded, previousHealth };
+    return { degraded, previousHealth, accepted: true };
   }
 
   /** 失聯門檻（毫秒）。心跳 1 Hz，預設五秒＝連掉四拍才判失聯。 */
@@ -204,9 +215,25 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async setOperationUpdate(vehicleCode: string, payload: any) {
+  async setOperationUpdate(vehicleCode: string, payload: any): Promise<boolean> {
+    if (!Number.isSafeInteger(Number(payload?.timestamp)) || Number(payload.timestamp) <= 0) {
+      this.logger.warn(`[Operation] Invalid timestamp from ${vehicleCode}, discarding.`);
+      return false;
+    }
     const key = `vtms:operation:${vehicleCode}`;
+    const previous = await this.client.get(key);
+    if (!this.isNewerPayload(payload, previous)) return false;
     await this.client.set(key, JSON.stringify(payload));
+    return true;
+  }
+
+  private isNewerPayload(payload: Record<string, unknown>, previous: string | null): boolean {
+    if (!previous) return true;
+    try {
+      return Number(payload.timestamp) > Number((JSON.parse(previous) as Record<string, unknown>).timestamp);
+    } catch {
+      return true;
+    }
   }
 
   /** 讀取車輛最新一筆 operation/update 快取（車端原樣） */

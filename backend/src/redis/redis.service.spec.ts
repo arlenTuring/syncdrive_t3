@@ -35,6 +35,7 @@ describe('RedisService', () => {
 
     it('子系統值為 null（非物件）時不拋例外，視為非 ERROR', async () => {
       const payload = {
+        timestamp: 1,
         overall_health: 'OK',
         subsystems: {
           COMPUTING: null,
@@ -46,11 +47,13 @@ describe('RedisService', () => {
       await expect(service.setHealth('PMS01', payload)).resolves.toEqual({
         degraded: false,
         previousHealth: 'OK',
+        accepted: true,
       });
     });
 
     it('任一子系統為 ERROR 物件時正常判定為劣化', async () => {
       const payload = {
+        timestamp: 1,
         overall_health: 'ERROR',
         subsystems: {
           COMPUTING: { status: 'ERROR' },
@@ -61,6 +64,22 @@ describe('RedisService', () => {
       };
       const result = await service.setHealth('PMS01', payload);
       expect(result.degraded).toBe(true);
+    });
+
+    it('相同 timestamp 的 Retain 重送不刷新快取或存活時間', async () => {
+      const payload = {
+        timestamp: 10,
+        overall_health: 'OK',
+        subsystems: {
+          COMPUTING: { status: 'OK' }, SENSING: { status: 'OK' },
+          COMMUNICATION: { status: 'OK' }, CHASSIS: { status: 'OK' },
+        },
+      };
+      client.get.mockResolvedValueOnce(JSON.stringify(payload));
+      await expect(service.setHealth('PMS01', payload)).resolves.toEqual({
+        degraded: false, previousHealth: 'OK', accepted: false,
+      });
+      expect(client.set).not.toHaveBeenCalled();
     });
   });
 });

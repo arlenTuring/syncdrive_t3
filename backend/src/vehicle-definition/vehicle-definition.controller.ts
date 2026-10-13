@@ -28,7 +28,7 @@ import {
  */
 @ApiTags('Vehicle Definitions')
 @Controller('syncdrive-api/vehicle-definitions')
-@RequirePermission('site.map.view', 'vehicle.registry.view')
+@RequirePermission('site.map.view', 'vehicle.registry.view', 'vehicle.realtime.view')
 export class VehicleDefinitionController {
   constructor(private readonly service: VehicleDefinitionService) {}
 
@@ -78,7 +78,7 @@ export class VehicleDefinitionController {
 
 @ApiTags('Vehicle Definitions')
 @Controller('syncdrive-api/map-vehicle-settings')
-@RequirePermission('site.map.view')
+@RequirePermission('site.map.view', 'vehicle.realtime.view')
 export class MapVehicleSettingsController {
   constructor(private readonly service: MapVehicleSettingsService) {}
 

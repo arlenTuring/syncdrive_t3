@@ -47,14 +47,26 @@ export class MqttController {
     if (!vehicleCode || !data) return;
     if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
-    await this.mqttService.updateVehicleLivePosition(vehicleCode, data);
-    await this.redisService.setTelemetry(vehicleCode, data);
+    const receivedAt = Date.now();
+    if (!(await this.redisService.setTelemetry(vehicleCode, data))) return;
+    let persistence: {
+      persisted: boolean;
+      dataAt: number;
+      receivedAt: number;
+      derivedLocation?: { label: string | null; kind: string | null; objectId: string | null };
+    } = { persisted: false, dataAt: Number(data.timestamp), receivedAt };
+    try {
+      persistence = await this.mqttService.updateVehicleLivePosition(vehicleCode, data, receivedAt);
+    } catch (error) {
+      this.logger.error(`[Telemetry snapshot] ${vehicleCode} 寫入失敗：${(error as Error).message}`);
+    }
     if (this.mqttService.shouldPersistTelemetry(vehicleCode)) {
       this.telemetryWriteQueue.enqueue(vehicleCode, data);
     }
 
     // 降級進行中才會真的保存（見 DegradedReplayRecorder）；平常只是一次判斷
     this.replayRecorder.capture('telemetry', vehicleCode, null, data);
+    this.eventsGateway.broadcastVehicleState({ vehicleCode, stream: 'telemetry', payload: data, ...persistence });
     this.eventsGateway.broadcastTelemetry(vehicleCode, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
@@ -66,7 +78,15 @@ export class MqttController {
     if (!vehicleCode || !data) return;
     if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
-    const { degraded, previousHealth } = await this.redisService.setHealth(vehicleCode, data);
+    const receivedAt = Date.now();
+    const { degraded, previousHealth, accepted } = await this.redisService.setHealth(vehicleCode, data);
+    if (!accepted) return;
+    let persistence = { persisted: false, dataAt: Number(data.timestamp), receivedAt };
+    try {
+      persistence = await this.mqttService.persistHealthSnapshot(vehicleCode, data, receivedAt);
+    } catch (error) {
+      this.logger.error(`[Health snapshot] ${vehicleCode} 寫入失敗：${(error as Error).message}`);
+    }
 
     if (degraded) {
       this.logger.warn(`[Health Degradation] ${vehicleCode} health dropped from ${previousHealth} to ERROR.`);
@@ -84,6 +104,7 @@ export class MqttController {
     }
 
     this.replayRecorder.capture('health', vehicleCode, null, data);
+    this.eventsGateway.broadcastVehicleState({ vehicleCode, stream: 'health', payload: data, ...persistence });
     this.eventsGateway.broadcastHealth(vehicleCode, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }
@@ -95,10 +116,18 @@ export class MqttController {
     if (!vehicleCode || !data) return;
     if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
 
-    await this.redisService.setOperationUpdate(vehicleCode, data);
+    const receivedAt = Date.now();
+    if (!(await this.redisService.setOperationUpdate(vehicleCode, data))) return;
+    let persistence = { persisted: false, dataAt: Number(data.timestamp), receivedAt };
+    try {
+      persistence = await this.mqttService.persistOperationSnapshot(vehicleCode, data, receivedAt);
+    } catch (error) {
+      this.logger.error(`[Operation snapshot] ${vehicleCode} 寫入失敗：${(error as Error).message}`);
+    }
     await this.mqttService.syncOperationOrderFromLive(vehicleCode, data);
 
     this.replayRecorder.capture('operation', vehicleCode, null, data);
+    this.eventsGateway.broadcastVehicleState({ vehicleCode, stream: 'operation', payload: data, ...persistence });
     this.eventsGateway.broadcastOperation(vehicleCode, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }

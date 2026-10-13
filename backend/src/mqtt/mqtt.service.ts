@@ -69,15 +69,27 @@ export class MqttService {
    * 每筆 telemetry 都由中心端依啟用圖資判定位置，並覆寫一車一筆的 DB 快照。
    * 顯示優先序在 MapService 固定為站點 → 設施 → 軌道；前端只讀結果，不再重算。
    */
-  async updateVehicleLivePosition(vehicleCode: string, payload: Record<string, unknown>): Promise<void> {
-    const position = (payload as { local_pose?: { position?: { x?: unknown; y?: unknown } } })
+  async updateVehicleLivePosition(
+    vehicleCode: string,
+    payload: Record<string, unknown>,
+    receivedAt = Date.now(),
+  ): Promise<{
+    persisted: boolean;
+    dataAt: number;
+    receivedAt: number;
+    derivedLocation: { label: string | null; kind: string | null; objectId: string | null };
+  }> {
+    const position = (payload as { local_pose?: { position?: { x?: unknown; y?: unknown; z?: unknown } } })
       ?.local_pose?.position;
-    delete payload.segment_label;
-    delete payload.location_kind;
-    delete payload.location_object_id;
     const x = Number(position?.x);
     const y = Number(position?.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const dataAt = Number(payload.timestamp);
+    if (!Number.isSafeInteger(dataAt) || dataAt <= 0) {
+      throw new Error(`telemetry timestamp 無效：${String(payload.timestamp)}`);
+    }
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error('telemetry 缺少有效 local_pose.position.x/y');
+    }
 
     const mapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
     const velocity = Number((payload as { kinematics?: { velocity?: unknown } }).kinematics?.velocity);
@@ -85,25 +97,38 @@ export class MqttService {
     const location = this.mapService.findVehicleLocationAtPoint(mapId, x, y, {
       speedMps: Number.isFinite(velocity) ? velocity : null,
     });
-    payload.segment_label = location?.label ?? null;
-    payload.location_kind = location?.kind ?? null;
-    payload.location_object_id = location?.objectId ?? null;
     const battery = Number((payload as { energy?: { battery_level?: unknown } }).energy?.battery_level);
-    const timestamp = Number(payload.timestamp);
-    await this.dataSource.query(
+    const z = Number(position?.z);
+    const localPose = payload.local_pose as { heading?: unknown } | undefined;
+    const heading = Number(localPose?.heading);
+    const gear = (payload.actuation_feedback as { gear?: unknown } | undefined)?.gear;
+    const rows = await this.dataSource.query(
       `INSERT INTO vehicle_monitor_demo (
          vehicle_code, segment_label, location_kind, location_object_id,
-         position_x, position_y, position_updated_at, demo_speed, demo_load
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         position_x, position_y, position_z, heading_rad, position_updated_at,
+         demo_speed, demo_load, gear, map_id,
+         telemetry_payload, telemetry_derived, telemetry_data_at, telemetry_received_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (vehicle_code) DO UPDATE SET
          segment_label = EXCLUDED.segment_label,
          location_kind = EXCLUDED.location_kind,
          location_object_id = EXCLUDED.location_object_id,
          position_x = EXCLUDED.position_x,
          position_y = EXCLUDED.position_y,
+         position_z = EXCLUDED.position_z,
+         heading_rad = EXCLUDED.heading_rad,
          position_updated_at = EXCLUDED.position_updated_at,
          demo_speed = EXCLUDED.demo_speed,
-         demo_load = EXCLUDED.demo_load`,
+         demo_load = EXCLUDED.demo_load,
+         gear = EXCLUDED.gear,
+         map_id = EXCLUDED.map_id,
+         telemetry_payload = EXCLUDED.telemetry_payload,
+         telemetry_derived = EXCLUDED.telemetry_derived,
+         telemetry_data_at = EXCLUDED.telemetry_data_at,
+         telemetry_received_at = EXCLUDED.telemetry_received_at
+       WHERE vehicle_monitor_demo.telemetry_data_at IS NULL
+          OR vehicle_monitor_demo.telemetry_data_at < EXCLUDED.telemetry_data_at
+       RETURNING vehicle_code`,
       [
         vehicleCode,
         location?.label ?? '場域外',
@@ -111,9 +136,22 @@ export class MqttService {
         location?.objectId ?? null,
         x,
         y,
-        Number.isFinite(timestamp) ? timestamp : Date.now(),
+        Number.isFinite(z) ? z : null,
+        Number.isFinite(heading) ? heading : null,
+        dataAt,
         Number.isFinite(velocity) ? velocity * 3.6 : null,
         Number.isFinite(battery) ? battery : null,
+        typeof gear === 'string' && ['P', 'R', 'N', 'D'].includes(gear) ? gear : null,
+        mapId ?? null,
+        JSON.stringify(payload),
+        JSON.stringify({
+          mapId: mapId ?? null,
+          label: location?.label ?? null,
+          kind: location?.kind ?? null,
+          objectId: location?.objectId ?? null,
+        }),
+        dataAt,
+        receivedAt,
       ],
     );
 
@@ -140,6 +178,71 @@ export class MqttService {
       this.vehiclePositionDirty = false;
       this.datasourceInvalidation.emitVehiclePosition(vehicleCode);
     }
+    return {
+      persisted: rows.length > 0,
+      dataAt,
+      receivedAt,
+      derivedLocation: {
+        label: location?.label ?? null,
+        kind: location?.kind ?? null,
+        objectId: location?.objectId ?? null,
+      },
+    };
+  }
+
+  /** operation/update 的一車一筆最後有效快照；REST 訂單狀態仍由 OrderService 管理。 */
+  async persistOperationSnapshot(
+    vehicleCode: string,
+    payload: Record<string, unknown>,
+    receivedAt = Date.now(),
+  ): Promise<{ persisted: boolean; dataAt: number; receivedAt: number }> {
+    const dataAt = Number(payload.timestamp);
+    if (!Number.isSafeInteger(dataAt) || dataAt <= 0) {
+      throw new Error(`operation timestamp 無效：${String(payload.timestamp)}`);
+    }
+    const rows = await this.dataSource.query(
+      `INSERT INTO vehicle_monitor_demo (
+         vehicle_code, operation_payload, operation_data_at, operation_received_at
+       ) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (vehicle_code) DO UPDATE SET
+         operation_payload = EXCLUDED.operation_payload,
+         operation_data_at = EXCLUDED.operation_data_at,
+         operation_received_at = EXCLUDED.operation_received_at
+       WHERE vehicle_monitor_demo.operation_data_at IS NULL
+          OR vehicle_monitor_demo.operation_data_at < EXCLUDED.operation_data_at
+       RETURNING vehicle_code`,
+      [vehicleCode, JSON.stringify(payload), dataAt, receivedAt],
+    );
+    return { persisted: rows.length > 0, dataAt, receivedAt };
+  }
+
+  /** health/heartbeat 快照。只有資料 timestamp 前進時才刷新在線接收時間。 */
+  async persistHealthSnapshot(
+    vehicleCode: string,
+    payload: Record<string, unknown>,
+    receivedAt = Date.now(),
+  ): Promise<{ persisted: boolean; dataAt: number; receivedAt: number }> {
+    const dataAt = Number(payload.timestamp);
+    if (!Number.isSafeInteger(dataAt) || dataAt <= 0) {
+      throw new Error(`health timestamp 無效：${String(payload.timestamp)}`);
+    }
+    const rows = await this.dataSource.query(
+      `INSERT INTO vehicle_monitor_demo (
+         vehicle_code, health_payload, health_data_at, health_received_at,
+         health_fresh_received_at, overall_health
+       ) VALUES ($1,$2,$3,$4,$4,$5)
+       ON CONFLICT (vehicle_code) DO UPDATE SET
+         health_payload = EXCLUDED.health_payload,
+         health_data_at = EXCLUDED.health_data_at,
+         health_received_at = EXCLUDED.health_received_at,
+         health_fresh_received_at = EXCLUDED.health_fresh_received_at,
+         overall_health = EXCLUDED.overall_health
+       WHERE vehicle_monitor_demo.health_data_at IS NULL
+          OR vehicle_monitor_demo.health_data_at < EXCLUDED.health_data_at
+       RETURNING vehicle_code`,
+      [vehicleCode, JSON.stringify(payload), dataAt, receivedAt, String(payload.overall_health)],
+    );
+    return { persisted: rows.length > 0, dataAt, receivedAt };
   }
 
   async saveTelemetry(vehicleCode: string, payload: any) {

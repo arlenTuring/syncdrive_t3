@@ -31,6 +31,7 @@ import VirtualFenceManagementApp from '../virtual-fence-management';
 import SystemFoundationApp from '../system-foundation';
 import { AccountManagementPage } from '../access-control/AccountManagementPage';
 import { RoleManagementPage } from '../access-control/RoleManagementPage';
+import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -132,6 +133,12 @@ function useWorkspaceChrome(
     if (view === 'trajectory') {
       return {
         title: t('nav.modules.vehicle'),
+        icon: <Route className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === 'vehicle-realtime') {
+      return {
+        title: '載具即時清單',
         icon: <Route className="size-4 text-sky-400" aria-hidden />,
       };
     }
@@ -376,6 +383,14 @@ export default function ScheduleManagementApp({
         {view === 'role-management' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="角色管理設定載入失敗"><RoleManagementPage onOpenAccounts={(roleId)=>{setAccountRoleFilter(roleId);setView('account-management');}} /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'vehicle-realtime' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="載具即時清單載入失敗">
+              <VehicleRealtimePage />
+            </ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 

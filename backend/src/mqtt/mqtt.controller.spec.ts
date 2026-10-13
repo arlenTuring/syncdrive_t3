@@ -3,11 +3,12 @@ import { MqttController } from './mqtt.controller';
 describe('MqttController', () => {
   it('does not sync operation orders from telemetry (operation/update only)', async () => {
     const redisService = {
-      setTelemetry: jest.fn().mockResolvedValue(undefined),
+      setTelemetry: jest.fn().mockResolvedValue(true),
     };
     const eventsGateway = {
       broadcastTelemetry: jest.fn(),
       broadcastMqttMessage: jest.fn(),
+      broadcastVehicleState: jest.fn(),
     };
     const mqttService = {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
@@ -39,7 +40,7 @@ describe('MqttController', () => {
     await controller.handleTelemetry(payload, context as any);
 
     expect(redisService.setTelemetry).toHaveBeenCalledWith('PMS05', payload);
-    expect(mqttService.updateVehicleLivePosition).toHaveBeenCalledWith('PMS05', payload);
+    expect(mqttService.updateVehicleLivePosition).toHaveBeenCalledWith('PMS05', payload, expect.any(Number));
     expect(mqttService.syncOperationOrderFromLive).not.toHaveBeenCalled();
     expect(telemetryWriteQueue.enqueue).not.toHaveBeenCalled();
     expect(eventsGateway.broadcastTelemetry).toHaveBeenCalledWith('PMS05', payload);
@@ -51,10 +52,11 @@ describe('MqttController', () => {
    * 報錯，只是查不到。
    */
   it('把舊寫法 PMS-05 的 topic 與 payload 一起收成 PMS05', async () => {
-    const redisService = { setTelemetry: jest.fn().mockResolvedValue(undefined) };
+    const redisService = { setTelemetry: jest.fn().mockResolvedValue(true) };
     const eventsGateway = {
       broadcastTelemetry: jest.fn(),
       broadcastMqttMessage: jest.fn(),
+      broadcastVehicleState: jest.fn(),
     };
     const mqttService = {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),
@@ -82,10 +84,11 @@ describe('MqttController', () => {
 
   /* 場域設施走同一批 topic，代號不是車輛格式，不該被動到 */
   it('不是車輛代號的就原樣放行', async () => {
-    const redisService = { setTelemetry: jest.fn().mockResolvedValue(undefined) };
+    const redisService = { setTelemetry: jest.fn().mockResolvedValue(true) };
     const eventsGateway = {
       broadcastTelemetry: jest.fn(),
       broadcastMqttMessage: jest.fn(),
+      broadcastVehicleState: jest.fn(),
     };
     const mqttService = {
       updateVehicleLivePosition: jest.fn().mockResolvedValue(undefined),

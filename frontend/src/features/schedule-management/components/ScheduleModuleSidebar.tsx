@@ -60,6 +60,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'shift-list': List,
   'maintenance-tasks': Wrench,
   trajectory: Route,
+  'vehicle-realtime': Route,
   'account-management': UserRoundCog,
   'role-management': ShieldCheck,
 };
@@ -79,7 +80,7 @@ function groupIcon(groupId: string) {
 
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return isSiteView(activeView);
-  if (groupId === 'vehicle') return activeView === 'trajectory';
+  if (groupId === 'vehicle') return activeView === 'trajectory' || activeView === 'vehicle-realtime';
   if (groupId === 'operations') return isOperationsView(activeView);
   if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
   if (groupId === 'schedule') {
@@ -183,7 +184,7 @@ export function ScheduleModuleSidebar({
     ) {
       setExpanded((prev) => ({ ...prev, schedule: true }));
     }
-    if (activeView === 'trajectory') {
+    if (activeView === 'trajectory' || activeView === 'vehicle-realtime') {
       setExpanded((prev) => ({ ...prev, vehicle: true }));
     }
     const mdpId = parseModuleDashboardViewId(activeView);

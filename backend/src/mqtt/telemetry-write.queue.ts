@@ -7,8 +7,7 @@ type TelemetryQueueItem = {
 };
 
 /**
- * 非阻塞 telemetry 寫庫佇列：MQTT 進來一筆就 enqueue 一筆，背景批次 INSERT。
- * 不降低 MQTT 頻率、不丟資料，只避免 handler 被 await DB 卡住。
+ * 非阻塞歷史 telemetry 寫庫佇列；最新狀態快照由 MQTT handler 另行同步保存。
  */
 @Injectable()
 export class TelemetryWriteQueue implements OnModuleDestroy {
@@ -16,12 +15,17 @@ export class TelemetryWriteQueue implements OnModuleDestroy {
   private readonly queue: TelemetryQueueItem[] = [];
   private draining = false;
   private readonly batchSize = 80;
+  private readonly maxQueued = 5000;
   private readonly pausedVehicles = new Set<string>();
 
   constructor(private readonly mqttService: MqttService) {}
 
   enqueue(vehicleCode: string, payload: Record<string, unknown>) {
     if (this.pausedVehicles.has(vehicleCode)) return;
+    if (this.queue.length >= this.maxQueued) {
+      const dropped = this.queue.splice(0, this.batchSize).length;
+      this.logger.warn(`Telemetry history queue full; dropped ${dropped} oldest records (latest snapshot is unaffected)`);
+    }
     this.queue.push({ vehicleCode, payload });
     void this.drain();
   }

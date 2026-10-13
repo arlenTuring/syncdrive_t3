@@ -216,7 +216,11 @@ describe('MqttService', () => {
     });
     expect(dataSourceMock.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO vehicle_monitor_demo'),
-      ['PMS03', 'D03', 'TRACK', 'track-d03', -820, -2, 123, 18, 83],
+      [
+        'PMS03', 'D03', 'TRACK', 'track-d03', -820, -2, null, null, 123, 18, 83,
+        null, 'map-test', expect.stringContaining('"velocity":5'),
+        expect.stringContaining('"label":"D03"'), 123, expect.any(Number),
+      ],
     );
     expect(invalidationMock.emitVehiclePosition).toHaveBeenCalledWith('PMS03');
   });

@@ -31,7 +31,7 @@ class SetActiveMapLibraryDto {
 
 @ApiTags('Map')
 @Controller('syncdrive-api/map')
-@RequirePermission('site.map.view')
+@RequirePermission('site.map.view', 'vehicle.realtime.view')
 export class MapController {
   constructor(private readonly mapService: MapService) {}
 
