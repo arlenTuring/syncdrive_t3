@@ -6,6 +6,11 @@ import { SESSION_COOKIE } from './access.constants';
 
 export const REQUIRE_PERMISSION = 'access:permission';
 export const RequirePermission = (...permissions: string[]) => SetMetadata(REQUIRE_PERMISSION, permissions);
+/**
+ * 不需登入的端點（覆蓋類別上的 RequirePermission）。只給健康檢查這類不含資料的端點用：
+ * 本機啟動腳本與部署機容器的 healthcheck 沒有登入工作階段，被擋成 401 就會把正常的後端判成沒就緒。
+ */
+export const PublicEndpoint = () => SetMetadata(REQUIRE_PERMISSION, []);
 
 export type AuthenticatedRequest = Request & { authUser?: AuthUser };
 

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, BadRequestExcep
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { DatasourceService } from './datasource.service';
 import { DashboardDemoSeedService } from '../database/dashboard-demo-seed.service';
-import { RequirePermission } from '../access-control/access.guard';
+import { PublicEndpoint, RequirePermission } from '../access-control/access.guard';
 import {
   DatasourceDefinitionsService,
   type DataSourceDefinitionPayload,
@@ -42,6 +42,8 @@ export class DatasourceController {
 
   /** 連線測試 */
   @Get('ping')
+  // 健康檢查（本機 dev-start.sh、部署機容器 healthcheck）：只回 ok 與延遲，不需登入
+  @PublicEndpoint()
   @ApiOperation({ summary: '測試後端資料庫連線狀態' })
   async ping() {
     return this.datasourceService.ping();
