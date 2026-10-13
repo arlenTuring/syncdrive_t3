@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MapService } from './map.service';
-import { RequirePermission } from '../access-control/access.guard';
+import { AllowApiKey, RequirePermission } from '../access-control/access.guard';
 
 class PublishMapLibraryDto {
   libraryId?: string;
@@ -48,6 +48,7 @@ export class MapController {
   }
 
   @Get('library/active')
+  @AllowApiKey()
   @ApiOperation({ summary: '地圖庫：目前使用中地圖的完整 JSON（模擬器／其他服務用）' })
   getActiveMapLibraryDocument() {
     return this.mapService.getActivePublishedMapLibrary();
@@ -70,6 +71,7 @@ export class MapController {
   }
 
   @Get('library/:mapId')
+  @AllowApiKey()
   @ApiOperation({ summary: '地圖庫：依 mapId 取得完整 JSON' })
   getMapLibraryDocument(@Param('mapId') mapId: string) {
     return this.mapService.getPublishedMapLibrary(mapId);

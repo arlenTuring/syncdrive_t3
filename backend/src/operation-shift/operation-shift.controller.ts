@@ -28,7 +28,7 @@ import { OperationShiftService } from './operation-shift.service';
 import { ModuleRef } from '@nestjs/core';
 import { DispatchEngineService } from '../dispatch/dispatch-engine.service';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
-import { RequirePermission } from '../access-control/access.guard';
+import { AllowApiKey, RequirePermission } from '../access-control/access.guard';
 
 @ApiTags('Operation Shifts')
 @Controller('syncdrive-api/operation-shift')
@@ -40,6 +40,7 @@ export class OperationShiftController {
   ) {}
 
   @Get('list')
+  @AllowApiKey()
   @ApiOperation({ summary: '正線班表列表（分頁、篩選）' })
   async listShifts(
     @Query('keyword') keyword?: string,

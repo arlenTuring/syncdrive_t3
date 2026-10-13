@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PartnerApiKey } from '../database/entities/partner-api-key.entity';
+import { ApiKeyGuard } from '../common/api-key.guard';
 import { PartnerAccessController } from './partner-access.controller';
 import { PartnerAccessService } from './partner-access.service';
 import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
@@ -18,7 +19,7 @@ import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature([PartnerApiKey])],
   controllers: [PartnerAccessController],
-  providers: [PartnerAccessService, VehicleCertificateIssuer],
-  exports: [PartnerAccessService, VehicleCertificateIssuer],
+  providers: [PartnerAccessService, VehicleCertificateIssuer, ApiKeyGuard],
+  exports: [PartnerAccessService, VehicleCertificateIssuer, ApiKeyGuard],
 })
 export class PartnerAccessModule {}

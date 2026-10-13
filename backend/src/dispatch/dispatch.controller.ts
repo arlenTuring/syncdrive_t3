@@ -9,7 +9,7 @@ import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
 import { MapService } from '../map/map.service';
-import { RequirePermission } from '../access-control/access.guard';
+import { AllowApiKey, RequirePermission } from '../access-control/access.guard';
 
 /**
  * 即時調度引擎的內部維運介面。
@@ -44,6 +44,7 @@ export class DispatchController {
   }
 
   @Post('daily-plan/adopt')
+  @AllowApiKey()
   @RequirePermission('operations.shift-deployment.deploy')
   @ApiOperation({
     summary: '部署每日計畫（明確切換該營運日採用的班表）',
@@ -95,7 +96,8 @@ export class DispatchController {
   }
 
   @Post('operating-clock')
-  @RequirePermission()
+  @AllowApiKey()
+  @RequirePermission('operations.dispatch.edit')
   @ApiOperation({
     summary: '推進營運時鐘（執行端用）',
     description:
@@ -133,6 +135,7 @@ export class DispatchController {
   }
 
   @Get('status')
+  @AllowApiKey()
   @ApiOperation({
     summary: '調度引擎狀態',
     description:
@@ -168,6 +171,7 @@ export class DispatchController {
   }
 
   @Get('plan/shift/:shiftId')
+  @AllowApiKey()
   @ApiOperation({
     summary: '指定班表的完整執行計畫（模擬器依班表 ID 載入用）',
     description:
@@ -193,6 +197,7 @@ export class DispatchController {
   }
 
   @Get('simulation/runs/:runId')
+  @AllowApiKey()
   @ApiOperation({
     summary: '模擬執行進度（依訂單 payload.plan_run_id 追溯）',
     description:
@@ -233,6 +238,7 @@ export class DispatchController {
   }
 
   @Post('enable')
+  @AllowApiKey()
   @RequirePermission('operations.shift-deployment.deploy')
   @ApiOperation({
     summary: '線上開關',

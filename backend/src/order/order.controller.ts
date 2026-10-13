@@ -19,7 +19,7 @@ import { IsInt, Min, Max, IsOptional, IsString } from 'class-validator';
 import { ExternalApi } from '../common/external-api.decorator';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
-import { RequirePermission } from '../access-control/access.guard';
+import { AllowApiKey, RequirePermission } from '../access-control/access.guard';
 
 class UpdateActionStatusDto {
   @ApiProperty({
@@ -61,6 +61,8 @@ export class OrderController {
   ) {}
 
   @Post('save')
+  @AllowApiKey()
+  @RequirePermission('operations.dispatch.create')
   @ApiOperation({ summary: '建立新營運訂單（含 route_id → 站點動作實例化）' })
   @ApiBody({
     description: '訂單內容。PMS99 人工測試單請使用 line_kind=TEST，避免納入正式排班。',
@@ -146,6 +148,7 @@ export class OrderController {
   }
 
   @Get('detail')
+  @AllowApiKey()
   @RequirePermission('schedule.records.view')
   @ApiOperation({ summary: '班次運行紀錄詳情（含站點動作與 task_group）' })
   async orderDetail(@Query('id') id: string) {
@@ -231,6 +234,7 @@ export class OrderController {
   }
 
   @Put('cancel/:id')
+  @AllowApiKey()
   @RequirePermission('operations.shift-deployment.revoke')
   @ApiOperation({
     summary: '中心端主動取消訂單（內部用，不對外）',
