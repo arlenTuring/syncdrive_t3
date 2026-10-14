@@ -12,6 +12,7 @@ export type ShellView =
   | 'map'
   | 'trajectory'
   | 'vehicle-realtime'
+  | 'vehicle-registry'
   | 'system-foundation'
   | 'account-management'
   | 'role-management';
@@ -63,6 +64,7 @@ export const SCHEDULE_NAV_ITEMS: ShellNavItem[] = [
 export const VEHICLE_NAV_ITEMS: ShellNavItem[] = [
   { id: 'vehicle-realtime', label: '載具即時清單', enabled: true, requiredPermission: 'vehicle.realtime.view' },
   { id: 'trajectory', label: 'nav.items.trajectory', enabled: true, requiredPermission: 'vehicle.trajectory.view' },
+  { id: 'vehicle-registry', label: '載具註冊管理', enabled: true, requiredPermission: 'vehicle.registry.view' },
 ];
 
 export const PERMISSION_NAV_ITEMS: ShellNavItem[] = [

@@ -6,6 +6,7 @@ import { ApiKeyGuard } from '../common/api-key.guard';
 import { PartnerAccessController } from './partner-access.controller';
 import { PartnerAccessService } from './partner-access.service';
 import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
+import { Vehicle } from '../database/entities/vehicle.entity';
 
 /**
  * 對外存取憑據。
@@ -17,7 +18,7 @@ import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, TypeOrmModule.forFeature([PartnerApiKey])],
+  imports: [ConfigModule, TypeOrmModule.forFeature([PartnerApiKey, Vehicle])],
   controllers: [PartnerAccessController],
   providers: [PartnerAccessService, VehicleCertificateIssuer, ApiKeyGuard],
   exports: [PartnerAccessService, VehicleCertificateIssuer, ApiKeyGuard],

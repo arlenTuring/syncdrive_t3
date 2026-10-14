@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { Vehicle } from '../database/entities/vehicle.entity';
 import { RedisService } from '../redis/redis.service';
+import { nextAvailableVehicleCode } from '../common/vehicle-codes';
 import { VehicleRealtimeQueryDto } from './dto/vehicle-realtime-query.dto';
+import { CreateVehicleDto, UpdateVehicleDto, UpdateVehicleServiceDto, VehicleRegistrationQueryDto } from './dto/vehicle-registration.dto';
 
 @Injectable()
 export class VehicleService {
@@ -13,6 +16,7 @@ export class VehicleService {
     private readonly vehicles: Repository<Vehicle>,
     private readonly dataSource: DataSource,
     private readonly redis: RedisService,
+    private readonly config: ConfigService,
   ) {}
 
   async listActive(): Promise<Vehicle[]> {
@@ -20,6 +24,166 @@ export class VehicleService {
       where: { isActive: true, vehicleCode: Like('PMS%') },
       order: { vehicleCode: 'ASC' },
     });
+  }
+
+  async getRegistrationList(query: VehicleRegistrationQueryDto) {
+    const sortColumns = {
+      name: `COALESCE(NULLIF(v.display_name, ''), v.vehicle_code)`,
+      mileage: 'v.initial_mileage_km',
+      connection: 'm.health_fresh_received_at',
+      service: 'v.service_enabled',
+      createdAt: 'v.created_at',
+    } as const;
+    const sort = sortColumns[query.sortBy] ?? sortColumns.createdAt;
+    const direction = query.sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const keyword = query.keyword ? `%${query.keyword}%` : null;
+    const offset = (query.page - 1) * query.pageSize;
+    const [countRows, rows] = await Promise.all([
+      this.dataSource.query(
+        `SELECT count(*)::int AS total FROM vehicles v
+         WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+           AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)`,
+        [keyword],
+      ),
+      this.dataSource.query(
+        `SELECT v.id, v.vehicle_code, COALESCE(NULLIF(v.display_name, ''), v.vehicle_code) AS display_name,
+                v.initial_mileage_km, v.service_enabled, v.created_at, v.updated_at, v.row_version,
+                m.telemetry_data_at, m.operation_data_at, m.health_data_at, m.health_fresh_received_at
+         FROM vehicles v
+         LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
+         WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+           AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)
+         ORDER BY ${sort} ${direction} NULLS LAST, v.vehicle_code ASC
+         LIMIT $2 OFFSET $3`,
+        [keyword, query.pageSize, offset],
+      ),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    const now = Date.now();
+    return {
+      items: rows.map((row: Record<string, unknown>) => ({
+        id: row.id,
+        displayName: row.display_name,
+        initialMileageKm: Number(row.initial_mileage_km),
+        connectionStatus: this.connectionStatus(row, now),
+        serviceEnabled: row.service_enabled,
+        createdAt: Number(row.created_at),
+        updatedAt: row.updated_at == null ? null : Number(row.updated_at),
+        version: Number(row.row_version),
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  }
+
+  async createRegistration(input: CreateVehicleDto) {
+    const displayName = this.validName(input.displayName);
+    const vehicle = await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext('syncdrive_vehicle_code_allocator'))`);
+      const usedRows = await manager.query(`SELECT vehicle_code FROM vehicles WHERE vehicle_code ~ '^PMS[0-9]{2}$'`);
+      const vehicleCode = nextAvailableVehicleCode(
+        usedRows.map((row: { vehicle_code: string }) => row.vehicle_code),
+      );
+      if (!vehicleCode) throw new ConflictException('PMS 兩碼通訊身分已用盡，無法建立載具');
+      const now = Date.now();
+      return manager.getRepository(Vehicle).save(manager.getRepository(Vehicle).create({
+        vehicleCode,
+        displayName,
+        isActive: true,
+        initialMileageKm: Number(input.initialMileageKm).toFixed(3),
+        serviceEnabled: true,
+        rowVersion: 1,
+        createdAt: String(now),
+        updatedAt: String(now),
+      }));
+    });
+    return this.registrationDetail(vehicle);
+  }
+
+  async getRegistration(id: string) {
+    const vehicle = await this.vehicles.findOne({ where: { id, isActive: true } });
+    if (!vehicle) throw new NotFoundException('找不到載具');
+    return this.registrationDetail(vehicle);
+  }
+
+  async updateRegistration(id: string, input: UpdateVehicleDto) {
+    const displayName = this.validName(input.displayName);
+    const now = Date.now();
+    const result = await this.vehicles.createQueryBuilder().update(Vehicle).set({
+      displayName,
+      initialMileageKm: Number(input.initialMileageKm).toFixed(3),
+      rowVersion: () => 'row_version + 1',
+      updatedAt: String(now),
+    }).where('id = :id AND is_active = true AND row_version = :version', { id, version: input.expectedVersion }).execute();
+    if (!result.affected) await this.throwMissingOrConflict(id);
+    return this.getRegistration(id);
+  }
+
+  async updateServiceSetting(id: string, input: UpdateVehicleServiceDto) {
+    const result = await this.vehicles.createQueryBuilder().update(Vehicle).set({
+      serviceEnabled: input.serviceEnabled,
+      rowVersion: () => 'row_version + 1',
+      updatedAt: String(Date.now()),
+    }).where('id = :id AND is_active = true AND row_version = :version', { id, version: input.expectedVersion }).execute();
+    if (!result.affected) await this.throwMissingOrConflict(id);
+    return this.getRegistration(id);
+  }
+
+  private async throwMissingOrConflict(id: string): Promise<never> {
+    const exists = await this.vehicles.exist({ where: { id, isActive: true } });
+    if (!exists) throw new NotFoundException('找不到載具');
+    throw new ConflictException('載具已被其他人修改，請重新開啟後再儲存');
+  }
+
+  private validName(value: string) {
+    const name = String(value ?? '').trim();
+    if (!name) throw new BadRequestException('載具名稱為必填');
+    if (name.length > 80) throw new BadRequestException('載具名稱不可超過 80 個字元');
+    return name;
+  }
+
+  private registrationDetail(vehicle: Vehicle) {
+    return {
+      id: vehicle.id,
+      vehicleCode: vehicle.vehicleCode,
+      displayName: vehicle.displayName || vehicle.vehicleCode,
+      initialMileageKm: Number(vehicle.initialMileageKm),
+      serviceEnabled: vehicle.serviceEnabled,
+      createdAt: Number(vehicle.createdAt),
+      updatedAt: vehicle.updatedAt == null ? null : Number(vehicle.updatedAt),
+      version: vehicle.rowVersion,
+      integration: this.integrationInfo(vehicle.vehicleCode),
+    };
+  }
+
+  private integrationInfo(vehicleCode: string) {
+    const brokerHost = this.config.get<string>('MQTT_PUBLIC_HOST', '').trim();
+    const configuredApiBase = this.config.get<string>('PUBLIC_API_BASE_URL', '').trim();
+    const apiBaseUrl = configuredApiBase || (brokerHost
+      ? `http://${brokerHost}:${Number(this.config.get<string>('PUBLIC_API_PORT', '3100'))}/syncdrive-api`
+      : '');
+    const topic = (suffix: string) => `v1/vtms/${vehicleCode}/${suffix}`;
+    return {
+      vehicleCode,
+      mqtt: { host: brokerHost || null, port: Number(this.config.get<string>('MQTT_PUBLIC_PORT', '8883')), tls: true, mutualTls: true },
+      apiBaseUrl: apiBaseUrl || null,
+      credentialEndpoint: '/syncdrive-api/auth/token',
+      wikiUrl: this.config.get<string>('VEHICLE_INTEGRATION_WIKI_URL', 'document/對外介接/車端介接說明書.md'),
+      publishTopics: [topic('telemetry/update'), topic('operation/update'), topic('health/heartbeat'), topic('command/ack'), topic('event/report')],
+      subscribeTopics: [topic('operation/assign'), topic('operation/cancel'), topic('command/execute')],
+      readiness: brokerHost && apiBaseUrl ? 'READY' : 'CONFIG_REQUIRED',
+    };
+  }
+
+  private connectionStatus(row: Record<string, unknown>, now: number) {
+    const hasData = row.telemetry_data_at != null || row.operation_data_at != null || row.health_data_at != null;
+    if (!hasData) return 'NO_DATA';
+    const lastHeartbeat = Number(row.health_fresh_received_at);
+    return Number.isFinite(lastHeartbeat) && now - lastHeartbeat <= this.redis.offlineAfterMs ? 'ONLINE' : 'OFFLINE';
   }
 
   /**

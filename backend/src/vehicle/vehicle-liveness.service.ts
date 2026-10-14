@@ -1,8 +1,11 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
 import { EventsGateway } from '../events/events.gateway';
 import { RedisService } from '../redis/redis.service';
 import { VTMS_VEHICLE_CODES } from '../common/vehicle-codes';
 import { withDerivedOffline } from '../common/vehicle-liveness';
+import { Vehicle } from '../database/entities/vehicle.entity';
 
 /**
  * 失聯巡檢。
@@ -30,6 +33,9 @@ export class VehicleLivenessService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly redis: RedisService,
     private readonly events: EventsGateway,
+    @Optional()
+    @InjectRepository(Vehicle)
+    private readonly vehicles?: Repository<Vehicle>,
   ) {}
 
   onModuleInit() {
@@ -51,7 +57,14 @@ export class VehicleLivenessService implements OnModuleInit, OnModuleDestroy {
     const offline: string[] = [];
     const changed: string[] = [];
 
-    for (const code of VTMS_VEHICLE_CODES) {
+    const registered = this.vehicles
+      ? await this.vehicles.find({ where: { isActive: true }, select: { vehicleCode: true } })
+      : [];
+    const vehicleCodes = registered.length > 0
+      ? registered.map((vehicle) => vehicle.vehicleCode)
+      : [...VTMS_VEHICLE_CODES];
+
+    for (const code of vehicleCodes) {
       const mark = await this.redis.getLivenessMark(code);
       const isOffline = mark === null || now - mark.receivedAt > this.redis.offlineAfterMs;
       if (isOffline) offline.push(code);

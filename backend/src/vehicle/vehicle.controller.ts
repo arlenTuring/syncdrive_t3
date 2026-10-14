@@ -1,8 +1,12 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { RequirePermission } from '../access-control/access.guard';
 import { VehicleRealtimeQueryDto } from './dto/vehicle-realtime-query.dto';
+import { CreateVehicleDto, UpdateVehicleDto, UpdateVehicleServiceDto, VehicleIdDto, VehicleRegistrationQueryDto } from './dto/vehicle-registration.dto';
+import { AuditService } from '../audit/audit.service';
+import { ActionResult, OperatorActionType } from '../database/entities/operator-action-log.entity';
+import type { AuthenticatedRequest } from '../access-control/access.guard';
 
 @ApiTags('vehicles')
 @Controller('syncdrive-api/vehicles')
@@ -10,6 +14,7 @@ import { VehicleRealtimeQueryDto } from './dto/vehicle-realtime-query.dto';
 export class VehicleController {
   constructor(
     private readonly vehicleService: VehicleService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get()
@@ -43,5 +48,67 @@ export class VehicleController {
   })
   async getSnapshot(@Query() query: VehicleRealtimeQueryDto) {
     return this.vehicleService.getRealtimeSnapshot(query);
+  }
+
+  @Get('registry')
+  @RequirePermission('vehicle.registry.view')
+  @ApiOperation({ summary: '載具註冊清單' })
+  registry(@Query() query: VehicleRegistrationQueryDto) {
+    return this.vehicleService.getRegistrationList(query);
+  }
+
+  @Post('registry')
+  @RequirePermission('vehicle.registry.create')
+  @ApiOperation({ summary: '完成載具註冊並分配穩定通訊身分' })
+  async createRegistry(@Body() body: CreateVehicleDto, @Req() request: AuthenticatedRequest) {
+    const result = await this.vehicleService.createRegistration(body);
+    await this.audit.write({
+      operatorId: request.authUser?.id,
+      sourceIp: request.ip || request.socket.remoteAddress,
+      actionType: OperatorActionType.VEHICLE_REGISTER,
+      targetVehicle: result.vehicleCode,
+      actionDetail: { displayName: result.displayName, initialMileageKm: result.initialMileageKm },
+      result: ActionResult.SUCCESS,
+    });
+    return result;
+  }
+
+  @Get('registry/:id')
+  @RequirePermission('vehicle.registry.view')
+  @ApiOperation({ summary: '載具註冊詳情與串接資訊' })
+  registryDetail(@Param() params: VehicleIdDto) {
+    return this.vehicleService.getRegistration(params.id);
+  }
+
+  @Patch('registry/:id')
+  @RequirePermission('vehicle.registry.edit')
+  @ApiOperation({ summary: '編輯載具名稱與里程基準' })
+  async updateRegistry(@Param() params: VehicleIdDto, @Body() body: UpdateVehicleDto, @Req() request: AuthenticatedRequest) {
+    const result = await this.vehicleService.updateRegistration(params.id, body);
+    await this.audit.write({
+      operatorId: request.authUser?.id,
+      sourceIp: request.ip || request.socket.remoteAddress,
+      actionType: OperatorActionType.VEHICLE_UPDATE,
+      targetVehicle: result.vehicleCode,
+      actionDetail: { displayName: result.displayName, initialMileageKm: result.initialMileageKm, version: result.version },
+      result: ActionResult.SUCCESS,
+    });
+    return result;
+  }
+
+  @Patch('registry/:id/service')
+  @RequirePermission('vehicle.registry.service-scope')
+  @ApiOperation({ summary: '設定是否允許派發新任務' })
+  async updateService(@Param() params: VehicleIdDto, @Body() body: UpdateVehicleServiceDto, @Req() request: AuthenticatedRequest) {
+    const result = await this.vehicleService.updateServiceSetting(params.id, body);
+    await this.audit.write({
+      operatorId: request.authUser?.id,
+      sourceIp: request.ip || request.socket.remoteAddress,
+      actionType: OperatorActionType.VEHICLE_SERVICE_SETTING,
+      targetVehicle: result.vehicleCode,
+      actionDetail: { serviceEnabled: result.serviceEnabled, version: result.version },
+      result: ActionResult.SUCCESS,
+    });
+    return result;
   }
 }

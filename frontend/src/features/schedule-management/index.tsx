@@ -32,6 +32,7 @@ import SystemFoundationApp from '../system-foundation';
 import { AccountManagementPage } from '../access-control/AccountManagementPage';
 import { RoleManagementPage } from '../access-control/RoleManagementPage';
 import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
+import { VehicleRegistryPage } from '../vehicle-registry/VehicleRegistryPage';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -141,6 +142,9 @@ function useWorkspaceChrome(
         title: '載具即時清單',
         icon: <Route className="size-4 text-sky-400" aria-hidden />,
       };
+    }
+    if (view === 'vehicle-registry') {
+      return { title: '載具註冊管理', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
     }
     if (view === 'system-foundation') {
       return {
@@ -391,6 +395,12 @@ export default function ScheduleManagementApp({
             <ViewErrorBoundary title="載具即時清單載入失敗">
               <VehicleRealtimePage />
             </ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'vehicle-registry' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="載具註冊管理載入失敗"><VehicleRegistryPage /></ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 

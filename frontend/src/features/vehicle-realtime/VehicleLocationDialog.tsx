@@ -10,7 +10,7 @@ import type { VehicleRealtimeItem } from './types';
 
 type Parsed = Awaited<ReturnType<typeof resolveParsedMapForPlatform>>;
 
-export function VehicleLocationDialog({ item, onClose }: { item: VehicleRealtimeItem; onClose: () => void }) {
+export function VehicleLocationDialog({ item, fleet, onClose }: { item: VehicleRealtimeItem; fleet: VehicleRealtimeItem[]; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [map, setMap] = useState<Parsed>(null);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -41,27 +41,27 @@ export function VehicleLocationDialog({ item, onClose }: { item: VehicleRealtime
     return () => { cancelled = true; };
   }, [item.mapId]);
 
-  const vehicle = useMemo<AreaVehicleLive[]>(() => {
-    if (!item.location) return [];
-    return [{
-      areaId: item.location.objectId ?? '',
-      vehicleId: item.vehicleCode,
-      xM: item.location.x,
-      yM: item.location.y,
+  const vehicles = useMemo<AreaVehicleLive[]>(() => fleet
+    .filter((candidate) => candidate.mapId === item.mapId && candidate.location)
+    .map((candidate) => ({
+      areaId: candidate.location!.objectId ?? '',
+      vehicleId: candidate.vehicleCode,
+      xM: candidate.location!.x,
+      yM: candidate.location!.y,
       payload: {
-        ...(item.telemetry?.payload ?? {}),
-        vehicle_code: item.vehicleCode,
-        segment_label: item.location.label,
+        ...(candidate.telemetry?.payload ?? {}),
+        vehicle_code: candidate.vehicleCode,
+        segment_label: candidate.location!.label,
+        __selected: candidate.vehicleCode === item.vehicleCode,
         local_pose: {
-          ...((item.telemetry?.payload.local_pose as Record<string, unknown> | undefined) ?? {}),
-          heading: item.location.headingRad,
-          position: { x: item.location.x, y: item.location.y, z: item.location.z },
+          ...((candidate.telemetry?.payload.local_pose as Record<string, unknown> | undefined) ?? {}),
+          heading: candidate.location!.headingRad,
+          position: { x: candidate.location!.x, y: candidate.location!.y, z: candidate.location!.z },
         },
       },
-      topic: `snapshot/${item.vehicleCode}`,
-      updatedAt: item.telemetry?.receivedAt ?? 0,
-    }];
-  }, [item]);
+      topic: `snapshot/${candidate.vehicleCode}`,
+      updatedAt: candidate.telemetry?.receivedAt ?? 0,
+    })), [fleet, item.mapId, item.vehicleCode]);
 
   const tasks = Array.isArray(item.operation?.payload.task_group)
     ? item.operation.payload.task_group as Array<Record<string, unknown>>
@@ -87,7 +87,7 @@ export function VehicleLocationDialog({ item, onClose }: { item: VehicleRealtime
               <MapViewport storageKey={`vehicle-realtime:${item.vehicleCode}`}>
                 <MapPlatformCanvas
                   map={{ areas: map.areas, routes: map.routes ?? [], pixelSize: map.pixelSize, pixelOrigin: map.pixelOrigin }}
-                  vehicles={vehicle}
+                  vehicles={vehicles}
                   liveById={{}}
                   tweenMs={1200}
                   orderStationsById={{}}

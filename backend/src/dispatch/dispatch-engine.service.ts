@@ -181,7 +181,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
 
   private async loadFleet(): Promise<string[]> {
     const vehicles = await this.vehicleRepository.find({
-      where: { isActive: true },
+      where: { isActive: true, serviceEnabled: true },
     });
     return vehicles
       .map((vehicle) => vehicle.vehicleCode)

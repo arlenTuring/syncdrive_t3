@@ -895,6 +895,7 @@ export function MapAreaVehicleOverlay({
           'data-marker': `${markerW.toFixed(1)}x${markerH.toFixed(1)}`,
         };
         const bgColor = resolveMapVehicleBgColor(vehicle);
+        const selected = vehicle.payload.__selected === true;
         const zIndex = 100 + stackOrder;
 
         // 大跳躍的判斷在上面（teleported）；高倍速行進仍走 CSS 補間
@@ -1049,6 +1050,19 @@ export function MapAreaVehicleOverlay({
             zIndex={zIndex + 2}
           />
         ) : null;
+        const selectedBadge = selected ? (
+          <div
+            className="pointer-events-none absolute whitespace-nowrap rounded border border-white/70 bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-lg"
+            style={{
+              left: badgeCenterX,
+              top: badgeTopY - (cellBadge ? 20 : 0),
+              zIndex: zIndex + 3,
+              transform: 'translate(-50%, -100%)',
+            }}
+          >
+            選取 · {vehicle.vehicleId}
+          </div>
+        ) : null;
 
         if (vehicleDefinition) {
           const vehicleKey = `${vehicle.areaId}:${vehicle.vehicleId}`;
@@ -1058,8 +1072,9 @@ export function MapAreaVehicleOverlay({
               {coordLabel}
               {anchorDebug}
               {cellBadge}
+              {selectedBadge}
               <div
-                style={{ ...style, overflow: 'visible', pointerEvents: 'none' }}
+                style={{ ...style, overflow: 'visible', pointerEvents: 'none', filter: selected ? 'drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 2px white)' : undefined }}
               >
                 <div className="pointer-events-none">
                   {/*
@@ -1097,12 +1112,13 @@ export function MapAreaVehicleOverlay({
             {coordLabel}
             {anchorDebug}
             {cellBadge}
+            {selectedBadge}
             <MapVehicleMarker
               spec={iconSpec}
               vehicleId={vehicle.vehicleId}
               bgColor={bgColor}
               showLabel={showLabels}
-              style={style}
+              style={{ ...style, filter: selected ? 'drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 2px white)' : undefined }}
             />
           </div>
         );

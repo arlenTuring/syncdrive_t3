@@ -13,12 +13,23 @@ export const VTMS_VEHICLE_CODES = Array.from(
   (_, i) => `PMS${String(i + 1).padStart(2, '0')}`,
 ) as readonly string[];
 
-export const VTMS_VEHICLE_CODE_PATTERN = /^PMS(0[1-9]|1[0-1])$/;
+/** 協議格式是 PMS + 兩碼；PMS00 無效、PMS99 保留聯測。是否已登錄另查 vehicles。 */
+export const VTMS_VEHICLE_CODE_PATTERN = /^PMS(0[1-9]|[1-9][0-9])$/;
 
-export const VTMS_VEHICLE_CODE_OR_ALL_PATTERN = /^(all|PMS(0[1-9]|1[0-1]))$/;
+export const VTMS_VEHICLE_CODE_OR_ALL_PATTERN = /^(all|PMS(0[1-9]|[1-8][0-9]|9[0-8]))$/;
+
+/** 由資料庫已使用集合找第一個可分配身分；PMS99 永遠保留給聯測。 */
+export function nextAvailableVehicleCode(usedCodes: Iterable<string>): string | null {
+  const used = new Set([...usedCodes].map(normalizeVehicleCode));
+  for (let number = 1; number <= 98; number += 1) {
+    const candidate = `PMS${String(number).padStart(2, '0')}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return null;
+}
 
 /** 改名前的寫法，只在入口用來辨認舊訊息 */
-const LEGACY_VEHICLE_CODE_PATTERN = /^PMS-(0[1-9]|1[0-1])$/;
+const LEGACY_VEHICLE_CODE_PATTERN = /^PMS-(0[1-9]|[1-9][0-9])$/;
 
 /**
  * 入口正規化：把舊寫法 `01` 收斂成 `PMS01`。

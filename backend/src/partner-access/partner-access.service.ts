@@ -12,6 +12,7 @@ import { LessThan, Repository } from 'typeorm';
 import { PartnerApiKey } from '../database/entities/partner-api-key.entity';
 import { VehicleCertificateIssuer } from './vehicle-certificate.issuer';
 import { VTMS_VEHICLE_CODES, normalizeVehicleCode } from '../common/vehicle-codes';
+import { Vehicle } from '../database/entities/vehicle.entity';
 
 /** 預設有效期：24 小時 */
 export const DEFAULT_TTL_MINUTES = 24 * 60;
@@ -61,6 +62,8 @@ export class PartnerAccessService {
     private readonly config: ConfigService,
     @InjectRepository(PartnerApiKey)
     private readonly keys: Repository<PartnerApiKey>,
+    @InjectRepository(Vehicle)
+    private readonly vehicles: Repository<Vehicle>,
     private readonly certificates: VehicleCertificateIssuer,
   ) {}
 
@@ -93,7 +96,7 @@ export class PartnerAccessService {
    * 車輛憑證在這裡<strong>當場簽</strong>，效期等於這次申請的 ttl_minutes——
    * 換金鑰與換憑證是同一個動作，不會出現「金鑰還有效但憑證過期」的半殘狀態。
    */
-  private buildMqttBundle(vehicleCodes: string[], expiresAt: number): MqttBundle {
+  private async buildMqttBundle(vehicleCodes: string[], expiresAt: number): Promise<MqttBundle> {
     const ca = this.certificates.rootCertificate();
     const intermediate = this.certificates.intermediateCertificate();
     if (!ca || !intermediate) {
@@ -102,7 +105,7 @@ export class PartnerAccessService {
       );
     }
 
-    const known = new Set(this.knownVehicleCodes());
+    const known = new Set(await this.knownVehicleCodes());
     const unknown = vehicleCodes.filter((code) => !known.has(code));
     if (unknown.length > 0) {
       throw new BadRequestException(
@@ -121,10 +124,11 @@ export class PartnerAccessService {
   }
 
   /** 這個環境簽發過憑證的車輛代號 */
-  private knownVehicleCodes(): string[] {
+  private async knownVehicleCodes(): Promise<string[]> {
     const raw = this.config.get<string>('MQTT_VEHICLE_CODES', '').trim();
     if (raw) return raw.split(',').map((item) => item.trim()).filter(Boolean);
-    return [...VTMS_VEHICLE_CODES, 'PMS99'];
+    const registered = await this.vehicles.find({ where: { isActive: true }, select: { vehicleCode: true } });
+    return [...new Set([...registered.map((item) => item.vehicleCode), 'PMS99'])].sort();
   }
 
   async issue(input: {
@@ -156,11 +160,11 @@ export class PartnerAccessService {
       ? input.vehicleCodes.map((code) =>
           normalizeVehicleCode(String(code).trim().toUpperCase()),
         )
-      : this.knownVehicleCodes();
+      : await this.knownVehicleCodes();
     // 到期時間先定下來，金鑰與憑證共用同一個值——兩者必須同時失效
     const issuedAt = Date.now();
     const expiresAt = issuedAt + ttl * 60_000;
-    const mqtt = this.buildMqttBundle(codes, expiresAt);
+    const mqtt = await this.buildMqttBundle(codes, expiresAt);
 
     // 32 bytes 的隨機值。金鑰只在這一刻存在，之後資料庫裡只有它的雜湊。
     const apiKey = randomBytes(32).toString('hex');

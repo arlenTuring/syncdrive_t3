@@ -9,6 +9,7 @@ type Buffered = Partial<Record<StreamKind, VehicleStateEnvelope>>;
 
 export function useVehicleRealtime(query: VehicleSnapshotQuery) {
   const [response, setResponse] = useState<VehicleSnapshotResponse | null>(null);
+  const [fleet, setFleet] = useState<VehicleSnapshotResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bufferedRef = useRef(new Map<string, Buffered>());
@@ -18,11 +19,18 @@ export function useVehicleRealtime(query: VehicleSnapshotQuery) {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    void fetchVehicleSnapshot(query, controller.signal)
-      .then((snapshot) => {
+    void Promise.all([
+      fetchVehicleSnapshot(query, controller.signal),
+      fetchVehicleSnapshot({ keyword: '', page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }, controller.signal),
+    ])
+      .then(([snapshot, fleetSnapshot]) => {
         setResponse({
           ...snapshot,
           items: snapshot.items.map((item) => mergeBufferedEnvelopes(item, bufferedRef.current.get(item.vehicleCode))),
+        });
+        setFleet({
+          ...fleetSnapshot,
+          items: fleetSnapshot.items.map((item) => mergeBufferedEnvelopes(item, bufferedRef.current.get(item.vehicleCode))),
         });
       })
       .catch((reason: Error) => {
@@ -54,6 +62,10 @@ export function useVehicleRealtime(query: VehicleSnapshotQuery) {
         ...previous,
         items: previous.items.map((item) => item.vehicleCode === code ? mergeVehicleEnvelope(item, raw) : item),
       } : previous);
+      setFleet((previous) => previous ? {
+        ...previous,
+        items: previous.items.map((item) => item.vehicleCode === code ? mergeVehicleEnvelope(item, raw) : item),
+      } : previous);
     };
     const onReconnect = () => refreshRef.current();
     socket.on('vehicle/state', onState);
@@ -67,5 +79,5 @@ export function useVehicleRealtime(query: VehicleSnapshotQuery) {
 
   useEffect(() => refresh(), [refresh]);
 
-  return { response, loading, error, retry: refresh };
+  return { response, fleet, loading, error, retry: refresh };
 }

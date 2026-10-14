@@ -17,8 +17,8 @@ export function VehicleRealtimePage() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
   const query = useMemo(() => ({ keyword, page, pageSize: PAGE_SIZE, sortBy, sortDirection }), [keyword, page, sortBy, sortDirection]);
-  const { response, loading, error, retry } = useVehicleRealtime(query);
-  const selected = response?.items.find((item) => item.vehicleCode === selectedCode) ?? null;
+  const { response, fleet, loading, error, retry } = useVehicleRealtime(query);
+  const selected = fleet?.items.find((item) => item.vehicleCode === selectedCode) ?? response?.items.find((item) => item.vehicleCode === selectedCode) ?? null;
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
@@ -81,7 +81,7 @@ export function VehicleRealtimePage() {
 
       {response ? <div className="flex shrink-0 items-center justify-center gap-3 border-t border-zinc-800 pt-4 text-sm text-zinc-400"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded p-1 disabled:opacity-30"><ChevronLeft className="size-4" /></button><span className="rounded-md border border-sky-500 px-2.5 py-1 text-sky-300">{response.pagination.page}</span><span>/ {response.pagination.totalPages}（共 {response.pagination.total} 輛）</span><button type="button" disabled={page >= response.pagination.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded p-1 disabled:opacity-30"><ChevronRight className="size-4" /></button></div> : null}
 
-      {selected ? <VehicleLocationDialog item={{ ...selected, connectionStatus: resolveConnectionStatus(selected, Date.now(), response?.offlineAfterMs ?? 5000) }} onClose={() => setSelectedCode(null)} /> : null}
+      {selected ? <VehicleLocationDialog item={{ ...selected, connectionStatus: resolveConnectionStatus(selected, now, fleet?.offlineAfterMs ?? response?.offlineAfterMs ?? 5000) }} fleet={fleet?.items ?? response?.items ?? []} onClose={() => setSelectedCode(null)} /> : null}
     </div>
   );
 }
