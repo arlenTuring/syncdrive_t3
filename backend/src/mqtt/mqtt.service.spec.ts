@@ -81,6 +81,13 @@ describe('MqttService', () => {
     expect(service).toBeDefined();
   });
 
+  it('只接受資料庫仍啟用的註冊身分，移除後立即拒絕', async () => {
+    dataSourceMock.query.mockResolvedValueOnce([{ exists: 1 }]);
+    await expect(service.acceptsVehicleInput('yard-shuttle_7')).resolves.toBe(true);
+    service.pauseLiveInputs(['yard-shuttle_7']);
+    await expect(service.acceptsVehicleInput('yard-shuttle_7')).resolves.toBe(false);
+  });
+
   it('delegates operation/update to OrderService incremental sync', async () => {
     const payload = {
       timestamp: new Date('2026-06-24T14:01:30+08:00').getTime(),

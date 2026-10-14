@@ -1,11 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { Vehicle } from '../database/entities/vehicle.entity';
 import { RedisService } from '../redis/redis.service';
-import { nextAvailableVehicleCode } from '../common/vehicle-codes';
+import { REGISTERED_VEHICLE_CODE_PATTERN } from '../common/vehicle-codes';
+import { MqttService } from '../mqtt/mqtt.service';
+import { TelemetryWriteQueue } from '../mqtt/telemetry-write.queue';
 import { VehicleRealtimeQueryDto } from './dto/vehicle-realtime-query.dto';
 import { CreateVehicleDto, UpdateVehicleDto, UpdateVehicleServiceDto, VehicleRegistrationQueryDto } from './dto/vehicle-registration.dto';
 
@@ -17,11 +19,13 @@ export class VehicleService {
     private readonly dataSource: DataSource,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly mqtt: MqttService,
+    private readonly telemetryQueue: TelemetryWriteQueue,
   ) {}
 
   async listActive(): Promise<Vehicle[]> {
     return this.vehicles.find({
-      where: { isActive: true, vehicleCode: Like('PMS%') },
+      where: { isActive: true },
       order: { vehicleCode: 'ASC' },
     });
   }
@@ -41,7 +45,7 @@ export class VehicleService {
     const [countRows, rows] = await Promise.all([
       this.dataSource.query(
         `SELECT count(*)::int AS total FROM vehicles v
-         WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+         WHERE v.is_active = true
            AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)`,
         [keyword],
       ),
@@ -51,7 +55,7 @@ export class VehicleService {
                 m.telemetry_data_at, m.operation_data_at, m.health_data_at, m.health_fresh_received_at
          FROM vehicles v
          LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
-         WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+         WHERE v.is_active = true
            AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)
          ORDER BY ${sort} ${direction} NULLS LAST, v.vehicle_code ASC
          LIMIT $2 OFFSET $3`,
@@ -81,17 +85,21 @@ export class VehicleService {
   }
 
   async createRegistration(input: CreateVehicleDto) {
-    const displayName = this.validName(input.displayName);
+    const displayName = this.validIdentity(input.displayName);
     const vehicle = await this.dataSource.transaction(async (manager) => {
       await manager.query(`SELECT pg_advisory_xact_lock(hashtext('syncdrive_vehicle_code_allocator'))`);
-      const usedRows = await manager.query(`SELECT vehicle_code FROM vehicles WHERE vehicle_code ~ '^PMS[0-9]{2}$'`);
-      const vehicleCode = nextAvailableVehicleCode(
-        usedRows.map((row: { vehicle_code: string }) => row.vehicle_code),
+      const duplicate = await manager.query(
+        `SELECT 1 FROM vehicles
+         WHERE lower(vehicle_code) = lower($1) OR lower(COALESCE(display_name, '')) = lower($1)
+         LIMIT 1`,
+        [displayName],
       );
-      if (!vehicleCode) throw new ConflictException('PMS 兩碼通訊身分已用盡，無法建立載具');
+      if (duplicate.length) {
+        throw new ConflictException(`載具名稱「${displayName}」已存在；名稱同時是通訊身分，不可重複使用`);
+      }
       const now = Date.now();
       return manager.getRepository(Vehicle).save(manager.getRepository(Vehicle).create({
-        vehicleCode,
+        vehicleCode: displayName,
         displayName,
         isActive: true,
         initialMileageKm: Number(input.initialMileageKm).toFixed(3),
@@ -102,6 +110,15 @@ export class VehicleService {
       }));
     });
     return this.registrationDetail(vehicle);
+  }
+
+  async identityAvailability(value: string) {
+    const vehicleCode = this.validIdentity(value);
+    const exists = await this.vehicles.createQueryBuilder('vehicle')
+      .where(`lower(vehicle.vehicle_code) = lower(:vehicleCode)
+        OR lower(COALESCE(vehicle.display_name, '')) = lower(:vehicleCode)`, { vehicleCode })
+      .getExists();
+    return { available: !exists };
   }
 
   async getRegistration(id: string) {
@@ -133,6 +150,45 @@ export class VehicleService {
     return this.getRegistration(id);
   }
 
+  async removeRegistration(id: string) {
+    const removed = await this.dataSource.transaction(async (manager) => {
+      const rows = await manager.query(
+        `SELECT id, vehicle_code, display_name
+         FROM vehicles WHERE id = $1 AND is_active = true FOR UPDATE`,
+        [id],
+      );
+      const vehicle = rows[0] as { id: string; vehicle_code: string; display_name: string } | undefined;
+      if (!vehicle) throw new NotFoundException('找不到載具');
+      const activeOrders = await manager.query(
+        `SELECT count(*)::int AS total FROM operation_orders
+         WHERE vehicle_code = $1 AND status IN ('PENDING', 'PROCESSING', 'FAULTED')`,
+        [vehicle.vehicle_code],
+      );
+      if (Number(activeOrders[0]?.total)) {
+        throw new ConflictException('載具仍有未結束任務，請先完成或取消任務後再移除');
+      }
+      await manager.query(
+        `UPDATE vehicles
+         SET is_active = false, service_enabled = false, row_version = row_version + 1, updated_at = $2
+         WHERE id = $1`,
+        [id, Date.now()],
+      );
+      await manager.query(
+        `UPDATE partner_api_keys
+         SET revoked = true
+         WHERE revoked = false
+           AND (vehicle_codes IS NULL OR vehicle_codes @> $1::jsonb)`,
+        [JSON.stringify([vehicle.vehicle_code])],
+      );
+      return { vehicleCode: vehicle.vehicle_code, displayName: vehicle.display_name || vehicle.vehicle_code };
+    });
+    this.mqtt.pauseLiveInputs([removed.vehicleCode]);
+    this.mqtt.clearLiveCaches([removed.vehicleCode]);
+    await this.telemetryQueue.pauseAndDiscard([removed.vehicleCode]);
+    await this.redis.deleteLiveState([removed.vehicleCode]).catch(() => undefined);
+    return removed;
+  }
+
   private async throwMissingOrConflict(id: string): Promise<never> {
     const exists = await this.vehicles.exist({ where: { id, isActive: true } });
     if (!exists) throw new NotFoundException('找不到載具');
@@ -144,6 +200,14 @@ export class VehicleService {
     if (!name) throw new BadRequestException('載具名稱為必填');
     if (name.length > 80) throw new BadRequestException('載具名稱不可超過 80 個字元');
     return name;
+  }
+
+  private validIdentity(value: string) {
+    const vehicleCode = this.validName(value);
+    if (!REGISTERED_VEHICLE_CODE_PATTERN.test(vehicleCode)) {
+      throw new BadRequestException('載具名稱只能使用英文字母、數字、底線或連字號，且不可為 all');
+    }
+    return vehicleCode;
   }
 
   private registrationDetail(vehicle: Vehicle) {
@@ -207,7 +271,7 @@ export class VehicleService {
     const countRows = await this.dataSource.query(
       `SELECT count(*)::int AS total
        FROM vehicles v
-       WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+       WHERE v.is_active = true
          AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)`,
       [keyword],
     );
@@ -233,7 +297,7 @@ export class VehicleService {
          ORDER BY o.created_at DESC, o.order_id DESC
          LIMIT 1
        ) active_order ON true
-       WHERE v.is_active = true AND v.vehicle_code LIKE 'PMS%'
+       WHERE v.is_active = true
          AND ($1::text IS NULL OR v.vehicle_code ILIKE $1 OR COALESCE(v.display_name, '') ILIKE $1)
        ORDER BY ${sortColumn} ${direction} NULLS LAST, v.vehicle_code ASC
        LIMIT $2 OFFSET $3`,

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import * as mqtt from 'mqtt';
 import { CommandLog } from '../database/entities/command-log.entity';
 import { ExecuteCommandDto } from './dto/execute-command.dto';
+import { Vehicle } from '../database/entities/vehicle.entity';
 
 @Injectable()
 export class CommandService implements OnModuleInit {
@@ -15,6 +16,8 @@ export class CommandService implements OnModuleInit {
   constructor(
     @InjectRepository(CommandLog)
     private commandLogRepository: Repository<CommandLog>,
+    @InjectRepository(Vehicle)
+    private vehicleRepository: Repository<Vehicle>,
     private configService: ConfigService,
   ) {}
 
@@ -27,6 +30,9 @@ export class CommandService implements OnModuleInit {
 
   async executeCommand(dto: ExecuteCommandDto): Promise<CommandLog> {
     const { vehicle_code, action, params } = dto;
+    if (vehicle_code !== 'all' && !(await this.vehicleRepository.exist({ where: { vehicleCode: vehicle_code, isActive: true } }))) {
+      throw new NotFoundException(`Vehicle '${vehicle_code}' is not registered or has been removed.`);
+    }
     const now = new Date().getTime();
 
     // 生成符合規格書格式的 command_id

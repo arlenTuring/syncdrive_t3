@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { REGISTERED_VEHICLE_CODE_PATTERN } from '../../common/vehicle-codes';
 
 const trim = ({ value }: { value: unknown }) => String(value ?? '').trim();
 
@@ -13,8 +14,16 @@ export class VehicleRegistrationQueryDto {
 }
 
 export class CreateVehicleDto {
-  @IsString() @Transform(trim) @MaxLength(80) displayName!: string;
+  @IsString() @Transform(trim) @MaxLength(40)
+  @Matches(REGISTERED_VEHICLE_CODE_PATTERN, { message: '載具名稱只能使用英文字母、數字、底線或連字號，且不可為 all' })
+  displayName!: string;
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(999999999) initialMileageKm = 0;
+}
+
+export class VehicleIdentityAvailabilityDto {
+  @IsString() @Transform(trim) @MaxLength(40)
+  @Matches(REGISTERED_VEHICLE_CODE_PATTERN, { message: '載具名稱只能使用英文字母、數字、底線或連字號，且不可為 all' })
+  value!: string;
 }
 
 export class UpdateVehicleDto {

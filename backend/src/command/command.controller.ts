@@ -6,7 +6,7 @@ import { ExecuteCommandDto } from './dto/execute-command.dto';
 import { CommandType } from '../database/entities/command-log.entity';
 import { AuditService } from '../audit/audit.service';
 import { OperatorActionType, ActionResult } from '../database/entities/operator-action-log.entity';
-import { VTMS_VEHICLE_CODE_OR_ALL_PATTERN } from '../common/vehicle-codes';
+import { REGISTERED_VEHICLE_CODE_OR_ALL_PATTERN } from '../common/vehicle-codes';
 import { ApiKeyGuard } from '../common/api-key.guard';
 
 @ApiTags('Command & Event (P4)')
@@ -24,7 +24,7 @@ export class CommandController {
   /**
    * 中心端下發動態控制指令
    * 支援兩種 vehicle_code：
-   *   - 特定車輛：已登錄的 PMS + 兩碼身分
+   *   - 特定車輛：已登錄的載具通訊身分
    *   - 全車隊廣播：'all'
    * 對應 Topic: v1/vtms/{vehicle_code}/command/execute (retain: false)
    */
@@ -44,7 +44,7 @@ export class CommandController {
     const sourceIp = req.ip || req.socket.remoteAddress;
 
     // 只驗證協議格式；已登錄／授權範圍由各入口的身分與 scope 驗證。
-    const validVehicleCode = VTMS_VEHICLE_CODE_OR_ALL_PATTERN.test(vehicle_code);
+    const validVehicleCode = REGISTERED_VEHICLE_CODE_OR_ALL_PATTERN.test(vehicle_code);
     if (!validVehicleCode) {
       // 稽核：驗證失敗的操作也要留紀錄
       await this.auditService.write({
@@ -56,7 +56,7 @@ export class CommandController {
         failureReason: `Invalid vehicle_code: '${vehicle_code}'`,
       });
       throw new BadRequestException(
-        `Invalid vehicle_code: '${vehicle_code}'. Must be 'all' or PMS followed by two digits.`
+        `Invalid vehicle_code: '${vehicle_code}'. Must be 'all' or a registered vehicle identity.`
       );
     }
 

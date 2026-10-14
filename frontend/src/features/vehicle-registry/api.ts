@@ -32,9 +32,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 const query = (value: RegistryQuery) => new URLSearchParams(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, String(item)]))).toString();
 export const fetchRegistry = (value: RegistryQuery) => request<RegistryResponse>(`/syncdrive-api/vehicles/registry?${query(value)}`);
 export const fetchVehicleRegistration = (id: string) => request<VehicleRegistration>(`/syncdrive-api/vehicles/registry/${encodeURIComponent(id)}`);
+export const checkVehicleIdentity = (value: string) => request<{ available: boolean }>(`/syncdrive-api/vehicles/registry/identity-availability?value=${encodeURIComponent(value)}`);
 export const createVehicleRegistration = (body: { displayName: string; initialMileageKm: number }) => request<VehicleRegistration>('/syncdrive-api/vehicles/registry', { method: 'POST', body: JSON.stringify(body) });
 export const updateVehicleRegistration = (id: string, body: { displayName: string; initialMileageKm: number; expectedVersion: number }) => request<VehicleRegistration>(`/syncdrive-api/vehicles/registry/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const updateVehicleService = (id: string, body: { serviceEnabled: boolean; expectedVersion: number }) => request<VehicleRegistration>(`/syncdrive-api/vehicles/registry/${encodeURIComponent(id)}/service`, { method: 'PATCH', body: JSON.stringify(body) });
+export const removeVehicleRegistration = (id: string) => request<{ vehicleCode: string; displayName: string }>(`/syncdrive-api/vehicles/registry/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
 export function integrationText(info: IntegrationInfo) {
   return [

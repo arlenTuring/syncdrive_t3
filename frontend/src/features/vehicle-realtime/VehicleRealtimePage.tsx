@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Battery, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LocateFixed, RefreshCw, Search } from 'lucide-react';
 import type { VehicleSnapshotQuery } from './api';
 import { resolveConnectionStatus } from './mergeVehicleState';
 import { VehicleLocationDialog } from './VehicleLocationDialog';
 import type { VehicleRealtimeItem } from './types';
 import { useVehicleRealtime } from './useVehicleRealtime';
+import { vehiclePhaseLabel } from './vehiclePhaseLabel';
 
 const PAGE_SIZE = 10;
 
 export function VehicleRealtimePage() {
+  const { i18n } = useTranslation();
   const [draft, setDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
@@ -61,7 +64,7 @@ export function VehicleRealtimePage() {
           <tbody>
             {response?.items.map((item) => {
               const connection = resolveConnectionStatus(item, now, response.offlineAfterMs);
-              const phase = typeof item.operation?.payload.vehicle_phase === 'string' ? item.operation.payload.vehicle_phase : null;
+              const phase = vehiclePhaseLabel(item.operation?.payload.vehicle_phase, i18n.language);
               return <tr key={item.id} className="border-b border-zinc-800/80 hover:bg-white/[0.025]">
                 <td className="px-4 py-4 font-medium text-zinc-200">{item.displayName}</td>
                 <td className="px-4 py-4">{item.speedKph == null ? '—' : `${item.speedKph.toFixed(1)} km/h`}</td>
@@ -69,7 +72,7 @@ export function VehicleRealtimePage() {
                 <td className="px-4 py-4 text-zinc-400">未知</td>
                 <td className="px-4 py-4"><Connection status={connection} /></td>
                 <td className="px-4 py-4">{item.gear ?? '—'}</td>
-                <td className="px-4 py-4">{phase ?? (item.speedKph == null ? '未知' : item.speedKph === 0 ? '停止' : '移動')}</td>
+                <td className="px-4 py-4">{phase ?? (i18n.language.startsWith('en') ? (item.speedKph == null ? 'Unknown' : item.speedKph === 0 ? 'Stopped' : 'Moving') : (item.speedKph == null ? '未知' : item.speedKph === 0 ? '停止' : '移動'))}</td>
                 <td className="px-4 py-4 text-center"><button type="button" onClick={() => setSelectedCode(item.vehicleCode)} className="rounded-lg p-2 text-zinc-300 hover:bg-sky-500/15 hover:text-sky-300" aria-label={`定位 ${item.displayName}`}><LocateFixed className="size-5" /></button></td>
               </tr>;
             })}

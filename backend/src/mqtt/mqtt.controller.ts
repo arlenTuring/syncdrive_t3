@@ -40,12 +40,17 @@ export class MqttController {
     return vehicleCode;
   }
 
+  private async acceptsVehicle(vehicleCode: string): Promise<boolean> {
+    return typeof this.mqttService.acceptsVehicleInput !== 'function'
+      || this.mqttService.acceptsVehicleInput(vehicleCode);
+  }
+
   @MessagePattern('v1/vtms/+/telemetry/update')
   async handleTelemetry(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
-    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
 
     const receivedAt = Date.now();
     if (!(await this.redisService.setTelemetry(vehicleCode, data))) return;
@@ -76,7 +81,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
-    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
 
     const receivedAt = Date.now();
     const { degraded, previousHealth, accepted } = await this.redisService.setHealth(vehicleCode, data);
@@ -114,7 +119,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
-    if (this.mqttService.isLiveInputPaused(vehicleCode)) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
 
     const receivedAt = Date.now();
     if (!(await this.redisService.setOperationUpdate(vehicleCode, data))) return;
@@ -137,6 +142,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
 
     await this.mqttService.handleCommandAck(vehicleCode, data);
   }
@@ -146,6 +152,7 @@ export class MqttController {
     const topic = context.getTopic();
     const vehicleCode = this.vehicleCodeFromTopic(topic, data);
     if (!vehicleCode || !data) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
 
     await this.mqttService.handleEventReport(vehicleCode, data);
     this.eventsGateway.broadcastEvent({ vehicleCode, ...data });
@@ -180,7 +187,9 @@ export class MqttController {
   @MessagePattern('v1/vtms/+/door/update')
   async handleDoorUpdate(@Payload() data: any, @Ctx() context: MqttContext) {
     const topic = context.getTopic();
-    if (!data) return;
+    const vehicleCode = this.vehicleCodeFromTopic(topic, data);
+    if (!vehicleCode || !data) return;
+    if (!(await this.acceptsVehicle(vehicleCode))) return;
     this.replayRecorder.capture('facility', null, topic, data);
     this.eventsGateway.broadcastMqttMessage(topic, data);
   }

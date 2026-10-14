@@ -26,6 +26,7 @@ export class MqttService {
   /** 各車上一次通知時的訂單顯示狀態；沒變就不通知 */
   private readonly lastOrderDisplayKeyByVehicle = new Map<string, string>();
   private readonly pausedLiveInputs = new Set<string>();
+  private readonly registeredVehicleCache = new Map<string, { active: boolean; until: number }>();
 
   constructor(
     @InjectRepository(CommandLog)
@@ -44,7 +45,10 @@ export class MqttService {
   ) {}
 
   pauseLiveInputs(vehicleCodes: string[]): void {
-    vehicleCodes.forEach((code) => this.pausedLiveInputs.add(code));
+    vehicleCodes.forEach((code) => {
+      this.pausedLiveInputs.add(code);
+      this.registeredVehicleCache.set(code, { active: false, until: Number.POSITIVE_INFINITY });
+    });
   }
 
   resumeLiveInputs(vehicleCodes: string[]): void {
@@ -53,6 +57,19 @@ export class MqttService {
 
   isLiveInputPaused(vehicleCode: string): boolean {
     return this.pausedLiveInputs.has(vehicleCode);
+  }
+
+  async acceptsVehicleInput(vehicleCode: string): Promise<boolean> {
+    if (this.pausedLiveInputs.has(vehicleCode)) return false;
+    const cached = this.registeredVehicleCache.get(vehicleCode);
+    if (cached && cached.until > Date.now()) return cached.active;
+    const rows = await this.dataSource.query(
+      `SELECT 1 FROM vehicles WHERE vehicle_code = $1 AND is_active = true LIMIT 1`,
+      [vehicleCode],
+    );
+    const active = rows.length > 0;
+    this.registeredVehicleCache.set(vehicleCode, { active, until: Date.now() + 2_000 });
+    return active;
   }
 
   clearLiveCaches(vehicleCodes: string[]): void {

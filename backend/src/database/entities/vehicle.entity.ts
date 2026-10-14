@@ -5,8 +5,8 @@ export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'vehicle_code', unique: true, length: 10 })
-  vehicleCode: string; // e.g. PMS01
+  @Column({ name: 'vehicle_code', unique: true, length: 64 })
+  vehicleCode: string; // 使用者建立時確定的穩定 MQTT／憑證身分
 
   @Column({ name: 'display_name', nullable: true })
   displayName: string;

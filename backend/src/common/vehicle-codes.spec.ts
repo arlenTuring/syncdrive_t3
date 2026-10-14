@@ -1,5 +1,6 @@
 import {
   nextAvailableVehicleCode,
+  REGISTERED_VEHICLE_CODE_PATTERN,
   VTMS_VEHICLE_CODE_PATTERN,
 } from './vehicle-codes';
 
@@ -20,5 +21,12 @@ describe('vehicle codes', () => {
     expect(VTMS_VEHICLE_CODE_PATTERN.test('PMS12')).toBe(true);
     expect(VTMS_VEHICLE_CODE_PATTERN.test('PMS99')).toBe(true);
     expect(VTMS_VEHICLE_CODE_PATTERN.test('PMS100')).toBe(false);
+  });
+
+  it('allows a user-defined safe registration identity without assuming a PMS prefix', () => {
+    expect(REGISTERED_VEHICLE_CODE_PATTERN.test('PMS20')).toBe(true);
+    expect(REGISTERED_VEHICLE_CODE_PATTERN.test('yard-shuttle_7')).toBe(true);
+    expect(REGISTERED_VEHICLE_CODE_PATTERN.test('all')).toBe(false);
+    expect(REGISTERED_VEHICLE_CODE_PATTERN.test('bad/topic')).toBe(false);
   });
 });

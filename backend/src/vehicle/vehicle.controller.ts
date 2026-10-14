@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { RequirePermission } from '../access-control/access.guard';
 import { VehicleRealtimeQueryDto } from './dto/vehicle-realtime-query.dto';
-import { CreateVehicleDto, UpdateVehicleDto, UpdateVehicleServiceDto, VehicleIdDto, VehicleRegistrationQueryDto } from './dto/vehicle-registration.dto';
+import { CreateVehicleDto, UpdateVehicleDto, UpdateVehicleServiceDto, VehicleIdDto, VehicleIdentityAvailabilityDto, VehicleRegistrationQueryDto } from './dto/vehicle-registration.dto';
 import { AuditService } from '../audit/audit.service';
 import { ActionResult, OperatorActionType } from '../database/entities/operator-action-log.entity';
 import type { AuthenticatedRequest } from '../access-control/access.guard';
@@ -57,6 +57,13 @@ export class VehicleController {
     return this.vehicleService.getRegistrationList(query);
   }
 
+  @Get('registry/identity-availability')
+  @RequirePermission('vehicle.registry.create')
+  @ApiOperation({ summary: '檢查載具通訊身分是否可用' })
+  identityAvailability(@Query() query: VehicleIdentityAvailabilityDto) {
+    return this.vehicleService.identityAvailability(query.value);
+  }
+
   @Post('registry')
   @RequirePermission('vehicle.registry.create')
   @ApiOperation({ summary: '完成載具註冊並分配穩定通訊身分' })
@@ -107,6 +114,22 @@ export class VehicleController {
       actionType: OperatorActionType.VEHICLE_SERVICE_SETTING,
       targetVehicle: result.vehicleCode,
       actionDetail: { serviceEnabled: result.serviceEnabled, version: result.version },
+      result: ActionResult.SUCCESS,
+    });
+    return result;
+  }
+
+  @Delete('registry/:id')
+  @RequirePermission('vehicle.registry.delete')
+  @ApiOperation({ summary: '移除載具並撤銷其外部存取' })
+  async removeRegistry(@Param() params: VehicleIdDto, @Req() request: AuthenticatedRequest) {
+    const result = await this.vehicleService.removeRegistration(params.id);
+    await this.audit.write({
+      operatorId: request.authUser?.id,
+      sourceIp: request.ip || request.socket.remoteAddress,
+      actionType: OperatorActionType.VEHICLE_REMOVE,
+      targetVehicle: result.vehicleCode,
+      actionDetail: { displayName: result.displayName, credentialsRevoked: true },
       result: ActionResult.SUCCESS,
     });
     return result;

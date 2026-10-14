@@ -18,9 +18,10 @@ describe('ExecuteCommandDto 驗證', () => {
     expect(validate({ vehicle_code: 'all', action: 'SET_SPEED_LIMIT', params: { limit_mps: 2.78 } })).toHaveLength(0);
   });
 
-  it('拒絕非法 vehicle_code', () => {
-    expect(validate({ vehicle_code: 'PMS99', action: 'EMERGENCY_STOP' }).length).toBeGreaterThan(0);
-    expect(validate({ vehicle_code: 'pms-05', action: 'EMERGENCY_STOP' }).length).toBeGreaterThan(0);
+  it('接受安全的自訂身分，拒絕可逃逸 MQTT topic 的字元', () => {
+    expect(validate({ vehicle_code: 'yard-shuttle_7', action: 'EMERGENCY_STOP' })).toHaveLength(0);
+    expect(validate({ vehicle_code: 'bad/topic', action: 'EMERGENCY_STOP' }).length).toBeGreaterThan(0);
+    expect(validate({ vehicle_code: '#', action: 'EMERGENCY_STOP' }).length).toBeGreaterThan(0);
   });
 
   it('拒絕不在白名單的 action', () => {

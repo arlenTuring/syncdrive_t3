@@ -125,9 +125,10 @@ export class PartnerAccessService {
 
   /** 這個環境簽發過憑證的車輛代號 */
   private async knownVehicleCodes(): Promise<string[]> {
-    const raw = this.config.get<string>('MQTT_VEHICLE_CODES', '').trim();
-    if (raw) return raw.split(',').map((item) => item.trim()).filter(Boolean);
     const registered = await this.vehicles.find({ where: { isActive: true }, select: { vehicleCode: true } });
+    const active = new Set(registered.map((item) => item.vehicleCode));
+    const raw = this.config.get<string>('MQTT_VEHICLE_CODES', '').trim();
+    if (raw) return raw.split(',').map((item) => item.trim()).filter((code) => active.has(code) || code === 'PMS99');
     return [...new Set([...registered.map((item) => item.vehicleCode), 'PMS99'])].sort();
   }
 
@@ -154,13 +155,16 @@ export class PartnerAccessService {
     }
 
     const ttl = this.normaliseTtl(input.ttlMinutes);
-    // 廠商手上可能還拿著改名前的 PMS-01，收斂後再比對，不要用「代號不存在」擋在門外；
-    // 憑證 CN 一律用新寫法簽發，broker 的 ACL（pattern write v1/vtms/%u/#）才對得上。
+    const knownCodes = await this.knownVehicleCodes();
+    const known = new Set(knownCodes);
+    // 新註冊身分可合法包含連字號，所以先精確比對；只有精確身分不存在時，
+    // 才把歷史的 PMS-01 寫法收斂成 PMS01。這避免把使用者建立的 PMS-20 改名。
     const codes = input.vehicleCodes?.length
-      ? input.vehicleCodes.map((code) =>
-          normalizeVehicleCode(String(code).trim().toUpperCase()),
-        )
-      : await this.knownVehicleCodes();
+      ? input.vehicleCodes.map((value) => {
+          const code = String(value).trim();
+          return known.has(code) ? code : normalizeVehicleCode(code);
+        })
+      : knownCodes;
     // 到期時間先定下來，金鑰與憑證共用同一個值——兩者必須同時失效
     const issuedAt = Date.now();
     const expiresAt = issuedAt + ttl * 60_000;

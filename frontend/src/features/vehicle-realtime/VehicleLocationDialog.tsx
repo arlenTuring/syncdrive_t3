@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Battery, Gauge, MapPin, X } from 'lucide-react';
 import { MapPlatformCanvas } from '../dashboard/elements/MapPlatformLayer';
 import { MapViewport } from '../degraded-operation/MapViewport';
@@ -7,10 +8,12 @@ import { resolveParsedMapForPlatform } from '../map-editor/utils/mapLibraryStora
 import type { AreaVehicleLive } from '../map-editor/vehicles/types';
 import { useMapVehicleModel } from '../vehicle-editor/model/useMapVehicleModel';
 import type { VehicleRealtimeItem } from './types';
+import { vehiclePhaseLabel } from './vehiclePhaseLabel';
 
 type Parsed = Awaited<ReturnType<typeof resolveParsedMapForPlatform>>;
 
 export function VehicleLocationDialog({ item, fleet, onClose }: { item: VehicleRealtimeItem; fleet: VehicleRealtimeItem[]; onClose: () => void }) {
+  const { i18n } = useTranslation();
   const closeRef = useRef<HTMLButtonElement>(null);
   const [map, setMap] = useState<Parsed>(null);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export function VehicleLocationDialog({ item, fleet, onClose }: { item: VehicleR
     ? item.operation.payload.task_group as Array<Record<string, unknown>>
     : [];
   const activeTasks = tasks.filter((task) => ['PENDING', 'IN_PROGRESS', 'FAILED'].includes(String(task.status)));
-  const phase = String(item.operation?.payload.vehicle_phase ?? '—');
+  const phase = vehiclePhaseLabel(item.operation?.payload.vehicle_phase, i18n.language) ?? '—';
   const trip = String(item.operation?.payload.trip_code ?? item.contractOrder?.tripCode ?? '—');
   const lastAt = Math.max(item.telemetry?.receivedAt ?? 0, item.operation?.receivedAt ?? 0, item.health?.receivedAt ?? 0);
 
@@ -111,7 +114,7 @@ export function VehicleLocationDialog({ item, fleet, onClose }: { item: VehicleR
           <Info icon={<Battery />} label="電量" value={item.batteryLevel == null ? '未知' : `${Math.round(item.batteryLevel)}%`} />
           <Info icon={<Gauge />} label="速度" value={item.speedKph == null ? '未知' : `${item.speedKph.toFixed(1)} km/h`} />
           <Info label="連線狀態" value={item.connectionStatus === 'ONLINE' ? '在線' : item.connectionStatus === 'NO_DATA' ? '尚無資料' : '離線（最後資料）'} />
-          <Info label="最後更新" value={lastAt ? new Date(lastAt).toLocaleString('zh-TW') : '—'} />
+          <Info label="最後更新" value={lastAt ? new Date(lastAt).toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'zh-TW') : '—'} />
         </div>
       </section>
     </div>,

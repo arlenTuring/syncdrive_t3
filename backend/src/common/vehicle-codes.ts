@@ -18,6 +18,10 @@ export const VTMS_VEHICLE_CODE_PATTERN = /^PMS(0[1-9]|[1-9][0-9])$/;
 
 export const VTMS_VEHICLE_CODE_OR_ALL_PATTERN = /^(all|PMS(0[1-9]|[1-8][0-9]|9[0-8]))$/;
 
+/** 正式註冊身分同時是 MQTT topic 段與憑證 CN，只接受安全字元。 */
+export const REGISTERED_VEHICLE_CODE_PATTERN = /^(?!all$)[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/i;
+export const REGISTERED_VEHICLE_CODE_OR_ALL_PATTERN = /^(?:all|(?!all$)[A-Za-z0-9][A-Za-z0-9_-]{0,39})$/i;
+
 /** 由資料庫已使用集合找第一個可分配身分；PMS99 永遠保留給聯測。 */
 export function nextAvailableVehicleCode(usedCodes: Iterable<string>): string | null {
   const used = new Set([...usedCodes].map(normalizeVehicleCode));
