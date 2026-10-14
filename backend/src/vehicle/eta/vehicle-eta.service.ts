@@ -1,5 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
 import { VTMS_VEHICLE_CODES } from '../../common/vehicle-codes';
+import { Vehicle } from '../../database/entities/vehicle.entity';
 import { OperationShiftService } from '../../operation-shift/operation-shift.service';
 import { RedisService } from '../../redis/redis.service';
 import { vehicleEtaConfig } from './vehicle-eta.config';
@@ -72,6 +75,9 @@ export class VehicleEtaService {
   constructor(
     private readonly redisService: RedisService,
     private readonly operationShiftService: OperationShiftService,
+    @Optional()
+    @InjectRepository(Vehicle)
+    private readonly vehicleRepository?: Repository<Vehicle>,
   ) {}
 
   async getByStation(query: {
@@ -324,13 +330,23 @@ export class VehicleEtaService {
   /** 一次備齊兩份資料來源，兩支 API 共用 */
   private async loadContext(): Promise<EtaContext> {
     const generatedAt = Date.now();
-    const snapshot = await this.redisService.getAllVehiclesSnapshot([
-      ...VTMS_VEHICLE_CODES,
-    ]);
+    const registered = this.vehicleRepository
+      ? await this.vehicleRepository.find({
+          where: { isActive: true },
+          select: { vehicleCode: true },
+          order: { vehicleCode: 'ASC' },
+        })
+      : [];
+    const vehicleCodes =
+      registered.length > 0
+        ? registered.map((vehicle) => vehicle.vehicleCode)
+        : [...VTMS_VEHICLE_CODES];
+    const snapshot =
+      await this.redisService.getAllVehiclesSnapshot(vehicleCodes);
 
     const vehicles: VehicleSnapshot[] = [];
     let freshCount = 0;
-    for (const vehicleCode of VTMS_VEHICLE_CODES) {
+    for (const vehicleCode of vehicleCodes) {
       const entry = snapshot[vehicleCode] as
         | { telemetry?: TelemetryPayload; operation?: OperationPayload }
         | undefined;
@@ -365,7 +381,9 @@ export class VehicleEtaService {
                 heading: numberOrNull(telemetry?.local_pose?.heading) ?? 0,
                 // 車端 kinematics.velocity 單位是 m/s（車端介接說明書 §四.2）；
                 // 本 API 對外欄位名已標明 kph，故在此換算一次，使用方不再換算。
-                velocity_kph: round1((numberOrNull(telemetry?.kinematics?.velocity) ?? 0) * 3.6),
+                velocity_kph: round1(
+                  (numberOrNull(telemetry?.kinematics?.velocity) ?? 0) * 3.6,
+                ),
               },
       });
     }
@@ -377,7 +395,7 @@ export class VehicleEtaService {
       shift_id: timetable.shiftId,
       source: timetable.source,
       data_quality: resolveDataQuality({
-        fleetSize: VTMS_VEHICLE_CODES.length,
+        fleetSize: vehicleCodes.length,
         freshCount,
       }),
     };

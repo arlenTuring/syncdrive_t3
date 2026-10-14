@@ -17,7 +17,8 @@ import {
 } from './station-eta';
 
 function num(value: unknown): number | null {
-  const n = typeof value === 'string' && value.trim() === '' ? NaN : Number(value);
+  const n =
+    typeof value === 'string' && value.trim() === '' ? NaN : Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -50,21 +51,28 @@ export class StationEtaService {
     private readonly mapService: MapService,
   ) {}
 
-  async byStation(stations: Array<{ stationId: string; events: StationEventKind[] }>, limit: number) {
+  async byStation(
+    stations: Array<{ stationId: string; events: StationEventKind[] }>,
+    limit: number,
+  ) {
     const operatingNow = this.clock.now();
     const day = this.clock.operatingDay();
     const adoption = await this.engine.ensureDailyPlan(day);
-    const plan = adoption ? await this.plannedArrivals(day, adoption.shift_id, adoption.plan_digest) : null;
+    const plan = adoption
+      ? await this.plannedArrivals(day, adoption.shift_id, adoption.plan_digest)
+      : null;
 
     // 模擬器／車端路徑使用圖資 facility id（如 156），班表使用營運 station id（如 t3_u）。
     // 兩者都來自同一張啟用圖資，在來源層正規化後再做事件關聯。
     const activeMapId = this.mapService.getActiveMapLibraryStatus().activeMapId;
     const stationIdByReportedId = new Map<string, string>();
-    for (const station of this.mapService.getOperationNodes(activeMapId).stations) {
+    for (const station of this.mapService.getOperationNodes(activeMapId)
+      .stations) {
       stationIdByReportedId.set(station.facilityId, station.stationId);
       stationIdByReportedId.set(station.stationId, station.stationId);
     }
-    const normalizeStationId = (value: string | null) => value == null ? null : (stationIdByReportedId.get(value) ?? value);
+    const normalizeStationId = (value: string | null) =>
+      value == null ? null : (stationIdByReportedId.get(value) ?? value);
     const live = (await this.liveVehicles()).map((vehicle) => ({
       ...vehicle,
       targetStationId: normalizeStationId(vehicle.targetStationId),
@@ -82,7 +90,12 @@ export class StationEtaService {
         params.push(replay.runId);
         runFilter = `AND payload->>'plan_run_id' = $${params.length}`;
       }
-      const rows: Array<{ trip_code: string; status: string; closed_reason: string | null; last_dwell_station_id: string | null }> = await this.dataSource.query(
+      const rows: Array<{
+        trip_code: string;
+        status: string;
+        closed_reason: string | null;
+        last_dwell_station_id: string | null;
+      }> = await this.dataSource.query(
         `SELECT COALESCE(payload->>'plan_trip_code', trip_code) AS trip_code, status::text AS status,
                 payload->>'closed_reason' AS closed_reason,
                 payload->'last_confirmed_dwell'->>'station_id' AS last_dwell_station_id
@@ -95,30 +108,39 @@ export class StationEtaService {
         params,
       );
       // 同一班重發：以最後一張為準
-      for (const row of rows) tripStates.set(row.trip_code, {
-        status: row.status,
-        closedReason: row.closed_reason,
-        lastDwellStationId: normalizeStationId(row.last_dwell_station_id),
-      });
+      for (const row of rows)
+        tripStates.set(row.trip_code, {
+          status: row.status,
+          closedReason: row.closed_reason,
+          lastDwellStationId: normalizeStationId(row.last_dwell_station_id),
+        });
     }
 
     /*
      * 站名在這裡（快取之後）才解析：同一張圖、同一個站點 ID 的最新保存名稱優先，圖上沒有才用班表
      * 展開時的快照。計畫快取只以班表版本為鍵，圖資改名不會改版本，所以名稱不能跟著快取。
      */
-    const currentNames = this.mapService.stationNameIndex(plan?.mapId ?? activeMapId);
-    const nameOf = (stationId: string, snapshot: string) => currentNames.get(stationId) ?? snapshot;
+    const currentNames = this.mapService.stationNameIndex(
+      plan?.mapId ?? activeMapId,
+    );
+    const nameOf = (stationId: string, snapshot: string) =>
+      currentNames.get(stationId) ?? snapshot;
     const stationNames = new Map<string, string>();
-    for (const [stationId, snapshot] of plan?.names ?? []) stationNames.set(stationId, nameOf(stationId, snapshot));
+    for (const [stationId, snapshot] of plan?.names ?? [])
+      stationNames.set(stationId, nameOf(stationId, snapshot));
     for (const station of stations) {
       const current = currentNames.get(station.stationId);
-      if (current && !stationNames.has(station.stationId)) stationNames.set(station.stationId, current);
+      if (current && !stationNames.has(station.stationId))
+        stationNames.set(station.stationId, current);
     }
     const groups = mergeStationEvents({
       stations,
       stationNames,
       // 保留完整計畫，mergeStationEvents 才能判斷某張舊待發單是否已被後續實際任務超越。
-      planned: (plan?.stops ?? []).map((stop) => ({ ...stop, stationName: nameOf(stop.stationId, stop.stationName) })),
+      planned: (plan?.stops ?? []).map((stop) => ({
+        ...stop,
+        stationName: nameOf(stop.stationId, stop.stationName),
+      })),
       stopsByTrip: plan?.stopsByTrip ?? new Map(),
       live,
       tripStates,
@@ -130,8 +152,15 @@ export class StationEtaService {
     return {
       operating_day: day,
       operating_now: operatingNow,
-      clock: { mode: clock.mode, rate: clock.rate, paused: clock.paused, stale: clock.stale },
-      plan: adoption ? { shift_id: adoption.shift_id, shift_name: adoption.shift_name } : null,
+      clock: {
+        mode: clock.mode,
+        rate: clock.rate,
+        paused: clock.paused,
+        stale: clock.stale,
+      },
+      plan: adoption
+        ? { shift_id: adoption.shift_id, shift_name: adoption.shift_name }
+        : null,
       source: '每日計畫站序＋車端即時回報（營運時間）',
       stations: groups,
       events: groups.flatMap((group) => group.events),
@@ -148,7 +177,10 @@ export class StationEtaService {
     const stopsByTrip = new Map<string, string[]>();
     const names = new Map<string, string>();
     for (const item of plan.planned) {
-      stopsByTrip.set(item.tripCode, item.stations.map((s) => s.stationId));
+      stopsByTrip.set(
+        item.tripCode,
+        item.stations.map((s) => s.stationId),
+      );
       item.stations.forEach((station, index) => {
         names.set(station.stationId, station.stationName);
         if (station.arriveAt == null && station.departAt == null) return;
@@ -164,20 +196,41 @@ export class StationEtaService {
         });
       });
     }
-    this.planCache = { key, stops, stopsByTrip, names, mapId: resolveMapIdFromShiftBody(plan.body ?? {}) };
+    this.planCache = {
+      key,
+      stops,
+      stopsByTrip,
+      names,
+      mapId: resolveMapIdFromShiftBody(plan.body ?? {}),
+    };
     return this.planCache;
   }
 
   private async liveVehicles(): Promise<LiveVehicle[]> {
-    const snapshot = await this.redis.getAllVehiclesSnapshot([...VTMS_VEHICLE_CODES]);
+    const registered = await this.dataSource.query<
+      Array<{ vehicle_code: string }>
+    >(
+      `SELECT vehicle_code
+       FROM vehicles
+       WHERE is_active = TRUE
+       ORDER BY vehicle_code ASC`,
+    );
+    const vehicleCodes =
+      registered.length > 0
+        ? registered.map((vehicle) => vehicle.vehicle_code)
+        : [...VTMS_VEHICLE_CODES];
+    const snapshot = await this.redis.getAllVehiclesSnapshot(vehicleCodes);
     const realNow = Date.now();
     const out: LiveVehicle[] = [];
-    for (const vehicleCode of VTMS_VEHICLE_CODES) {
-      const entry = snapshot[vehicleCode] as { telemetry?: Record<string, any>; operation?: Record<string, any> } | undefined;
+    for (const vehicleCode of vehicleCodes) {
+      const entry = snapshot[vehicleCode] as
+        | { telemetry?: Record<string, any>; operation?: Record<string, any> }
+        | undefined;
       const operation = entry?.operation;
       if (!operation) continue;
       // 訊息時刻是實際時間（技術判斷用）；換成營運時刻才能跟計畫比
-      const observedAt = num(operation.timestamp) ?? num(entry?.telemetry?.timestamp) ?? realNow;
+      const observedAt =
+        num(operation.timestamp) ?? num(entry?.telemetry?.timestamp) ?? realNow;
       const leg = operation.current_leg as Record<string, unknown> | undefined;
       out.push({
         vehicleCode,

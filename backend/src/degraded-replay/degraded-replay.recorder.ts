@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
-import { VTMS_VEHICLE_CODES } from '../common/vehicle-codes';
 import { DegradedOperationExecution } from '../database/entities/degraded-operation-execution.entity';
 import {
   DegradedReplayFrame,
@@ -147,7 +146,9 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
       }
       if (this.session?.executionId === execution.id) return;
       const map = await this.saveActiveMap();
-      const vehicleModel = map ? await this.snapshotVehicleModel(map.mapId) : null;
+      const vehicleModel = map
+        ? await this.snapshotVehicleModel(map.mapId)
+        : null;
       const clockRun = this.clockRun();
       const now = Date.now();
       await this.sessions.save(
@@ -547,7 +548,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     startedAtOperating: number,
   ): Promise<void> {
     const receivedAt = Date.now();
-    for (const vehicleCode of VTMS_VEHICLE_CODES) {
+    for (const vehicleCode of this.lastTelemetrySeen.keys()) {
       // 最近 REPLAY_STALE_AFTER_MS 內沒收到遙測的車不算在場（即時圖台也不會畫它）
       const seenAt = this.lastTelemetrySeen.get(vehicleCode);
       if (seenAt === undefined || receivedAt - seenAt > REPLAY_STALE_AFTER_MS)
