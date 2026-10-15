@@ -51,4 +51,12 @@ describe('DataRetentionService', () => {
       { id: 'job-1', criteria: { category: 'telemetry' } },
     ]);
   });
+
+  it('工作清單提供精確預覽總數供進度顯示', async () => {
+    const query = jest.fn().mockResolvedValue([]);
+    const service = serviceWith(query);
+    await service.jobs();
+    expect(query.mock.calls[0][0]).toContain("p.preview->>'records'");
+    expect(query.mock.calls[0][0]).toContain('expected_count');
+  });
 });

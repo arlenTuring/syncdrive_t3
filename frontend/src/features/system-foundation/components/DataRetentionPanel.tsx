@@ -31,6 +31,17 @@ export function DataRetentionPanel() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) }
   }
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const hasActiveJobs = jobs.some((job) => ['queued', 'running'].includes(job.status))
+  useEffect(() => {
+    if (!hasActiveJobs) return
+    const timer = window.setInterval(() => {
+      void fetchCleanupJobs(account).then((nextJobs) => {
+        setJobs(nextJobs)
+        if (!nextJobs.some((job) => ['queued', 'running'].includes(job.status))) void load()
+      }).catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)))
+    }, 750)
+    return () => window.clearInterval(timer)
+  }, [hasActiveJobs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function createQuickPreview(categoryKeys: string[]) {
     if (!auth.require('system.data-admin.cleanup')) return
@@ -68,13 +79,18 @@ export function DataRetentionPanel() {
 
   return <div className="space-y-3 text-xs">
     <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><HardDrive size={16} />資料容量概況<button type="button" disabled={busy} onClick={() => void createQuickPreview(categories.map((item) => item.key))} className="ml-auto rounded bg-rose-700 px-3 py-1.5 text-white disabled:opacity-50"><Trash2 size={14} className="mr-1 inline" />全部清除</button><button type="button" onClick={() => void load()} className="text-sky-300">重新統計</button></div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><HardDrive size={16} />資料容量概況<button type="button" disabled={busy || hasActiveJobs} onClick={() => void createQuickPreview(categories.map((item) => item.key))} className="ml-auto rounded bg-rose-700 px-3 py-1.5 text-white disabled:opacity-50"><Trash2 size={14} className="mr-1 inline" />全部清除</button><button type="button" onClick={() => void load()} className="text-sky-300">重新統計</button></div>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="資料庫總容量" value={bytes(overview?.database.totalBytes)} note={overview?.database.includes ?? '包含表、索引與大型欄位'} />
         <Metric label="後端檔案系統" value={overview?.backendFilesystem.available ? `${bytes(overview.backendFilesystem.freeBytes)} 可用／${bytes(overview.backendFilesystem.totalBytes)}` : '無法取得'} note={overview?.backendFilesystem.note ?? '不是瀏覽器磁碟'} />
         <Metric label="PostgreSQL 資料卷" value="無法取得" note={overview?.databaseVolume.note ?? '不以其他磁碟冒充'} />
       </div>
-      <div className="mt-2 overflow-auto"><table className="w-full text-left"><thead className="text-zinc-500"><tr><th>類別</th><th>容量</th><th>估算筆數</th><th className="text-right">操作</th></tr></thead><tbody>{overview?.categories.map((item) => <tr key={item.category} className="border-t border-zinc-800"><td className="py-2">{item.label}</td><td>{bytes(item.totalBytes)}</td><td>約 {item.estimatedRows.toLocaleString()}</td><td className="text-right"><button type="button" disabled={busy} onClick={() => void createQuickPreview([item.category])} className="rounded border border-rose-700 px-2 py-1 text-rose-300 disabled:opacity-50">快速清除</button></td></tr>)}</tbody></table></div>
+      <div className="mt-2 overflow-auto"><table className="w-full text-left"><thead className="text-zinc-500"><tr><th>類別</th><th>容量</th><th>估算筆數</th><th className="text-right">操作</th></tr></thead><tbody>{overview?.categories.map((item) => {
+        const job = jobs.find((candidate) => candidate.category === item.category && ['queued', 'running'].includes(candidate.status))
+        const deleted = Number(job?.deleted_count ?? 0); const expected = Math.max(Number(job?.expected_count ?? 0), deleted)
+        const progress = expected > 0 ? Math.min(100, Math.round(deleted / expected * 100)) : 0
+        return <tr key={item.category} className="border-t border-zinc-800"><td className="py-2"><div>{item.label}</div>{job && <div className="mt-1 w-64 max-w-full"><div className="h-1.5 overflow-hidden rounded bg-zinc-700"><div className="h-full bg-sky-500 transition-[width] duration-300" style={{ width: `${progress}%` }} /></div><div className="mt-1 text-[10px] text-sky-300">{job.status === 'queued' ? '排隊中' : `清理中 ${progress}%`} · 已清除 {deleted.toLocaleString()}／預計 {expected.toLocaleString()} 筆</div></div>}</td><td>{bytes(item.totalBytes)}</td><td>{job ? `約 ${Math.max(expected - deleted, 0).toLocaleString()} 筆待清理` : `約 ${item.estimatedRows.toLocaleString()}`}</td><td className="text-right">{job ? <span className="text-sky-300">{progress}%</span> : <button type="button" disabled={busy} onClick={() => void createQuickPreview([item.category])} className="rounded border border-rose-700 px-2 py-1 text-rose-300 disabled:opacity-50">快速清除</button>}</td></tr>
+      })}</tbody></table></div>
       <div className="mt-2 text-zinc-500">最後統計：{date(overview?.collectedAt)}。{overview?.countSemantics}</div>
     </section>
 

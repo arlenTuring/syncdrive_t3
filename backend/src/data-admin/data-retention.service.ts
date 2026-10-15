@@ -191,7 +191,14 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
     return inserted;
   }
 
-  async jobs(limit = 50) { return this.db.query(`SELECT * FROM data_cleanup_jobs ORDER BY requested_at DESC LIMIT $1`, [Math.min(Math.max(limit, 1), 200)]); }
+  async jobs(limit = 50) {
+    return this.db.query(`SELECT j.*,
+      COALESCE((p.preview->>'records')::bigint, (j.criteria->>'expectedRecords')::bigint, 0)
+        + COALESCE((p.preview->>'relatedRecords')::bigint, 0) AS expected_count
+      FROM data_cleanup_jobs j
+      LEFT JOIN data_cleanup_plans p ON p.id=j.plan_id
+      ORDER BY j.requested_at DESC LIMIT $1`, [Math.min(Math.max(limit, 1), 200)]);
+  }
   async stop(jobId: string) { const rows = this.mutationRows(await this.db.query(`UPDATE data_cleanup_jobs SET stop_requested=true WHERE id=$1 AND status IN ('queued','running') RETURNING *`, [jobId])); if (!rows.length) throw new ConflictException('工作已結束或不存在'); return rows[0]; }
 
   private async processJob(jobId: string) {
@@ -305,6 +312,8 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
       const due = await this.db.query(`SELECT * FROM data_retention_policies WHERE enabled=true AND next_run_at <= $1 ORDER BY next_run_at LIMIT 1`, [Date.now()]);
       if (!due.length || due[0].category === 'telemetry' && await this.legacyTelemetryPolicy()) return;
       const p = due[0]; const unitMs = p.retention_unit === 'hour' ? 3_600_000 : 86_400_000; const cutoff = Date.now() - Number(p.retention_value) * unitMs; const criteria = this.normalize({ category: p.category, to: cutoff }, 'policy'); const now = Date.now();
+      const counts = await this.exactCounts(criteria);
+      (criteria as CleanupCriteria & { expectedRecords: number }).expectedRecords = counts.records + counts.relatedRecords;
       const rows = await this.db.query(`INSERT INTO data_cleanup_jobs(category,trigger,status,criteria,requested_at) VALUES($1,'policy','queued',$2,$3) RETURNING id`, [p.category, criteria, now]);
       await this.db.query(`UPDATE data_retention_policies SET next_run_at=$2 WHERE category=$1`, [p.category, now + Number(p.interval_minutes) * 60_000]);
       setImmediate(() => void this.processJob(rows[0].id));

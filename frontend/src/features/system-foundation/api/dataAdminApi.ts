@@ -26,7 +26,7 @@ export type RetentionOverview = {
   countSemantics: string
 }
 export type CleanupPreview = { planId: string; expiresAt: number; criteria: Record<string, unknown>; preview: { categoryLabel: string; impact: string; environment: Record<string, unknown>; range: { from: number | null; to: number }; vehicleCode: string | null; records: number; relatedRecords: number; affectedReplays: number; affectedOrders: number; protected: string[]; estimatedBytes: number | null; warnings: string[] } }
-export type CleanupJob = { id: string; category: string; trigger: string; status: string; requested_at: string; started_at: string | null; finished_at: string | null; stop_requested: boolean; deleted_count: string; result: Record<string, unknown>; error: string | null }
+export type CleanupJob = { id: string; category: string; trigger: string; status: string; requested_at: string; started_at: string | null; finished_at: string | null; stop_requested: boolean; deleted_count: string; expected_count: string; result: Record<string, unknown>; error: string | null }
 
 export async function fetchRetentionOverview(account: DemoAccount) { return readResponse<RetentionOverview>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/overview`, { headers: adminHeaders(account) })) }
 export async function fetchCleanupCategories(account: DemoAccount) { return readResponse<CleanupCategory[]>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/categories`, { headers: adminHeaders(account) })) }
