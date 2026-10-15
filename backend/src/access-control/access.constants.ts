@@ -137,6 +137,8 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('system', '系統管理模組', 'datasource', 'manage', '管理', 921),
   permission('system', '系統管理模組', 'data-admin', '資料管理', 'view', '檢視', 930),
   permission('system', '系統管理模組', 'data-admin', 'execute', '執行查詢／異動', 931),
+  permission('system', '系統管理模組', 'data-admin', 'cleanup', '預覽／執行歷史清理', 932),
+  permission('system', '系統管理模組', 'data-admin', 'policy', '修改自動保留政策', 933),
 
   permission('access', '權限管理模組', 'accounts', '帳號管理中心', 'view', '檢視', 1000),
   permission('access', '權限管理模組', 'accounts', 'manage', '管理', 1001),

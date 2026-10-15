@@ -4,6 +4,7 @@ import { MqttService } from './mqtt.service';
 type TelemetryQueueItem = {
   vehicleCode: string;
   payload: Record<string, unknown>;
+  receivedAt: number;
 };
 
 /**
@@ -26,7 +27,7 @@ export class TelemetryWriteQueue implements OnModuleDestroy {
       const dropped = this.queue.splice(0, this.batchSize).length;
       this.logger.warn(`Telemetry history queue full; dropped ${dropped} oldest records (latest snapshot is unaffected)`);
     }
-    this.queue.push({ vehicleCode, payload });
+    this.queue.push({ vehicleCode, payload, receivedAt: Date.now() });
     void this.drain();
   }
 
@@ -42,6 +43,12 @@ export class TelemetryWriteQueue implements OnModuleDestroy {
 
   resume(vehicleCodes: string[]): void {
     vehicleCodes.forEach((code) => this.pausedVehicles.delete(code));
+  }
+
+  /** 清理前的寫入屏障：先把清理快照時間以前已接收的佇列資料落庫。 */
+  async flushForCleanup(): Promise<void> {
+    while (this.draining) await new Promise((resolve) => setTimeout(resolve, 10));
+    await this.drain(true);
   }
 
   async onModuleDestroy() {

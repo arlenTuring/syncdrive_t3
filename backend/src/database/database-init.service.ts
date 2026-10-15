@@ -51,14 +51,18 @@ export class DatabaseInitService implements OnApplicationBootstrap {
         this.logger.log('Compression policy set (7 days).');
       }
 
-      // 4. 自動刪除 7 天前的遙測 chunk，避免 demo/MQTT 灌爆磁碟
+      // 4. 保留政策改由資料管理介面統一呈現與管理。已存在的 TimescaleDB
+      // 政策不會在升級時被關閉或縮短；新安裝也不會在未經使用者確認時自動啟用刪除。
       try {
-        await this.dataSource.query(`
-          SELECT add_retention_policy('telemetry_logs', INTERVAL '7 days', if_not_exists => TRUE);
+        const policies = await this.dataSource.query(`
+          SELECT job_id, config FROM timescaledb_information.jobs
+          WHERE proc_name='policy_retention' AND hypertable_name='telemetry_logs';
         `);
-        this.logger.log('Retention policy set for telemetry_logs (7 days).');
+        this.logger.log(policies.length
+          ? 'Existing telemetry retention policy detected; it will be shown as externally managed.'
+          : 'No telemetry retention policy enabled (safe default).');
       } catch (retentionErr) {
-        this.logger.warn('Could not set telemetry retention policy (may already exist)', retentionErr);
+        this.logger.warn('Could not inspect telemetry retention policy', retentionErr);
       }
 
       this.logger.log('TimescaleDB setup completed successfully.');

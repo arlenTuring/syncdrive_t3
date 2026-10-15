@@ -81,7 +81,7 @@ export type CoverageGap = {
   to_real: number;
   from_operating: number | null;
   to_operating: number | null;
-  reason: 'not_recorded' | 'write_failed' | 'backpressure' | 'backend_restart';
+  reason: 'not_recorded' | 'write_failed' | 'backpressure' | 'backend_restart' | 'retention_cleanup';
   count?: number;
   detail?: string | null;
 };
@@ -122,7 +122,7 @@ export class VehicleHistoryService {
       vehicle_records: await this.vehicleRecords(vehicle, from, clampedTo),
       timezone: typeof input.tz === 'string' && input.tz ? input.tz : 'Asia/Taipei',
       window,
-      coverage: await this.coverage(from, clampedTo),
+      coverage: await this.coverage(from, clampedTo, vehicle?.vehicle_code),
       vehicles: await this.vehiclesIn(from, clampedTo),
       clock_runs: await this.clockRunsIn(from, clampedTo),
       stale_after_ms: REPLAY_STALE_AFTER_MS,
@@ -206,7 +206,7 @@ export class VehicleHistoryService {
         vehicle: null,
         vehicle_candidates: involved.map((item) => ({ vehicle_code: item.vehicle_code, vehicle: item.vehicle, records: item.records })),
       };
-    const coverage = await this.coverage(range.from, range.to);
+    const coverage = await this.coverage(range.from, range.to, vehicle.vehicle_code);
     const ongoing = order.status === 'PROCESSING';
     const state = coverage.state === 'none' ? 'no_history' : ongoing ? 'running' : coverage.state === 'partial' ? 'partial' : 'complete';
     const labels: Record<string, string> = {
@@ -252,7 +252,7 @@ export class VehicleHistoryService {
   }
 
   /** 錄製涵蓋：錄製區段的聯集以外是未錄製；區段內另有寫入失敗、背壓丟棄的缺段 */
-  async coverage(from: number, to: number): Promise<Coverage> {
+  async coverage(from: number, to: number, vehicleCode?: string): Promise<Coverage> {
     const segments = await this.dataSource.query<Array<{ started_real: string; last_alive_real: string; ended_real: string | null; status: string }>>(
       `SELECT started_real, last_alive_real, ended_real, status FROM vehicle_history_segments
         WHERE started_real <= $2 AND COALESCE(ended_real, last_alive_real) >= $1 OR (status = 'recording' AND started_real <= $2)
@@ -276,8 +276,8 @@ export class VehicleHistoryService {
     if (cursor < to) gaps.push({ from_real: cursor, to_real: to, from_operating: null, to_operating: null, reason: recorded.length ? 'backend_restart' : 'not_recorded' });
     const failures = await this.dataSource.query<Array<{ from_real: string; to_real: string; from_operating: string | null; to_operating: string | null; reason: CoverageGap['reason']; count: number; detail: string | null }>>(
       `SELECT from_real, to_real, from_operating, to_operating, reason, count, detail FROM vehicle_history_gaps
-        WHERE from_real <= $2 AND to_real >= $1 ORDER BY from_real`,
-      [from, to],
+        WHERE from_real <= $2 AND to_real >= $1 AND (vehicle_code IS NULL OR vehicle_code = $3) ORDER BY from_real`,
+      [from, to, vehicleCode ?? ''],
     );
     for (const gap of failures)
       gaps.push({ from_real: Number(gap.from_real), to_real: Number(gap.to_real), from_operating: numberOrNull(gap.from_operating), to_operating: numberOrNull(gap.to_operating), reason: gap.reason, count: gap.count, detail: gap.detail });

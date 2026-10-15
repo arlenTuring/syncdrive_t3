@@ -9,10 +9,14 @@ import { RedisModule } from '../redis/redis.module';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { DemoSimulationModule } from '../demo/demo-simulation.module';
 import { DispatchModule } from '../dispatch/dispatch.module';
+import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from '../database/entities/data-retention.entities';
+import { VehicleHistoryModule } from '../vehicle-history/vehicle-history.module';
+import { DegradedReplayModule } from '../degraded-replay/degraded-replay.module';
+import { DataRetentionService } from './data-retention.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DataAdminAudit]), RedisModule, MqttModule, DemoSimulationModule, DispatchModule],
+  imports: [TypeOrmModule.forFeature([DataAdminAudit, DataCleanupJob, DataCleanupPlan, DataRetentionPolicy]), RedisModule, MqttModule, DemoSimulationModule, DispatchModule, VehicleHistoryModule, DegradedReplayModule],
   controllers: [DataAdminController],
-  providers: [DataAdminService, DataAdminGuard, LiveDataResetService],
+  providers: [DataAdminService, DataAdminGuard, LiveDataResetService, DataRetentionService],
 })
 export class DataAdminModule {}

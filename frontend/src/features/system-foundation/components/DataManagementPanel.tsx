@@ -17,6 +17,8 @@ import {
   type DataAdminResult,
 } from '../api/dataAdminApi'
 import { CLEAR_ALL_ORDERS_SQL } from '../dataAdminTemplates'
+import { DataRetentionPanel } from './DataRetentionPanel'
+import { useAuth } from '../../access-control/AuthContext'
 
 const TABLE_PURPOSE: Record<string, string> = {
   operation_orders: '已建立的營運訂單',
@@ -38,6 +40,7 @@ function displayValue(value: unknown): string {
 }
 
 export function DataManagementPanel() {
+  const auth = useAuth()
   const [account] = useDemoAccount()
   const [metadata, setMetadata] = useState<DataAdminMetadata | null>(null)
   const [selected, setSelected] = useState<{ schema: string; table: string } | null>(null)
@@ -112,6 +115,7 @@ export function DataManagementPanel() {
   }
 
   async function runLiveReset() {
+    if (!auth.require('system.data-admin.execute')) return
     if (!window.confirm('將停用調度與即時寫入，並清除所選範圍的訂單、明細、遙測及快照；班表定義會保留。是否繼續？')) return
     setLoading(true)
     setError('')
@@ -126,6 +130,7 @@ export function DataManagementPanel() {
   }
 
   async function resumeLiveInputs() {
+    if (!auth.require('system.data-admin.execute')) return
     setError('')
     try {
       setLiveResetResult(await resumeLiveReset(account, resetScope()))
@@ -147,6 +152,7 @@ export function DataManagementPanel() {
   }
 
   async function execute() {
+    if (!auth.require('system.data-admin.execute')) return
     if (mode === 'write' && !window.confirm('即將執行資料寫入。失敗時會回滾整筆交易，是否繼續？')) return
     const requestId = crypto.randomUUID()
     setActiveRequestId(requestId)
@@ -164,6 +170,7 @@ export function DataManagementPanel() {
   }
 
   async function cancel() {
+    if (!auth.require('system.data-admin.execute')) return
     if (!activeRequestId) return
     try {
       await cancelDataAdminSql(account, activeRequestId)
@@ -172,13 +179,7 @@ export function DataManagementPanel() {
     }
   }
 
-  if (account.id !== 'supervisor') {
-    return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-amber-300">
-        資料管理介面僅限主管帳號使用。
-      </div>
-    )
-  }
+  if (!auth.can('system.data-admin.view')) return <div className="flex h-full items-center justify-center p-8 text-sm text-amber-300">權限不足</div>
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] bg-zinc-950 text-zinc-200">
@@ -205,7 +206,11 @@ export function DataManagementPanel() {
           </div>
         ))}
       </aside>
-      <section className="flex min-h-0 flex-col gap-3 p-3">
+      <section className="min-h-0 space-y-3 overflow-auto p-3">
+        <DataRetentionPanel />
+        <details className="rounded border border-zinc-800" open>
+          <summary className="cursor-pointer bg-zinc-900 px-3 py-2 text-sm font-semibold">資料庫結構、查詢與即時資料重置（既有功能）</summary>
+          <div className="flex min-h-[620px] flex-col gap-3 p-3">
         <div className="grid shrink-0 grid-cols-3 gap-2 text-xs">
           <div className="rounded border border-zinc-800 bg-zinc-900 p-2">環境：{metadata?.environment.host === '127.0.0.1' || metadata?.environment.host === 'localhost' ? '本機' : '遠端'}／{metadata?.environment.type ?? '—'}</div>
           <div className="rounded border border-zinc-800 bg-zinc-900 p-2">資料庫：{metadata?.environment.database ?? '—'}</div>
@@ -265,6 +270,8 @@ export function DataManagementPanel() {
             ) : <div className="p-4 text-xs text-zinc-600">沒有結果資料</div>}
           </div>
         </div>
+          </div>
+        </details>
       </section>
     </div>
   )

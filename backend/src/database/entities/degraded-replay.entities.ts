@@ -107,6 +107,7 @@ export type ReplayGap = {
     | 'frame_limit'
     | 'not_recorded'
     | 'clock_unsynced'
+    | 'retention_cleanup'
     // 一般運行歷史的缺段（降級資料來自一般歷史時併入）
     | 'backpressure';
   count?: number;

@@ -266,12 +266,13 @@ export class MqttService {
     await this.saveTelemetryBatch([{ vehicleCode, payload }]);
   }
 
-  async saveTelemetryBatch(batch: Array<{ vehicleCode: string; payload: any }>) {
+  async saveTelemetryBatch(batch: Array<{ vehicleCode: string; payload: any; receivedAt?: number }>) {
     if (batch.length === 0 || this.telemetryPersistDisabled) return;
 
-    const rows = batch.map(({ vehicleCode, payload }) => ({
+    const rows = batch.map(({ vehicleCode, payload, receivedAt }) => ({
       vehicleCode,
       timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+      receivedAt: String(receivedAt ?? Date.now()),
       rawPayload: payload,
     }));
 

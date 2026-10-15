@@ -2,6 +2,7 @@ import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
 
 @Entity('telemetry_logs')
 @Index('IDX_TELEMETRY_VEHICLE_TIME', ['vehicleCode', 'timestamp'])
+@Index('IDX_TELEMETRY_RECEIVED', ['receivedAt'])
 export class TelemetryLog {
   // 對於超表 (Hypertable) 來說，必須有一個唯一主鍵組合。
   // 我們使用 UUID 作為主鍵，但由於超表分割需要，主鍵必須包含分割用的時間欄位
@@ -15,6 +16,10 @@ export class TelemetryLog {
 
   @Column({ name: 'vehicle_code' })
   vehicleCode: string;
+
+  /** 後端可信接收時間；保留政策不得使用可被車端或模擬時鐘改動的 timestamp。 */
+  @Column({ type: 'bigint', name: 'received_at', nullable: true })
+  receivedAt: string | null;
 
   // 100% 無損保存車端傳來的原始 JSON
   @Column({ type: 'jsonb', name: 'raw_payload' })

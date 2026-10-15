@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { type AuthenticatedRequest, RequirePermission } from '../access-control/access.guard';
 import { DataAdminService, type ExecuteAdminQuery } from './data-admin.service';
 import { LiveDataResetService } from './live-data-reset.service';
+import { DataRetentionService } from './data-retention.service';
 
 @Controller('syncdrive-api/data-admin')
 @RequirePermission('system.data-admin.view')
@@ -9,7 +10,48 @@ export class DataAdminController {
   constructor(
     private readonly service: DataAdminService,
     private readonly liveReset: LiveDataResetService,
+    private readonly retention: DataRetentionService,
   ) {}
+
+  @Get('retention/categories')
+  retentionCategories() { return this.retention.categories(); }
+
+  @Get('retention/overview')
+  retentionOverview() { return this.retention.overview(); }
+
+  @Get('retention/policies')
+  retentionPolicies() { return this.retention.policies(); }
+
+  @Post('cleanup/preview')
+  @RequirePermission('system.data-admin.cleanup')
+  cleanupPreview(@Body() body: unknown, @Req() request: AuthenticatedRequest) {
+    return this.retention.preview(body, request.authUser!.id);
+  }
+
+  @Post('cleanup/plans/:planId/execute')
+  @RequirePermission('system.data-admin.cleanup')
+  cleanupExecute(@Param('planId') planId: string, @Req() request: AuthenticatedRequest) {
+    return this.retention.execute(planId, request.authUser!.id);
+  }
+
+  @Get('cleanup/jobs')
+  cleanupJobs(@Query('limit') limit?: string) { return this.retention.jobs(Number(limit ?? 50)); }
+
+  @Post('cleanup/jobs/:jobId/stop')
+  @RequirePermission('system.data-admin.cleanup')
+  cleanupStop(@Param('jobId') jobId: string) { return this.retention.stop(jobId); }
+
+  @Post('retention/policies/:category/preview')
+  @RequirePermission('system.data-admin.policy')
+  policyPreview(@Param('category') category: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
+    return this.retention.previewPolicy(category, body, request.authUser!.id);
+  }
+
+  @Put('retention/policies/:category')
+  @RequirePermission('system.data-admin.policy')
+  policySave(@Param('category') category: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
+    return this.retention.savePolicy(category, body, request.authUser!.id);
+  }
 
   @Get('metadata')
   metadata() {

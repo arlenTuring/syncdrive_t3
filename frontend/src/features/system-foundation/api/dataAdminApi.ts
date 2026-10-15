@@ -6,15 +6,36 @@ function apiBase(): string {
   return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl)
 }
 
-function adminHeaders(account: DemoAccount): HeadersInit {
+function adminHeaders(_account: DemoAccount): HeadersInit {
   const apiKey = import.meta.env.VITE_DATA_ADMIN_API_KEY as string | undefined
   return {
     'Content-Type': 'application/json',
-    'X-Syncdrive-Operator': account.id,
-    'X-Syncdrive-Role': account.id,
     ...(apiKey ? { 'X-Syncdrive-Admin-Key': apiKey } : {}),
   }
 }
+
+export type CleanupCategory = { key: string; label: string; impact: string; tables: string[]; vehicleFilter: boolean; trustedTime: string }
+export type RetentionPolicy = { category: string; enabled: boolean; retention_value: number; retention_unit: 'hour' | 'day'; interval_minutes: number; next_run_at: string | null; last_success_at: string | null; last_failure_at: string | null; last_error: string | null; source: string; readOnlyReason?: string }
+export type RetentionOverview = {
+  collectedAt: number
+  database: { name: string; totalBytes: number; includes: string }
+  backendFilesystem: { available: boolean; scope: string; path?: string; totalBytes?: number; freeBytes?: number; note: string }
+  databaseVolume: { available: boolean; scope: string; note: string }
+  categories: Array<CleanupCategory & { category: string; estimatedRows: number; totalBytes: number; oldest: number | null; newest: number | null }>
+  policies: RetentionPolicy[]
+  countSemantics: string
+}
+export type CleanupPreview = { planId: string; expiresAt: number; criteria: Record<string, unknown>; preview: { categoryLabel: string; impact: string; environment: Record<string, unknown>; range: { from: number | null; to: number }; vehicleCode: string | null; records: number; relatedRecords: number; affectedReplays: number; affectedOrders: number; protected: string[]; estimatedBytes: number | null; warnings: string[] } }
+export type CleanupJob = { id: string; category: string; trigger: string; status: string; requested_at: string; started_at: string | null; finished_at: string | null; stop_requested: boolean; deleted_count: string; result: Record<string, unknown>; error: string | null }
+
+export async function fetchRetentionOverview(account: DemoAccount) { return readResponse<RetentionOverview>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/overview`, { headers: adminHeaders(account) })) }
+export async function fetchCleanupCategories(account: DemoAccount) { return readResponse<CleanupCategory[]>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/categories`, { headers: adminHeaders(account) })) }
+export async function fetchCleanupJobs(account: DemoAccount) { return readResponse<CleanupJob[]>(await fetch(`${apiBase()}/syncdrive-api/data-admin/cleanup/jobs`, { headers: adminHeaders(account) })) }
+export async function previewCleanup(account: DemoAccount, body: { category: string; from?: number; to: number; vehicleCode?: string }) { return readResponse<CleanupPreview>(await fetch(`${apiBase()}/syncdrive-api/data-admin/cleanup/preview`, { method: 'POST', headers: adminHeaders(account), body: JSON.stringify(body) })) }
+export async function executeCleanupPlan(account: DemoAccount, planId: string) { return readResponse<CleanupJob>(await fetch(`${apiBase()}/syncdrive-api/data-admin/cleanup/plans/${planId}/execute`, { method: 'POST', headers: adminHeaders(account) })) }
+export async function stopCleanupJob(account: DemoAccount, jobId: string) { return readResponse<CleanupJob>(await fetch(`${apiBase()}/syncdrive-api/data-admin/cleanup/jobs/${jobId}/stop`, { method: 'POST', headers: adminHeaders(account) })) }
+export async function previewRetentionPolicy(account: DemoAccount, category: string, body: { enabled: boolean; retentionValue: number; retentionUnit: 'hour' | 'day'; intervalMinutes: number }) { return readResponse<CleanupPreview>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/policies/${category}/preview`, { method: 'POST', headers: adminHeaders(account), body: JSON.stringify(body) })) }
+export async function saveRetentionPolicy(account: DemoAccount, category: string, body: { enabled: boolean; retentionValue: number; retentionUnit: 'hour' | 'day'; intervalMinutes: number; confirmationPlanId?: string }) { return readResponse<RetentionPolicy>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/policies/${category}`, { method: 'PUT', headers: adminHeaders(account), body: JSON.stringify(body) })) }
 
 async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}))

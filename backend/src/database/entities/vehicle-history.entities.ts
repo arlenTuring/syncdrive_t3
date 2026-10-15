@@ -104,6 +104,10 @@ export class VehicleHistoryGap {
   @Column({ type: 'bigint', name: 'segment_id', nullable: true })
   segmentId: string | null;
 
+  /** null 表示全車隊；單車清理時只對指定車輛回報缺段。 */
+  @Column({ type: 'varchar', length: 64, name: 'vehicle_code', nullable: true })
+  vehicleCode: string | null;
+
   @Column({ type: 'bigint', name: 'from_real' })
   fromReal: string;
 
