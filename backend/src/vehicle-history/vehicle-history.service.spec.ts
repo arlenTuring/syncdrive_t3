@@ -87,10 +87,58 @@ describe('VehicleHistoryService', () => {
     expect(coverage.gaps).toEqual([expect.objectContaining({ reason: 'not_recorded', from_real: 1000, to_real: 2000 })]);
   });
 
+  it('clips persisted cleanup gaps to the requested range', async () => {
+    const { service } = serviceWith([
+      (sql) =>
+        sql.includes('FROM vehicle_history_gaps')
+          ? [{ from_real: '0', to_real: '1500', from_operating: null, to_operating: null, reason: 'retention_cleanup', count: 10, detail: null }]
+          : undefined,
+    ]);
+    const coverage = await service.coverage(1000, 2000);
+    expect(coverage.gaps).toContainEqual(expect.objectContaining({ reason: 'retention_cleanup', from_real: 1000, to_real: 1500 }));
+    expect(coverage.gaps.every((gap) => gap.from_real >= 1000 && gap.to_real <= 2000)).toBe(true);
+  });
+
+  it('uses actual vehicle frames as recording evidence when old segment metadata is missing', async () => {
+    const { service } = serviceWith([]);
+    const coverage = await service.coverage(1000, 2000, 'PMS01', { first_real: 1200, last_real: 1800 });
+    expect(coverage.state).toBe('partial');
+    expect(coverage.recorded).toEqual([{ from_real: 1200, to_real: 1800 }]);
+    expect(coverage.gaps.map((gap) => [gap.from_real, gap.to_real])).toEqual([
+      [1000, 1200],
+      [1800, 2000],
+    ]);
+  });
+
   it('rejects an end before the start and ranges that are too long', async () => {
     const { service } = serviceWith([]);
     await expect(service.resolveRange({ vehicle_id: VEHICLE_A.id, from: '2026-10-15T10:00:00+08:00', to: '2026-10-15T09:00:00+08:00' })).rejects.toThrow('結束時間必須晚於開始時間');
     await expect(service.resolveRange({ vehicle_id: VEHICLE_A.id, from: '2026-10-14T00:00:00+08:00', to: '2026-10-15T00:00:00+08:00' })).rejects.toThrow('一次最多查');
+  });
+
+  it('resolves a time range from every saved frame for the vehicle, without consulting shift or order boundaries', async () => {
+    const from = Date.parse('2026-10-15T08:00:00+08:00');
+    const to = Date.parse('2026-10-15T09:00:00+08:00');
+    const { service, calls } = serviceWith([
+      (sql) =>
+        sql.includes('count(*) AS count')
+          ? [{ count: '2', first: String(from + 1000), last: String(to - 1000) }]
+          : undefined,
+    ]);
+    const result = await service.resolveRange({
+      vehicle_id: VEHICLE_A.id,
+      from: '2026-10-15T08:00:00+08:00',
+      to: '2026-10-15T09:00:00+08:00',
+    });
+    expect(result).toMatchObject({
+      range_basis: 'vehicle_received_at',
+      vehicle_records: { count: 2, first_real: from + 1000, last_real: to - 1000 },
+    });
+    expect(calls.some((call) => call.sql.includes('FROM operation_orders'))).toBe(false);
+    const count = calls.find((call) => call.sql.includes('count(*) AS count'))!;
+    expect(count.sql).toContain('vehicle_code = $1');
+    expect(count.sql).toContain('received_at BETWEEN $2 AND $3');
+    expect(count.params.slice(0, 3)).toEqual(['PMS01', from, to]);
   });
 
   const order = (createdAt: string, extra: Record<string, unknown> = {}) => ({

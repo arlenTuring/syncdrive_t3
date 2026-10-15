@@ -183,7 +183,16 @@ export function QueryPanel({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-zinc-400">結束</span>
+            <span className="mb-1 flex items-center justify-between text-zinc-400">
+              <span>結束</span>
+              <button
+                type="button"
+                onClick={() => setDraft((current) => ({ ...current, to: epochToZonedInput(Date.now(), current.timeZone) }))}
+                className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-sky-300 hover:border-sky-500 hover:text-sky-200"
+              >
+                此刻
+              </button>
+            </span>
             <input
               type="datetime-local"
               step={1}
@@ -193,7 +202,9 @@ export function QueryPanel({
               className="w-full rounded-lg bg-zinc-800 px-3 py-2 font-mono [color-scheme:dark]"
             />
           </label>
-          <p className="text-xs text-zinc-500">以 {draft.timeZone} 當地時間解讀；一次最多 12 小時。查詢後停在開始時刻，不自動播放。</p>
+          <p className="text-xs text-zinc-500">
+            以 {draft.timeZone} 當地時間解讀；一次最多 12 小時。會查詢該載具在此區間內由後端實際收到並保存的全部紀錄，不套用任務或班次起訖。
+          </p>
           {!rangeCheck.ok ? <p className="text-xs text-amber-300">{rangeCheck.error}</p> : null}
           {pending && applied ? (
             <p className="rounded-lg border border-sky-800/60 bg-sky-500/10 px-3 py-2 text-xs text-sky-200" role="status">

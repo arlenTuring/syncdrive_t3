@@ -117,7 +117,8 @@ function ReplayStage({ resolved, panelSlot }: { resolved: Resolved | null; panel
   const window_ = useMemo(() => replayWindow(resolved), [resolved]);
   const coverage = coverageOf(resolved);
   const records = recordsOf(resolved);
-  const nothingRecorded = coverage?.state === "none";
+  // 實際車輛幀是最終依據。即使舊資料缺少錄製區段 metadata，也不能擋掉資料庫裡確實存在的幀。
+  const nothingRecorded = coverage?.state === "none" && (records == null || records.count === 0);
   // 調查載具在範圍內沒有任何紀錄：沒有可逐幀的資料，不建立播放器，不拿其他車的資料充數
   const noVehicleRecords = records != null && records.count === 0;
   const playable = !!resolved && !!vehicle && !!window_ && !nothingRecorded && !noVehicleRecords;

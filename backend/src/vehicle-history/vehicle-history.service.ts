@@ -116,13 +116,19 @@ export class VehicleHistoryService {
     if (from > now) throw new BadRequestException('開始時間在未來，沒有歷史資料');
     const clampedTo = Math.min(to, now);
     const window = { from_real: from, to_real: clampedTo, requested_to_real: to, ongoing: to > now };
+    // 指定時間區間只看「載具＋後端接收時間」；不經過訂單、任務或班次狀態解析。
+    const vehicleRecords = await this.vehicleRecords(vehicle, from, clampedTo);
     return {
       mode: 'range' as const,
       vehicle,
-      vehicle_records: await this.vehicleRecords(vehicle, from, clampedTo),
+      range_basis: 'vehicle_received_at' as const,
+      vehicle_records: vehicleRecords,
       timezone: typeof input.tz === 'string' && input.tz ? input.tz : 'Asia/Taipei',
       window,
-      coverage: await this.coverage(from, clampedTo, vehicle?.vehicle_code),
+      coverage: await this.coverage(from, clampedTo, vehicle.vehicle_code, {
+        first_real: vehicleRecords.first_real,
+        last_real: vehicleRecords.last_real,
+      }),
       vehicles: await this.vehiclesIn(from, clampedTo),
       clock_runs: await this.clockRunsIn(from, clampedTo),
       stale_after_ms: REPLAY_STALE_AFTER_MS,
@@ -252,7 +258,12 @@ export class VehicleHistoryService {
   }
 
   /** 錄製涵蓋：錄製區段的聯集以外是未錄製；區段內另有寫入失敗、背壓丟棄的缺段 */
-  async coverage(from: number, to: number, vehicleCode?: string): Promise<Coverage> {
+  async coverage(
+    from: number,
+    to: number,
+    vehicleCode?: string,
+    recordedEvidence?: { first_real: number | null; last_real: number | null },
+  ): Promise<Coverage> {
     const segments = await this.dataSource.query<Array<{ started_real: string; last_alive_real: string; ended_real: string | null; status: string }>>(
       `SELECT started_real, last_alive_real, ended_real, status FROM vehicle_history_segments
         WHERE started_real <= $2 AND COALESCE(ended_real, last_alive_real) >= $1 OR (status = 'recording' AND started_real <= $2)
@@ -260,13 +271,19 @@ export class VehicleHistoryService {
       [from, to],
     );
     const now = Date.now();
-    const recorded = mergeRanges(
-      segments.map((segment) => {
+    const segmentRanges = segments.map((segment) => {
         // 錄製中的區段：心跳每 10 秒一次，現在仍在錄製就算到現在
         const end = segment.status === 'recording' ? Math.max(Number(segment.last_alive_real), Math.min(now, to)) : Number(segment.ended_real ?? segment.last_alive_real);
         return { from_real: Math.max(from, Number(segment.started_real)), to_real: Math.min(to, end) };
-      }).filter((range) => range.to_real >= range.from_real),
-    );
+      }).filter((range) => range.to_real >= range.from_real);
+    // 舊資料可能尚未有 segment metadata；資料表中實際存在的首末幀仍是可靠的錄製證據。
+    if (recordedEvidence?.first_real != null && recordedEvidence.last_real != null) {
+      segmentRanges.push({
+        from_real: Math.max(from, recordedEvidence.first_real),
+        to_real: Math.min(to, recordedEvidence.last_real),
+      });
+    }
+    const recorded = mergeRanges(segmentRanges);
     const gaps: CoverageGap[] = [];
     let cursor = from;
     for (const range of recorded) {
@@ -280,7 +297,15 @@ export class VehicleHistoryService {
       [from, to, vehicleCode ?? ''],
     );
     for (const gap of failures)
-      gaps.push({ from_real: Number(gap.from_real), to_real: Number(gap.to_real), from_operating: numberOrNull(gap.from_operating), to_operating: numberOrNull(gap.to_operating), reason: gap.reason, count: gap.count, detail: gap.detail });
+      gaps.push({
+        from_real: Math.max(from, Number(gap.from_real)),
+        to_real: Math.min(to, Number(gap.to_real)),
+        from_operating: numberOrNull(gap.from_operating),
+        to_operating: numberOrNull(gap.to_operating),
+        reason: gap.reason,
+        count: gap.count,
+        detail: gap.detail,
+      });
     gaps.sort((a, b) => a.from_real - b.from_real);
     const covered = recorded.reduce((sum, range) => sum + (range.to_real - range.from_real), 0);
     const state = recorded.length === 0 || covered === 0 ? 'none' : gaps.length > 0 ? 'partial' : 'complete';

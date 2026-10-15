@@ -3,6 +3,7 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReplayFrame } from "../replay-core/replayState";
+import { zonedInputToIso } from "../replay-core/time";
 import type { InvestigatedVehicle } from "./api";
 import { createFakeHistoryBackend, type FakeBackend } from "./__tests__/fakeHistoryBackend";
 import { RunHistoryPage } from "./RunHistoryPage";
@@ -133,6 +134,21 @@ async function step(dir: "上一幀" | "下一幀") {
 }
 
 describe("運行管理紀錄：固定調查載具", () => {
+  it("結束時間的「此刻」按鈕會依目前時區填入現在", async () => {
+    mount();
+    await settle(3);
+    const nowButton = [...box!.querySelectorAll("button")].find((node) => node.textContent?.trim() === "此刻") as HTMLButtonElement;
+    const before = Date.now();
+    act(() => nowButton.click());
+    await settle(1);
+    const after = Date.now();
+    const endInput = [...box!.querySelectorAll('input[type="datetime-local"]')][1] as HTMLInputElement;
+    expect(endInput.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.000)?$/);
+    const filled = Date.parse(zonedInputToIso(endInput.value.replace(/\.000$/, ""), "Asia/Taipei")!);
+    expect(filled).toBeGreaterThanOrEqual(before - 1000);
+    expect(filled).toBeLessThanOrEqual(after);
+  });
+
   it("1. 時間區間模式沒選載具不能查詢", async () => {
     mount();
     await settle(3);
