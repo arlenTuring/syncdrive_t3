@@ -43,6 +43,11 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
 
   categories() { return Object.entries(CATEGORY_INFO).map(([key, value]) => ({ key, ...value })); }
 
+  /** TypeORM's PostgreSQL driver wraps UPDATE ... RETURNING rows as [rows, affected]. */
+  private mutationRows<T = any>(result: any): T[] {
+    return Array.isArray(result?.[0]) ? result[0] : result;
+  }
+
   private async legacyTelemetryPolicy() {
     try {
       const rows = await this.db.query(`SELECT job_id, schedule_interval::text, config, next_start, last_run_status, last_successful_finish FROM timescaledb_information.jobs WHERE proc_name='policy_retention' AND hypertable_name='telemetry_logs' LIMIT 1`);
@@ -177,7 +182,7 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
     if (plan.protection_fingerprint !== await this.protectionFingerprint()) throw new ConflictException('重要保護狀態已改變，請重新預覽');
     const now = Date.now();
     const inserted = await this.db.transaction(async (manager) => {
-      const consumed = await manager.query(`UPDATE data_cleanup_plans SET consumed_at=$2 WHERE id=$1 AND consumed_at IS NULL RETURNING *`, [planId, now]);
+      const consumed = this.mutationRows(await manager.query(`UPDATE data_cleanup_plans SET consumed_at=$2 WHERE id=$1 AND consumed_at IS NULL RETURNING *`, [planId, now]));
       if (!consumed.length) { const found = await manager.query(`SELECT * FROM data_cleanup_jobs WHERE plan_id=$1`, [planId]); return found[0]; }
       const jobs = await manager.query(`INSERT INTO data_cleanup_jobs(plan_id,category,trigger,status,criteria,requested_by,requested_at) VALUES($1,$2,'manual','queued',$3,$4,$5) RETURNING *`, [planId, plan.category, plan.criteria, operatorId, now]);
       return jobs[0];
@@ -187,7 +192,7 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
   }
 
   async jobs(limit = 50) { return this.db.query(`SELECT * FROM data_cleanup_jobs ORDER BY requested_at DESC LIMIT $1`, [Math.min(Math.max(limit, 1), 200)]); }
-  async stop(jobId: string) { const rows = await this.db.query(`UPDATE data_cleanup_jobs SET stop_requested=true WHERE id=$1 AND status IN ('queued','running') RETURNING *`, [jobId]); if (!rows.length) throw new ConflictException('工作已結束或不存在'); return rows[0]; }
+  async stop(jobId: string) { const rows = this.mutationRows(await this.db.query(`UPDATE data_cleanup_jobs SET stop_requested=true WHERE id=$1 AND status IN ('queued','running') RETURNING *`, [jobId])); if (!rows.length) throw new ConflictException('工作已結束或不存在'); return rows[0]; }
 
   private async processJob(jobId: string) {
     if (this.running.has(jobId)) return;
@@ -204,7 +209,7 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
         const retry = setTimeout(() => void this.processJob(jobId), 60_000); retry.unref();
         return;
       }
-      const rows = await this.db.query(`UPDATE data_cleanup_jobs SET status='running', started_at=$2, error=NULL WHERE id=$1 AND status='queued' RETURNING *`, [jobId, Date.now()]);
+      const rows = this.mutationRows(await this.db.query(`UPDATE data_cleanup_jobs SET status='running', started_at=$2, error=NULL WHERE id=$1 AND status='queued' RETURNING *`, [jobId, Date.now()]));
       if (!rows.length) return;
       const criteria = rows[0].criteria as CleanupCriteria;
       [beforeDb] = (await this.db.query(`SELECT pg_database_size(current_database())::bigint bytes`)).map((r: any) => Number(r.bytes));

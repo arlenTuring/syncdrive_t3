@@ -44,4 +44,11 @@ describe('DataRetentionService', () => {
     expect(sql).toContain('vehicle_code');
     expect(sql).not.toContain('drop_chunks');
   });
+
+  it('能解析 PostgreSQL 對 UPDATE RETURNING 的巢狀回傳格式', () => {
+    const service = serviceWith(jest.fn());
+    expect((service as any).mutationRows([[{ id: 'job-1', criteria: { category: 'telemetry' } }], 1])).toEqual([
+      { id: 'job-1', criteria: { category: 'telemetry' } },
+    ]);
+  });
 });
