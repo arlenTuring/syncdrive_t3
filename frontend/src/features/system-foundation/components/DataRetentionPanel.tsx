@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HardDrive, History, ShieldAlert, Trash2 } from 'lucide-react'
 import { useAuth } from '../../access-control/AuthContext'
 import { useDemoAccount } from '../../schedule-management/utils/demoAccountPreference'
@@ -10,7 +10,6 @@ import {
 
 const bytes = (value?: number | null) => value == null ? '無法取得' : new Intl.NumberFormat('zh-TW', { style: 'unit', unit: 'megabyte', maximumFractionDigits: 1 }).format(value / 1024 / 1024)
 const date = (value?: number | string | null) => value == null ? '—' : new Date(Number(value)).toLocaleString('zh-TW')
-const datetimeLocal = (millis: number) => { const d = new Date(millis - new Date().getTimezoneOffset() * 60_000); return d.toISOString().slice(0, 16) }
 
 export function DataRetentionPanel() {
   const auth = useAuth()
@@ -18,12 +17,7 @@ export function DataRetentionPanel() {
   const [overview, setOverview] = useState<RetentionOverview | null>(null)
   const [categories, setCategories] = useState<CleanupCategory[]>([])
   const [jobs, setJobs] = useState<CleanupJob[]>([])
-  const [category, setCategory] = useState('vehicle_history')
-  const [mode, setMode] = useState<'before' | 'range'>('before')
-  const [from, setFrom] = useState(datetimeLocal(Date.now() - 7 * 86_400_000))
-  const [to, setTo] = useState(datetimeLocal(Date.now() - 86_400_000))
-  const [vehicleCode, setVehicleCode] = useState('')
-  const [preview, setPreview] = useState<CleanupPreview | null>(null)
+  const [previews, setPreviews] = useState<CleanupPreview[]>([])
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,21 +32,21 @@ export function DataRetentionPanel() {
   }
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selected = useMemo(() => categories.find((item) => item.key === category), [categories, category])
-  async function createPreview() {
+  async function createQuickPreview(categoryKeys: string[]) {
     if (!auth.require('system.data-admin.cleanup')) return
-    setBusy(true); setError(''); setPreview(null)
+    if (categoryKeys.length === 0) return
+    setBusy(true); setError(''); setPreviews([])
     try {
-      const end = new Date(to).getTime(); const start = mode === 'range' ? new Date(from).getTime() : undefined
-      if (!Number.isFinite(end) || (start != null && !Number.isFinite(start))) throw new Error('請輸入有效時間')
-      setPreview(await previewCleanup(account, { category, from: start, to: end, vehicleCode: vehicleCode.trim() || undefined }))
+      const cutoff = Date.now()
+      const next = await Promise.all(categoryKeys.map((category) => previewCleanup(account, { category, to: cutoff })))
+      setPreviews(next)
       setConfirming(true)
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   async function runCleanup() {
-    if (!preview || !auth.require('system.data-admin.cleanup')) return
+    if (previews.length === 0 || !auth.require('system.data-admin.cleanup')) return
     setBusy(true); setError('')
-    try { await executeCleanupPlan(account, preview.planId); setConfirming(false); setPreview(null); await load() }
+    try { await Promise.all(previews.map((preview) => executeCleanupPlan(account, preview.planId))); setConfirming(false); setPreviews([]); await load() }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   async function updatePolicy(policy: RetentionPolicy) {
@@ -74,27 +68,14 @@ export function DataRetentionPanel() {
 
   return <div className="space-y-3 text-xs">
     <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><HardDrive size={16} />資料容量概況<button type="button" onClick={() => void load()} className="ml-auto text-sky-300">重新統計</button></div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><HardDrive size={16} />資料容量概況<button type="button" disabled={busy} onClick={() => void createQuickPreview(categories.map((item) => item.key))} className="ml-auto rounded bg-rose-700 px-3 py-1.5 text-white disabled:opacity-50"><Trash2 size={14} className="mr-1 inline" />全部清除</button><button type="button" onClick={() => void load()} className="text-sky-300">重新統計</button></div>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="資料庫總容量" value={bytes(overview?.database.totalBytes)} note={overview?.database.includes ?? '包含表、索引與大型欄位'} />
         <Metric label="後端檔案系統" value={overview?.backendFilesystem.available ? `${bytes(overview.backendFilesystem.freeBytes)} 可用／${bytes(overview.backendFilesystem.totalBytes)}` : '無法取得'} note={overview?.backendFilesystem.note ?? '不是瀏覽器磁碟'} />
         <Metric label="PostgreSQL 資料卷" value="無法取得" note={overview?.databaseVolume.note ?? '不以其他磁碟冒充'} />
       </div>
-      <div className="mt-2 overflow-auto"><table className="w-full text-left"><thead className="text-zinc-500"><tr><th>類別</th><th>容量</th><th>估算筆數</th><th>資料範圍</th></tr></thead><tbody>{overview?.categories.map((item) => <tr key={item.category} className="border-t border-zinc-800"><td className="py-2">{item.label}</td><td>{bytes(item.totalBytes)}</td><td>約 {item.estimatedRows.toLocaleString()}</td><td>{date(item.oldest)} ～ {date(item.newest)}</td></tr>)}</tbody></table></div>
+      <div className="mt-2 overflow-auto"><table className="w-full text-left"><thead className="text-zinc-500"><tr><th>類別</th><th>容量</th><th>估算筆數</th><th className="text-right">操作</th></tr></thead><tbody>{overview?.categories.map((item) => <tr key={item.category} className="border-t border-zinc-800"><td className="py-2">{item.label}</td><td>{bytes(item.totalBytes)}</td><td>約 {item.estimatedRows.toLocaleString()}</td><td className="text-right"><button type="button" disabled={busy} onClick={() => void createQuickPreview([item.category])} className="rounded border border-rose-700 px-2 py-1 text-rose-300 disabled:opacity-50">快速清除</button></td></tr>)}</tbody></table></div>
       <div className="mt-2 text-zinc-500">最後統計：{date(overview?.collectedAt)}。{overview?.countSemantics}</div>
-    </section>
-
-    <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Trash2 size={16} />手動清理</div>
-      <div className="grid grid-cols-5 gap-2">
-        <label>資料類別<select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-black p-2">{categories.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-        <label>時間方式<select value={mode} onChange={(e) => setMode(e.target.value as 'before' | 'range')} className="mt-1 w-full rounded border border-zinc-700 bg-black p-2"><option value="before">清理此時間之前</option><option value="range">指定時間區間</option></select></label>
-        {mode === 'range' && <label>開始時間<input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-black p-2" /></label>}
-        <label>結束／截止時間<input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-black p-2" /></label>
-        <label>載具（預設全部）<input value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} placeholder="全部載具" className="mt-1 w-full rounded border border-zinc-700 bg-black p-2" /></label>
-      </div>
-      <div className="mt-2 text-zinc-400">{selected?.impact} 時間基準：{selected?.trustedTime}。無可靠來源標記時不會猜測哪些是測試資料。</div>
-      <button type="button" disabled={busy} onClick={() => void createPreview()} className="mt-2 rounded bg-amber-700 px-3 py-2 text-white">預覽清理範圍</button>
     </section>
 
     <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
@@ -115,7 +96,7 @@ export function DataRetentionPanel() {
       <div className="overflow-auto"><table className="w-full text-left"><thead className="text-zinc-500"><tr><th>工作 ID</th><th>類別</th><th>觸發</th><th>狀態</th><th>刪除筆數</th><th>開始／完成</th><th /></tr></thead><tbody>{jobs.map((job) => <tr key={job.id} className="border-t border-zinc-800"><td className="py-2 font-mono">{job.id.slice(0, 8)}</td><td>{categories.find((c) => c.key === job.category)?.label ?? job.category}</td><td>{job.trigger === 'policy' ? '自動政策' : '手動'}</td><td>{job.status}{job.error ? `：${job.error}` : ''}</td><td>{job.deleted_count}</td><td>{date(job.started_at)}／{date(job.finished_at)}</td><td>{['queued','running'].includes(job.status) && <button type="button" onClick={() => auth.require('system.data-admin.cleanup') && void stopCleanupJob(account, job.id).then(load)} className="text-amber-300">停止</button>}</td></tr>)}</tbody></table>{jobs.length === 0 && <div className="py-3 text-zinc-500">尚無清理紀錄</div>}</div>
     </section>
     {error && <div role="alert" className="rounded border border-rose-800 bg-rose-950/50 p-2 text-rose-200">{error}</div>}
-    {confirming && preview && <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/70 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-xl rounded-xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl"><h3 className="text-lg font-semibold text-rose-300">確認不可還原的歷史清理</h3><div className="mt-3 space-y-2 text-sm text-zinc-300"><p>{preview.preview.categoryLabel}：預計刪除 {preview.preview.records.toLocaleString()} 筆，影響回放 {preview.preview.affectedReplays}、訂單關聯 {preview.preview.affectedOrders}。</p><p>範圍：{date(preview.preview.range.from)} ～ {date(preview.preview.range.to)}；載具：{preview.preview.vehicleCode ?? '全部載具'}。</p><p>保護／排除：{preview.preview.protected.join('、')}。</p>{preview.preview.warnings.map((warning) => <p key={warning} className="text-amber-300">{warning}</p>)}<p>計畫將於 {date(preview.expiresAt)} 過期；執行時仍會重新檢查權限與保護狀態。</p></div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(false)} className="rounded px-3 py-2">取消</button><button type="button" disabled={busy} onClick={() => void runCleanup()} className="rounded bg-rose-700 px-3 py-2 text-white">確認並建立背景工作</button></div></div></div>}
+    {confirming && previews.length > 0 && <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/70 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-xl rounded-xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl"><h3 className="text-lg font-semibold text-rose-300">確認不可還原的資料清除</h3><div className="mt-3 space-y-3 text-sm text-zinc-300"><p>將清除下列區塊目前可安全清理的全部歷史資料：</p>{previews.map((preview) => <div key={preview.planId} className="rounded bg-zinc-900 p-2"><strong>{preview.preview.categoryLabel}</strong>：預計 {preview.preview.records.toLocaleString()} 筆<div className="mt-1 text-xs text-zinc-500">保護／排除：{preview.preview.protected.join('、')}</div></div>)}<p className="text-amber-300">此操作無法還原。執行時仍會重新檢查權限、進行中資料與其他保護狀態。</p></div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setConfirming(false); setPreviews([]) }} className="rounded px-3 py-2">取消</button><button type="button" disabled={busy} onClick={() => void runCleanup()} className="rounded bg-rose-700 px-3 py-2 text-white">確認清除</button></div></div></div>}
   </div>
 }
 
