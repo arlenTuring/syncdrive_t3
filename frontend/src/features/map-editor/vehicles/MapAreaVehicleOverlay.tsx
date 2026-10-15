@@ -896,6 +896,13 @@ export function MapAreaVehicleOverlay({
         };
         const bgColor = resolveMapVehicleBgColor(vehicle);
         const selected = vehicle.payload.__selected === true;
+        // 運行管理紀錄的調查載具：另一種顏色與標籤；只加外光與標籤，不改車身幾何
+        const investigated = selected && vehicle.payload.__highlight === 'investigated';
+        const highlightFilter = !selected
+          ? undefined
+          : investigated
+            ? 'drop-shadow(0 0 8px #f59e0b) drop-shadow(0 0 2px white)'
+            : 'drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 2px white)';
         const zIndex = 100 + stackOrder;
 
         // 大跳躍的判斷在上面（teleported）；高倍速行進仍走 CSS 補間
@@ -1052,7 +1059,7 @@ export function MapAreaVehicleOverlay({
         ) : null;
         const selectedBadge = selected ? (
           <div
-            className="pointer-events-none absolute whitespace-nowrap rounded border border-white/70 bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-lg"
+            className={`pointer-events-none absolute whitespace-nowrap rounded border border-white/70 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-lg ${investigated ? 'bg-amber-400' : 'bg-sky-500'}`}
             style={{
               left: badgeCenterX,
               top: badgeTopY - (cellBadge ? 20 : 0),
@@ -1060,7 +1067,7 @@ export function MapAreaVehicleOverlay({
               transform: 'translate(-50%, -100%)',
             }}
           >
-            選取 · {vehicle.vehicleId}
+            {investigated ? '調查' : '選取'} · {vehicle.vehicleId}
           </div>
         ) : null;
 
@@ -1074,7 +1081,7 @@ export function MapAreaVehicleOverlay({
               {cellBadge}
               {selectedBadge}
               <div
-                style={{ ...style, overflow: 'visible', pointerEvents: 'none', filter: selected ? 'drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 2px white)' : undefined }}
+                style={{ ...style, overflow: 'visible', pointerEvents: 'none', filter: highlightFilter }}
               >
                 <div className="pointer-events-none">
                   {/*
@@ -1118,7 +1125,7 @@ export function MapAreaVehicleOverlay({
               vehicleId={vehicle.vehicleId}
               bgColor={bgColor}
               showLabel={showLabels}
-              style={{ ...style, filter: selected ? 'drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 2px white)' : undefined }}
+              style={{ ...style, filter: highlightFilter }}
             />
           </div>
         );

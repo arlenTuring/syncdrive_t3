@@ -76,7 +76,7 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('schedule', '班表管理模組', 'maintenance', 'publish', '發布／撤回', 335),
 
   permission('vehicle', '載具管理模組', 'realtime', '即時資訊清單', 'view', '檢視', 400),
-  permission('vehicle', '載具管理模組', 'log', '運行管理日誌', 'view', '檢視', 410),
+  permission('vehicle', '載具管理模組', 'log', '運行管理紀錄', 'view', '檢視', 410),
   permission('vehicle', '載具管理模組', 'log', 'download', '下載', 411),
   permission('vehicle', '載具管理模組', 'registry', '載具註冊管理', 'view', '檢視', 420),
   permission('vehicle', '載具管理模組', 'registry', 'create', '建立', 421),

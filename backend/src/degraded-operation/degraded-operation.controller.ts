@@ -70,8 +70,19 @@ export class DegradedOperationController {
   @ApiOperation({
     summary: '指定營運時刻的重建起點（各串流在該時刻以前最後一筆）',
   })
-  replaySnapshot(@Param('id') id: string, @Query('at') at?: string) {
-    return this.replay.snapshot(id, at);
+  replaySnapshot(@Param('id') id: string, @Query('at') at?: string, @Query('seq') seq?: string) {
+    return this.replay.snapshot(id, at, seq);
+  }
+
+  @Get('executions/:id/replay/neighbor')
+  @ApiOperation({ summary: '游標前一筆／後一筆（逐幀跨出已載入範圍時用）' })
+  replayNeighbor(
+    @Param('id') id: string,
+    @Query('at') at?: string,
+    @Query('seq') seq?: string,
+    @Query('dir') dir?: string,
+  ) {
+    return this.replay.neighbor(id, { at, seq, dir });
   }
 
   @Get('executions/:id/replay/frames')

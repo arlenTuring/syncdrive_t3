@@ -17,6 +17,7 @@ import {
   Pentagon,
   Plus,
   Route,
+  History,
   Send,
   Settings,
   ShieldCheck,
@@ -59,9 +60,9 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'time-templates': FileText,
   'shift-list': List,
   'maintenance-tasks': Wrench,
-  trajectory: Route,
   'vehicle-realtime': Route,
   'vehicle-registry': Route,
+  'vehicle-run-history': History,
   'account-management': UserRoundCog,
   'role-management': ShieldCheck,
 };
@@ -81,7 +82,7 @@ function groupIcon(groupId: string) {
 
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return isSiteView(activeView);
-  if (groupId === 'vehicle') return activeView === 'trajectory' || activeView === 'vehicle-realtime' || activeView === 'vehicle-registry';
+  if (groupId === 'vehicle') return activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history';
   if (groupId === 'operations') return isOperationsView(activeView);
   if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
   if (groupId === 'schedule') {
@@ -185,7 +186,7 @@ export function ScheduleModuleSidebar({
     ) {
       setExpanded((prev) => ({ ...prev, schedule: true }));
     }
-    if (activeView === 'trajectory' || activeView === 'vehicle-realtime' || activeView === 'vehicle-registry') {
+    if (activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history') {
       setExpanded((prev) => ({ ...prev, vehicle: true }));
     }
     const mdpId = parseModuleDashboardViewId(activeView);

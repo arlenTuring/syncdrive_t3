@@ -7,6 +7,7 @@ import { RedisModule } from '../redis/redis.module';
 import { OrderModule } from '../order/order.module';
 import { MapModule } from '../map/map.module';
 import { DegradedReplayModule } from '../degraded-replay/degraded-replay.module';
+import { VehicleHistoryModule } from '../vehicle-history/vehicle-history.module';
 import { CommandLog } from '../database/entities/command-log.entity';
 import { SecurityEventLog } from '../database/entities/security-event-log.entity';
 import { TelemetryLog } from '../database/entities/telemetry-log.entity';
@@ -18,6 +19,7 @@ import { SlotStatus_ } from '../database/entities/slot-status.entity';
     OrderModule,
     MapModule,
     DegradedReplayModule,
+    VehicleHistoryModule,
     TypeOrmModule.forFeature([CommandLog, SecurityEventLog, TelemetryLog, SlotStatus_]),
   ],
   providers: [MqttService, TelemetryWriteQueue],

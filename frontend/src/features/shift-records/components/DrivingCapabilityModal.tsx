@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail } from '../api/shiftRecordsApi';
+import { RunCodeRow } from './RunCodeRow';
 import {
   buildDrivingCapabilityModel,
   filterEventsByLane,
@@ -622,6 +623,7 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
   const [filter, setFilter] = useState<TaskLaneFilter>('all');
   const [model, setModel] = useState<DrivingCapabilityModel | null>(null);
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
+  const [runCode, setRunCode] = useState<string | null>(null);
 
   const filterLabels: Record<TaskLaneFilter, string> = {
     all: t('shiftRecords.capabilityModal.filterAll'),
@@ -636,6 +638,7 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
       const detail = await fetchShiftRecordDetail(orderId);
       const next = buildDrivingCapabilityModel(detail);
       setModel(next);
+      setRunCode(typeof detail.run_code === 'string' && detail.run_code ? detail.run_code : null);
       setSelected(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -700,14 +703,17 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
                 </span>
                 <span className="truncate">{model.routeEndpoints.replace(/➔|→/g, '→')}</span>
               </div>
-              <div className="inline-flex shrink-0 items-center gap-2 text-[12px] text-zinc-400">
-                <Clock className="size-3.5 shrink-0" aria-hidden />
-                <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
-                <span className="text-zinc-500">
-                  {t('shiftRecords.capabilityModal.durationMinutes', {
-                    minutes: model.durationMinutes,
-                  })}
-                </span>
+              <div className="flex min-w-0 shrink-0 flex-col items-end gap-1">
+                <div className="inline-flex shrink-0 items-center gap-2 text-[12px] text-zinc-400">
+                  <Clock className="size-3.5 shrink-0" aria-hidden />
+                  <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
+                  <span className="text-zinc-500">
+                    {t('shiftRecords.capabilityModal.durationMinutes', {
+                      minutes: model.durationMinutes,
+                    })}
+                  </span>
+                </div>
+                {runCode ? <RunCodeRow code={runCode} /> : null}
               </div>
             </div>
           ) : null}

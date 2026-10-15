@@ -532,6 +532,12 @@ export class OrderService {
     };
     return {
       ...item,
+      created_at: toEpoch(order.createdAt ?? null),
+      /**
+       * 班次唯一碼：訂單號＠建立時刻。訂單號在資料重置後可能被重新使用，加上建立時刻才能
+       * 無歧義對到「這一次執行」；運行管理紀錄回放用它定位同一筆歷史（不是用班次代號）。
+       */
+      run_code: `${order.id}@${order.createdAt}`,
       actions: actions.map((a) => ({
         action_id: a.id,
         station_id: a.stationId,

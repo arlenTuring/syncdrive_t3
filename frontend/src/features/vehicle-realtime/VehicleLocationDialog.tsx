@@ -55,6 +55,9 @@ export function VehicleLocationDialog({ item, fleet, onClose }: { item: VehicleR
         ...(candidate.telemetry?.payload ?? {}),
         vehicle_code: candidate.vehicleCode,
         segment_label: candidate.location!.label,
+        // 後端對這筆遙測的位置判定（站點／設施／軌道）：圖台據此讓停在格位的車以車身中心對齊格位
+        location_kind: candidate.location!.kind,
+        location_object_id: candidate.location!.objectId,
         __selected: candidate.vehicleCode === item.vehicleCode,
         local_pose: {
           ...((candidate.telemetry?.payload.local_pose as Record<string, unknown> | undefined) ?? {}),

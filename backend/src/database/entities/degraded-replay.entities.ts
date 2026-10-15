@@ -85,6 +85,14 @@ export class DegradedReplaySession {
 
   @Column({ type: 'bigint', name: 'updated_at' })
   updatedAt: string;
+
+  /**
+   * 串流資料（遙測、營運、健康、場域）從哪裡讀：degraded＝本表的 degraded_replay_frames（舊紀錄）；
+   * history＝一般運行歷史 vehicle_history_frames（一般錄製開著時不再重複寫同一份 MQTT）。
+   * 訂單站序快照仍存在 degraded_replay_frames。
+   */
+  @Column({ type: 'varchar', length: 16, name: 'frames_source', default: 'degraded' })
+  framesSource: string;
 }
 
 export type ReplayGap = {
@@ -98,7 +106,9 @@ export type ReplayGap = {
     | 'clock_run_changed'
     | 'frame_limit'
     | 'not_recorded'
-    | 'clock_unsynced';
+    | 'clock_unsynced'
+    // 一般運行歷史的缺段（降級資料來自一般歷史時併入）
+    | 'backpressure';
   count?: number;
 };
 

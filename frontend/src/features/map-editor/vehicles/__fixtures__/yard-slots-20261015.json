@@ -1,0 +1,721 @@
+{
+ "schemaVersion": 2,
+ "mapId": "map-1789194688160-bu1e5q6",
+ "displayName": "地圖_20261005",
+ "version": "v0.4",
+ "createdAt": "2026-09-12T06:31:28.160Z",
+ "updatedAt": "2026-10-11T12:06:40.619Z",
+ "pixelSize": {
+  "width": 3152,
+  "height": 642
+ },
+ "creationMode": "trackGen",
+ "areas": [
+  {
+   "id": "077",
+   "customName": "高精地圖 軌道",
+   "layout": {
+    "xPx": 0,
+    "yPx": 0,
+    "wPx": 3151.15614012314,
+    "hPx": 641.4626039268418,
+    "borderPx": 0,
+    "borderColor": "transparent"
+   },
+   "domain": {
+    "xMinM": 0,
+    "xMaxM": 3117.5284709011307,
+    "yMinM": 0,
+    "yMaxM": 642.681193763267
+   },
+   "showRuler": false,
+   "mqtt": {
+    "topic": "v1/vtms/+/telemetry/update",
+    "vehicleIdField": "vehicle_code",
+    "xField": "x",
+    "yField": "y"
+   },
+   "view": {
+    "panXM": 0,
+    "panYM": 0,
+    "zoom": 1
+   },
+   "facilities": [
+    {
+     "id": "125",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "整備區",
+     "positionMeters": {
+      "x": 1005.0093224010018,
+      "y": 189.5289929946609
+     },
+     "areaPosition": {
+      "x": 1015.8499999999999,
+      "y": 189.1696264738844
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 188,
+      "h": 244.04
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "rgba(34, 211, 238, 0.08)",
+      "strokeWidthPx": 1,
+      "strokeColor": "#22d3ee",
+      "strokeStyle": "dashed",
+      "refFieldXMinM": -900,
+      "refFieldXMaxM": -873,
+      "refFieldYMinM": -330,
+      "refFieldYMaxM": -262,
+      "labelStyle": {
+       "fontSizePx": 22,
+       "labelOffsetPx": {
+        "x": -2.37890625,
+        "y": 7.1328125
+       },
+       "labelOffsetCustom": true
+      },
+      "zonePartitionEntranceId": "124",
+      "zonePartitionLinkId": "zl-mtz7uvj9-3x4l"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "129",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "調度區",
+     "positionMeters": {
+      "x": 767.3636517301006,
+      "y": 189.5252290908384
+     },
+     "areaPosition": {
+      "x": 775.6409301236206,
+      "y": 189.16586970681178
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 215,
+      "h": 244.04
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "rgba(34, 211, 238, 0.08)",
+      "strokeWidthPx": 1,
+      "strokeColor": "#22d3ee",
+      "strokeStyle": "dashed",
+      "labelStyle": {
+       "fontSizePx": 22,
+       "labelOffsetPx": {
+        "x": 40.3984375,
+        "y": -35.10546875
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "129",
+      "refFieldXMinM": -900,
+      "refFieldXMaxM": -873,
+      "refFieldYMinM": -380,
+      "refFieldYMaxM": -330,
+      "zonePartitionEntranceId": "124",
+      "zonePartitionLinkId": "zl-mtz7v9r8-17et"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "130",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "充電區",
+     "positionMeters": {
+      "x": 1259.355777779329,
+      "y": 229.41760336742527
+     },
+     "areaPosition": {
+      "x": 1272.94,
+      "y": 228.98260392684176
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 373,
+      "h": 166.75
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "rgba(34, 211, 238, 0.08)",
+      "strokeWidthPx": 1,
+      "strokeColor": "#22d3ee",
+      "strokeStyle": "dashed",
+      "refFieldXMinM": -290,
+      "refFieldXMaxM": -225,
+      "refFieldYMinM": -10,
+      "refFieldYMaxM": -1,
+      "labelStyle": {
+       "fontSizePx": 22,
+       "labelOffsetPx": {
+        "x": -128.17578125,
+        "y": -46.76171875
+       },
+       "labelOffsetCustom": true
+      },
+      "zonePartitionEntranceId": "131",
+      "zonePartitionLinkId": "zl-mtzda6vr-w8e3",
+      "mqttInstanceId": "130"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "132",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "D1",
+     "positionMeters": {
+      "x": 791.8288245017374,
+      "y": 356.1979920618827
+     },
+     "areaPosition": {
+      "x": 800.37,
+      "y": 355.5226039268417
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#136881",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -896.89,
+      "refFieldXMaxM": -890.87,
+      "refFieldYMinM": -345.92,
+      "refFieldYMaxM": -331.63,
+      "zoneLocalField": {
+       "u": 0.22660032500641591,
+       "v": 0.8245440674480822,
+       "du": 0.2231627906976744,
+       "dv": 0.2857318472381577
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "138",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "D2",
+     "positionMeters": {
+      "x": 791.8288245017374,
+      "y": 275.8756926969811
+     },
+     "areaPosition": {
+      "x": 800.37,
+      "y": 275.35260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#136881",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -896.89,
+      "refFieldXMaxM": -890.87,
+      "refFieldYMinM": -362.34,
+      "refFieldYMaxM": -348.06,
+      "zoneLocalField": {
+       "u": 0.22660032500641591,
+       "v": 0.49603234805781843,
+       "du": 0.2231627906976744,
+       "dv": 0.2857318472381577
+      },
+      "mqttInstanceId": "138",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "139",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "D3",
+     "positionMeters": {
+      "x": 791.8295607486392,
+      "y": 196.93076957510405
+     },
+     "areaPosition": {
+      "x": 800.370744188535,
+      "y": 196.5573685224322
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#136881",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -896.89,
+      "refFieldXMaxM": -890.87,
+      "refFieldYMinM": -377.15,
+      "refFieldYMaxM": -363.63,
+      "zoneLocalField": {
+       "u": 0.22665029797634614,
+       "v": 0.19212628591878556,
+       "du": 0.22325581395348837,
+       "dv": 0.27040649073922307
+      },
+      "mqttInstanceId": "139",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "140",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "D4",
+     "positionMeters": {
+      "x": 858.4106302777745,
+      "y": 196.92599592818667
+     },
+     "areaPosition": {
+      "x": 867.67,
+      "y": 196.55260392684175
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#136881",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -888.44,
+      "refFieldXMaxM": -882.42,
+      "refFieldYMinM": -378.49,
+      "refFieldYMaxM": -364.2,
+      "zoneLocalField": {
+       "u": 0.5396235808203692,
+       "v": 0.17313446246529254,
+       "du": 0.2231627906976744,
+       "dv": 0.2857318472381577
+      },
+      "mqttInstanceId": "140",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "141",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "D5",
+     "positionMeters": {
+      "x": 923.4985500698324,
+      "y": 196.92599592818667
+     },
+     "areaPosition": {
+      "x": 933.46,
+      "y": 196.55260392684175
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#136881",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -880.18,
+      "refFieldXMaxM": -874.16,
+      "refFieldYMinM": -378.49,
+      "refFieldYMaxM": -364.2,
+      "zoneLocalField": {
+       "u": 0.8456235808203696,
+       "v": 0.17313446246529254,
+       "du": 0.2231627906976744,
+       "dv": 0.2857318472381577
+      },
+      "mqttInstanceId": "141",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "142",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M3",
+     "positionMeters": {
+      "x": 1039.4133131463825,
+      "y": 333.0574614916468
+     },
+     "areaPosition": {
+      "x": 1050.6250943396226,
+      "y": 332.42595018953017
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#216d6d",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -895.01,
+      "refFieldXMaxM": -888.11,
+      "refFieldYMinM": -290.08,
+      "refFieldYMaxM": -271.7,
+      "zoneLocalField": {
+       "u": 0.3126334805299079,
+       "v": 0.7222230934094648,
+       "du": 0.2553191489361702,
+       "dv": 0.27040649073922307
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "144",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M4",
+     "positionMeters": {
+      "x": 1038.5359841291754,
+      "y": 211.4848140747378
+     },
+     "areaPosition": {
+      "x": 1049.7383018867918,
+      "y": 211.08381705243397
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 47.98,
+      "h": 69.73
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#216d6d",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -895.13,
+      "refFieldXMaxM": -888.24,
+      "refFieldYMinM": -323.89,
+      "refFieldYMaxM": -305.51,
+      "zoneLocalField": {
+       "u": 0.307916499397829,
+       "v": 0.22500078093160789,
+       "du": 0.2553191489361702,
+       "dv": 0.27040649073922307
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "144"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "147",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E1",
+     "positionMeters": {
+      "x": 1499.4954763828582,
+      "y": 325.9506399622647
+     },
+     "areaPosition": {
+      "x": 1515.67,
+      "y": 325.3326039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#1e3a1d",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -247.7,
+      "refFieldXMaxM": -231.84,
+      "refFieldYMinM": -4.8,
+      "refFieldYMaxM": -2.26,
+      "zoneLocalField": {
+       "u": 0.7727345844504022,
+       "v": 0.7190104947526239,
+       "du": 0.24396782841823056,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "148",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E2",
+     "positionMeters": {
+      "x": 1390.5605189683045,
+      "y": 325.9506399622647
+     },
+     "areaPosition": {
+      "x": 1405.56,
+      "y": 325.3326039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#1e3a1d",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -266.89,
+      "refFieldXMaxM": -251.03,
+      "refFieldYMinM": -4.8,
+      "refFieldYMaxM": -2.26,
+      "zoneLocalField": {
+       "u": 0.47753351206434286,
+       "v": 0.7190104947526239,
+       "du": 0.24396782841823056,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "148"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "149",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E3",
+     "positionMeters": {
+      "x": 1499.4954763828582,
+      "y": 251.2590169405182
+     },
+     "areaPosition": {
+      "x": 1515.67,
+      "y": 250.7826039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#1e3a1d",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -247.7,
+      "refFieldXMaxM": -231.84,
+      "refFieldYMinM": -8.82,
+      "refFieldYMaxM": -6.28,
+      "zoneLocalField": {
+       "u": 0.7727345844504022,
+       "v": 0.27193403298350843,
+       "du": 0.24396782841823056,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "149"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "150",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E4",
+     "positionMeters": {
+      "x": 1390.253827143779,
+      "y": 251.2590169405182
+     },
+     "areaPosition": {
+      "x": 1405.25,
+      "y": 250.7826039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#1e3a1d",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -266.94,
+      "refFieldXMaxM": -251.09,
+      "refFieldYMinM": -8.82,
+      "refFieldYMaxM": -6.28,
+      "zoneLocalField": {
+       "u": 0.4767024128686326,
+       "v": 0.27193403298350843,
+       "du": 0.24396782841823056,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "150"
+     },
+     "currentState": "Normal"
+    }
+   ],
+   "trackJoints": []
+  }
+ ],
+ "routeGroups": [],
+ "routes": [],
+ "visibleRouteIds": []
+}

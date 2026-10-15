@@ -85,6 +85,13 @@ import {
   DegradedReplayMap,
   DegradedReplaySession,
 } from './database/entities/degraded-replay.entities';
+import {
+  VehicleHistoryFrame,
+  VehicleHistoryGap,
+  VehicleHistorySegment,
+  VehicleHistoryStreamKey,
+} from './database/entities/vehicle-history.entities';
+import { VehicleHistoryModule } from './vehicle-history/vehicle-history.module';
 
 @Module({
   imports: [
@@ -122,6 +129,8 @@ import {
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
           DegradedOperationPlan, DegradedOperationExecution, DegradedOperationEvent, DegradedOperationDraft,
           DegradedReplaySession, DegradedReplayMap, DegradedReplayFrame,
+          // 一般運行歷史（運行管理紀錄回放）
+          VehicleHistoryFrame, VehicleHistorySegment, VehicleHistoryGap, VehicleHistoryStreamKey,
           DataAdminAudit,
           // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
           PartnerApiKey,
@@ -182,6 +191,7 @@ import {
     DataAdminModule,
     DegradedOperationModule,
     AccessControlModule,
+    VehicleHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

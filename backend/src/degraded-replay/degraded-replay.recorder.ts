@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   Injectable,
   Logger,
@@ -18,6 +17,8 @@ import { MapService } from '../map/map.service';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
 import { RedisService } from '../redis/redis.service';
 import { MapVehicleSettingsService } from '../vehicle-definition/map-vehicle-settings.service';
+import { saveActiveMapSnapshot, vehicleModelSnapshot } from '../vehicle-history/history-snapshots';
+import { healthContentKey, VehicleHistoryRecorder } from '../vehicle-history/vehicle-history.recorder';
 
 export type ReplayStream = 'telemetry' | 'operation' | 'health' | 'facility';
 
@@ -58,6 +59,11 @@ type ActiveSession = {
   limitReached: boolean;
   /** 已收資料中最大的營運時間；營運時間倒退（時鐘還沒接回來）時不收 */
   lastOperatingAt: number;
+  /**
+   * history：遙測／營運／健康／場域資料由一般運行歷史保存（VehicleHistoryRecorder），這裡不再
+   * 重複寫同一份；訂單站序快照寫進一般歷史（同一序號空間）。degraded：舊做法，全部自己存。
+   */
+  framesSource: 'history' | 'degraded';
 };
 
 /** 營運時間倒退超過這麼多才算時鐘沒接上（同一毫秒、心跳微調不算） */
@@ -108,6 +114,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     private readonly mapService: MapService,
     private readonly clock: OperatingClockService,
     private readonly mapVehicles: MapVehicleSettingsService,
+    private readonly history: VehicleHistoryRecorder,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -151,6 +158,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
         : null;
       const clockRun = this.clockRun();
       const now = Date.now();
+      const framesSource = this.history.enabled() ? 'history' : 'degraded';
       await this.sessions.save(
         this.sessions.create({
           executionId: execution.id,
@@ -172,10 +180,12 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
           lastError: map ? null : '開始時讀不到使用中的地圖',
           lastWrittenReal: String(now),
           updatedAt: String(now),
+          framesSource,
         }),
       );
       this.activate({
         executionId: execution.id,
+        framesSource,
         clockRun,
         frameCount: 0,
         droppedCount: 0,
@@ -314,9 +324,15 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     session.lastOperatingAt = Math.max(session.lastOperatingAt, operatingAt);
 
     const body = payload as Record<string, unknown>;
+    if (session.framesSource === 'history') {
+      // 一般運行歷史已逐筆保存這則訊息；這裡只補降級回放要的訂單站序快照
+      this.captureNewOrder(session, stream, body);
+      return;
+    }
     const dedupKey = `${stream}|${vehicleCode ?? ''}|${topic ?? ''}`;
+    // 健康心跳只略過「除了 timestamp 以外完全相同」的；錯誤碼等任何變化都會留下
     const contentKey =
-      stream === 'health' ? healthKey(body) : JSON.stringify(body);
+      stream === 'health' ? healthContentKey(body) : JSON.stringify(body);
     if (this.lastPayloadKey.get(dedupKey) === contentKey) {
       // 內容完全一樣：retain 重送或停住的心跳。健康心跳仍定期留一筆，證明那段時間有收到
       if (stream !== 'health') return;
@@ -353,7 +369,11 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
       payload: body,
     });
 
-    // 新出現的訂單：記下它當時的站序與用途（判位要用），之後訂單再被改也不影響回放
+    this.captureNewOrder(session, stream, body);
+  }
+
+  /** 新出現的訂單：記下它當時的站序與用途（判位要用），之後訂單再被改也不影響回放 */
+  private captureNewOrder(session: ActiveSession, stream: ReplayStream, body: Record<string, unknown>) {
     const orderId =
       stream === 'operation' && typeof body.order_id === 'string'
         ? body.order_id.trim()
@@ -470,29 +490,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     mapId: string,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const resolution = await this.mapVehicles.resolve(mapId);
-      const definition = resolution.definition;
-      return {
-        capturedAt: Date.now(),
-        source: resolution.source,
-        setting: resolution.setting,
-        missingDefinitionKey: resolution.missingDefinitionKey,
-        definition: definition
-          ? {
-              definitionKey: definition.definitionKey,
-              name: definition.name,
-              version: definition.version,
-              width: definition.width,
-              height: definition.height,
-              backgroundColor: definition.backgroundColor,
-              elements: definition.elements as unknown,
-              previewData: definition.previewData as unknown,
-              rearAxleFromTailRatio: definition.rearAxleFromTailRatio,
-              createdAt: definition.createdAt,
-              updatedAt: definition.updatedAt,
-            }
-          : null,
-      };
+      return await vehicleModelSnapshot(this.mapVehicles, mapId);
     } catch (error) {
       this.logger.warn(
         `降級開始時無法保存車輛模型：${(error as Error).message}`,
@@ -508,31 +506,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     displayName: string | null;
   } | null> {
     try {
-      const doc = this.mapService.getActivePublishedMapLibrary();
-      const document = doc.mapDocument;
-      if (!document || typeof document !== 'object') return null;
-      const hash = createHash('sha256')
-        .update(JSON.stringify(document))
-        .digest('hex');
-      const mapId = String(doc.mapId ?? '');
-      const version =
-        typeof document.version === 'string' ? document.version : null;
-      await this.maps
-        .createQueryBuilder()
-        .insert()
-        .into(DegradedReplayMap)
-        .values({
-          mapHash: hash,
-          mapId,
-          mapVersion: version,
-          document: document as DegradedReplayMap['document'],
-          createdAt: String(Date.now()),
-        })
-        .orIgnore()
-        .execute();
-      const displayName =
-        typeof document.displayName === 'string' ? document.displayName : null;
-      return { mapId, hash, version, displayName };
+      return await saveActiveMapSnapshot(this.mapService, this.maps);
     } catch (error) {
       this.logger.error(`降級開始時無法保存地圖：${(error as Error).message}`);
       return null;
@@ -548,7 +522,9 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
     startedAtOperating: number,
   ): Promise<void> {
     const receivedAt = Date.now();
-    for (const vehicleCode of this.lastTelemetrySeen.keys()) {
+    // 一般運行歷史有錄製時，開始那一刻各車的狀態由歷史的起點快照提供，不再另存一份
+    const historyBacked = this.session?.framesSource === 'history';
+    for (const vehicleCode of historyBacked ? [] : this.lastTelemetrySeen.keys()) {
       // 最近 REPLAY_STALE_AFTER_MS 內沒收到遙測的車不算在場（即時圖台也不會畫它）
       const seenAt = this.lastTelemetrySeen.get(vehicleCode);
       if (seenAt === undefined || receivedAt - seenAt > REPLAY_STALE_AFTER_MS)
@@ -564,7 +540,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
         if (!payload || typeof payload !== 'object') continue;
         this.lastPayloadKey.set(
           `${stream}|${vehicleCode}|`,
-          stream === 'health' ? healthKey(payload) : JSON.stringify(payload),
+          stream === 'health' ? healthContentKey(payload) : JSON.stringify(payload),
         );
         this.buffer.push({
           executionId,
@@ -627,6 +603,30 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
               .filter(Boolean)
           : [];
         if (this.session?.executionId !== executionId) return;
+        const snapshot = {
+          order_id: row.order_id,
+          vehicle_code: row.vehicle_code,
+          trip_code: row.trip_code,
+          status: row.status,
+          stations,
+          transition_purpose: payload.transition_purpose ?? null,
+          transition_facility: payload.transition_facility ?? null,
+          execution_id: executionId,
+          kind,
+        };
+        if (this.session.framesSource === 'history') {
+          // 同一張歷史表、同一序號空間；降級回放依營運時間讀
+          const accepted = this.history.captureSystem({
+            stream: 'order_route',
+            streamKey: `order_route|${row.order_id}`,
+            vehicleCode: row.vehicle_code,
+            orderId: row.order_id,
+            payload: snapshot,
+            receivedAt,
+            operatingAt: at,
+          });
+          if (accepted) continue;
+        }
         this.buffer.push({
           executionId,
           stream: 'order',
@@ -636,15 +636,7 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
           receivedAt,
           operatingAt: at,
           vehicleTs: null,
-          payload: {
-            order_id: row.order_id,
-            vehicle_code: row.vehicle_code,
-            trip_code: row.trip_code,
-            status: row.status,
-            stations,
-            transition_purpose: payload.transition_purpose ?? null,
-            transition_facility: payload.transition_facility ?? null,
-          },
+          payload: snapshot,
         });
       }
     } catch (error) {
@@ -715,6 +707,8 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
       session.initialCaptured || Number(session.frameCount) > 0;
     this.activate({
       executionId: execution.id,
+      // 舊 session 沒有這一欄（預設 degraded）：照它原本的方式接著存
+      framesSource: session.framesSource === 'history' && this.history.enabled() ? 'history' : 'degraded',
       clockRun: session.clockRun ?? this.clockRun(),
       frameCount: Number(session.frameCount) || 0,
       droppedCount: Number(session.droppedCount) || 0,
@@ -738,21 +732,6 @@ export class DegradedReplayRecorder implements OnModuleInit, OnModuleDestroy {
       `降級 ${execution.id} 進行中，回放保存已接續；重啟期間記為資料缺段`,
     );
   }
-}
-
-/** 健康心跳的比較鍵：總評與各子系統狀態；只有時間戳變了不算變化 */
-function healthKey(payload: Record<string, unknown>): string {
-  const subsystems = payload.subsystems as
-    | Record<string, { status?: unknown }>
-    | undefined;
-  const parts = subsystems
-    ? Object.keys(subsystems)
-        .sort()
-        .map(
-          (name) => `${name}:${JSON.stringify(subsystems[name]?.status ?? '')}`,
-        )
-    : [];
-  return `${JSON.stringify(payload.overall_health ?? '')}|${parts.join(',')}`;
 }
 
 function numberOrNull(value: unknown): number | null {

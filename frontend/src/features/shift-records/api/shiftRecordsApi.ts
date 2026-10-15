@@ -46,6 +46,10 @@ export type ShiftRecordDetail = ShiftRecordListItem & {
   task_group: Array<Record<string, unknown>>;
   vehicle_phase: unknown;
   current_leg: unknown;
+  /** 訂單建立時刻（Unix ms） */
+  created_at?: number | string | null;
+  /** 班次唯一碼：訂單號＠建立時刻；運行管理紀錄以它對到同一次執行 */
+  run_code?: string | null;
 };
 
 function buildQuery(params: Record<string, string | number | undefined>): string {

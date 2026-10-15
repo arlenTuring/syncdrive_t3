@@ -33,6 +33,7 @@ import { AccountManagementPage } from '../access-control/AccountManagementPage';
 import { RoleManagementPage } from '../access-control/RoleManagementPage';
 import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
 import { VehicleRegistryPage } from '../vehicle-registry/VehicleRegistryPage';
+import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -131,17 +132,14 @@ function useWorkspaceChrome(
         icon: <Map className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'trajectory') {
-      return {
-        title: t('nav.modules.vehicle'),
-        icon: <Route className="size-4 text-sky-400" aria-hidden />,
-      };
-    }
     if (view === 'vehicle-realtime') {
       return {
         title: '載具即時清單',
         icon: <Route className="size-4 text-sky-400" aria-hidden />,
       };
+    }
+    if (view === 'vehicle-run-history') {
+      return { title: '運行管理紀錄', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
     }
     if (view === 'vehicle-registry') {
       return { title: '載具註冊管理', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
@@ -189,7 +187,6 @@ export default function ScheduleManagementApp({
   const [view, setView] = useState<string>(initialView);
   const auth = useAuth(); const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
-  const [trajectoryMounted, setTrajectoryMounted] = useState(initialView === 'trajectory');
   const [adminMode, setAdminMode] = useState(readAdminModePreference);
   const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
@@ -223,7 +220,6 @@ export default function ScheduleManagementApp({
 
   useEffect(() => {
     if (view === 'map') setMapMounted(true);
-    if (view === 'trajectory') setTrajectoryMounted(true);
   }, [view]);
 
   // 儀表板「前往圖資管理編輯」：切到圖資資料管理並打開車輛模型（圖資頁可能還沒掛載，所以經 prop 傳過去）
@@ -398,6 +394,12 @@ export default function ScheduleManagementApp({
           </ShellWorkspaceFrame>
         ) : null}
 
+        {view === 'vehicle-run-history' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="運行管理紀錄載入失敗"><RunHistoryPage /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
         {view === 'vehicle-registry' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="載具註冊管理載入失敗"><VehicleRegistryPage /></ViewErrorBoundary>
@@ -418,25 +420,6 @@ export default function ScheduleManagementApp({
             >
               <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.map') })}>
                 <MapEditorApp workspace="map" vehicleModelsRequest={vehicleModelsRequest} />
-              </ViewErrorBoundary>
-            </ShellWorkspaceFrame>
-          </div>
-        ) : null}
-
-        {trajectoryMounted ? (
-          <div
-            className={`absolute inset-0 z-20 flex min-h-0 flex-col ${
-              view === 'trajectory' ? '' : 'pointer-events-none hidden'
-            }`}
-          >
-            <ShellWorkspaceFrame
-              title="載具管理模組"
-              titleIcon={<Route className="size-4 text-sky-400" aria-hidden />}
-              flush
-              {...frameProps}
-            >
-              <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.trajectory') })}>
-                <MapEditorApp workspace="trajectory" />
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>
           </div>

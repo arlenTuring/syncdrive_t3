@@ -1,7 +1,8 @@
 import { resolveBrowserApiBaseUrl } from "../../lib/browserApiBase";
 import { getDemoAccount } from "../schedule-management/utils/demoAccountPreference";
-import type { VehicleDefinitionRow } from "../vehicle-editor/api/vehicleDefinitionsApi";
-import type { MapVehicleSetting } from "../vehicle-editor/model/mapVehicleSettingsApi";
+import type { ReplayVehicleModelSnapshot } from "../replay-core/ReplayMapLayer";
+import type { ReplayCursor } from "../replay-core/cursor";
+import type { ReplayFrame as CoreReplayFrame } from "../replay-core/replayState";
 
 const API = "/syncdrive-api/degraded-operation";
 
@@ -322,6 +323,8 @@ export type ReplayMeta = {
     dropped_count: number;
     gaps: ReplayGap[];
     last_error: string | null;
+    /** history：資料來自一般運行歷史（同一份錄製）；degraded：舊紀錄，降級自己保存的 */
+    frames_source?: "history" | "degraded";
   } | null;
   stale_after_ms: number;
   max_frames_per_request: number;
@@ -329,31 +332,17 @@ export type ReplayMeta = {
   vehicle_model: ReplayVehicleModelSnapshot | null;
 };
 
-export type ReplayVehicleModelSnapshot = {
-  capturedAt: number;
-  source: "map" | "default" | "none";
-  setting: MapVehicleSetting | null;
-  missingDefinitionKey: string | null;
-  definition: VehicleDefinitionRow | null;
-};
+export type { ReplayVehicleModelSnapshot } from "../replay-core/ReplayMapLayer";
 
-export type ReplayFrame = {
-  seq: number;
-  stream: "telemetry" | "operation" | "health" | "facility" | "order";
-  kind: "initial" | "live";
-  vehicle_code: string | null;
-  topic: string | null;
-  received_at: number;
-  operating_at: number;
-  vehicle_ts: number | null;
-  payload: Record<string, unknown>;
-};
+/** 一筆回放資料：與一般運行紀錄共用格式；t＝營運時間，seq 以字串保留 bigint 精度 */
+export type ReplayFrame = CoreReplayFrame;
 
 export type ReplaySnapshot = {
   execution_id: string;
   at: number;
+  seq: string | null;
   frames: ReplayFrame[];
-  reference: { received_at: number; operating_at: number; seq: number } | null;
+  reference: { t: number; received_at: number; operating_at: number; seq: string } | null;
 };
 
 export type ReplayFramesPage = {
@@ -362,7 +351,7 @@ export type ReplayFramesPage = {
   to: number;
   frames: ReplayFrame[];
   covered_to: number;
-  next: { from: number; after_seq: number } | null;
+  next: { from: number; after_seq: string } | null;
 };
 
 const executionPath = (id: string) => `${API}/executions/${encodeURIComponent(id)}`;
@@ -395,23 +384,37 @@ export function fetchReplayMap(id: string, signal?: AbortSignal) {
   );
 }
 
-export function fetchReplaySnapshot(id: string, at: number, signal?: AbortSignal) {
-  return json<ReplaySnapshot>(
-    `${executionPath(id)}/replay/snapshot?at=${Math.floor(at)}`,
+export function fetchReplaySnapshot(id: string, cursor: ReplayCursor, signal?: AbortSignal) {
+  const query = new URLSearchParams({ at: String(Math.floor(cursor.t)) });
+  if (cursor.seq != null) query.set("seq", cursor.seq);
+  return json<ReplaySnapshot>(`${executionPath(id)}/replay/snapshot?${query}`, { signal });
+}
+
+/** 游標前一筆／後一筆（逐幀跨出已載入範圍時用） */
+export function fetchReplayNeighbor(
+  id: string,
+  cursor: ReplayCursor,
+  dir: "prev" | "next",
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ at: String(Math.floor(cursor.t)), dir });
+  if (cursor.seq != null) query.set("seq", cursor.seq);
+  return json<{ execution_id: string; frame: ReplayFrame | null }>(
+    `${executionPath(id)}/replay/neighbor?${query}`,
     { signal },
   );
 }
 
 export function fetchReplayFrames(
   id: string,
-  input: { from: number; to: number; afterSeq?: number; limit?: number },
+  input: { from: number; to: number; afterSeq?: string; limit?: number },
   signal?: AbortSignal,
 ) {
   const query = new URLSearchParams({
     from: String(Math.floor(input.from)),
     to: String(Math.floor(input.to)),
   });
-  if (input.afterSeq !== undefined) query.set("after_seq", String(input.afterSeq));
+  if (input.afterSeq !== undefined) query.set("after_seq", input.afterSeq);
   if (input.limit !== undefined) query.set("limit", String(input.limit));
   return json<ReplayFramesPage>(`${executionPath(id)}/replay/frames?${query}`, {
     signal,

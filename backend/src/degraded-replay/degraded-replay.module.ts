@@ -10,6 +10,7 @@ import {
 import { MapModule } from '../map/map.module';
 import { RedisModule } from '../redis/redis.module';
 import { VehicleDefinitionModule } from '../vehicle-definition/vehicle-definition.module';
+import { VehicleHistoryModule } from '../vehicle-history/vehicle-history.module';
 import { DegradedReplayRecorder } from './degraded-replay.recorder';
 import { DegradedReplayService } from './degraded-replay.service';
 
@@ -22,6 +23,7 @@ import { DegradedReplayService } from './degraded-replay.service';
     RedisModule,
     MapModule,
     VehicleDefinitionModule,
+    VehicleHistoryModule,
     TypeOrmModule.forFeature([
       DegradedReplaySession,
       DegradedReplayMap,

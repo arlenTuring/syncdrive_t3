@@ -111,6 +111,8 @@ async function bootstrap() {
     },
   });
 
+  // 關閉時讓各模組收尾（歷史錄製、遙測佇列把緩衝寫完），不在 SIGTERM 時直接丟掉
+  app.enableShutdownHooks();
   await app.startAllMicroservices();
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, '0.0.0.0');

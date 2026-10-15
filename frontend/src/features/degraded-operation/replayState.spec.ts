@@ -4,11 +4,16 @@ import {
   gapAt,
   orderOverrideFrom,
   parametersAt,
-  stateAt,
+  stateAt as stateAtCursor,
   stateFromSnapshot,
+  timelineGaps,
   typicalTelemetryInterval,
   visibleVehicles,
 } from "./replayState";
+
+/** 連續播放、拖曳時的游標：整毫秒 */
+const stateAt = (...args: [Parameters<typeof stateAtCursor>[0], Parameters<typeof stateAtCursor>[1], number]) =>
+  stateAtCursor(args[0], args[1], { t: args[2], seq: null });
 
 let seq = 0;
 function frame(
@@ -20,7 +25,8 @@ function frame(
 ): ReplayFrame {
   seq += 1;
   return {
-    seq,
+    seq: String(seq),
+    t: operatingAt,
     stream,
     kind: "live",
     vehicle_code: code,
@@ -75,9 +81,9 @@ describe("replay state reconstruction", () => {
 
   it("hides a vehicle whose last frame is before a data gap instead of carrying it across", () => {
     const state = stateAt(base, live, T0 + 2_000);
-    const gaps = [
+    const gaps = timelineGaps([
       { from_real: 0, to_real: 0, from_operating: T0 + 2_100, to_operating: T0 + 2_900, reason: "backend_restart" },
-    ];
+    ]);
     expect(visibleVehicles(state, T0 + 2_050, gaps, 5_000).vehicles.map((v) => v.code)).toEqual(["PMS01"]);
     const during = visibleVehicles(state, T0 + 2_500, gaps, 5_000);
     expect(during.vehicles).toHaveLength(0);

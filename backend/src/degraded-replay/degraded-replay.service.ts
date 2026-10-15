@@ -16,6 +16,15 @@ import {
   MAX_FRAMES_PER_EXECUTION,
   REPLAY_STALE_AFTER_MS,
 } from './degraded-replay.recorder';
+import { MAX_SEQ, parseSeq } from '../vehicle-history/history-cursor';
+import type { ReplayGap } from '../database/entities/degraded-replay.entities';
+
+/** 由一般運行歷史讀的串流（order_route 是降級開始時的訂單站序快照） */
+const HISTORY_STREAMS = ['telemetry', 'operation', 'health', 'facility', 'order_route'];
+/** 起點快照往回找多久（降級開始前最後一筆狀態） */
+const HISTORY_SNAPSHOT_LOOKBACK_MS = 6 * 60 * 60_000;
+/** 這些缺段期間收到的資料營運時間不可信（時鐘未接上），讀一般歷史時排除 */
+const UNTRUSTED_GAP_REASONS = new Set(['clock_unsynced', 'clock_run_changed']);
 
 /** 一次最多回傳幾筆回放資料（分段載入） */
 export const MAX_FRAMES_PER_REQUEST = 4_000;
@@ -120,6 +129,10 @@ export class DegradedReplayService {
     const execution = await this.requireExecution(executionId);
     const session = await this.sessions.findOne({ where: { executionId } });
     const availability = this.replayAvailability(execution, session);
+    const historyBacked = session?.framesSource === 'history';
+    // 資料來自一般運行歷史：那段期間歷史寫入失敗、緩衝滿載的缺段也算在這次降級的缺段裡
+    const historyGaps = historyBacked && session ? await this.historyGapsFor(session) : [];
+    const historyFrameCount = historyBacked && session ? await this.historyFrameCount(session) : null;
     const startedAt = numberOrNull(execution.startedAtOperating);
     const endedAt = numberOrNull(execution.endedAtOperating);
     const live = isRecording(execution.executionStatus);
@@ -148,9 +161,10 @@ export class DegradedReplayService {
         ? {
             status: session.status,
             initial_captured: session.initialCaptured,
-            frame_count: Number(session.frameCount),
-            dropped_count: Number(session.droppedCount),
-            gaps: session.gaps ?? [],
+            frame_count: historyFrameCount ?? Number(session.frameCount),
+            dropped_count: Number(session.droppedCount) + historyGaps.reduce((sum, gap) => sum + (gap.count ?? 0), 0),
+            gaps: [...(session.gaps ?? []), ...historyGaps].sort((a, b) => a.from_real - b.from_real),
+            frames_source: session.framesSource ?? 'degraded',
             last_error: session.lastError,
             clock_run: session.clockRun,
             frame_limit: MAX_FRAMES_PER_EXECUTION,
@@ -159,6 +173,33 @@ export class DegradedReplayService {
       stale_after_ms: REPLAY_STALE_AFTER_MS,
       max_frames_per_request: MAX_FRAMES_PER_REQUEST,
     };
+  }
+
+  private async historyGapsFor(session: DegradedReplaySession): Promise<ReplayGap[]> {
+    const to = session.endedReal ? Number(session.endedReal) : Date.now();
+    const rows = await this.dataSource.query<Array<{ from_real: string; to_real: string; from_operating: string | null; to_operating: string | null; reason: string; count: number }>>(
+      `SELECT from_real, to_real, from_operating, to_operating, reason, count FROM vehicle_history_gaps
+        WHERE from_real <= $2 AND to_real >= $1 ORDER BY from_real`,
+      [Number(session.startedReal), to],
+    );
+    return rows.map((row) => ({
+      from_real: Number(row.from_real),
+      to_real: Number(row.to_real),
+      from_operating: numberOrNull(row.from_operating),
+      to_operating: numberOrNull(row.to_operating),
+      reason: row.reason as ReplayGap['reason'],
+      count: row.count,
+    }));
+  }
+
+  private async historyFrameCount(session: DegradedReplaySession): Promise<number> {
+    const to = session.endedOperating ? Number(session.endedOperating) : this.clock.now();
+    const [row] = await this.dataSource.query<Array<{ count: string }>>(
+      `SELECT count(*) AS count FROM vehicle_history_frames
+        WHERE clock_run = $1 AND operating_at BETWEEN $2 AND $3 AND stream = ANY($4::text[])`,
+      [session.clockRun, Number(session.startedOperating), to, HISTORY_STREAMS],
+    );
+    return Number(row?.count ?? 0);
   }
 
   /** 當時那一份地圖（依開始時保存的內容雜湊；之後地圖被改也不影響） */
@@ -182,38 +223,142 @@ export class DegradedReplayService {
    * 指定時刻的重建起點：每個串流（每台車、每個設施 topic、每張訂單）在 T 之前最後一筆。
    * 初始狀態的營運時間是開始時刻，所以自然成為最早的那一筆；T 之後的資料一筆都不給。
    */
-  async snapshot(executionId: string, atRaw: unknown) {
-    const { execution, from, to } = await this.requireReplayWindow(executionId);
+  async snapshot(executionId: string, atRaw: unknown, seqRaw?: unknown) {
+    const { execution, from, to, session } = await this.requireReplayWindow(executionId);
     const at = this.parseTime(atRaw, 'at');
+    // 游標精確到同一時刻的第幾筆；沒給序號＝這一毫秒的資料全部套用
+    const seq = parseSeq(seqRaw) ?? MAX_SEQ;
     if (at < from || at > to)
       throw new BadRequestException('時刻超出這次降級的回放時段');
+    if (session?.framesSource === 'history')
+      return this.historySnapshot(execution.id, session, at, seq);
     const rows = await this.dataSource.query<FrameRow[]>(
       `SELECT DISTINCT ON (stream, vehicle_code, topic)
               seq, stream, kind, vehicle_code, topic, received_at, operating_at, vehicle_ts, payload
          FROM degraded_replay_frames
-        WHERE execution_id = $1 AND operating_at <= $2
+        WHERE execution_id = $1 AND (operating_at, seq) <= ($2::bigint, $3::bigint)
         ORDER BY stream, vehicle_code, topic, operating_at DESC, seq DESC`,
-      [execution.id, at],
+      [execution.id, at, seq],
     );
     // 收到時刻的參考點：T 之前最後收到的任何一筆（判斷哪台車已經過期用）
     const [reference] = await this.dataSource.query<
       Array<{ received_at: string; operating_at: string; seq: string }>
     >(
       `SELECT received_at, operating_at, seq FROM degraded_replay_frames
-        WHERE execution_id = $1 AND operating_at <= $2
+        WHERE execution_id = $1 AND (operating_at, seq) <= ($2::bigint, $3::bigint)
         ORDER BY operating_at DESC, seq DESC LIMIT 1`,
-      [execution.id, at],
+      [execution.id, at, seq],
     );
     return {
       execution_id: execution.id,
       at,
+      seq: seq === MAX_SEQ ? null : seq,
       frames: rows.map(frameResponse),
       reference: reference
         ? {
+            t: Number(reference.operating_at),
             received_at: Number(reference.received_at),
             operating_at: Number(reference.operating_at),
-            seq: Number(reference.seq),
+            seq: String(reference.seq),
           }
+        : null,
+    };
+  }
+
+  /**
+   * 前一筆／後一筆（逐幀跨出已載入範圍時用），限本次降級的回放時段。沒有就回 null。
+   */
+  async neighbor(executionId: string, input: { at?: unknown; seq?: unknown; dir?: unknown }) {
+    const { execution, from, to, session } = await this.requireReplayWindow(executionId);
+    const at = this.parseTime(input.at, 'at');
+    const seq = parseSeq(input.seq) ?? MAX_SEQ;
+    const dir = input.dir === 'prev' ? 'prev' : input.dir === 'next' ? 'next' : null;
+    if (!dir) throw new BadRequestException('dir 必須是 prev 或 next');
+    const compare = dir === 'prev' ? '<' : '>';
+    const order = dir === 'prev' ? 'DESC' : 'ASC';
+    if (session?.framesSource === 'history') {
+      const filter = this.historyFilter(session, 4);
+      const [row] = await this.dataSource.query<HistoryRow[]>(
+        `SELECT seq, stream, vehicle_code, topic, order_id, received_at, operating_at, vehicle_ts, source, payload, derived
+           FROM vehicle_history_frames
+          WHERE clock_run = $1 AND (operating_at, seq) ${compare} ($2::bigint, $3::bigint)
+            AND operating_at BETWEEN ${filter.boundsParams}
+            ${filter.sql}
+          ORDER BY operating_at ${order}, seq ${order} LIMIT 1`,
+        [session.clockRun, at, seq, from, to, ...filter.params],
+      );
+      return { execution_id: execution.id, frame: row ? historyFrameResponse(row) : null };
+    }
+    const [row] = await this.dataSource.query<FrameRow[]>(
+      `SELECT seq, stream, kind, vehicle_code, topic, received_at, operating_at, vehicle_ts, payload
+         FROM degraded_replay_frames
+        WHERE execution_id = $1 AND kind = 'live'
+          AND (operating_at, seq) ${compare} ($2::bigint, $3::bigint)
+          AND operating_at BETWEEN $4 AND $5
+        ORDER BY operating_at ${order}, seq ${order} LIMIT 1`,
+      [execution.id, at, seq, from, to],
+    );
+    return { execution_id: execution.id, frame: row ? frameResponse(row) : null };
+  }
+
+  /** 讀一般運行歷史的過濾條件：限定串流、排除即時系統拒收與時鐘不可信的期間 */
+  private historyFilter(session: DegradedReplaySession, firstParam: number) {
+    const params: unknown[] = [];
+    const clauses: string[] = [`stream = ANY($${firstParam + 2}::text[])`, `(derived IS NULL OR NOT derived ? 'rejected')`];
+    params.push(HISTORY_STREAMS);
+    for (const gap of (session.gaps ?? []) as ReplayGap[]) {
+      if (!UNTRUSTED_GAP_REASONS.has(gap.reason)) continue;
+      const index = firstParam + 2 + params.length;
+      params.push(gap.from_real, gap.to_real);
+      clauses.push(`NOT (received_at BETWEEN $${index} AND $${index + 1})`);
+    }
+    return {
+      boundsParams: `$${firstParam} AND $${firstParam + 1}`,
+      sql: clauses.map((clause) => `AND ${clause}`).join(' '),
+      params,
+    };
+  }
+
+  /** 由一般運行歷史組出降級回放的起點：同一個營運時鐘輪次、營運時間不晚於游標的最後一筆 */
+  private async historySnapshot(
+    executionId: string,
+    session: DegradedReplaySession,
+    at: number,
+    seq: string,
+  ) {
+    const since = Number(session.startedReal) - HISTORY_SNAPSHOT_LOOKBACK_MS;
+    const keys = await this.dataSource.query<Array<{ stream_key: string }>>(
+      `SELECT stream_key FROM vehicle_history_stream_keys
+        WHERE stream = ANY($1::text[]) AND last_real >= $2`,
+      [HISTORY_STREAMS, since],
+    );
+    const filter = this.historyFilter(session, 5);
+    const rows = keys.length
+      ? await this.dataSource.query<HistoryRow[]>(
+          `SELECT f.* FROM unnest($1::text[]) AS k(stream_key)
+             CROSS JOIN LATERAL (
+               SELECT seq, stream, vehicle_code, topic, order_id, received_at, operating_at, vehicle_ts, source, payload, derived
+                 FROM vehicle_history_frames
+                WHERE stream_key = k.stream_key AND clock_run = $2
+                  AND (operating_at, seq) <= ($3::bigint, $4::bigint)
+                  AND received_at BETWEEN ${filter.boundsParams}
+                  ${filter.sql}
+                ORDER BY received_at DESC, seq DESC LIMIT 1
+             ) f`,
+          [keys.map((key) => key.stream_key), session.clockRun, at, seq, since, Date.now(), ...filter.params],
+        )
+      : [];
+    const frames = rows.map(historyFrameResponse);
+    const reference = frames
+      .filter((frame) => frame.kind === 'live')
+      .sort((a, b) => b.received_at - a.received_at)[0];
+    return {
+      execution_id: executionId,
+      at,
+      seq: seq === MAX_SEQ ? null : seq,
+      frames,
+      reference: reference
+        ? { t: reference.operating_at, received_at: reference.received_at, operating_at: reference.operating_at, seq: reference.seq }
         : null,
     };
   }
@@ -235,6 +380,7 @@ export class DegradedReplayService {
       execution,
       from: windowFrom,
       to: windowTo,
+      session,
     } = await this.requireReplayWindow(executionId);
     const from = this.parseTime(input.from, 'from');
     const to = this.parseTime(input.to, 'to');
@@ -245,10 +391,7 @@ export class DegradedReplayService {
       );
     const clampedFrom = Math.max(from, windowFrom);
     const clampedTo = Math.min(to, windowTo);
-    const afterSeq =
-      input.after_seq === undefined || input.after_seq === ''
-        ? 0
-        : this.parseTime(input.after_seq, 'after_seq');
+    const afterSeq = parseSeq(input.after_seq, 'after_seq') ?? '0';
     const limit = Math.min(
       MAX_FRAMES_PER_REQUEST,
       Math.max(1, Math.floor(Number(input.limit)) || MAX_FRAMES_PER_REQUEST),
@@ -262,6 +405,32 @@ export class DegradedReplayService {
         covered_to: to,
         next: null,
       };
+    if (session?.framesSource === 'history') {
+      const filter = this.historyFilter(session, 5);
+      const historyRows = await this.dataSource.query<HistoryRow[]>(
+        `SELECT seq, stream, vehicle_code, topic, order_id, received_at, operating_at, vehicle_ts, source, payload, derived
+           FROM vehicle_history_frames
+          WHERE clock_run = $1
+            AND (operating_at, seq) > ($2::bigint, $3::bigint)
+            AND operating_at <= $4
+            AND operating_at BETWEEN ${filter.boundsParams}
+            ${filter.sql}
+          ORDER BY operating_at, seq
+          LIMIT $${7 + filter.params.length}`,
+        [session.clockRun, clampedFrom, afterSeq, clampedTo, windowFrom, windowTo, ...filter.params, limit + 1],
+      );
+      const truncatedHistory = historyRows.length > limit;
+      const pageHistory = (truncatedHistory ? historyRows.slice(0, limit) : historyRows).map(historyFrameResponse);
+      const lastHistory = pageHistory.at(-1);
+      return {
+        execution_id: execution.id,
+        from,
+        to,
+        frames: pageHistory,
+        covered_to: truncatedHistory && lastHistory ? lastHistory.operating_at : to,
+        next: truncatedHistory && lastHistory ? { from: lastHistory.operating_at, after_seq: lastHistory.seq } : null,
+      };
+    }
     // (operating_at, seq) 嚴格大於起點：前端拿到的 snapshot 已含 from 當下（含）的資料
     const rows = await this.dataSource.query<FrameRow[]>(
       `SELECT seq, stream, kind, vehicle_code, topic, received_at, operating_at, vehicle_ts, payload
@@ -285,7 +454,7 @@ export class DegradedReplayService {
       covered_to: truncated && last ? Number(last.operating_at) : to,
       next:
         truncated && last
-          ? { from: Number(last.operating_at), after_seq: Number(last.seq) }
+          ? { from: Number(last.operating_at), after_seq: String(last.seq) }
           : null,
     };
   }
@@ -309,7 +478,8 @@ export class DegradedReplayService {
     const to =
       numberOrNull(execution.endedAtOperating) ??
       (isRecording(execution.executionStatus) ? this.clock.now() : from);
-    return { execution, from, to };
+    const session = await this.sessions.findOne({ where: { executionId } });
+    return { execution, from, to, session };
   }
 
   private parseTime(value: unknown, name: string): number {
@@ -379,9 +549,44 @@ function numberOrNull(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+type HistoryRow = {
+  seq: string;
+  stream: string;
+  vehicle_code: string | null;
+  topic: string | null;
+  order_id: string | null;
+  received_at: string;
+  operating_at: string;
+  vehicle_ts: string | null;
+  source: string;
+  payload: Record<string, unknown>;
+  derived: Record<string, unknown> | null;
+};
+
+/** 一般運行歷史的一筆 → 降級回放的資料格式（時間軸是營運時間） */
+function historyFrameResponse(row: HistoryRow) {
+  const isOrder = row.stream === 'order_route';
+  return {
+    seq: String(row.seq),
+    t: Number(row.operating_at),
+    stream: isOrder ? 'order' : row.stream,
+    kind: isOrder && row.payload?.kind === 'initial' ? 'initial' : 'live',
+    vehicle_code: row.vehicle_code,
+    topic: isOrder ? row.order_id : row.topic,
+    received_at: Number(row.received_at),
+    operating_at: Number(row.operating_at),
+    vehicle_ts: numberOrNull(row.vehicle_ts),
+    source: row.source,
+    payload: row.payload,
+    // 當時中心端的位置判定（與原始內容分開）；回放圖台據此判斷車是否停在格位
+    derived: row.derived ?? null,
+  };
+}
+
 function frameResponse(row: FrameRow) {
   return {
-    seq: Number(row.seq),
+    seq: String(row.seq),
+    t: Number(row.operating_at),
     stream: row.stream,
     kind: row.kind,
     vehicle_code: row.vehicle_code,

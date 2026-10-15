@@ -5,7 +5,7 @@ import { DegradedReplayRecorder } from './degraded-replay.recorder';
  * 保存端的規則：只在降級進行中收、內容相同不重複存、營運時間倒退或換 run 不收而記缺段、
  * 寫入失敗記缺段、收尾時把排隊的寫完。
  */
-function createRecorder() {
+function createRecorder({ historyEnabled = false }: { historyEnabled?: boolean } = {}) {
   let operatingNow = 1_000_000;
   let run = 'run-a';
   const inserted: Array<Record<string, unknown>> = [];
@@ -79,6 +79,17 @@ function createRecorder() {
     toOperating: () => operatingNow,
     snapshot: () => ({ mode: 'replay', run_id: run }),
   };
+  // 一般運行歷史：預設關閉（舊做法，降級自己保存全部串流）；historyEnabled＝true 時由一般歷史保存
+  const systemFrames: Array<Record<string, unknown>> = [];
+  const history = {
+    enabled: () => historyEnabled,
+    captureSystem: jest.fn((input: Record<string, unknown>) => {
+      if (!historyEnabled) return false;
+      systemFrames.push(input);
+      return true;
+    }),
+    systemFrames,
+  };
   const recorder = new DegradedReplayRecorder(
     sessions as never,
     maps as never,
@@ -89,9 +100,11 @@ function createRecorder() {
     mapService as never,
     clock as never,
     mapVehicles as never,
+    history as never,
   );
   return {
     recorder,
+    history,
     sessions,
     inserted,
     sessionUpdates,
@@ -155,6 +168,22 @@ describe('DegradedReplayRecorder', () => {
       vehicleTs: '2',
       stream: 'telemetry',
     });
+  });
+
+  it('does not write the same MQTT twice when the general run history is recording', async () => {
+    const harness = createRecorder({ historyEnabled: true });
+    harness.recorder.capture('telemetry', 'PMS01', null, { timestamp: 1 });
+    await harness.recorder.start({ id: 'exec-h', startedAtReal: Date.now(), startedAtOperating: 2_000_000 });
+    harness.setOperating(2_000_100);
+    harness.recorder.capture('telemetry', 'PMS01', null, { timestamp: 2, x: 1 });
+    harness.recorder.capture('health', 'PMS01', null, { timestamp: 2, overall_health: 'OK' });
+    harness.recorder.capture('operation', 'PMS01', null, { timestamp: 2, order_id: 'ORD-H' });
+    await harness.recorder.flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    // 串流資料由一般運行歷史保存：降級表一筆遙測／營運／健康都沒有
+    expect(harness.inserted.filter((row) => ['telemetry', 'operation', 'health'].includes(String(row.stream)))).toEqual([]);
+    const saved = harness.sessions.save.mock.calls.map((call: unknown[]) => call[0] as Record<string, unknown>);
+    expect(saved.find((row) => row.executionId === 'exec-h')).toMatchObject({ framesSource: 'history' });
   });
 
   it('stores an immutable snapshot of the vehicle model used by the map at start', async () => {

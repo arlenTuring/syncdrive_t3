@@ -1,32 +1,33 @@
-import {
-  ArrowLeft,
-  ChevronLeft,
-  Clock3,
-  MessageSquareText,
-  Pause,
-  Play,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ChevronLeft, Clock3, MessageSquareText } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { PlaybackControls } from "../replay-core/PlaybackControls";
+import { GAP_REASON } from "../replay-core/replayLabels";
+import { useReplayPlayer, type ReplaySource } from "../replay-core/useReplayPlayer";
+import { VehicleDataPanel } from "../replay-core/VehicleDataPanel";
 import {
   fetchDegradedHistory,
   fetchDegradedHistoryDetail,
+  fetchReplayFrames,
+  fetchReplayMap,
   fetchReplayMeta,
+  fetchReplayNeighbor,
+  fetchReplaySnapshot,
   type HistoryDetail,
   type HistoryItem,
   type ParameterChange,
-  type ReplayGap,
   type ReplayMeta,
 } from "./api";
 import { ImpactMetrics } from "./DegradedIcons";
 import { MapViewport } from "./MapViewport";
-import { ReplayMapLayer, replayVehicleModelNotice } from "./ReplayMapLayer";
+import { ReplayMapLayer } from "../replay-core/ReplayMapLayer";
+import { replayVehicleModelNotice } from "../replay-core/vehicleModelNotice";
 import {
   gapAt,
   parametersAt,
+  timelineGaps,
   typicalTelemetryInterval,
   visibleVehicles,
 } from "./replayState";
-import { REPLAY_SPEEDS, useReplayPlayer, type ReplaySpeed } from "./useReplayPlayer";
 
 const PAGE_SIZE = 20;
 
@@ -294,6 +295,47 @@ function ParameterChangeRow({ change }: { change: ParameterChange }) {
   );
 }
 
+/** 歷史降級的回放來源：時間軸＝營運時間；同一份逐幀規則（replay-core） */
+function degradedSource(executionId: string, meta: ReplayMeta): ReplaySource | null {
+  const window_ = meta.window;
+  const replayable =
+    !!window_ &&
+    (meta.availability.state === "complete" ||
+      meta.availability.state === "partial" ||
+      meta.availability.state === "recording");
+  if (!replayable || !window_) return null;
+  return {
+    key: executionId,
+    window: { from: window_.from_operating, to: window_.to_operating, ongoing: window_.ongoing },
+    snapshot: async (cursor, signal) => {
+      const body = await fetchReplaySnapshot(executionId, cursor, signal);
+      return { frames: body.frames, reference: body.reference };
+    },
+    frames: async ({ after, to }, signal) => {
+      // 降級的 frames 從回放時段開頭算起；游標在時段之前時，從開頭那一毫秒（含）要
+      const before = after.t < window_.from_operating;
+      const page = await fetchReplayFrames(
+        executionId,
+        {
+          from: before ? window_.from_operating : after.t,
+          to,
+          afterSeq: before ? undefined : (after.seq ?? MAX_SEQ),
+        },
+        signal,
+      );
+      return {
+        frames: page.frames,
+        coveredTo: page.covered_to,
+        next: page.next ? { t: page.next.from, seq: page.next.after_seq } : null,
+      };
+    },
+    neighbor: async (cursor, dir, signal) => (await fetchReplayNeighbor(executionId, cursor, dir, signal)).frame,
+  };
+}
+
+/** 資料庫 bigint 上限：「整毫秒」游標的嚴格之後＝該毫秒最後一筆之後 */
+const MAX_SEQ = "9223372036854775807";
+
 function ReplayStage({
   selectedId,
   meta,
@@ -304,19 +346,22 @@ function ReplayStage({
   detail: HistoryDetail | null;
 }) {
   const value = meta?.value ?? null;
-  const player = useReplayPlayer(selectedId, value);
-  const gaps = value?.coverage?.gaps ?? EMPTY_GAPS;
+  const source = useMemo(() => (selectedId && value ? degradedSource(selectedId, value) : null), [selectedId, value]);
+  const player = useReplayPlayer(source);
+  const gaps = useMemo(() => timelineGaps(value?.coverage?.gaps ?? []), [value?.coverage?.gaps]);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const at = player.cursor?.t ?? null;
   const visible = useMemo(
     () =>
-      player.state && player.cursor != null
-        ? visibleVehicles(player.state, player.cursor, gaps, value?.stale_after_ms ?? 5_000)
+      player.state && at != null
+        ? visibleVehicles(player.state, at, gaps, value?.stale_after_ms ?? 5_000)
         : { vehicles: [], hidden: [] },
-    [gaps, player.cursor, player.state, value?.stale_after_ms],
+    [gaps, at, player.state, value?.stale_after_ms],
   );
   const interval = useMemo(() => typicalTelemetryInterval(player.frames), [player.frames]);
   const tweenMs = interval ? Math.min(2_000, Math.max(0, interval / player.speed)) : 1_000;
-  const params = detail && player.cursor != null ? parametersAt(detail.parameter_changes, player.cursor) : null;
-  const inGap = player.cursor != null ? gapAt(gaps, player.cursor) : null;
+  const params = detail && at != null ? parametersAt(detail.parameter_changes, at) : null;
+  const inGap = at != null ? gapAt(gaps, at) : null;
 
   let body: React.ReactNode;
   if (!selectedId) {
@@ -333,21 +378,22 @@ function ReplayStage({
     body = (
       <MapViewport storageKey="history">
         <ReplayMapLayer
-          executionId={selectedId}
+          mapKey={`degraded:${selectedId}`}
+          loadMap={(signal) => fetchReplayMap(selectedId, signal)}
           mapId={value.map?.map_id ?? null}
           vehicleModel={value.vehicle_model}
           state={player.state}
           vehicles={visible.vehicles}
           jumped={player.jumped || !player.playing}
           tweenMs={tweenMs}
+          selectedVehicle={selectedVehicle}
+          onSelectVehicle={setSelectedVehicle}
         />
       </MapViewport>
     );
   }
 
-  const window_ = value?.window ?? null;
-  const canPlay =
-    !!window_ && (value?.availability.state === "complete" || value?.availability.state === "partial" || value?.availability.state === "recording");
+  const canPlay = !!source;
   return (
     <>
       <div className="relative mt-12 min-h-0 flex-1 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
@@ -384,116 +430,31 @@ function ReplayStage({
             ) : null}
           </div>
         ) : null}
+        {canPlay && selectedVehicle ? (
+          <div className="absolute top-3 right-3 bottom-3 z-20 flex w-[min(380px,85%)] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#121214]/95 shadow-2xl">
+            <VehicleDataPanel
+              vehicleCode={selectedVehicle}
+              vehicles={visible.vehicles.map((vehicle) => vehicle.code)}
+              state={player.state}
+              cursor={player.cursor}
+              staleAfterMs={value?.stale_after_ms ?? 5_000}
+              hidden={visible.hidden}
+              onSelect={setSelectedVehicle}
+              onClose={() => setSelectedVehicle(null)}
+            />
+          </div>
+        ) : null}
       </div>
-      <PlaybackBar
-        window_={canPlay ? window_ : null}
-        title={detail ? `${detail.name}` : null}
+      <PlaybackControls
+        heading="歷史降級運轉回放"
+        subtitle={detail?.name ?? null}
+        window_={source?.window ?? null}
         player={player}
         gaps={gaps}
+        timelineLabel="營運時間"
+        emptyMessage="選取一筆有回放資料的紀錄後可以播放"
       />
     </>
-  );
-}
-
-const GAP_REASON: Record<string, string> = {
-  write_failed: "寫入失敗",
-  backend_restart: "後端重啟",
-  clock_run_changed: "營運時鐘換了另一輪",
-  frame_limit: "超過保存上限",
-  not_recorded: "當時未保存",
-};
-const EMPTY_GAPS: ReplayGap[] = [];
-
-function PlaybackBar({
-  window_,
-  title,
-  player,
-  gaps,
-}: {
-  window_: { from_operating: number; to_operating: number; ongoing: boolean } | null;
-  title: string | null;
-  player: ReturnType<typeof useReplayPlayer>;
-  gaps: readonly ReplayGap[];
-}) {
-  const sliderRef = useRef<HTMLInputElement>(null);
-  const span = window_ ? Math.max(1, window_.to_operating - window_.from_operating) : 1;
-  const onSlide = useCallback(
-    (value: number) => {
-      if (window_) player.seek(window_.from_operating + value);
-    },
-    [player, window_],
-  );
-  return (
-    <div className="mt-3 shrink-0 rounded-2xl border border-zinc-800 bg-[#0f1013] px-5 py-4">
-      <h3 className="text-blue-400">歷史降級運轉回放</h3>
-      {!window_ ? (
-        <p className="mt-2 text-sm text-zinc-500">選取一筆有回放資料的紀錄後可以播放</p>
-      ) : (
-        <>
-          <p className="mt-1 text-sm text-zinc-300">
-            {title ? `${title}　` : ""}
-            {formatDateTime(window_.from_operating)}～{formatClock(window_.to_operating)}
-            {window_.ongoing ? "（進行中，載入時為止）" : ""}
-          </p>
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={player.playing ? player.pause : player.play}
-              disabled={player.cursor == null}
-              aria-label={player.playing ? "暫停" : "播放"}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40"
-            >
-              {player.playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </button>
-            <span className="w-20 shrink-0 font-mono text-sm text-zinc-200">
-              {player.cursor != null ? formatClockSeconds(player.cursor) : "—"}
-            </span>
-            <div className="relative min-w-0 flex-1">
-              <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2">
-                {gaps
-                  .filter((gap) => gap.from_operating != null)
-                  .map((gap, index) => {
-                    const from = Math.max(0, (gap.from_operating! - window_.from_operating) / span);
-                    const to = Math.min(1, ((gap.to_operating ?? window_.to_operating) - window_.from_operating) / span);
-                    return (
-                      <span
-                        key={index}
-                        className="absolute h-full rounded bg-red-500/50"
-                        style={{ left: `${from * 100}%`, width: `${Math.max(0.5, (to - from) * 100)}%` }}
-                        title={GAP_REASON[gap.reason] ?? gap.reason}
-                      />
-                    );
-                  })}
-              </div>
-              <input
-                ref={sliderRef}
-                type="range"
-                min={0}
-                max={span}
-                step={1000}
-                value={player.cursor != null ? player.cursor - window_.from_operating : 0}
-                onChange={(event) => onSlide(Number(event.target.value))}
-                aria-label="回放時間軸"
-                className="relative w-full accent-blue-500"
-              />
-            </div>
-            <select
-              value={player.speed}
-              onChange={(event) => player.setSpeed(Number(event.target.value) as ReplaySpeed)}
-              aria-label="回放倍速"
-              className="shrink-0 rounded-lg bg-zinc-800 px-2 py-1.5 text-sm"
-            >
-              {REPLAY_SPEEDS.map((speed) => (
-                <option key={speed} value={speed}>
-                  {speed}×
-                </option>
-              ))}
-            </select>
-          </div>
-          {player.buffering ? <p className="mt-2 text-xs text-zinc-500">載入回放資料…</p> : null}
-        </>
-      )}
-    </div>
   );
 }
 
