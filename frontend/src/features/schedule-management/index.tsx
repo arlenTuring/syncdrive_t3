@@ -16,6 +16,7 @@ import {
   Activity,
   ShieldCheck,
   UserRoundCog,
+  Volume2,
 } from 'lucide-react';
 import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
 import MapEditorApp from '../map-editor';
@@ -34,6 +35,7 @@ import { RoleManagementPage } from '../access-control/RoleManagementPage';
 import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
 import { VehicleRegistryPage } from '../vehicle-registry/VehicleRegistryPage';
 import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
+import { MediaContentPage } from '../media-content/MediaContentPage';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -143,6 +145,9 @@ function useWorkspaceChrome(
     }
     if (view === 'vehicle-registry') {
       return { title: '載具註冊管理', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
+    }
+    if (view === 'media-content') {
+      return { title: t('nav.items.media-content'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
     }
     if (view === 'system-foundation') {
       return {
@@ -403,6 +408,12 @@ export default function ScheduleManagementApp({
         {view === 'vehicle-registry' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="載具註冊管理載入失敗"><VehicleRegistryPage /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'media-content' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="媒體內容清單載入失敗"><MediaContentPage /></ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 

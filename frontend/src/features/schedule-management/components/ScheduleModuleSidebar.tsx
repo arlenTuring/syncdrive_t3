@@ -24,6 +24,7 @@ import {
   Trash2,
   UserRoundCog,
   Wrench,
+  Volume2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +64,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'vehicle-realtime': Route,
   'vehicle-registry': Route,
   'vehicle-run-history': History,
+  'media-content': Volume2,
   'account-management': UserRoundCog,
   'role-management': ShieldCheck,
 };
@@ -74,7 +76,8 @@ function groupIcon(groupId: string) {
   if (groupId === 'site') return Map;
   if (groupId === 'operations') return Activity;
   if (groupId === 'permission') return Settings;
-  if (groupId === 'service' || groupId === 'media') {
+  if (groupId === 'media') return Volume2;
+  if (groupId === 'service') {
     return LayoutDashboard;
   }
   return LayoutDashboard;
@@ -85,6 +88,7 @@ function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'vehicle') return activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history';
   if (groupId === 'operations') return isOperationsView(activeView);
   if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
+  if (groupId === 'media') return activeView === 'media-content';
   if (groupId === 'schedule') {
     return (
       activeView === 'shift-records'
@@ -189,6 +193,7 @@ export function ScheduleModuleSidebar({
     if (activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history') {
       setExpanded((prev) => ({ ...prev, vehicle: true }));
     }
+    if (activeView === 'media-content') setExpanded((prev) => ({ ...prev, media: true }));
     const mdpId = parseModuleDashboardViewId(activeView);
     if (mdpId) {
       const page = moduleDashboardPages.find((item) => item.id === mdpId);

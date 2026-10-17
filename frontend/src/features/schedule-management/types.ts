@@ -13,6 +13,7 @@ export type ShellView =
   | 'vehicle-realtime'
   | 'vehicle-run-history'
   | 'vehicle-registry'
+  | 'media-content'
   | 'system-foundation'
   | 'account-management'
   | 'role-management';
@@ -72,6 +73,10 @@ export const PERMISSION_NAV_ITEMS: ShellNavItem[] = [
   { id: 'role-management', label: '角色管理設定', enabled: true, requiredPermission: 'access.roles.view' },
 ];
 
+export const MEDIA_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'media-content', label: 'nav.items.media-content', enabled: true, requiredPermission: 'media.content.view' },
+];
+
 export type ShellModuleGroup = {
   id: string;
   /** i18n key；使用者自訂別名不經由此欄 */
@@ -117,7 +122,7 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
     items: SITE_NAV_ITEMS,
   },
   { id: 'service', label: 'nav.modules.service', enabled: false },
-  { id: 'media', label: 'nav.modules.media', enabled: false },
+  { id: 'media', label: 'nav.modules.media', enabled: true, items: MEDIA_NAV_ITEMS },
   // 系統基礎模組只從右上角齒輪進入，側欄不另設入口
   { id: 'permission', label: 'nav.modules.permission', enabled: true, items: PERMISSION_NAV_ITEMS },
 ];
@@ -132,7 +137,7 @@ export function isScheduleSubView(view: ShellView): view is ScheduleSubView {
 }
 
 export const VIEW_PERMISSIONS: Partial<Record<ShellView, string>> = Object.fromEntries(
-  [...OPERATIONS_NAV_ITEMS, ...SITE_NAV_ITEMS, ...SCHEDULE_NAV_ITEMS, ...VEHICLE_NAV_ITEMS, ...PERMISSION_NAV_ITEMS]
+  [...OPERATIONS_NAV_ITEMS, ...SITE_NAV_ITEMS, ...SCHEDULE_NAV_ITEMS, ...VEHICLE_NAV_ITEMS, ...MEDIA_NAV_ITEMS, ...PERMISSION_NAV_ITEMS]
     .filter((item) => item.requiredPermission).map((item) => [item.id, item.requiredPermission!]),
 );
 VIEW_PERMISSIONS.dashboard = 'dashboard.dashboard.view';

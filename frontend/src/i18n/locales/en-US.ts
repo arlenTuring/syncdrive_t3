@@ -65,6 +65,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       'time-templates': 'Time Templates',
       'shift-list': 'Shift List',
       'maintenance-tasks': 'Maintenance Tasks',
+      'media-content': 'Media Content',
       trajectory: 'Vehicle Trajectory',
       dashboard: 'Dashboard',
     },

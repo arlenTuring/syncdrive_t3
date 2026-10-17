@@ -113,9 +113,9 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('service', '服務管理模組', 'order-records', '訂單紀錄清單', 'view', '檢視', 620, false),
 
   permission('media', '媒體管理模組', 'content', '媒體內容清單', 'view', '檢視', 700),
-  permission('media', '媒體管理模組', 'content', 'create', '建立', 701, false),
-  permission('media', '媒體管理模組', 'content', 'edit', '編輯', 702, false),
-  permission('media', '媒體管理模組', 'content', 'delete', '刪除', 703, false),
+  permission('media', '媒體管理模組', 'content', 'create', '建立', 701),
+  permission('media', '媒體管理模組', 'content', 'edit', '編輯', 702),
+  permission('media', '媒體管理模組', 'content', 'delete', '刪除', 703),
   permission('media', '媒體管理模組', 'groups', '媒體分組清單', 'view', '檢視', 710, false),
   permission('media', '媒體管理模組', 'groups', 'create', '建立', 711, false),
   permission('media', '媒體管理模組', 'groups', 'edit', '編輯', 712, false),

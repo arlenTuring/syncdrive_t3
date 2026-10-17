@@ -9,6 +9,8 @@ node_modules/
 # ── 本機開發執行期產物（日誌、PID、除錯截圖，勿提交）──
 .dev/
 backend/logs/
+# 本機媒體內容屬執行期資料；正式環境由 backenddata volume 保存。
+backend/data/media/
 
 # 地圖庫 API 發佈快取（由編輯器 PUT，模擬器 GET）：納入版控。
 # 雲端的排班驗收要讀使用者實際發布的地圖，排除的話 git push 永遠帶不上去。

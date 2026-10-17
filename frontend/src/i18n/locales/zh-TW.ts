@@ -58,6 +58,7 @@ const zhTW = {
       'time-templates': '時間模板管理',
       'shift-list': '班表清單管理',
       'maintenance-tasks': '整備任務管理',
+      'media-content': '媒體內容清單',
       trajectory: '載具軌跡圖台',
       dashboard: '儀表板管理',
     },

@@ -132,6 +132,8 @@ services:
       DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       TELEMETRY_PERSIST_ALL: ${TELEMETRY_PERSIST_ALL:-0}
+      # 媒體主檔的實體內容；位於 backenddata 持久化卷，不進映像與 Git。
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/app/data/media}
       # 容器預設是 UTC，但班表的時刻是<strong>營運當地時間</strong>——時間線上寫
       # 05:05 就是現場的 05:05。不設這一項，調度引擎會把 05:05 當成 UTC，訂單
       # 整整晚八小時才發（2026-08-26 實測）。

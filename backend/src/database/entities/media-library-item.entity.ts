@@ -23,7 +23,8 @@ export class MediaLibraryItem {
   kind: MediaLibraryKind;
 
   /**
-   * media：可放 durationSeconds、fileKey 等
+   * media：{ mediaType, description, textContent? } 或 { ..., file: { storageKey,
+   * originalName, mimeType, sizeBytes, sha256, durationSeconds?, width?, height? } }
    * group：{ mediaIds: string[] } 組成順序
    */
   @Column({ type: 'jsonb', default: {} })
