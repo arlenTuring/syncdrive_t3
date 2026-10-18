@@ -30,7 +30,7 @@ log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m失敗：\033[0m %s\n' "$*" >&2; exit 1; }
 hash_file() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
-  else shasum -a 256 "$1" | awk '{print $1}'
+  else LC_ALL=C shasum -a 256 "$1" | awk '{print $1}'
   fi
 }
 
@@ -75,7 +75,7 @@ dirty="$(git -C "$ROOT" status --porcelain -- backend/src frontend/src deploy sc
 
 # The controller itself must be exactly the version being deployed.
 for file in deploy/sync.sh deploy/remote-sync.sh deploy/migrate.sh deploy/build-sync-bundle.sh deploy/data-snapshot.sh deploy/migrations/order.txt; do
-  committed="$(git -C "$ROOT" show "$SOURCE_SHA:$file" 2>/dev/null | { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; } | awk '{print $1}')" \
+  committed="$(git -C "$ROOT" show "$SOURCE_SHA:$file" 2>/dev/null | { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else LC_ALL=C shasum -a 256; fi; } | awk '{print $1}')" \
     || die "$file 尚未推送到 GitHub $BRANCH"
   [ "$committed" = "$(hash_file "$ROOT/$file")" ] || die "$file 與 GitHub 固定版本不同"
 done
@@ -86,7 +86,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 BATCH="$(date -u +%Y%m%dT%H%M%SZ)-${SOURCE_SHA:0:12}"
 "$ROOT/deploy/build-sync-bundle.sh" "$WORK/bundle" "$SOURCE_SHA"
-COPYFILE_DISABLE=1 tar --no-xattrs -czf "$WORK/$BATCH.tar.gz" -C "$WORK/bundle" .
+LC_ALL=C COPYFILE_DISABLE=1 tar --no-xattrs -czf "$WORK/$BATCH.tar.gz" -C "$WORK/bundle" .
 BUNDLE_SHA="$(hash_file "$WORK/$BATCH.tar.gz")"
 
 echo "    來源：本機設定資料 + GitHub $BRANCH"
