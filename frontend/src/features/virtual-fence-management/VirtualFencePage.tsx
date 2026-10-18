@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Search } from 'lucide-react';
@@ -185,7 +186,7 @@ export function VirtualFencePage() {
       <div className="relative flex shrink-0 items-center gap-2 border-b border-zinc-800/80 px-4 py-3">
         {!isEditing ? (
           <>
-            <select
+            <SiteSelect
               value={enableFilter}
               onChange={(e) => setEnableFilter(e.target.value as FenceEnableFilter)}
               className={SELECT}
@@ -194,7 +195,7 @@ export function VirtualFencePage() {
               <option value="all">{t('virtualFence.enableFilterAll')}</option>
               <option value="enabled">{t('virtualFence.enableFilterEnabled')}</option>
               <option value="disabled">{t('virtualFence.enableFilterDisabled')}</option>
-            </select>
+            </SiteSelect>
             <button
               type="button"
               className="inline-flex size-9 items-center justify-center rounded-lg border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 text-[#51A2FF] transition hover:bg-[#2B7FFF]/25"

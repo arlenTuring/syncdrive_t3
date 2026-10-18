@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
@@ -91,8 +93,7 @@ export function FrameInspectorSection({
 
             <label className="block text-[10px] text-zinc-500">
               {t('mapEditor.inspector.frame.strokeColor')}
-              <input
-                type="color"
+              <SiteColorInput
                 disabled={readOnly}
                 value={
                   strokeColor && strokeColor !== 'transparent' ? strokeColor : '#22d3ee'
@@ -101,13 +102,13 @@ export function FrameInspectorSection({
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
                 className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-60"
-              />
+               />
             </label>
           </div>
 
           <label className="block text-[10px] text-zinc-500">
             {t('mapEditor.inspector.frame.dashStyle')}
-            <select
+            <SiteSelect
               disabled={readOnly}
               value={strokeStyle}
               onChange={(e) =>
@@ -124,7 +125,7 @@ export function FrameInspectorSection({
                   {t(`mapEditor.inspector.stroke.${s}`)}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </label>
         </>
       )}

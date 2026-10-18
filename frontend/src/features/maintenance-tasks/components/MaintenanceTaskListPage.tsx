@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import {
   ChevronLeft,
   ChevronRight,
@@ -180,7 +181,7 @@ export function MaintenanceTaskListPage({
       </header>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800/60 px-6 py-4">
-        <select
+        <SiteSelect
           value={publishStatus}
           onChange={(e) => {
             setPublishStatus(e.target.value as PublishStatusKey | 'all');
@@ -195,8 +196,8 @@ export function MaintenanceTaskListPage({
                 : t(`common.publishStatus.${opt.value}`)}
             </option>
           ))}
-        </select>
-        <select
+        </SiteSelect>
+        <SiteSelect
           value={usageStatus}
           onChange={(e) => {
             setUsageStatus(e.target.value as UsageStatusKey | 'all');
@@ -211,7 +212,7 @@ export function MaintenanceTaskListPage({
                 : t(`common.usageStatus.${opt.value}`)}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           <input

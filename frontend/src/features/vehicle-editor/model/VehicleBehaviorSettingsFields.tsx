@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, Trash2, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -149,7 +150,7 @@ export function VehicleBehaviorSettingsFields({
         {rules.map((rule, i) => (
           <div key={rule.id} className="space-y-1.5 rounded border border-zinc-700/50 bg-zinc-800/30 p-2">
             <div className="flex gap-1">
-              <select
+              <SiteSelect
                 value={rule.iconFile}
                 onChange={(e) => {
                   const cat = VEHICLE_BEHAVIOR_ACTION_CATALOG.find((c) => c.iconFile === e.target.value);
@@ -167,7 +168,7 @@ export function VehicleBehaviorSettingsFields({
                     {c.label}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               <button
                 type="button"
                 onClick={() => onChange({ actionIconRules: rules.filter((_, j) => j !== i) })}
@@ -184,7 +185,7 @@ export function VehicleBehaviorSettingsFields({
               style={{ fontSize: 10 }}
             />
             <div className="grid grid-cols-2 gap-1">
-              <select
+              <SiteSelect
                 value={rule.matchOp}
                 onChange={(e) => updateRule(i, { matchOp: e.target.value as RouteActionMatchOp })}
                 className={selectCls}
@@ -195,7 +196,7 @@ export function VehicleBehaviorSettingsFields({
                     {o.label}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               <input
                 value={rule.threshold ?? ''}
                 onChange={(e) => updateRule(i, { threshold: e.target.value })}

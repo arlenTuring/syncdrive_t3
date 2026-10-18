@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
@@ -57,7 +59,7 @@ export function RoadLineInspectorSection({
         >
           {t('mapEditor.inspector.roadLine.style')}
         </label>
-        <select
+        <SiteSelect
           id="road-line-style"
           disabled={readOnly}
           value={style}
@@ -78,7 +80,7 @@ export function RoadLineInspectorSection({
               {t(`mapEditor.inspector.roadLine.styles.${opt.value}`)}
             </option>
           ))}
-        </select>
+        </SiteSelect>
       </div>
       <div>
         <label
@@ -113,9 +115,8 @@ export function RoadLineInspectorSection({
           {t('mapEditor.inspector.roadLine.color')}
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <SiteColorInput
             id="road-line-color"
-            type="color"
             disabled={readOnly}
             value={color.startsWith('#') ? color : DEFAULT_ROAD_LINE_COLOR}
             onChange={(e) =>
@@ -129,7 +130,7 @@ export function RoadLineInspectorSection({
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="h-8 w-10 shrink-0 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-60"
-          />
+           />
           <input
             readOnly={readOnly}
             value={color}

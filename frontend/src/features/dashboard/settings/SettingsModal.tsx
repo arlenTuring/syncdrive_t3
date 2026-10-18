@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useState } from 'react';
 import { X, Database, Plus, Trash2, CheckCircle, AlertCircle, Loader, Edit2, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -410,14 +411,14 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         </div>
         <div>
           <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.typeRequired')}</label>
-          <select
+          <SiteSelect
             value={form.type}
             onChange={e => setForm(f => ({ ...f, type: e.target.value as DataSourceType }))}
             className={inputCls}
           >
             <option value="internal">{t('dashboard.settings.typeSql')}</option>
             <option value="mqtt">{t('dashboard.settings.typeMqtt')}</option>
-          </select>
+          </SiteSelect>
         </div>
       </div>
       <div>

@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -521,7 +522,7 @@ function FillEmptySlotsControl({
     <>
       <div className="mt-3 flex items-center gap-2 border-t border-zinc-800/60 pt-3">
         <div className="relative min-w-0 flex-1">
-          <select
+          <SiteSelect
             value={taskType}
             disabled={disabled}
             onChange={(e) => setTaskType(e.target.value as TaskTypeKey)}
@@ -533,7 +534,7 @@ function FillEmptySlotsControl({
                 {t(`timeTemplates.taskTypes.${opt.key}`)}
               </option>
             ))}
-          </select>
+          </SiteSelect>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
         </div>
         <button

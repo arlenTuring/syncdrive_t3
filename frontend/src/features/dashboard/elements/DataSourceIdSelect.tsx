@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Database, Radio } from 'lucide-react';
 import {
   getDataSourcesForBinding,
@@ -31,7 +32,7 @@ export function DataSourceIdSelect({ kind, value, onChange, emptyLabel }: Props)
       <label className="block text-zinc-500 text-xs mb-1 flex items-center gap-1">
         <Icon size={10} /> {kind === 'sql' ? 'SQL 資料來源' : 'MQTT 資料來源'}
       </label>
-      <select
+      <SiteSelect
         value={invalid ? '' : value}
         onChange={e => onChange(e.target.value)}
         className={inputCls}
@@ -42,7 +43,7 @@ export function DataSourceIdSelect({ kind, value, onChange, emptyLabel }: Props)
             {ds.name}
           </option>
         ))}
-      </select>
+      </SiteSelect>
       {invalid && (
         <p className="mt-1 text-[10px] text-amber-500/90 leading-relaxed">
           目前綁定的「{invalidName ?? value}」不是此類型，請改選

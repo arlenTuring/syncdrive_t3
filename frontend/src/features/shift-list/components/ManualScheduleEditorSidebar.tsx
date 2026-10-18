@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { SlidersHorizontal, Tag } from 'lucide-react';
 import type { TransitionCardCodes } from '../utils/cardCode';
 import { useEffect, useMemo, useState } from 'react';
@@ -290,7 +291,7 @@ function ManualBlockSettingsForm({
         {block.taskType === 'passenger' ? (
           <>
             <span className={LABEL_CLASS}>{t('shiftList.manualSidebar.selectRoute')}</span>
-            <select
+            <SiteSelect
               value={routeId}
               onChange={(event) => {
                 const nextRouteId = event.target.value;
@@ -312,7 +313,7 @@ function ManualBlockSettingsForm({
                   {route.routeCode ? `（${route.routeCode}）` : ''}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </>
         ) : null}
 
@@ -396,7 +397,7 @@ function ManualBlockSettingsForm({
                     {t('shiftList.manualSidebar.stationPrefix', { name: dwell.stationName || dwell.stationId })}
                   </span>
                   <div className="flex items-center justify-center gap-1">
-                    <select
+                    <SiteSelect
                       value={mode}
                       className="h-8 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-1 text-center text-[11px] text-zinc-100"
                       aria-label={t('shiftList.manualSidebar.dwellModeAria', { name: dwell.stationName })}
@@ -430,7 +431,7 @@ function ManualBlockSettingsForm({
                       <option value="seconds">{t('shiftList.manualSidebar.dwellSeconds')}</option>
                       <option value="no_stop">{t('shiftList.manualSidebar.noStop')}</option>
                       <option value="line_change">{t('shiftList.manualSidebar.lineChange')}</option>
-                    </select>
+                    </SiteSelect>
                     {mode === 'seconds' ? (
                       <input
                         type="text"

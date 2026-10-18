@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CanvasElementProps, ChildWidget, FreshnessPolicy, GroupDataSource, WidgetDataBinding } from '../types';
@@ -182,7 +183,7 @@ export function WidgetDataBindingSettings({ w, onUpdate }: { w: WidgetDataBindin
         />
         {!editableValueField && hasInherited && <p className="text-[10px] text-zinc-500">未設定獨立欄位；目前使用上方群組列欄位。</p>}
       </Field>}
-      {hasOwn && <Field label={t('dashboard.properties.freshness')}><select value={policy} onChange={(event) => onUpdate({ freshnessPolicy: event.target.value as FreshnessPolicy })} className={inputCls}>{FRESHNESS_POLICY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(`dashboard.properties.freshnessOpt.${option.value}`)}</option>)}</select><p className="text-zinc-500 text-[10px] leading-snug mt-1">{t(`dashboard.properties.freshnessHint.${policy}`)}<span className="block text-zinc-600 mt-0.5">{t('dashboard.properties.freshnessCurrent', { reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams) })}</span></p>{policy === 'interval' && <input type="number" min={1} value={w.refreshInterval || 15} onChange={(event) => onUpdate({ refreshInterval: +event.target.value })} className={`${inputCls} mt-1.5`} />}</Field>}
+      {hasOwn && <Field label={t('dashboard.properties.freshness')}><SiteSelect value={policy} onChange={(event) => onUpdate({ freshnessPolicy: event.target.value as FreshnessPolicy })} className={inputCls}>{FRESHNESS_POLICY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(`dashboard.properties.freshnessOpt.${option.value}`)}</option>)}</SiteSelect><p className="text-zinc-500 text-[10px] leading-snug mt-1">{t(`dashboard.properties.freshnessHint.${policy}`)}<span className="block text-zinc-600 mt-0.5">{t('dashboard.properties.freshnessCurrent', { reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams) })}</span></p>{policy === 'interval' && <input type="number" min={1} value={w.refreshInterval || 15} onChange={(event) => onUpdate({ refreshInterval: +event.target.value })} className={`${inputCls} mt-1.5`} />}</Field>}
     </div>
   );
 }

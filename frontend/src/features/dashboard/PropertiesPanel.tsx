@@ -1,3 +1,6 @@
+import { SiteColorInput } from '../../components/SiteColorInput';
+import { SiteDateTimeInput } from '../../components/SiteDateTimeInput';
+import { SiteSelect } from '../../components/SiteSelect';
 import { NumberInput } from '../../components/NumberInput'
 import React, { useEffect, useState } from 'react';
 import { usePlaneSourceResolver } from './context/PlaneDataSourceContext';
@@ -185,20 +188,20 @@ function AlertRulesEditor({
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label={t('dashboard.properties.textColor')}>
-              <input type="color" value={rule.textColor} onChange={e => patch(i, { textColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={rule.textColor} onChange={e => patch(i, { textColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
             </Field>
             <Field label={t('dashboard.properties.backgroundColor')}>
-              <input type="color" value={hexFromRgba(rule.backgroundColor)} onChange={e => patch(i, { backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={hexFromRgba(rule.backgroundColor)} onChange={e => patch(i, { backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
             </Field>
           </div>
           <Field label={t('dashboard.properties.alertRules.borderColor')}>
-            <input type="color" value={hexFromRgba(rule.borderColor)} onChange={e => patch(i, { borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+            <SiteColorInput value={hexFromRgba(rule.borderColor)} onChange={e => patch(i, { borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
           </Field>
           <Field label={t('dashboard.properties.alertRules.displayMode')}>
-            <select value={rule.displayMode} onChange={e => patch(i, { displayMode: e.target.value as AlertDisplayMode })} className={selectCls}>
+            <SiteSelect value={rule.displayMode} onChange={e => patch(i, { displayMode: e.target.value as AlertDisplayMode })} className={selectCls}>
               <option value="blink">{t('dashboard.properties.alertRules.blink')}</option>
               <option value="static">{t('dashboard.properties.alertRules.static')}</option>
-            </select>
+            </SiteSelect>
           </Field>
 
           <div className="pt-1 border-t border-zinc-700/50 space-y-2">
@@ -207,11 +210,11 @@ function AlertRulesEditor({
               <input value={rule.startField} onChange={e => patch(i, { startField: e.target.value })} className={inputCls} placeholder="alert_message" />
             </Field>
             <Field label={t('dashboard.properties.alertRules.triggerMode')}>
-              <select value={rule.startMode} onChange={e => patch(i, { startMode: e.target.value as AlertTriggerMode })} className={selectCls}>
+              <SiteSelect value={rule.startMode} onChange={e => patch(i, { startMode: e.target.value as AlertTriggerMode })} className={selectCls}>
                 <option value="non-empty">{t('dashboard.properties.alertRules.nonEmpty')}</option>
                 <option value="equals">{t('dashboard.properties.alertRules.equals')}</option>
                 <option value="not-equals">{t('dashboard.properties.alertRules.notEquals')}</option>
-              </select>
+              </SiteSelect>
             </Field>
             {(rule.startMode === 'equals' || rule.startMode === 'not-equals') && (
               <Field label={t('dashboard.properties.alertRules.compareValue')}>
@@ -231,11 +234,11 @@ function AlertRulesEditor({
                   <input value={rule.endField ?? ''} onChange={e => patch(i, { endField: e.target.value })} className={inputCls} placeholder="health_status" />
                 </Field>
                 <Field label={t('dashboard.properties.alertRules.endMode')}>
-                  <select value={rule.endMode ?? 'non-empty'} onChange={e => patch(i, { endMode: e.target.value as AlertTriggerMode })} className={selectCls}>
+                  <SiteSelect value={rule.endMode ?? 'non-empty'} onChange={e => patch(i, { endMode: e.target.value as AlertTriggerMode })} className={selectCls}>
                     <option value="non-empty">{t('dashboard.properties.alertRules.nonEmpty')}</option>
                     <option value="equals">{t('dashboard.properties.alertRules.equals')}</option>
                     <option value="not-equals">{t('dashboard.properties.alertRules.notEquals')}</option>
-                  </select>
+                  </SiteSelect>
                 </Field>
                 {(rule.endMode === 'equals' || rule.endMode === 'not-equals' || !rule.endMode) && (
                   <Field label={t('dashboard.properties.alertRules.endCompareValue')}>
@@ -295,24 +298,24 @@ function ColorRulesEditor({
             <X size={10} />
           </button>
           <div className="flex gap-1.5 items-center">
-            <select value={rule.condition} onChange={e => updateRule(i, { condition: e.target.value as any })} className={`${selectCls} flex-1`}>
+            <SiteSelect value={rule.condition} onChange={e => updateRule(i, { condition: e.target.value as any })} className={`${selectCls} flex-1`}>
               <option value="gt">{t('dashboard.properties.colorRules.opGt')}</option><option value="lt">{t('dashboard.properties.colorRules.opLt')}</option>
               <option value="eq">{t('dashboard.properties.colorRules.opEq')}</option><option value="contains">{t('dashboard.properties.colorRules.opContains')}</option>
               <option value="status_eq">{t('dashboard.properties.colorRules.opStatusEq')}</option>
-            </select>
+            </SiteSelect>
             <input value={rule.threshold} onChange={e => updateRule(i, { threshold: e.target.value })} className={`${inputCls} flex-1`} placeholder={t('dashboard.properties.colorRules.thresholdPlaceholder')} />
           </div>
           <div className="grid grid-cols-3 gap-1">
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
-              <input type="color" value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
+              <SiteColorInput value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
               <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrText')}</span>
             </div>
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
-              <input type="color" value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
+              <SiteColorInput value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
               <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBg')}</span>
             </div>
             <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
-              <input type="color" value={rule.borderColor || '#ffffff'} onChange={e => updateRule(i, { borderColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer" />
+              <SiteColorInput value={rule.borderColor || '#ffffff'} onChange={e => updateRule(i, { borderColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
               <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBorder')}</span>
             </div>
           </div>
@@ -368,10 +371,10 @@ function TextSettings({
         
         <Field label={t('dashboard.properties.icon')}>
           <div className="space-y-2">
-            <select value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={selectCls}>
+            <SiteSelect value={w.icon || ''} onChange={e => onUpdate({ icon: e.target.value })} className={selectCls}>
               <option value="">{t('dashboard.properties.iconBuiltin')}</option>
               {commonIcons.map(icon => <option key={icon} value={icon}>{icon}</option>)}
-            </select>
+            </SiteSelect>
             <div className="flex flex-wrap gap-1 mt-2">
               {commonIcons.slice(0, 8).map(icon => (
                 <button key={icon} onClick={() => onUpdate({ icon })} 
@@ -409,7 +412,7 @@ function TextSettings({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.textColor')}>
             <div className="flex gap-2">
-              <input type="color" value={w.color.startsWith('#') ? w.color : '#ffffff'} onChange={e => onUpdate({ color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={w.color.startsWith('#') ? w.color : '#ffffff'} onChange={e => onUpdate({ color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
               <input value={w.color} onChange={e => onUpdate({ color: e.target.value })} className={`${inputCls} font-mono`} placeholder="#RRGGBB" />
             </div>
           </Field>
@@ -430,7 +433,7 @@ function TextSettings({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.backgroundFill')}>
             <div className="flex gap-2">
-              <input type="color" value={w.backgroundColor?.startsWith('#') ? w.backgroundColor : '#000000'} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={w.backgroundColor?.startsWith('#') ? w.backgroundColor : '#000000'} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
               <button onClick={() => onUpdate({ backgroundColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
             </div>
           </Field>
@@ -442,7 +445,7 @@ function TextSettings({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.borderColor')}>
             <div className="flex gap-2">
-              <input type="color" value={w.borderColor?.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={w.borderColor?.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
               <button onClick={() => onUpdate({ borderColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
             </div>
           </Field>
@@ -504,14 +507,14 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       <div className="pt-2 border-t border-zinc-800 space-y-3">
         <SH icon={<Type size={13} />} label={t('dashboard.properties.displayModeSection')} color="#38bdf8" />
         <Field label={t('dashboard.properties.alertRules.multiHit')}>
-          <select
+          <SiteSelect
             value={w.alertPresentation ?? 'stack'}
             onChange={e => onUpdate({ alertPresentation: e.target.value as 'stack' | 'carousel' })}
             className={inputCls}
           >
             <option value="stack">{t('dashboard.properties.alertRules.stack')}</option>
             <option value="carousel">{t('dashboard.properties.alertRules.carousel')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         {(w.alertPresentation ?? 'stack') === 'carousel' && (
           <Field label={t('dashboard.properties.alertRules.carouselMs')}>
@@ -552,7 +555,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <Field label={t('dashboard.properties.valueField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="speed" /></Field>
       <Field label={t('dashboard.properties.style')}>
-        <select
+        <SiteSelect
           value={w.gaugeVariant ?? 'default'}
           onChange={e => onUpdate({ gaugeVariant: e.target.value as GaugeWidget['gaugeVariant'] })}
           className={selectCls}
@@ -561,18 +564,18 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           <option value="semi-arc">{t('dashboard.properties.widgets.gauge.variantSemiArc')}</option>
           <option value="ring">{t('dashboard.properties.widgets.gauge.variantRing')}</option>
           <option value="band">數字＋水平色帶</option>
-        </select>
+        </SiteSelect>
       </Field>
       {w.gaugeVariant === 'band' || w.gaugeVariant === 'semi-arc' ? (
         <Field label="色帶方向">
-          <select
+          <SiteSelect
             value={w.arcVariant ?? 'speed'}
             onChange={e => onUpdate({ arcVariant: e.target.value as GaugeWidget['arcVariant'] })}
             className={selectCls}
           >
             <option value="speed">速度：低綠 → 高紅</option>
             <option value="load">電量：低紅 → 高綠</option>
-          </select>
+          </SiteSelect>
         </Field>
       ) : null}
       {w.gaugeVariant === 'band' ? (
@@ -683,12 +686,11 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.gauge.panelBg')}>
-          <input
-            type="color"
+          <SiteColorInput
             value={w.panelBackgroundColor?.startsWith('#') ? w.panelBackgroundColor : '#1a2332'}
             onChange={e => onUpdate({ panelBackgroundColor: e.target.value })}
             className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
-          />
+           />
         </Field>
         <Field label={t('dashboard.properties.widgets.gauge.panelRadius')}>
           <NumberInput
@@ -748,7 +750,7 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
           <Field label={t('dashboard.properties.label')}><input value={rule.label} onChange={e => patchRule(idx, { label: e.target.value })} className={inputCls} /></Field>
           <div className="col-span-2">
             <Field label={t('dashboard.properties.color')}>
-              <input type="color" value={rule.color} onChange={e => patchRule(idx, { color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+              <SiteColorInput value={rule.color} onChange={e => patchRule(idx, { color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
             </Field>
           </div>
         </div>
@@ -773,18 +775,18 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
       </div>
       <Field label={t('dashboard.properties.widgets.slotGrid.activeValues')}><input value={w.activeValues.join(',')} onChange={e => onUpdate({ activeValues: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} placeholder="OCCUPIED,CHARGING" /></Field>
       <Field label={t('dashboard.properties.variant')}>
-        <select value={w.variant ?? 'default'} onChange={e => onUpdate({ variant: e.target.value as SlotGridWidget['variant'] })} className={selectCls}>
+        <SiteSelect value={w.variant ?? 'default'} onChange={e => onUpdate({ variant: e.target.value as SlotGridWidget['variant'] })} className={selectCls}>
           <option value="default">{t('dashboard.properties.widgets.slotGrid.variantDefault')}</option>
           <option value="compact-row">{t('dashboard.properties.widgets.slotGrid.variantCompact')}</option>
-        </select>
+        </SiteSelect>
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t('dashboard.properties.widgets.slotGrid.activeColor')}><input type="color" value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label={t('dashboard.properties.widgets.slotGrid.inactiveColor')}><input type="color" value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.activeColor')}><SiteColorInput value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.inactiveColor')}><SiteColorInput value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.widgets.slotGrid.layoutMode')}>
-          <select value={w.layout} onChange={e => onUpdate({ layout: e.target.value as any })} className={selectCls}>
+          <SiteSelect value={w.layout} onChange={e => onUpdate({ layout: e.target.value as any })} className={selectCls}>
             <option value="horizontal">{t('dashboard.properties.widgets.slotGrid.layoutHorizontal')}</option><option value="grid">{t('dashboard.properties.widgets.slotGrid.layoutGrid')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.slotGrid.slotGap')}><NumberInput min={0} value={w.slotGap ?? 4} onChange={n => onUpdate({ slotGap: n })} className={inputCls} /></Field>
       </div>
@@ -853,7 +855,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
 
       {/* 圖片填充模式 */}
       <Field label={t('dashboard.properties.widgets.image.objectFit')}>
-        <select
+        <SiteSelect
           value={w.objectFit}
           onChange={e => onUpdate({ objectFit: e.target.value as ImageWidget['objectFit'] })}
           className={selectCls}
@@ -862,7 +864,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
           <option value="contain">{t('dashboard.properties.widgets.image.fitContain')}</option>
           <option value="fill">{t('dashboard.properties.widgets.image.fitFill')}</option>
           <option value="none">{t('dashboard.properties.widgets.image.fitNone')}</option>
-        </select>
+        </SiteSelect>
       </Field>
 
       {/* 圓角與透明度 */}
@@ -886,12 +888,11 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       {/* 背景色 */}
       <Field label={t('dashboard.properties.backgroundColorShort')}>
         <div className="flex gap-2 items-center">
-          <input
-            type="color"
+          <SiteColorInput
             value={w.backgroundColor ?? '#000000'}
             onChange={e => onUpdate({ backgroundColor: e.target.value })}
             className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
-          />
+           />
           <input
             value={w.backgroundColor ?? ''}
             onChange={e => onUpdate({ backgroundColor: e.target.value })}
@@ -912,12 +913,11 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
         </Field>
         <Field label={t('dashboard.properties.borderColor')}>
           <div className="flex gap-1 items-center">
-            <input
-              type="color"
+            <SiteColorInput
               value={w.borderColor ?? '#ffffff'}
               onChange={e => onUpdate({ borderColor: e.target.value })}
               className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
-            />
+             />
             <input
               value={w.borderColor ?? ''}
               onChange={e => onUpdate({ borderColor: e.target.value })}
@@ -944,7 +944,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       {(w.overlayText ?? '').trim() !== '' && (
         <>
           <Field label={t('dashboard.properties.widgets.image.textPosition')}>
-            <select
+            <SiteSelect
               value={w.overlayPosition ?? 'bottom-left'}
               onChange={e => onUpdate({ overlayPosition: e.target.value as ImageWidget['overlayPosition'] })}
               className={selectCls}
@@ -956,7 +956,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
               <option value="bottom-left">{t('dashboard.properties.widgets.image.posBottomLeft')}</option>
               <option value="bottom-center">{t('dashboard.properties.widgets.image.posBottomCenter')}</option>
               <option value="bottom-right">{t('dashboard.properties.widgets.image.posBottomRight')}</option>
-            </select>
+            </SiteSelect>
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
@@ -968,26 +968,25 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
               />
             </Field>
             <Field label={t('dashboard.properties.fontWeight')}>
-              <select
+              <SiteSelect
                 value={w.overlayFontWeight ?? 'normal'}
                 onChange={e => onUpdate({ overlayFontWeight: e.target.value as 'normal' | 'bold' })}
                 className={selectCls}
               >
                 <option value="normal">{t('dashboard.properties.normal')}</option>
                 <option value="bold">{t('dashboard.properties.boldWeight')}</option>
-              </select>
+              </SiteSelect>
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <Field label={t('dashboard.properties.textColor')}>
               <div className="flex gap-1 items-center">
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.overlayTextColor ?? '#ffffff'}
                   onChange={e => onUpdate({ overlayTextColor: e.target.value })}
                   className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
-                />
+                 />
                 <input
                   value={w.overlayTextColor ?? '#ffffff'}
                   onChange={e => onUpdate({ overlayTextColor: e.target.value })}
@@ -997,12 +996,11 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
             </Field>
             <Field label={t('dashboard.properties.widgets.image.textBg')}>
               <div className="flex gap-1 items-center">
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.overlayBgColor ?? '#000000'}
                   onChange={e => onUpdate({ overlayBgColor: e.target.value })}
                   className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
-                />
+                 />
                 <input
                   value={w.overlayBgColor ?? 'rgba(0,0,0,0.45)'}
                   onChange={e => onUpdate({ overlayBgColor: e.target.value })}
@@ -1047,10 +1045,10 @@ function ChartAxisFields({
       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{label}</p>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.unit')}>
-          <select value={unit} onChange={e => patch({ unit: e.target.value as ChartAxisUnit })} className={selectCls}>
+          <SiteSelect value={unit} onChange={e => patch({ unit: e.target.value as ChartAxisUnit })} className={selectCls}>
             <option value="number">{t('dashboard.properties.widgets.chart.unitNumber')}</option>
             <option value="time">{t('dashboard.properties.widgets.chart.unitTime')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.axisLabel')}>
           <input value={axis?.label ?? ''} onChange={e => patch({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.optionalShort')} />
@@ -1060,15 +1058,15 @@ function ChartAxisFields({
         {unit === 'time' && (
           <>
             <Field label={t('dashboard.properties.widgets.chart.timeFormat')}>
-              <select value={axis?.timeStyle ?? 'hm'} onChange={e => patch({ timeStyle: e.target.value as 'hm' })} className={selectCls}>
+              <SiteSelect value={axis?.timeStyle ?? 'hm'} onChange={e => patch({ timeStyle: e.target.value as 'hm' })} className={selectCls}>
                 <option value="hm">{t('dashboard.properties.widgets.chart.timeHm')}</option>
-              </select>
+              </SiteSelect>
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.clockSystem')}>
-              <select value={axis?.timeClock ?? '24h'} onChange={e => patch({ timeClock: e.target.value as '12h' | '24h' })} className={selectCls}>
+              <SiteSelect value={axis?.timeClock ?? '24h'} onChange={e => patch({ timeClock: e.target.value as '12h' | '24h' })} className={selectCls}>
                 <option value="24h">{t('dashboard.properties.widgets.chart.h24')}</option>
                 <option value="12h">{t('dashboard.properties.widgets.chart.h12')}</option>
-              </select>
+              </SiteSelect>
             </Field>
             <div className="col-span-2 space-y-2 pt-1 border-t border-zinc-800/80">
               <label className="flex items-center gap-2 text-xs text-zinc-400">
@@ -1173,12 +1171,11 @@ function LineChartSeriesFields({
           <input value={series.yField} onChange={e => patch({ yField: e.target.value })} className={inputCls} placeholder="actual_util" />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.lineColor')}>
-          <input
-            type="color"
+          <SiteColorInput
             value={series.color?.startsWith('#') ? series.color : '#38bdf8'}
             onChange={e => patch({ color: e.target.value })}
             className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
-          />
+           />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.legendName')}>
           <input
@@ -1247,7 +1244,7 @@ function LineChartSeriesFields({
               />
             </Field>
             <Field label={t('dashboard.properties.fontWeight')}>
-              <select
+              <SiteSelect
                 value={String(series.eventLabelStyle?.fontWeight ?? 'normal')}
                 onChange={e =>
                   patchLabelStyle({
@@ -1258,23 +1255,21 @@ function LineChartSeriesFields({
               >
                 <option value="normal">{t('dashboard.properties.normal')}</option>
                 <option value="bold">{t('dashboard.properties.boldWeight')}</option>
-              </select>
+              </SiteSelect>
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.textColorShort')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={series.eventLabelStyle?.fill?.startsWith('#') ? series.eventLabelStyle.fill : '#fca5a5'}
                 onChange={e => patchLabelStyle({ fill: e.target.value })}
                 className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
-              />
+               />
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.borderColorShort')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={series.eventLabelStyle?.stroke?.startsWith('#') ? series.eventLabelStyle.stroke : '#ef4444'}
                 onChange={e => patchLabelStyle({ stroke: e.target.value })}
                 className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
-              />
+               />
             </Field>
             <Field label={t('dashboard.properties.borderWidth')}>
               <input
@@ -1331,7 +1326,7 @@ function AxisBandFields({
           <input value={band.segmentField} onChange={e => patch({ segmentField: e.target.value })} className={inputCls} placeholder="segment_code" />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.defaultColor')}>
-          <input type="color" value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+          <SiteColorInput value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.thickness')}>
           <NumberInput min={1} max={20} value={band.thickness ?? 4} onChange={n => patch({ thickness: n })} className={inputCls} />
@@ -1349,7 +1344,7 @@ function AxisBandFields({
           <div key={i} className="flex items-center gap-1.5 p-1.5 bg-zinc-800/40 rounded border border-zinc-700/50 relative group">
             <button type="button" onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-700 rounded-full text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100"><X size={10} /></button>
             <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} flex-1 font-mono`} placeholder="IN_SERVICE" />
-            <input type="color" value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer shrink-0" />
+            <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer shrink-0"  />
           </div>
         ))}
         {rules.length === 0 && <p className="text-[10px] text-zinc-600 italic text-center py-1">{t('dashboard.properties.widgets.chart.noMapping')}</p>}
@@ -1436,14 +1431,14 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
       <div className="space-y-2 pt-2 border-t border-zinc-800">
         <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.axesSection')} color="#22d3ee" />
         <Field label={t('dashboard.properties.widgets.chart.viewportMode')}>
-          <select
+          <SiteSelect
             value={w.viewportMode ?? 'fixed-axis'}
             onChange={e => onUpdate({ viewportMode: e.target.value as ChartViewportMode })}
             className={selectCls}
           >
             <option value="fixed-axis">{t('dashboard.properties.widgets.chart.viewportFixed')}</option>
             <option value="data-centered">{t('dashboard.properties.widgets.chart.viewportData')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         {w.viewportMode === 'data-centered' && (
           <Field label={t('dashboard.properties.widgets.chart.viewportPad')}>
@@ -1630,10 +1625,10 @@ function ObstacleRingSettings({
           <NumberInput min={2} max={40} value={w.dotSize ?? 8} onChange={n => onUpdate({ dotSize: Math.max(2, n) })} className={inputCls} />
         </Field>
         <Field label="無障礙（灰）">
-          <input type="color" value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+          <SiteColorInput value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"  />
         </Field>
         <Field label="有障礙（紅）">
-          <input type="color" value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" />
+          <SiteColorInput value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"  />
         </Field>
       </div>
       <div className="space-y-2">
@@ -1652,7 +1647,7 @@ function ObstacleRingSettings({
                 />
               </div>
               <div className="grid grid-cols-2 gap-1">
-                <select
+                <SiteSelect
                   value={binding.mode}
                   onChange={e => patchDirection(direction, { mode: e.target.value as ObstacleDirectionBinding['mode'] })}
                   className={selectCls}
@@ -1660,7 +1655,7 @@ function ObstacleRingSettings({
                 >
                   <option value="boolean">布林：true＝偵測到</option>
                   <option value="distance">距離：≤ 門檻＝偵測到</option>
-                </select>
+                </SiteSelect>
                 {binding.mode === 'distance' ? (
                   <input
                     type="number"
@@ -1785,12 +1780,12 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <div className="space-y-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
           <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">{t('dashboard.properties.canvas.mapSource')}</div>
           <Field label={t('dashboard.properties.canvas.selectMap')}>
-            <select value={el.mapId ?? ''} onChange={e => onUpdate({ mapId: e.target.value })} className={selectCls}>
+            <SiteSelect value={el.mapId ?? ''} onChange={e => onUpdate({ mapId: e.target.value })} className={selectCls}>
               <option value="">{t('dashboard.properties.canvas.selectMapPlaceholder')}</option>
               {maps.map(m => (
                 <option key={m.mapId} value={m.mapId}>{m.displayName}</option>
               ))}
-            </select>
+            </SiteSelect>
           </Field>
           <p className="text-[9px] leading-relaxed text-zinc-500">
             {t('dashboard.properties.canvas.mapHint')}
@@ -1806,7 +1801,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <Field label={t('dashboard.properties.width')}><NumberInput value={el.width} onChange={n => onUpdate({ width: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.height')}><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
-      <Field label={t('dashboard.properties.backgroundColor')}><input type="color" value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+      <Field label={t('dashboard.properties.backgroundColor')}><SiteColorInput value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
       {el.canvasKind !== 'map-platform' ? (
         <BackgroundImagePicker
           value={el.backgroundImage ?? ''}
@@ -1821,23 +1816,23 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <div className="space-y-3 rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
           <div className="text-[11px] font-semibold text-cyan-300">班次中心統計時間</div>
           <Field label="統計日期">
-            <select
+            <SiteSelect
               value={shiftRange.dateMode}
               onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, dateMode: e.target.value as 'operating' | 'fixed' } })}
               className={selectCls}
             >
               <option value="operating">跟隨目前營運日期</option>
               <option value="fixed">選定日期</option>
-            </select>
+            </SiteSelect>
           </Field>
           {shiftRange.dateMode === 'fixed' && (
             <Field label="日期">
-              <input type="date" value={shiftRange.date ?? ''} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, date: e.target.value } })} className={inputCls} />
+              <SiteDateTimeInput type="date" value={shiftRange.date ?? ''} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, date: e.target.value } })} className={inputCls} />
             </Field>
           )}
           <div className="grid grid-cols-2 gap-2">
             <Field label="起始時間">
-              <input type="time" value={shiftRange.startTime} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, startTime: e.target.value || '00:00' } })} className={inputCls} />
+              <SiteDateTimeInput type="time" value={shiftRange.startTime} onChange={e => onUpdate({ shiftCenterRange: { ...shiftRange, startTime: e.target.value || '00:00' } })} className={inputCls} />
             </Field>
             <Field label="結束時間">
               <input readOnly value={`隔日 ${shiftRange.startTime}`} className={inputCls} />
@@ -1896,7 +1891,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           </div>
 
           <Field label={t('dashboard.properties.canvas.presentMode')}>
-            <select
+            <SiteSelect
               value={el.groupRepeatMode || 'tile'}
               onChange={e => onUpdate({ groupRepeatMode: e.target.value as 'tile' | 'scroll' | 'slots' })}
               className={selectCls}
@@ -1904,7 +1899,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <option value="tile">{t('dashboard.properties.canvas.modeTile')}</option>
               <option value="scroll">{t('dashboard.properties.canvas.modeScroll')}</option>
               <option value="slots">{t('dashboard.properties.canvas.modeSlots')}</option>
-            </select>
+            </SiteSelect>
           </Field>
 
           {(el.groupRepeatMode === 'scroll') && (
@@ -1938,17 +1933,17 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
                 </Field>
               </div>
               <Field label={t('dashboard.properties.canvas.slotAssign')}>
-                <select
+                <SiteSelect
                   value={el.groupSlotAssignment ?? 'sticky-pool'}
                   onChange={e => onUpdate({ groupSlotAssignment: e.target.value as 'index' | 'sticky-pool' })}
                   className={selectCls}
                 >
                   <option value="sticky-pool">{t('dashboard.properties.canvas.slotSticky')}</option>
                   <option value="index">{t('dashboard.properties.canvas.slotIndex')}</option>
-                </select>
+                </SiteSelect>
               </Field>
               <Field label={t('dashboard.properties.canvas.transition')}>
-                <select
+                <SiteSelect
                   value={el.groupTransition ?? 'flip'}
                   onChange={e => onUpdate({ groupTransition: e.target.value as 'none' | 'fade' | 'flip' })}
                   className={selectCls}
@@ -1956,7 +1951,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
                   <option value="flip">{t('dashboard.properties.canvas.transitionFlip')}</option>
                   <option value="fade">{t('dashboard.properties.canvas.transitionFade')}</option>
                   <option value="none">{t('dashboard.properties.canvas.transitionNone')}</option>
-                </select>
+                </SiteSelect>
               </Field>
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {t('dashboard.properties.canvas.slotPoolHint')}
@@ -1965,14 +1960,14 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           )}
 
           <Field label={t('dashboard.properties.canvas.varMode')}>
-            <select
+            <SiteSelect
               value={el.groupVariableMode ?? 'row'}
               onChange={e => onUpdate({ groupVariableMode: e.target.value as 'index' | 'row' })}
               className={selectCls}
             >
               <option value="index">{t('dashboard.properties.canvas.varModeIndex')}</option>
               <option value="row">{t('dashboard.properties.canvas.varModeRow')}</option>
-            </select>
+            </SiteSelect>
           </Field>
 
           <div className="p-2.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50 space-y-1.5">
@@ -2000,7 +1995,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           </div>
 
           <Field label={t('dashboard.properties.canvas.tileFit')}>
-            <select
+            <SiteSelect
               value={el.groupTileFit || 'fill'}
               onChange={e => onUpdate({ groupTileFit: e.target.value as 'fixed' | 'fill' | 'slot' })}
               className={selectCls}
@@ -2008,7 +2003,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <option value="slot">{t('dashboard.properties.canvas.tileSlot')}</option>
               <option value="fill">{t('dashboard.properties.canvas.tileFill')}</option>
               <option value="fixed">{t('dashboard.properties.canvas.tileFixed')}</option>
-            </select>
+            </SiteSelect>
             <p className="mt-1 text-[10px] text-zinc-500 leading-relaxed">
               {(el.groupTileFit || 'fill') === 'slot'
                 ? t('dashboard.properties.canvas.tileSlotHint')
@@ -2044,22 +2039,22 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
 
           {(el.groupTileFit || 'fill') === 'fixed' && (
             <Field label={t('dashboard.properties.canvas.alignFixed')}>
-              <select
+              <SiteSelect
                 value={el.groupTileAlign || 'start'}
                 onChange={e => onUpdate({ groupTileAlign: e.target.value as 'start' | 'center' })}
                 className={selectCls}
               >
                 <option value="start">{t('dashboard.properties.canvas.alignStart')}</option>
                 <option value="center">{t('dashboard.properties.canvas.alignCenter')}</option>
-              </select>
+              </SiteSelect>
             </Field>
           )}
 
           <Field label={t('dashboard.properties.canvas.layoutMode')}>
-            <select value={el.layoutMode || 'grid'} onChange={e => onUpdate({ layoutMode: e.target.value as 'free' | 'grid' })} className={selectCls}>
+            <SiteSelect value={el.layoutMode || 'grid'} onChange={e => onUpdate({ layoutMode: e.target.value as 'free' | 'grid' })} className={selectCls}>
               <option value="grid">{t('dashboard.properties.canvas.layoutGrid')}</option>
               <option value="free">{t('dashboard.properties.canvas.layoutFree')}</option>
-            </select>
+            </SiteSelect>
           </Field>
 
           {(el.layoutMode === 'grid' || !el.layoutMode) ? (
@@ -2146,8 +2141,8 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.backgroundColor')}>
           <div className="flex gap-2">
-            <input type="color" value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1e293b'}
-              onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" />
+            <SiteColorInput value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1e293b'}
+              onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
             <input value={w.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className={`${inputCls} font-mono`} />
           </div>
         </Field>
@@ -2158,7 +2153,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <div className="grid grid-cols-3 gap-2">
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.borderWidth')}><NumberInput min={0} value={w.borderWidth} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.borderColor')}><input type="color" value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.borderColor')}><SiteColorInput value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
         <input type="checkbox" checked={!!w.severityStripColor}
@@ -2208,8 +2203,8 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="status" /></Field>
         <Field label={t('dashboard.properties.widgets.statusBadge.defaultLabel')}><input value={w.defaultLabel} onChange={e => onUpdate({ defaultLabel: e.target.value })} className={inputCls} placeholder="UNKNOWN" /></Field>
-        <Field label={t('dashboard.properties.widgets.statusBadge.defaultBg')}><input type="color" value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label={t('dashboard.properties.widgets.statusBadge.defaultText')}><input type="color" value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultBg')}><SiteColorInput value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultText')}><SiteColorInput value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.fontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
@@ -2230,8 +2225,8 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
               <input value={rule.label} onChange={e => updateRule(i, { label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statusBadge.labelPlaceholder')} />
             </div>
             <div className="flex gap-2">
-              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.bg')}</span></div>
-              <div className="flex items-center gap-1 flex-1"><input type="color" value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded" /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.text')}</span></div>
+              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.bg')}</span></div>
+              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.text')}</span></div>
             </div>
           </div>
         ))}
@@ -2257,7 +2252,7 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
         <Field label={t('dashboard.properties.widgets.statCard.labelFontSize')}><NumberInput value={w.labelFontSize} onChange={n => onUpdate({ labelFontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.statCard.unitFontSize')}><NumberInput min={8} value={w.unitFontSize ?? Math.max(w.labelFontSize, 10)} onChange={n => onUpdate({ unitFontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.statCard.labelPosition')}>
-          <select
+          <SiteSelect
             value={w.labelPosition ?? 'top'}
             onChange={e => onUpdate({ labelPosition: e.target.value as StatCardWidget['labelPosition'] })}
             className={selectCls}
@@ -2266,13 +2261,13 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
             <option value="bottom">{t('dashboard.properties.sideBottom')}</option>
             <option value="left">{t('dashboard.properties.sideLeft')}</option>
             <option value="right">{t('dashboard.properties.sideRight')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <p className="text-[10px] text-zinc-500 leading-relaxed">
           {t('dashboard.properties.widgets.statCard.labelPositionHint')}
         </p>
         <Field label={t('dashboard.properties.widgets.statCard.contentAlign')}>
-          <select
+          <SiteSelect
             value={w.contentAlign ?? 'center'}
             onChange={e => onUpdate({ contentAlign: e.target.value as StatCardWidget['contentAlign'] })}
             className={selectCls}
@@ -2280,12 +2275,12 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
             <option value="left">{t('dashboard.properties.alignLeft')}</option>
             <option value="center">{t('dashboard.properties.alignCenter')}</option>
             <option value="right">{t('dashboard.properties.alignRight')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.statCard.layoutGap')}><NumberInput min={0} max={24} value={w.layoutGap ?? 4} onChange={n => onUpdate({ layoutGap: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.valueColor')}><input type="color" value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.labelColor')}><input type="color" value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.unitColor')}><input type="color" value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.valueColor')}><SiteColorInput value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelColor')}><SiteColorInput value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.unitColor')}><SiteColorInput value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-400">
@@ -2309,8 +2304,8 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.properties.widgets.statCard.tolerance')}><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><input type="color" value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><input type="color" value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><SiteColorInput value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><SiteColorInput value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
           <Field label={t('dashboard.properties.widgets.statCard.hintField')}><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
         </div>
         <Field label={t('dashboard.properties.widgets.statCard.hintIcon')}>
@@ -2338,10 +2333,10 @@ function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; 
         <Field label={t('dashboard.properties.min')}><NumberInput value={w.min} onChange={n => onUpdate({ min: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.max')}><NumberInput value={w.max} onChange={n => onUpdate({ max: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.direction')}>
-          <select value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as any })} className={selectCls}>
+          <SiteSelect value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as any })} className={selectCls}>
             <option value="horizontal">{t('dashboard.properties.horizontal')}</option>
             <option value="vertical">{t('dashboard.properties.vertical')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
@@ -2372,27 +2367,27 @@ function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; on
         <input value={w.subLabel ?? ''} onChange={e => onUpdate({ subLabel: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.emptyState.subPlaceholder')} />
       </Field>
       <Field label={t('dashboard.properties.widgets.emptyState.when')}>
-        <select
+        <SiteSelect
           value={w.visibilityMode ?? 'when-empty'}
           onChange={e => onUpdate({ visibilityMode: e.target.value as EmptyStateWidget['visibilityMode'] })}
           className={selectCls}
         >
           <option value="when-empty">{t('dashboard.properties.widgets.emptyState.whenEmpty')}</option>
           <option value="when-has-data">{t('dashboard.properties.widgets.emptyState.whenHasData')}</option>
-        </select>
+        </SiteSelect>
       </Field>
       <Field label={t('dashboard.properties.borderRadius')}>
         <NumberInput min={0} value={w.borderRadius ?? 8} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} />
       </Field>
       <Field label={t('dashboard.properties.style')}>
-        <select
+        <SiteSelect
           value={w.emptyStateVariant ?? 'default'}
           onChange={e => onUpdate({ emptyStateVariant: e.target.value as EmptyStateWidget['emptyStateVariant'] })}
           className={selectCls}
         >
           <option value="default">{t('dashboard.properties.widgets.emptyState.variantDefault')}</option>
           <option value="minimal-center">{t('dashboard.properties.widgets.emptyState.variantMinimal')}</option>
-        </select>
+        </SiteSelect>
       </Field>
       <p className="text-[10px] text-zinc-500 leading-relaxed">
         {t('dashboard.properties.widgets.emptyState.dualHintBefore')}<strong className="text-zinc-400">{t('dashboard.properties.widgets.emptyState.dualHintStrong')}</strong>{t('dashboard.properties.widgets.emptyState.dualHintAfter')}
@@ -2410,22 +2405,22 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
       <SH icon={<Clock size={13} />} label={t('dashboard.properties.widgets.clock.title')} color="#a3e635" />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.clock.timeFormat')}>
-          <select value={w.format} onChange={e => onUpdate({ format: e.target.value as any })} className={selectCls}>
+          <SiteSelect value={w.format} onChange={e => onUpdate({ format: e.target.value as any })} className={selectCls}>
             <option value="24h">{t('dashboard.properties.widgets.clock.h24')}</option>
             <option value="12h">{t('dashboard.properties.widgets.clock.h12')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.clock.dateFormat')}>
-          <select value={w.dateFormat} onChange={e => onUpdate({ dateFormat: e.target.value as any })} className={selectCls}>
+          <SiteSelect value={w.dateFormat} onChange={e => onUpdate({ dateFormat: e.target.value as any })} className={selectCls}>
             <option value="YYYY-MM-DD">YYYY-MM-DD</option>
             <option value="MM/DD/YYYY">MM/DD/YYYY</option>
             <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.clock.timeFontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.clock.dateFontSize')}><NumberInput value={w.dateFontSize} onChange={n => onUpdate({ dateFontSize: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.widgets.clock.timeColor')}><input type="color" value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
-        <Field label={t('dashboard.properties.widgets.clock.dateColor')}><input type="color" value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer" /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.timeColor')}><SiteColorInput value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.dateColor')}><SiteColorInput value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
       </div>
       <div className="flex gap-4">
         <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
@@ -2506,10 +2501,10 @@ function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpda
         <Field label={t('dashboard.properties.widgets.chart.xField')}><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.barChart.yFields')}><input value={w.yFields.join(',')} onChange={e => onUpdate({ yFields: e.target.value.split(',').map(s => s.trim()) })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.direction')}>
-          <select value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as BarChartWidget['orientation'] })} className={selectCls}>
+          <SiteSelect value={w.orientation} onChange={e => onUpdate({ orientation: e.target.value as BarChartWidget['orientation'] })} className={selectCls}>
             <option value="vertical">{t('dashboard.properties.widgets.barChart.vertical')}</option>
             <option value="horizontal">{t('dashboard.properties.widgets.barChart.horizontal')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.barChart.barPadding')}><NumberInput step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={n => onUpdate({ barPadding: n })} className={inputCls} /></Field>
       </div>
@@ -2546,10 +2541,10 @@ function UnitTelemetrySettings({
         <input value={w.mqttHealthTopic ?? ''} onChange={e => onUpdate({ mqttHealthTopic: e.target.value })} className={inputCls} />
       </Field>
       <Field label={t('dashboard.properties.variant')}>
-        <select value={w.cardVariant ?? 'default'} onChange={e => onUpdate({ cardVariant: e.target.value as UnitTelemetryCardWidget['cardVariant'] })} className={selectCls}>
+        <SiteSelect value={w.cardVariant ?? 'default'} onChange={e => onUpdate({ cardVariant: e.target.value as UnitTelemetryCardWidget['cardVariant'] })} className={selectCls}>
           <option value="default">{t('dashboard.properties.widgets.unitTelemetry.variantDefault')}</option>
           <option value="instrument-row">{t('dashboard.properties.widgets.unitTelemetry.variantInstrument')}</option>
-        </select>
+        </SiteSelect>
       </Field>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -2574,7 +2569,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
     <div className="space-y-3">
       <SH icon={<Map size={13} />} label={t('dashboard.properties.widgets.mapCanvas.title')} color="#0ea5e9" />
       <Field label={t('dashboard.properties.widgets.mapCanvas.mapSource')}>
-        <select
+        <SiteSelect
           value={w.mapId}
           onChange={e => onUpdate({ mapId: e.target.value })}
           className={selectCls}
@@ -2583,7 +2578,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
           {maps.map(m => (
             <option key={m.mapId} value={m.mapId}>{m.displayName}</option>
           ))}
-        </select>
+        </SiteSelect>
         {maps.length === 0 && (
           <p className="text-[9px] text-zinc-500 mt-1">
             {t('dashboard.properties.widgets.mapCanvas.noMaps')}
@@ -2669,7 +2664,7 @@ function VehicleContainerSettings({
       ) : (
         <>
           <Field label="車輛模型">
-            <select
+            <SiteSelect
               value={w.vehicleDefinitionId ?? ''}
               onChange={(e) => onUpdate({ vehicleDefinitionId: e.target.value || undefined })}
               className={selectCls}
@@ -2683,7 +2678,7 @@ function VehicleContainerSettings({
               {w.vehicleDefinitionId && models && !current ? (
                 <option value={w.vehicleDefinitionId}>（找不到模型 {w.vehicleDefinitionId}）</option>
               ) : null}
-            </select>
+            </SiteSelect>
           </Field>
           {error ? <p className="text-[10px] text-red-300">模型清單讀取失敗：{error}</p> : null}
           {mapId ? (
@@ -3120,9 +3115,9 @@ function TabListSettings({
                       placeholder="欄位或 JSON 路徑"
                     />
                     <datalist id={`tab-list-fields-${activeTab.id}`}>{detectedSqlFields.map(f => <option key={f} value={f} />)}</datalist>
-                    <select value={col.format ?? 'text'} onChange={e => updateColumn(col.id, { format: e.target.value as 'text' | 'countdown' })} className={`${selectCls} mt-1`}>
+                    <SiteSelect value={col.format ?? 'text'} onChange={e => updateColumn(col.id, { format: e.target.value as 'text' | 'countdown' })} className={`${selectCls} mt-1`}>
                       <option value="text">文字</option><option value="countdown">時間欄位轉倒數</option>
-                    </select>
+                    </SiteSelect>
                   </div>
 
                   {/* 第 3 行：欄位寬度 */}
@@ -3152,13 +3147,12 @@ function TabListSettings({
                           className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner"
                           style={{ backgroundColor: colTextColor }}
                         >
-                          <input
-                            type="color"
+                          <SiteColorInput
                             value={colTextColor.startsWith('#') ? colTextColor : '#cbd5e1'}
                             onChange={e => patchColumnTextStyle(col.id, { color: e.target.value })}
                             className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                             title={t('dashboard.properties.widgets.tabList.pickColumnColor')}
-                          />
+                           />
                         </div>
                       </div>
                     );
@@ -3204,13 +3198,12 @@ function TabListSettings({
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabActiveColor ?? '#3b82f6' }}
               >
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.tabActiveColor ?? '#3b82f6'}
                   onChange={e => onUpdate({ tabActiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickActive')}
-                />
+                 />
               </div>
             </div>
             <div>
@@ -3219,13 +3212,12 @@ function TabListSettings({
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabInactiveColor ?? '#64748b' }}
               >
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.tabInactiveColor ?? '#64748b'}
                   onChange={e => onUpdate({ tabInactiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickInactive')}
-                />
+                 />
               </div>
             </div>
           </div>
@@ -3293,13 +3285,12 @@ function TabListSettings({
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.headerTextColor ?? '#94a3b8' }}
               >
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.headerTextColor ?? '#94a3b8'}
                   onChange={e => onUpdate({ headerTextColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickHeaderColor')}
-                />
+                 />
               </div>
             </div>
           </div>
@@ -3319,13 +3310,12 @@ function TabListSettings({
                 className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.textColor ?? '#cbd5e1' }}
               >
-                <input
-                  type="color"
+                <SiteColorInput
                   value={w.textColor ?? '#cbd5e1'}
                   onChange={e => onUpdate({ textColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickContentColor')}
-                />
+                 />
               </div>
             </div>
           </div>

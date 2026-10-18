@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useState } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { FacilityObject } from '../types/facility'
@@ -123,7 +124,7 @@ export function DockingPointInspectorSection({
         >
           圖示樣式
         </label>
-        <select
+        <SiteSelect
           id="docking-icon-mode"
           disabled={readOnly}
           value={iconMode}
@@ -144,7 +145,7 @@ export function DockingPointInspectorSection({
           <option value="dot">預設藍點</option>
           <option value="builtin">內建站點圖示</option>
           <option value="custom">自訂圖片 URL</option>
-        </select>
+        </SiteSelect>
       </div>
 
       {iconMode === 'custom' && (

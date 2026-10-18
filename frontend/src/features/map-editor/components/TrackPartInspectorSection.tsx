@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
@@ -96,7 +98,7 @@ export function TrackPartInspectorSection({
             {isSwitch ? (
               <label className="flex items-center gap-1.5 text-[10px] text-zinc-500">
                 <span className="shrink-0">{t('mapEditor.inspector.trackParts.style')}</span>
-                <select
+                <SiteSelect
                   disabled={readOnly}
                   value={style}
                   onFocus={onFieldFocus}
@@ -115,7 +117,7 @@ export function TrackPartInspectorSection({
                   <option value="dashed">
                     {t('mapEditor.inspector.trackParts.styleDashed')}
                   </option>
-                </select>
+                </SiteSelect>
               </label>
             ) : null}
             <div className="flex items-center gap-1.5">
@@ -137,8 +139,7 @@ export function TrackPartInspectorSection({
                 placeholder={t('mapEditor.inspector.trackParts.placeholder')}
                 className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
               />
-              <input
-                type="color"
+              <SiteColorInput
                 aria-label={
                   dashed
                     ? t('mapEditor.inspector.trackParts.dashColor')
@@ -153,7 +154,7 @@ export function TrackPartInspectorSection({
                 value={swatchValue}
                 onChange={(e) => onPatchParameters(swatchPatch(e.target.value))}
                 className="h-[26px] w-9 shrink-0 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-              />
+               />
               <NumberInput
                 aria-label={t('mapEditor.inspector.trackParts.fontSize')}
                 title={t('mapEditor.inspector.trackParts.fontSize')}

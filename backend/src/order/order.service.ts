@@ -24,6 +24,7 @@ import { orderBusinessKindSql } from './order-business-kind';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
 import { MapService } from '../map/map.service';
+import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
 import {
   ExecutionStatusKey,
   PENDING_VEHICLE_FAULT_SQL,
@@ -178,8 +179,13 @@ export class OrderService {
     private readonly orderRouteService: OrderRouteService,
     private readonly datasourceInvalidation: DatasourceInvalidationService,
     private readonly mapService: MapService,
+    @Optional() private readonly systemSettings?: SystemFoundationSettingsService,
     @Optional() private readonly operatingClock?: OperatingClockService,
   ) {}
+
+  private async displayTimeZone(): Promise<string> {
+    return (await this.systemSettings?.get())?.locale.timeZone || 'Asia/Taipei';
+  }
 
   /** 實際時刻 → 營運時刻（沒有時鐘服務時，例如單元測試，就是實際時間） */
   private toOperating(realTs: number): number {
@@ -403,6 +409,7 @@ export class OrderService {
     total: number;
     page: number;
     page_size: number;
+    time_zone: string;
   }> {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.page_size) || 20));
@@ -503,11 +510,13 @@ export class OrderService {
       .take(pageSize)
       .getMany();
 
+    const timeZone = await this.displayTimeZone();
     return {
-      items: rows.map(toShiftRecordListItem),
+      items: rows.map((row) => toShiftRecordListItem(row, timeZone)),
       total,
       page,
       page_size: pageSize,
+      time_zone: timeZone,
     };
   }
 
@@ -523,7 +532,7 @@ export class OrderService {
     const stationNameById = new Map(
       stations.map((s) => [s.stationId, s.stationDisplayName]),
     );
-    const item = toShiftRecordListItem(order);
+    const item = toShiftRecordListItem(order, await this.displayTimeZone());
     const payload = (order.payload ?? {}) as Record<string, unknown>;
     const toEpoch = (v?: string | null) => {
       if (v == null || v === '') return null;

@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Database, Play, RefreshCw, Square } from 'lucide-react'
 import { useDemoAccount } from '../../schedule-management/utils/demoAccountPreference'
@@ -189,9 +190,9 @@ export function DataManagementPanel() {
           <button type="button" aria-label="重新整理資料庫結構" onClick={() => void loadMetadata()} className="rounded p-1 text-zinc-400 hover:bg-zinc-800"><RefreshCw size={14} /></button>
         </div>
         {metadata && (
-          <select aria-label="資料庫環境" className="mb-3 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs" value="current" onChange={() => undefined}>
+          <SiteSelect aria-label="資料庫環境" className="mb-3 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs" value="current" onChange={() => undefined}>
             <option value="current">{metadata.environment.database}@{metadata.environment.host}:{metadata.environment.port}</option>
-          </select>
+          </SiteSelect>
         )}
         <input aria-label="搜尋資料表" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="搜尋資料表或用途" className="mb-3 w-full rounded border border-zinc-700 bg-black px-2 py-1.5 text-xs outline-none focus:border-sky-500" />
         {groupedTables.map(([schema, tables]) => (

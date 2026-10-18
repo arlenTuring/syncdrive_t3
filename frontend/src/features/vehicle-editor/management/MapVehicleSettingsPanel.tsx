@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NumberInput } from '../../../components/NumberInput';
 import { VehicleFleetMqttProvider } from '../../dashboard/context/VehicleFleetMqttContext';
@@ -171,7 +172,7 @@ export function MapVehicleSettingsPanel({
             </h3>
             <label className="block space-y-1">
               <span className="text-[10px] font-bold text-zinc-500">車輛模型</span>
-              <select
+              <SiteSelect
                 value={draft?.definitionKey ?? ''}
                 onChange={(e) => {
                   const picked = models?.find((m) => m.id === e.target.value);
@@ -198,7 +199,7 @@ export function MapVehicleSettingsPanel({
                     {m.name}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
             </label>
             {draft ? (
               <>

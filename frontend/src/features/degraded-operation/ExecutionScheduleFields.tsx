@@ -19,7 +19,7 @@ function parseHm(value: string | undefined): { hour: number; minute: number } | 
 
 /**
  * 預約時間：系統的深色時間面板（跟時段模板同一個 TimePickerPanel），24 小時制、只選時與分。
- * 送出的格式跟原本的 <input type="time"> 一樣是 "HH:MM"，後端驗證與營運時鐘語意不變。
+ * 送出的格式跟原本的 <SiteDateTimeInput type="time"> 一樣是 "HH:MM"，後端驗證與營運時鐘語意不變。
  * 面板沒有「此刻」：預約以營運時鐘為準，不能拿瀏覽器的時間。
  */
 function ScheduledTimeField({

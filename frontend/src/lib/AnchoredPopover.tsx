@@ -50,8 +50,8 @@ export function AnchoredPopover({
   offset?: number;
   className?: string;
   style?: CSSProperties;
-  /** 'menu'：上下鍵在 role=menuitem 之間移動 */
-  role?: 'menu' | 'dialog';
+  /** menu/listbox：上下鍵在可操作項目之間移動 */
+  role?: 'menu' | 'listbox' | 'dialog';
   ariaLabel?: string;
   /** 打開時把焦點移到第一個可操作項目 */
   autoFocus?: boolean;
@@ -70,7 +70,7 @@ export function AnchoredPopover({
     if (!anchor || !panel) return;
     const rect = anchor.getBoundingClientRect();
     // 觸發元素被捲出可視範圍（表格捲動）：浮層不能掛在半空中
-    if (rect.bottom < 0 || rect.top > window.innerHeight || rect.width === 0) {
+    if (!anchor.isConnected || rect.bottom < 0 || rect.top > window.innerHeight) {
       onCloseRef.current('scroll-away');
       return;
     }
@@ -115,10 +115,16 @@ export function AnchoredPopover({
       onCloseRef.current('outside');
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      onCloseRef.current('escape');
-      anchorRef.current?.focus();
+      if (e.key === 'Tab') {
+        onCloseRef.current('outside');
+        anchorRef.current?.focus();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCloseRef.current('escape');
+        anchorRef.current?.focus();
+      }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey, true);
@@ -133,14 +139,17 @@ export function AnchoredPopover({
     const panel = panelRef.current;
     if (!panel || panel.contains(document.activeElement)) return;
     const first = panel.querySelector<HTMLElement>(
-      role === 'menu' ? '[role="menuitem"]:not([disabled])' : 'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      role === 'menu' ? '[role="menuitem"]:not([disabled])'
+        : role === 'listbox' ? '[role="option"]:not([aria-disabled="true"])'
+          : 'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
     first?.focus();
   }, [open, autoFocus, pos, role]);
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (role !== 'menu' || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End')) return;
-    const items = [...(panelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [])];
+    if ((role !== 'menu' && role !== 'listbox') || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End')) return;
+    const selector = role === 'menu' ? '[role="menuitem"]:not([disabled])' : '[role="option"]:not([aria-disabled="true"])';
+    const items = [...(panelRef.current?.querySelectorAll<HTMLElement>(selector) ?? [])];
     if (items.length === 0) return;
     e.preventDefault();
     const index = items.indexOf(document.activeElement as HTMLElement);

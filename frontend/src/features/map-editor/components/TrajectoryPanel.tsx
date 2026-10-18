@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { FolderOpen, LocateFixed, Pause, Play, RotateCcw } from 'lucide-react'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -72,7 +73,7 @@ export function TrajectoryPanel({
               {t('mapEditor.trajectory.vehicle')}
             </label>
             <div className="flex gap-2">
-              <select
+              <SiteSelect
                 id="vehicle-select"
                 value={selectedVehicleId ?? ''}
                 onChange={(e) => {
@@ -87,7 +88,7 @@ export function TrajectoryPanel({
                     {id}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               <button
                 type="button"
                 disabled={!hasTrajectory}
@@ -111,7 +112,7 @@ export function TrajectoryPanel({
             >
               {t('mapEditor.trajectory.fileList')}
             </label>
-            <select
+            <SiteSelect
               id="traj-file-select"
               value={selectedEntryId ?? ''}
               disabled={!selectedVehicleId || trajectoryEntries.length === 0}
@@ -130,7 +131,7 @@ export function TrajectoryPanel({
                   </option>
                 ))
               )}
-            </select>
+            </SiteSelect>
           </div>
 
           <div className="flex flex-wrap gap-2">

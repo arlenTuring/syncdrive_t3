@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -57,16 +59,15 @@ export function FillColorRulesSection({
           {t('mapEditor.fillColorRules.defaultLabel')}
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <SiteColorInput
             id={`${title}-default-fill`}
-            type="color"
             disabled={readOnly}
             value={defaultFill}
             onChange={(e) => onDefaultFillChange(e.target.value)}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-50"
-          />
+           />
           <input
             type="text"
             readOnly={readOnly}
@@ -118,7 +119,7 @@ export function FillColorRulesSection({
                   className="min-w-[8rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
                   placeholder={t('mapEditor.fillColorRules.fieldPlaceholder')}
                 />
-                <select
+                <SiteSelect
                   disabled={readOnly}
                   value={rule.operator}
                   onChange={(e) => {
@@ -136,7 +137,7 @@ export function FillColorRulesSection({
                   <option value="eq">=</option>
                   <option value="gt">&gt;</option>
                   <option value="lt">&lt;</option>
-                </select>
+                </SiteSelect>
                 <input
                   readOnly={readOnly}
                   value={rule.compareValue}
@@ -150,8 +151,7 @@ export function FillColorRulesSection({
                   className="min-w-[4rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
                   placeholder={t('mapEditor.fillColorRules.valuePlaceholder')}
                 />
-                <input
-                  type="color"
+                <SiteColorInput
                   disabled={readOnly}
                   value={rule.color}
                   onChange={(e) => {
@@ -162,7 +162,7 @@ export function FillColorRulesSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="h-7 w-8 cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
-                />
+                 />
                 {!readOnly && (
                   <button
                     type="button"

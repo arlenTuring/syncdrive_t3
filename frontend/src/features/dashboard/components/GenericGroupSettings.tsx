@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useState } from 'react';
 import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import type {
@@ -66,13 +67,13 @@ function ConditionRow({
         placeholder="欄位"
         className={`${inputCls} flex-[1.2]`}
       />
-      <select
+      <SiteSelect
         value={condition.operator}
         onChange={e => onChange({ ...condition, operator: e.target.value as GroupConditionOperator })}
         className={`${selectCls} flex-1`}
       >
         {OPERATORS.map(op => <option key={op} value={op}>{OPERATOR_LABEL[op]}</option>)}
-      </select>
+      </SiteSelect>
       {!NO_VALUE_OPS.has(condition.operator) && (
         <input
           value={condition.value ?? ''}
@@ -119,7 +120,7 @@ function SourceEditor({
         <div className="space-y-2 pl-4">
           <div>
             <label className="block text-[9px] text-zinc-500 mb-0.5">後處理</label>
-            <select
+            <SiteSelect
               value={source.postProcessId ?? ''}
               onChange={e => onUpdate({ postProcessId: e.target.value || undefined })}
               className={selectCls}
@@ -129,7 +130,7 @@ function SourceEditor({
               {source.postProcessId && !getPostProcessorDefinition(source.postProcessId) && (
                 <option value={source.postProcessId}>設定問題：未知處理器 {source.postProcessId}</option>
               )}
-            </select>
+            </SiteSelect>
             <p className={`mt-1 text-[9px] ${source.postProcessId && !getPostProcessorDefinition(source.postProcessId) ? 'text-amber-300' : 'text-zinc-500'}`}>
               {source.postProcessId
                 ? getPostProcessorDefinition(source.postProcessId)?.description ?? `找不到處理器「${source.postProcessId}」，執行時不會套用。`
@@ -146,7 +147,7 @@ function SourceEditor({
             </div>
             <div>
               <label className="block text-[9px] text-zinc-500 mb-0.5">更新策略</label>
-              <select
+              <SiteSelect
                 value={source.freshnessPolicy ?? 'auto'}
                 onChange={e => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
                 className={selectCls}
@@ -156,7 +157,7 @@ function SourceEditor({
                 <option value="on_change">有變更就更新</option>
                 <option value="interval">定時輪詢</option>
                 <option value="once">僅載入一次</option>
-              </select>
+              </SiteSelect>
             </div>
           </div>
           <div>
@@ -253,14 +254,14 @@ function PriorityRuleRow({
           placeholder="規則名稱"
           className={`${inputCls} flex-1`}
         />
-        <select
+        <SiteSelect
           value={rule.sourceId ?? ''}
           onChange={e => onUpdate({ sourceId: e.target.value || undefined })}
           className={`${selectCls} w-24`}
         >
           <option value="">全部來源</option>
           {sourceIds.map(id => <option key={id} value={id}>{id}</option>)}
-        </select>
+        </SiteSelect>
         <label className="text-[9px] text-zinc-500">優先值</label>
         <input
           type="number"
@@ -412,14 +413,14 @@ export function GenericGroupSettings({
           <Section title={`有效性規則（${validityRules.length}）`} hint="命中即視為失效（可切換成「視為有效」白名單規則）。計畫結束時間到了不會自動失效，除非在這裡設規則。">
             {validityRules.map((r, i) => (
               <div key={r.id} className="flex items-center gap-1.5 rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-1.5">
-                <select
+                <SiteSelect
                   value={r.effect ?? 'invalid'}
                   onChange={e => patch({ validityRules: validityRules.map((rr, ii) => ii === i ? { ...rr, effect: e.target.value as 'invalid' | 'valid' } : rr) })}
                   className={`${selectCls} w-20`}
                 >
                   <option value="invalid">命中→失效</option>
                   <option value="valid">命中→有效</option>
-                </select>
+                </SiteSelect>
                 <ConditionRow
                   condition={r}
                   onChange={next => patch({ validityRules: validityRules.map((rr, ii) => ii === i ? { ...rr, ...next } as GroupValidityRule : rr) })}
@@ -481,7 +482,7 @@ export function GenericGroupSettings({
             title="可見卡片排列"
             hint="決定卡片選進畫面後的位置。卡片只是換位置時會平移過去，不會當成換卡翻頁。"
           >
-            <select
+            <SiteSelect
               value={config.arrangeMode ?? 'priority'}
               onChange={e => patch({ arrangeMode: e.target.value as GroupArrangeMode })}
               className={selectCls}
@@ -489,7 +490,7 @@ export function GenericGroupSettings({
               <option value="priority">優先程度高者在前</option>
               <option value="sort">選卡後依排序欄位排列</option>
               <option value="keep">保留既有位置</option>
-            </select>
+            </SiteSelect>
           </Section>
 
           <Section title="同優先次排序" hint="優先程度相同時依此欄位排序；再相同則維持目前位置。">
@@ -500,14 +501,14 @@ export function GenericGroupSettings({
                 placeholder="欄位（如 depart_at）"
                 className={inputCls}
               />
-              <select
+              <SiteSelect
                 value={sortRules[0]?.direction ?? 'asc'}
                 onChange={e => patch({ sortRules: [{ field: sortRules[0]?.field ?? '', direction: e.target.value as 'asc' | 'desc' }] })}
                 className={selectCls}
               >
                 <option value="asc">升冪</option>
                 <option value="desc">降冪</option>
-              </select>
+              </SiteSelect>
             </div>
           </Section>
 
@@ -554,14 +555,14 @@ export function GenericGroupSettings({
               </div>
               <div>
                 <label className="block text-[9px] text-zinc-500 mb-0.5">資料不足時</label>
-                <select
+                <SiteSelect
                   value={capacity.overflowFill ?? 'blank'}
                   onChange={e => patch({ capacityConfig: { ...capacity, overflowFill: e.target.value as 'stretch' | 'blank' } })}
                   className={selectCls}
                 >
                   <option value="blank">保留空格</option>
                   <option value="stretch">撐滿畫面</option>
-                </select>
+                </SiteSelect>
               </div>
             </div>
             <label className="flex items-center gap-2 text-[10px] text-zinc-400 cursor-pointer">
@@ -577,7 +578,7 @@ export function GenericGroupSettings({
 
           <Section title="換頁效果">
             <div className="grid grid-cols-2 gap-1.5">
-              <select
+              <SiteSelect
                 value={transition.type ?? 'flip-up'}
                 onChange={e => patch({ transitionConfig: { ...transition, type: e.target.value as 'none' | 'fade' | 'flip-up' } })}
                 className={selectCls}
@@ -585,7 +586,7 @@ export function GenericGroupSettings({
                 <option value="flip-up">向上翻頁</option>
                 <option value="fade">淡入位移</option>
                 <option value="none">無動畫</option>
-              </select>
+              </SiteSelect>
               <div>
                 <label className="block text-[9px] text-zinc-500 mb-0.5">時間（毫秒，選填）</label>
                 <input

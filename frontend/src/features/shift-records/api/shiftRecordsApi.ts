@@ -22,6 +22,7 @@ export type ShiftRecordListResponse = {
   total: number;
   page: number;
   page_size: number;
+  time_zone: string;
 };
 
 export type ShiftRecordAction = {
@@ -95,14 +96,18 @@ export async function fetchShiftRecordDetail(
   return res.json() as Promise<ShiftRecordDetail>;
 }
 
-export function exportShiftRecordsCsv(items: ShiftRecordListItem[], filename = 'shift-records.csv'): void {
+export function exportShiftRecordsCsv(
+  items: ShiftRecordListItem[],
+  filename = 'shift-records.csv',
+  timeZone = 'Asia/Taipei',
+): void {
   const headers = [
     '班次代號',
     '執行狀態',
     '執行路線',
     '執行載具',
-    '發車時間',
-    '結束時間',
+    `發車時間（${timeZone}）`,
+    `結束時間（${timeZone}）`,
     '訂單編號',
   ];
   const rows = items.map((row) => [

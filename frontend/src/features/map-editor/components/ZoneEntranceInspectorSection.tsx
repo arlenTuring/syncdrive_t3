@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
 import type { FacilityObject } from '../types/facility'
@@ -106,7 +107,7 @@ export function ZoneEntranceInspectorSection({
             {t('mapEditor.inspector.zoneEntrance.waypointEmpty')}
           </p>
         ) : (
-          <select
+          <SiteSelect
             value={boundWaypointId}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
@@ -127,7 +128,7 @@ export function ZoneEntranceInspectorSection({
                 </option>
               )
             })}
-          </select>
+          </SiteSelect>
         )}
         {boundWaypointId && !boundWaypoint ? (
           <p className="text-[10px] text-amber-300/80">
@@ -195,7 +196,7 @@ export function ZoneEntranceInspectorSection({
                   ) : (
                     <label className="block text-[10px] text-amber-300/80">
                       {t('mapEditor.inspector.zoneEntrance.rebind')}
-                      <select
+                      <SiteSelect
                         value=""
                         onChange={(e) => {
                           const zoneId = e.target.value.trim()
@@ -215,7 +216,7 @@ export function ZoneEntranceInspectorSection({
                             {zoneDisplayLabel(z)}（{z.id}）
                           </option>
                         ))}
-                      </select>
+                      </SiteSelect>
                       <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-600">
                         {t('mapEditor.inspector.zoneEntrance.rebindHint')}
                       </span>
@@ -286,7 +287,7 @@ export function ZoneEntranceInspectorSection({
               {t('mapEditor.inspector.zoneEntrance.noAvailable')}
             </p>
           ) : (
-            <select
+            <SiteSelect
               defaultValue=""
               onChange={(e) => {
                 const id = e.target.value.trim()
@@ -306,7 +307,7 @@ export function ZoneEntranceInspectorSection({
                   {zoneDisplayLabel(z)}（{z.id}）
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           )}
         </div>
       ) : null}

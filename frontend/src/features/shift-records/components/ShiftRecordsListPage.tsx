@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,8 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
-import { VTMS_VEHICLE_POOL } from '../../dashboard/constants/vtmsVehiclePool';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
+import { fetchRegistry, type VehicleRegistration } from '../../vehicle-registry/api';
 import {
   exportShiftRecordsCsv,
   fetchShiftRecordList,
@@ -42,6 +43,12 @@ type ShiftRecordsListPageProps = {
 
 const PAGE_SIZE = 20;
 
+function DateTimeCell({ value }: { value: string | null }) {
+  if (!value) return <>—</>;
+  const [date, time] = value.split(' ');
+  return <><span className="block">{date}</span><span className="block">{time}</span></>;
+}
+
 export function ShiftRecordsListPage({
   onBackToHome,
   onOpenDetail,
@@ -62,6 +69,8 @@ export function ShiftRecordsListPage({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [vehicles, setVehicles] = useState<VehicleRegistration[]>([]);
+  const [timeZone, setTimeZone] = useState('Asia/Taipei');
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -94,6 +103,7 @@ export function ShiftRecordsListPage({
       });
       setItems(res.items);
       setTotal(res.total);
+      setTimeZone(res.time_zone || 'Asia/Taipei');
       setSelected(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -109,6 +119,14 @@ export function ShiftRecordsListPage({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchRegistry({ keyword: '', page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' })
+      .then((response) => { if (!cancelled) setVehicles(response.items.filter((item) => item.vehicleCode)); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     return subscribeDatasourceInvalidation((payload) => {
@@ -173,9 +191,9 @@ export function ShiftRecordsListPage({
         page_size: 5000,
       });
       const tabLabel = tab === 'mainline' ? 'mainline' : 'maintenance';
-      exportShiftRecordsCsv(res.items, `shift-records-${tabLabel}.csv`);
+      exportShiftRecordsCsv(res.items, `shift-records-${tabLabel}.csv`, res.time_zone || timeZone);
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -241,7 +259,7 @@ export function ShiftRecordsListPage({
             className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-sky-600 focus:outline-none"
           />
         </div>
-        <select
+        <SiteSelect
           value={executionStatus}
           onChange={(e) => {
             setExecutionStatus(e.target.value as ExecutionStatusKey | 'all');
@@ -256,8 +274,8 @@ export function ShiftRecordsListPage({
                 : t(`shiftRecords.executionStatus.${opt.value}`)}
             </option>
           ))}
-        </select>
-        <select
+        </SiteSelect>
+        <SiteSelect
           value={vehicleCode}
           onChange={(e) => {
             setVehicleCode(e.target.value);
@@ -266,12 +284,14 @@ export function ShiftRecordsListPage({
           className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
         >
           <option value="">{t('shiftRecords.selectVehicle')}</option>
-          {VTMS_VEHICLE_POOL.map((v) => (
-            <option key={v} value={v}>
-              {v}
+          {vehicles.map((vehicle) => (
+            <option key={vehicle.id} value={vehicle.vehicleCode}>
+              {vehicle.displayName === vehicle.vehicleCode
+                ? vehicle.vehicleCode
+                : `${vehicle.displayName}（${vehicle.vehicleCode}）`}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <div className="shrink-0 min-w-[400px] max-w-[520px] flex-1 basis-[400px]">
           <DateTimeRangePicker value={dateRange} onChange={setDateRange} />
         </div>
@@ -362,8 +382,8 @@ export function ShiftRecordsListPage({
                   </td>
                   <td className="py-3 pr-4 text-zinc-300">{row.route_label}</td>
                   <td className="py-3 pr-4 text-zinc-300">{row.vehicle_code}</td>
-                  <td className="py-3 pr-4 font-mono text-zinc-400">{row.depart_time ?? '—'}</td>
-                  <td className="py-3 pr-4 font-mono text-zinc-400">{row.end_time ?? ''}</td>
+                  <td className="py-3 pr-4 font-mono leading-5 text-zinc-400"><DateTimeCell value={row.depart_time} /></td>
+                  <td className="py-3 pr-4 font-mono leading-5 text-zinc-400"><DateTimeCell value={row.end_time} /></td>
                   <td className="py-3">
                     <button
                       type="button"

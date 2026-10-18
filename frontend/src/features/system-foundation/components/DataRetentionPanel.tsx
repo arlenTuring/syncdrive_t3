@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useState } from 'react'
 import { HardDrive, History, ShieldAlert, Trash2 } from 'lucide-react'
 import { useAuth } from '../../access-control/AuthContext'
@@ -100,7 +101,7 @@ export function DataRetentionPanel() {
         <div><strong>{info?.label ?? policy.category}</strong><div className="text-zinc-500">{policy.source === 'timescaledb_existing' ? policy.readOnlyReason : `最近成功 ${date(policy.last_success_at)}／下次 ${date(policy.next_run_at)}`}</div></div>
         <label><input type="checkbox" checked={draft.enabled} disabled={policy.source === 'timescaledb_existing'} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, enabled: e.target.checked } })} /> 啟用</label>
         <input aria-label={`${policy.category}保留數量`} type="number" min={1} value={draft.retentionValue} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, retentionValue: Number(e.target.value) } })} className="w-20 rounded border border-zinc-700 bg-zinc-900 p-1" />
-        <select value={draft.retentionUnit} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, retentionUnit: e.target.value as 'hour' | 'day' } })} className="rounded border border-zinc-700 bg-zinc-900 p-1"><option value="hour">小時</option><option value="day">天</option></select>
+        <SiteSelect value={draft.retentionUnit} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, retentionUnit: e.target.value as 'hour' | 'day' } })} className="rounded border border-zinc-700 bg-zinc-900 p-1"><option value="hour">小時</option><option value="day">天</option></SiteSelect>
         <label className="text-zinc-500">每 <input aria-label={`${policy.category}執行間隔`} type="number" min={15} value={draft.intervalMinutes} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, intervalMinutes: Number(e.target.value) } })} className="w-20 rounded border border-zinc-700 bg-zinc-900 p-1 text-zinc-200" /> 分鐘</label>
         <button type="button" disabled={busy || policy.source === 'timescaledb_existing'} onClick={() => void updatePolicy(policy)} className="rounded border border-sky-700 px-2 py-1 text-sky-300">儲存</button>
       </div>})}</div>

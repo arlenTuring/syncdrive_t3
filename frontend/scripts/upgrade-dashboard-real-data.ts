@@ -9,7 +9,7 @@
  * 用法：npx tsx scripts/upgrade-dashboard-real-data.ts [http://127.0.0.1:3000] [--dry-run]
  *
  * 部署機的內部 API 在 nginx 帳密後面：設環境變數 DASHBOARD_API_AUTH="帳號:密碼" 就會帶上
- * Basic 認證（deploy/git-sync.sh 會自動從 VM 的 deploy/.env 讀出來帶，不寫進任何檔案）。
+ * Basic 認證由部署環境注入，不寫進任何檔案。
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -28,7 +28,7 @@ const basicAuth = process.env.DASHBOARD_API_AUTH
   : {};
 const response = await fetch(`${apiBase}/syncdrive-api/dashboard/planes`, { headers: basicAuth });
 if (response.status === 401) {
-  throw new Error('讀取畫布失敗：HTTP 401，這個位址需要帳密。請設定 DASHBOARD_API_AUTH="帳號:密碼"（git-sync.sh 會自動帶）');
+  throw new Error('讀取畫布失敗：HTTP 401，這個位址需要帳密。請設定 DASHBOARD_API_AUTH="帳號:密碼"');
 }
 if (!response.ok) throw new Error(`讀取畫布失敗：HTTP ${response.status}`);
 const planes = await response.json() as Array<{

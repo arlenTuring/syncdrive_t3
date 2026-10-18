@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Pause, Play, SkipForward } from 'lucide-react';
@@ -146,7 +147,7 @@ export function VehiclePreviewTestPanel({
           </label>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] text-zinc-500">{t('vehicleEditor.preview.direction')}</span>
-            <select
+            <SiteSelect
               value={String(preview.direction_label ?? DIR_DOWN)}
               onChange={(e) => {
                 const dir = e.target.value;
@@ -163,7 +164,7 @@ export function VehiclePreviewTestPanel({
             >
               <option value={DIR_DOWN}>{t('vehicleEditor.preview.down')}</option>
               <option value={DIR_UP}>{t('vehicleEditor.preview.up')}</option>
-            </select>
+            </SiteSelect>
           </label>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] text-zinc-500">

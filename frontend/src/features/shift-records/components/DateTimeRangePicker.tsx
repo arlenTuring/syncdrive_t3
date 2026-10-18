@@ -1,5 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useId, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AnchoredPopover } from '../../../lib/AnchoredPopover';
 import { CustomDateTimePanel } from './CustomDateTimePanel';
 
 export type DateTimeRange = {
@@ -33,107 +34,48 @@ export function hasDateTimeRangeFilter(range: DateTimeRange): boolean {
   return range.start != null || range.end != null;
 }
 
-const POPOVER_WIDTH = 420;
-const VIEWPORT_MARGIN = 12;
-
-function clampPopoverLeft(
-  anchorRect: DOMRect,
-  field: 'start' | 'end',
-  rangeRect: DOMRect | null,
-  width: number,
-): number {
-  const w = Math.min(width, window.innerWidth - VIEWPORT_MARGIN * 2);
-  const rect = field === 'end' && rangeRect ? rangeRect : anchorRect;
-  const left = field === 'end' ? rect.right - w : rect.left;
-  return Math.max(VIEWPORT_MARGIN, Math.min(left, window.innerWidth - w - VIEWPORT_MARGIN));
-}
-
 function FieldDateTimePopover({
+  open,
   field,
   anchorRef,
-  rangeRef,
   value,
   onClose,
   onConfirm,
 }: {
+  open: boolean;
   field: 'start' | 'end';
   anchorRef: RefObject<HTMLElement | null>;
-  rangeRef: RefObject<HTMLElement | null>;
   value: Date | null;
   onClose: () => void;
   onConfirm: (next: Date | null) => void;
 }) {
   const { t } = useTranslation();
   const titleId = useId();
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, caretLeft: 24 });
-
-  const updatePosition = () => {
-    const anchor = anchorRef.current;
-    const range = rangeRef.current;
-    const popover = popoverRef.current;
-    if (!anchor) return;
-    const anchorRect = anchor.getBoundingClientRect();
-    const rangeRect = range?.getBoundingClientRect() ?? null;
-    const width = popover?.offsetWidth ?? POPOVER_WIDTH;
-    const left = clampPopoverLeft(anchorRect, field, rangeRect, width);
-    const caretLeft = Math.max(16, Math.min(anchorRect.left + anchorRect.width / 2 - left - 6, width - 24));
-    setPos({
-      top: anchorRect.bottom + 10,
-      left,
-      caretLeft,
-    });
-  };
-
-  useLayoutEffect(() => {
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [anchorRef, rangeRef, field]);
-
-  useEffect(() => {
-    const onDocDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (popoverRef.current?.contains(target)) return;
-      if (anchorRef.current?.contains(target)) return;
-      if (rangeRef.current?.contains(target)) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', onDocDown);
-    return () => document.removeEventListener('mousedown', onDocDown);
-  }, [anchorRef, rangeRef, onClose]);
 
   const label =
     field === 'start' ? t('shiftRecords.dateRange.selectStart') : t('shiftRecords.dateRange.selectEnd');
 
   return (
-    <div
-      ref={popoverRef}
+    <AnchoredPopover
+      open={open}
+      anchorRef={anchorRef}
+      onClose={onClose}
       role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className="fixed z-[10001] w-[min(420px,calc(100vw-24px))] rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50"
-      style={{ top: pos.top, left: pos.left }}
+      ariaLabel={label}
+      align={field === 'end' ? 'end' : 'start'}
+      offset={10}
+      autoFocus={false}
+      className="w-[min(420px,calc(100vw-24px))] rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50"
     >
       <span id={titleId} className="sr-only">
         {label}
       </span>
-      <div
-        className="absolute -top-[7px] size-3 rotate-45 border border-b-0 border-r-0 border-zinc-700/90 bg-[#141416]"
-        style={{ left: pos.caretLeft }}
-        aria-hidden
-      />
-
       <CustomDateTimePanel
         key={`${field}-${value?.getTime() ?? 'empty'}`}
         value={value}
         onConfirm={(next) => onConfirm(next)}
       />
-    </div>
+    </AnchoredPopover>
   );
 }
 
@@ -221,9 +163,9 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
 
       {openField && (
         <FieldDateTimePopover
+          open
           field={openField}
           anchorRef={anchorRef}
-          rangeRef={rangeRef}
           value={openField === 'start' ? value.start : value.end}
           onClose={() => setOpenField(null)}
           onConfirm={(next) => confirmField(openField, next)}

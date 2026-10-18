@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Crosshair } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
@@ -110,8 +112,7 @@ export function CrossTrackInspectorSection({
       <div className="grid grid-cols-2 gap-2 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5">
         <label className="block text-[9px] text-zinc-400">
           {t('mapEditor.inspector.crossTrack.diagStrokeDown')}
-          <input
-            type="color"
+          <SiteColorInput
             disabled={readOnly}
             value={diagColors.down}
             onChange={(e) =>
@@ -120,12 +121,11 @@ export function CrossTrackInspectorSection({
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-          />
+           />
         </label>
         <label className="block text-[9px] text-zinc-400">
           {t('mapEditor.inspector.crossTrack.diagStrokeUp')}
-          <input
-            type="color"
+          <SiteColorInput
             disabled={readOnly}
             value={diagColors.up}
             onChange={(e) =>
@@ -134,7 +134,7 @@ export function CrossTrackInspectorSection({
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
-          />
+           />
         </label>
       </div>
 
@@ -279,7 +279,7 @@ export function CrossTrackInspectorSection({
                   {portalLabel(from)}→{portalLabel(to)}
                 </span>
               </label>
-              <select
+              <SiteSelect
                 id={`xc-route-${facility.id}-${key}`}
                 disabled={readOnly}
                 value={routes[key]}
@@ -295,7 +295,7 @@ export function CrossTrackInspectorSection({
                     {t(`mapEditor.inspector.crossTrack.direction.${d}`)}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
             </div>
           )
         })}

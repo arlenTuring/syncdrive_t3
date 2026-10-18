@@ -1,3 +1,4 @@
+import { SiteDateTimeInput } from '../../../components/SiteDateTimeInput';
 import { Calendar, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -288,7 +289,7 @@ export function ScheduleAdjustApplyDialog({
                   {t('shiftDeployment.adjust.execDate')}
                 </span>
                 <div className="relative">
-                  <input
+                  <SiteDateTimeInput
                     type="date"
                     value={execDate}
                     onChange={(e) => setExecDate(e.target.value)}

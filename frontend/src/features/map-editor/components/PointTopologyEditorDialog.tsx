@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import {
   useCallback,
   useEffect,
@@ -2261,7 +2262,7 @@ export function PointTopologyEditorDialog({
                 </div>
                 <label className="block space-y-1">
                   <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.dispatchDocking')}</span>
-                  <select
+                  <SiteSelect
                     value={selectedFacilityDispatchId ?? ''}
                     onChange={(event) => {
                       const nextId = event.target.value || null
@@ -2277,7 +2278,7 @@ export function PointTopologyEditorDialog({
                         {nodeDisplayLabel(node.id, node.label)}
                       </option>
                     ))}
-                  </select>
+                  </SiteSelect>
                 </label>
                 {dockingNodes.length === 0 ? (
                   <p className="text-[10px] leading-snug text-amber-300/90">

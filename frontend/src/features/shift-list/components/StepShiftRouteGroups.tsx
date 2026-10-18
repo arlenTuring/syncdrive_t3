@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useTranslation } from 'react-i18next';
 import { TransitionCardCodesBar } from './TransitionCardCodesBar';
 import type { MaintenanceSectionCodeBySection, MaintenanceSectionCodeKey } from '../utils/maintenanceSectionCode';
@@ -1709,7 +1710,7 @@ export function StepShiftRouteGroups({
                 {!isManual ? (
                   <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
                     <span className="shrink-0">{t('shiftList.routeGroups.serviceDir')}</span>
-                    <select
+                    <SiteSelect
                       value={route.serviceDirectionId ?? ''}
                       onChange={(e) => updateServiceDirectionId(instanceId, e.target.value)}
                       disabled={serviceDirectionTags.length === 0}
@@ -1727,7 +1728,7 @@ export function StepShiftRouteGroups({
                           {tag.name}
                         </option>
                       ))}
-                    </select>
+                    </SiteSelect>
                   </label>
                 ) : null}
               </div>

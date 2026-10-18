@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Boxes, Link2, LogIn, SquareDashed } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
@@ -242,7 +243,7 @@ export function ParentZoneInspectorSection({
       </header>
       <label className="block text-[10px] text-zinc-500">
         {t('mapEditor.inspector.parentZone.select')}
-        <select
+        <SiteSelect
           disabled={readOnly}
           value={parentId}
           onChange={(e) => {
@@ -267,7 +268,7 @@ export function ParentZoneInspectorSection({
               {(z.customName || z.name).trim() || z.id}
             </option>
           ))}
-        </select>
+        </SiteSelect>
       </label>
       {local ? (
         <p className="font-mono text-[10px] text-zinc-500">

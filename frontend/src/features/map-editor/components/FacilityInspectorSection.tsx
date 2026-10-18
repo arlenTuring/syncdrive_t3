@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import type { FacilityObject } from '../types/facility'
 import { parseFacilityColorRules } from '../utils/facilityArea'
 import { FillColorRulesSection } from './FillColorRulesSection'
@@ -69,7 +70,7 @@ export function FacilityInspectorSection({
           >
             圖示顯示
           </label>
-          <select
+          <SiteSelect
             id="facility-icon-display"
             disabled={readOnly}
             value={iconDisplay}
@@ -87,7 +88,7 @@ export function FacilityInspectorSection({
             <option value="none">不顯示</option>
             <option value="builtin">內建圖示</option>
             <option value="custom">自訂圖片 URL</option>
-          </select>
+          </SiteSelect>
         </div>
         {iconDisplay === 'custom' && (
           <div>

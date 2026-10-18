@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import type { ReactNode } from "react";
 import type { TimelineGap, ReplayFrame } from "./replayState";
@@ -117,7 +118,7 @@ export function PlaybackControls({
                 className="relative w-full accent-blue-500"
               />
             </div>
-            <select
+            <SiteSelect
               value={player.speed}
               onChange={(event) => player.setSpeed(Number(event.target.value) as ReplaySpeed)}
               aria-label="回放倍速"
@@ -128,7 +129,7 @@ export function PlaybackControls({
                   {speed}×
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </div>
           <FrameInfo player={player} />
         </>

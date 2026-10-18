@@ -1,3 +1,5 @@
+import { SiteDateTimeInput } from '../../../components/SiteDateTimeInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Clock, UserRound, X } from 'lucide-react'
@@ -21,7 +23,7 @@ export function SelectField({
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
       <div className="relative">
-        <select
+        <SiteSelect
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="h-11 w-full appearance-none rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 pr-9 text-[13px] text-zinc-100 outline-none focus:border-sky-500/70"
@@ -31,7 +33,7 @@ export function SelectField({
               {opt.label}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
       </div>
     </label>
@@ -146,7 +148,7 @@ export function TimeField({
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
       <div className="relative">
-        <input
+        <SiteDateTimeInput
           type="time"
           value={value}
           onChange={(e) => onChange(e.target.value)}

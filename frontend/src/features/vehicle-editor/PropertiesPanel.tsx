@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../components/SiteColorInput';
+import { SiteSelect } from '../../components/SiteSelect';
 import { NumberInput } from '../../components/NumberInput'
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -147,7 +149,7 @@ function ImageRulesEditor({
             style={{ fontSize: 10 }}
           />
           <div className="grid grid-cols-2 gap-1">
-            <select
+            <SiteSelect
               value={rule.matchOp}
               onChange={(e) => updateRule(i, { matchOp: e.target.value as VehicleMatchOp })}
               className={selectCls}
@@ -158,7 +160,7 @@ function ImageRulesEditor({
                   {matchLabel(o)}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
             <input
               value={rule.threshold}
               onChange={(e) => updateRule(i, { threshold: e.target.value })}
@@ -177,12 +179,11 @@ function ImageRulesEditor({
           )}
           {assetCategory === 'body' && (
             <Field label={t('vehicleEditor.properties.tintOnHit')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={rule.tintColor ?? DEFAULT_BODY_TINT}
                 onChange={(e) => updateRule(i, { tintColor: e.target.value })}
                 className="h-8 w-full cursor-pointer rounded border border-zinc-700"
-              />
+               />
             </Field>
           )}
           {assetCategory !== 'body' && (
@@ -260,13 +261,12 @@ export function PropertiesPanel({
           </Field>
           <Field label={t('vehicleEditor.properties.backgroundColor')}>
             <div className="flex items-center gap-2">
-              <input
-                type="color"
+              <SiteColorInput
                 value={toColorInputHex(vehicle.backgroundColor)}
                 disabled={isTransparentColor(vehicle.backgroundColor)}
                 onChange={(e) => onUpdateVehicle({ backgroundColor: e.target.value })}
                 className="h-8 min-w-0 flex-1 cursor-pointer rounded border border-zinc-700 bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-              />
+               />
               <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-zinc-400">
                 <input
                   type="checkbox"
@@ -388,14 +388,13 @@ export function PropertiesPanel({
         {el.type === 'body' && (
           <>
             <Field label={t('vehicleEditor.properties.defaultBodyColor')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={el.defaultTintColor ?? DEFAULT_BODY_TINT}
                 onChange={(e) =>
                   patch({ defaultImage: DEFAULT_BODY_IMAGE, defaultTintColor: e.target.value })
                 }
                 className="h-8 w-full cursor-pointer rounded border border-zinc-700"
-              />
+               />
             </Field>
             <Field label={t('vehicleEditor.properties.colorField')}>
               <input
@@ -438,15 +437,14 @@ export function PropertiesPanel({
               />
             </Field>
             <Field label={t('vehicleEditor.properties.color')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={el.color}
                 onChange={(e) => patch({ color: e.target.value })}
                 className="h-8 w-full cursor-pointer rounded border border-zinc-700"
-              />
+               />
             </Field>
             <Field label={t('vehicleEditor.properties.align')}>
-              <select
+              <SiteSelect
                 value={el.textAlign}
                 onChange={(e) => patch({ textAlign: e.target.value as 'left' | 'center' | 'right' })}
                 className={selectCls}
@@ -454,7 +452,7 @@ export function PropertiesPanel({
                 <option value="left">{t('vehicleEditor.properties.alignLeft')}</option>
                 <option value="center">{t('vehicleEditor.properties.alignCenter')}</option>
                 <option value="right">{t('vehicleEditor.properties.alignRight')}</option>
-              </select>
+              </SiteSelect>
             </Field>
           </>
         )}
@@ -483,12 +481,11 @@ export function PropertiesPanel({
         {el.type === 'door' && (
           <>
             <Field label={t('vehicleEditor.properties.doorColor')}>
-              <input
-                type="color"
+              <SiteColorInput
                 value={el.defaultColor ?? DEFAULT_DOOR_COLOR}
                 onChange={(e) => patch({ defaultColor: e.target.value })}
                 className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-800"
-              />
+               />
             </Field>
             <Field label={t('vehicleEditor.properties.openPercentField')}>
               <input

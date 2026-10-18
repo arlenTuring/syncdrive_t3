@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NumberInput } from '../../../components/NumberInput'
@@ -61,7 +63,7 @@ export function GeofenceInspectorSection({
         </p>
         <div>
           <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.lineStyle')}</label>
-          <select
+          <SiteSelect
             disabled={readOnly}
             value={params.strokeStyle}
             onChange={(e) =>
@@ -74,7 +76,7 @@ export function GeofenceInspectorSection({
             <option value="solid">{t('mapEditor.inspector.stroke.solid')}</option>
             <option value="dashed">{t('mapEditor.inspector.stroke.dashed')}</option>
             <option value="dotted">{t('mapEditor.inspector.stroke.dotted')}</option>
-          </select>
+          </SiteSelect>
         </div>
         <div>
           <label className="mb-1 block text-[10px] text-zinc-500">
@@ -91,13 +93,12 @@ export function GeofenceInspectorSection({
         </div>
         <div>
           <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.strokeColor')}</label>
-          <input
-            type="color"
+          <SiteColorInput
             disabled={readOnly}
             value={params.strokeColor}
             onChange={(e) => onPatchParameters({ strokeColor: e.target.value })}
             className="h-8 w-full cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
-          />
+           />
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
           <input
@@ -115,8 +116,7 @@ export function GeofenceInspectorSection({
           <>
             <div>
               <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.fillColor')}</label>
-              <input
-                type="color"
+              <SiteColorInput
                 disabled={readOnly}
                 value={params.fillBaseColor}
                 onChange={(e) =>
@@ -126,7 +126,7 @@ export function GeofenceInspectorSection({
                   })
                 }
                 className="h-8 w-full cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
-              />
+               />
             </div>
             <div>
               <label

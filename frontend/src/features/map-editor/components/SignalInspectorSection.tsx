@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FacilityObject } from '../types/facility'
@@ -76,7 +77,7 @@ export function SignalInspectorSection({
         >
           {t('mapEditor.signal.mount')}
         </label>
-        <select
+        <SiteSelect
           id="signal-mount"
           disabled={readOnly}
           value={mountDirection}
@@ -94,7 +95,7 @@ export function SignalInspectorSection({
               {mountLabel(d)}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <p className="mt-1 text-[10px] text-zinc-600">
           {t('mapEditor.signal.mountHint')}
         </p>
@@ -107,7 +108,7 @@ export function SignalInspectorSection({
         >
           {t('mapEditor.signal.defaultLamp')}
         </label>
-        <select
+        <SiteSelect
           id="signal-default-lamp"
           disabled={readOnly}
           value={defaultLamp}
@@ -125,7 +126,7 @@ export function SignalInspectorSection({
               {lampLabel(lamp)}
             </option>
           ))}
-        </select>
+        </SiteSelect>
       </div>
 
       <div>
@@ -175,7 +176,7 @@ export function SignalInspectorSection({
                   className="min-w-[7rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
                   placeholder={t('mapEditor.signal.fieldPlaceholder')}
                 />
-                <select
+                <SiteSelect
                   disabled={readOnly}
                   value={rule.operator}
                   onChange={(e) => {
@@ -193,7 +194,7 @@ export function SignalInspectorSection({
                   <option value="eq">=</option>
                   <option value="gt">&gt;</option>
                   <option value="lt">&lt;</option>
-                </select>
+                </SiteSelect>
                 <input
                   readOnly={readOnly}
                   value={rule.compareValue}
@@ -207,7 +208,7 @@ export function SignalInspectorSection({
                   className="min-w-[3.5rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
                   placeholder={t('mapEditor.signal.valuePlaceholder')}
                 />
-                <select
+                <SiteSelect
                   disabled={readOnly}
                   value={rule.lamp}
                   onChange={(e) => {
@@ -227,7 +228,7 @@ export function SignalInspectorSection({
                       {lampLabel(lamp)}
                     </option>
                   ))}
-                </select>
+                </SiteSelect>
                 <img
                   src={signalIconUrl(rule.lamp, mountDirection)}
                   alt=""

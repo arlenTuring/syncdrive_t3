@@ -1,3 +1,4 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
 import { useState } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapAreaPatch } from '../utils/areaCoords'
@@ -207,8 +208,7 @@ export function AreaInspectorSection({
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-[10px] text-zinc-500">
                 填色
-                <input
-                  type="color"
+                <SiteColorInput
                   disabled={readOnly}
                   value={fillPickerHex}
                   onChange={(e) => {
@@ -219,7 +219,7 @@ export function AreaInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-60"
-                />
+                 />
               </label>
               <label className="block text-[10px] text-zinc-500">
                 色碼 / rgba
@@ -271,8 +271,7 @@ export function AreaInspectorSection({
             <label className="block text-[10px] text-zinc-500">
               線條顏色
               <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="color"
+                <SiteColorInput
                   disabled={readOnly || (layout.borderPx ?? 0) <= 0}
                   value={
                     layout.borderColor &&
@@ -293,7 +292,7 @@ export function AreaInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-40"
-                />
+                 />
                 <input
                   readOnly={readOnly}
                   value={layout.borderColor ?? 'transparent'}

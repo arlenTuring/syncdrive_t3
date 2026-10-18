@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { LayoutDashboard, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,7 +68,7 @@ export function AttachModuleDashboardDialog({
                 <span className="text-xs font-medium text-zinc-400">
                   {t('shell.attachDashboard.selectPlane')}
                 </span>
-                <select
+                <SiteSelect
                   value={planeId}
                   onChange={(event) => {
                     const nextId = event.target.value;
@@ -86,7 +87,7 @@ export function AttachModuleDashboardDialog({
                       })}
                     </option>
                   ))}
-                </select>
+                </SiteSelect>
               </label>
 
               <label className="block space-y-1.5">

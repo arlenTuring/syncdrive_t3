@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -150,7 +151,7 @@ export function StepShiftTimeTemplate({
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <select
+              <SiteSelect
                 value={draft.templateId}
                 onChange={(e) => handleSelect(e.target.value)}
                 className={SELECT_CLASS}
@@ -163,7 +164,7 @@ export function StepShiftTimeTemplate({
                     {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               {draft.templateId
                 && !previewLoading
                 && !previewError

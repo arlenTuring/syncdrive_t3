@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 /* eslint-disable react-refresh/only-export-components -- draft helpers are the form's shared validation contract */
 import type { DegradedOperationPlan, DegradedOperationPlanInput } from "./api";
 
@@ -96,7 +97,7 @@ export function DegradedPlanForm({
         <span className="mb-1.5 block">
           <b className="text-red-400">*</b>計畫等級
         </span>
-        <select
+        <SiteSelect
           disabled={disabled}
           value={value.level}
           onChange={(event) =>
@@ -107,7 +108,7 @@ export function DegradedPlanForm({
           <option value={1}>Level 1</option>
           <option value={2}>Level 2</option>
           <option value={3}>Level 3</option>
-        </select>
+        </SiteSelect>
       </label>
       <fieldset disabled={disabled} className="space-y-3">
         <legend className="mb-1.5 text-sm text-zinc-300">

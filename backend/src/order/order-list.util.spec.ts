@@ -17,7 +17,7 @@ describe('order-list.util', () => {
     routeId: 'ROUTE-MAINLINE-UP',
     status: OrderStatus.PROCESSING,
     delayMinutes: 0,
-    plannedStart: String(new Date('2026-06-24T10:30:00').getTime()),
+    plannedStart: String(new Date('2026-06-24T10:30:00+08:00').getTime()),
     completedAt: null,
     payload: {},
   };
@@ -27,7 +27,7 @@ describe('order-list.util', () => {
     expect(item.execution_status).toBe('running');
     expect(item.execution_status_label).toBe('執行中');
     expect(item.route_label).toBe('S2W→T3→N2W');
-    expect(item.depart_time).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    expect(item.depart_time).toBe('2026-06-24 10:30:00');
     expect(item.end_time).toBeNull();
   });
 
@@ -65,12 +65,22 @@ describe('order-list.util', () => {
     const end = resolveEndTime({
       ...baseOrder,
       status: OrderStatus.END,
-      plannedStart: String(new Date('2026-06-24T10:30:00').getTime()),
-      plannedEnd: String(new Date('2026-06-24T10:36:00').getTime()),
-      completedAt: String(new Date('2026-06-24T19:58:28').getTime()),
+      plannedStart: String(new Date('2026-12-31T23:58:00+08:00').getTime()),
+      plannedEnd: String(new Date('2027-01-01T00:04:00+08:00').getTime()),
+      completedAt: String(new Date('2027-01-01T09:58:28+08:00').getTime()),
     } as never);
-    expect(end).toBe('10:36:00');
+    expect(end).toBe('2027-01-01 00:04:00');
     expect(resolveEndTime(baseOrder as never)).toBeNull();
+  });
+
+  it('uses the configured time zone instead of the process time zone', () => {
+    const order = { ...baseOrder, plannedStart: String(Date.parse('2026-10-15T16:30:30Z')) } as never;
+    expect(resolveDepartTime(order, 'Asia/Taipei')).toBe('2026-10-16 00:30:30');
+    expect(resolveDepartTime(order, 'UTC')).toBe('2026-10-15 16:30:30');
+  });
+
+  it('does not invent an end time when planned_end is missing', () => {
+    expect(resolveEndTime({ ...baseOrder, status: OrderStatus.END, plannedEnd: null } as never)).toBeNull();
   });
 
   it('沒有計畫發車時刻就是沒有，不從班次代號推', () => {

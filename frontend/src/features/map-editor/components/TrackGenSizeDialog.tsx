@@ -1,3 +1,4 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
@@ -1566,12 +1567,11 @@ function SizeDialogBody({
               </label>
               <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
                 {t('mapEditor.trackGen.groups.color')}
-                <input
-                  type="color"
+                <SiteColorInput
                   value={editing.color}
                   onChange={(e) => patchEditing({ color: e.target.value })}
                   className="h-[30px] w-14 cursor-pointer rounded border border-zinc-600 bg-zinc-950"
-                />
+                 />
               </label>
               <div className="flex-1 text-[11px] text-zinc-400">
                 {t('mapEditor.trackGen.groups.picked', { n: editing.members.length })}

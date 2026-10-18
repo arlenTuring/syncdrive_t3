@@ -99,33 +99,38 @@ export function buildRouteLabel(order: OperationOrder): string {
   return MAINLINE_ROUTE_LABELS[String(order.routeId ?? '')] ?? '—';
 }
 
-export function formatHmsFromMs(ms: string | number | null | undefined): string | null {
+export function formatDateTimeFromMs(
+  ms: string | number | null | undefined,
+  timeZone = 'Asia/Taipei',
+): string | null {
   if (ms == null || ms === '') return null;
   const n = Number(ms);
   if (!Number.isFinite(n)) return null;
-  const d = new Date(n);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${hh}:${mm}:${ss}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(n));
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  return `${value('year')}-${value('month')}-${value('day')} ${value('hour')}:${value('minute')}:${value('second')}`;
 }
 
 /** 計畫發車時刻只看訂單的 planned_start；沒有就是沒有，不從班次代號推 */
-export function resolveDepartTime(order: OperationOrder): string | null {
-  return formatHmsFromMs(order.plannedStart);
+export function resolveDepartTime(order: OperationOrder, timeZone = 'Asia/Taipei'): string | null {
+  return formatDateTimeFromMs(order.plannedStart, timeZone);
 }
 
-export function resolveEndTime(order: OperationOrder): string | null {
+export function resolveEndTime(order: OperationOrder, timeZone = 'Asia/Taipei'): string | null {
   if (order.status !== OrderStatus.END) return null;
-  const fromPlanned = formatHmsFromMs(order.plannedEnd);
-  if (fromPlanned) return fromPlanned;
-  if (order.plannedStart) {
-    return formatHmsFromMs(Number(order.plannedStart) + 6 * 60_000);
-  }
-  return null;
+  return formatDateTimeFromMs(order.plannedEnd, timeZone);
 }
 
-export function toShiftRecordListItem(order: OperationOrder): ShiftRecordListItem {
+export function toShiftRecordListItem(order: OperationOrder, timeZone = 'Asia/Taipei'): ShiftRecordListItem {
   const exec = resolveExecutionStatus(order);
   return {
     order_id: order.id,
@@ -136,8 +141,8 @@ export function toShiftRecordListItem(order: OperationOrder): ShiftRecordListIte
     execution_status: exec.key,
     execution_status_label: exec.label,
     route_label: buildRouteLabel(order),
-    depart_time: resolveDepartTime(order),
-    end_time: resolveEndTime(order),
+    depart_time: resolveDepartTime(order, timeZone),
+    end_time: resolveEndTime(order, timeZone),
     delay_minutes: Number(order.delayMinutes ?? 0),
     planned_start: order.plannedStart ?? null,
     planned_end: order.plannedEnd ?? null,

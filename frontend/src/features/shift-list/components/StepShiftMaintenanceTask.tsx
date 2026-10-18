@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { fetchMaintenanceTaskDetail, fetchMaintenanceTaskList } from '../../maintenance-tasks/api/maintenanceTasksApi';
@@ -325,7 +326,7 @@ export function StepShiftMaintenanceTask({
             載入整備任務中…
           </div>
         ) : (
-          <select
+          <SiteSelect
             value={draft.taskId}
             onChange={(e) => handleSelect(e.target.value)}
             className={SELECT_CLASS}
@@ -338,7 +339,7 @@ export function StepShiftMaintenanceTask({
                 {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
               </option>
             ))}
-          </select>
+          </SiteSelect>
         )}
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
         {!loading && !error && items.length === 0 && (

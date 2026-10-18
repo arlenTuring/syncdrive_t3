@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useState } from 'react';
 import { Copy, Link2 } from 'lucide-react';
 import type { DashboardPlane, PlaneDataSettings } from '../types';
@@ -93,7 +94,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
               {boundId === 'default-mqtt' && <span className="text-[11px] text-zinc-500">（也決定車隊與圖台即時資料）</span>}
             </div>
             <div className="flex items-center gap-2">
-              <select
+              <SiteSelect
                 className={selectCls}
                 value={selected ? selectedId : ''}
                 onChange={(e) => onChange(withSourceSelection(plane.dataSettings, boundId, e.target.value))}
@@ -104,7 +105,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
                     {ds.name}（{ds.id}）{ds.id === boundId ? '・元件原本的來源' : ''}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               {selected && (
                 <button
                   type="button"

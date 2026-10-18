@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Check, ChevronDown, Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -222,7 +223,7 @@ function AttributeSelect({
 
   return (
     <div className="relative">
-      <select
+      <SiteSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`${FIELD_CLASS} appearance-none pr-9 ${!value ? 'text-[#99A1AF]' : 'pl-7'}`}
@@ -234,7 +235,7 @@ function AttributeSelect({
             {attr.name}
           </option>
         ))}
-      </select>
+      </SiteSelect>
       {selected && (
         <span
           className="pointer-events-none absolute left-3 top-1/2 size-2.5 -translate-y-1/2 rounded-sm"

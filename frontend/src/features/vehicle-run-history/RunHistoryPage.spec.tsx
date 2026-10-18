@@ -166,10 +166,10 @@ describe("運行管理紀錄：固定調查載具", () => {
     expect(box!.querySelector('[data-testid="applied-vehicle"]')?.textContent).toContain("甲車");
     expect(box!.querySelector('[data-testid="investigated-vehicle"]')?.textContent).toContain("甲車");
     expect(box!.querySelector("#replay-vehicle-select")).toBeNull();
-    // 車輛資料區沒有任何下拉選單（畫面上其他 select 只有查詢表單的時區與播放倍速）
+    // 車輛資料區沒有切車選單（畫面上其他選單只有查詢表單的時區與播放倍速）
     const panel = box!.querySelector('[data-testid="investigated-vehicle"]')!.closest('[aria-label$="車輛資料"]')!;
-    expect(panel.querySelector("select")).toBeNull();
-    expect([...box!.querySelectorAll("select")].map((node) => node.getAttribute("aria-label") ?? "時區").sort()).toEqual(["回放倍速", "時區"]);
+    expect(panel.querySelector('[aria-haspopup="listbox"]')).toBeNull();
+    expect([...box!.querySelectorAll('[aria-haspopup="listbox"]')].map((node) => node.getAttribute("aria-label") ?? "時區").sort()).toEqual(["回放倍速", "時區"]);
     const visited: string[] = [];
     for (let index = 0; index < A_SEQS.length + 2; index += 1) {
       await step("下一幀");

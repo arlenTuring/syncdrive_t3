@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -228,7 +229,7 @@ export function DispatchSchedulingPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
       <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800/60 px-6 py-4">
-        <select
+        <SiteSelect
           value={priority}
           onChange={(e) => {
             const next = e.target.value as DispatchPriorityKey | 'all';
@@ -243,8 +244,8 @@ export function DispatchSchedulingPage() {
               {opt.label}
             </option>
           ))}
-        </select>
-        <select
+        </SiteSelect>
+        <SiteSelect
           value={status}
           onChange={(e) => {
             const next = e.target.value as DispatchStatusKey | 'all';
@@ -259,8 +260,8 @@ export function DispatchSchedulingPage() {
               {opt.label}
             </option>
           ))}
-        </select>
-        <select
+        </SiteSelect>
+        <SiteSelect
           value={vehicleCode}
           onChange={(e) => {
             const next = e.target.value;
@@ -276,8 +277,8 @@ export function DispatchSchedulingPage() {
               {code}
             </option>
           ))}
-        </select>
-        <select
+        </SiteSelect>
+        <SiteSelect
           value={location}
           onChange={(e) => {
             const next = e.target.value;
@@ -293,7 +294,7 @@ export function DispatchSchedulingPage() {
               {loc}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <button
           type="button"
           onClick={applyFilters}

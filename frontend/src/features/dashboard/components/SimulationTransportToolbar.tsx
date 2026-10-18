@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronUp,
@@ -369,7 +370,7 @@ export function SimulationTransportToolbar() {
               <div className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
                   <span>{t('dashboard.simulation.pickVehicle')}</span>
-                  <select
+                  <SiteSelect
                     value={faultVehicleCode}
                     onChange={(e) => setFaultVehicleCode(e.target.value)}
                     className="rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100"
@@ -380,7 +381,7 @@ export function SimulationTransportToolbar() {
                         {code}
                       </option>
                     ))}
-                  </select>
+                  </SiteSelect>
                 </label>
                 <button
                   type="button"

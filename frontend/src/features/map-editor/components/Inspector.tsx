@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
@@ -178,16 +180,15 @@ function FacilityLabelStyleSection({
           {t('mapEditor.inspector.labelStyle.textColor')}
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <SiteColorInput
             id="label-color"
-            type="color"
             disabled={readOnly || labelStyle.visible === false}
             value={labelStyle.color ?? '#e4e4e7'}
             onChange={(e) => patchLabelStyle({ color: e.target.value })}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
             className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-50"
-          />
+           />
           <button
             type="button"
             disabled={readOnly || labelStyle.visible === false}
@@ -870,7 +871,7 @@ export function Inspector({
                   {t('mapEditor.inspector.slot.mapDefaultHint')}
                 </p>
                 <div className="flex flex-col gap-2">
-                  <select
+                  <SiteSelect
                     value={sf.slotOccupancy}
                     onChange={(e) =>
                       onPatchSlot({
@@ -886,8 +887,8 @@ export function Inspector({
                         {s === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </SiteSelect>
+                  <SiteSelect
                     value={sf.slotEquipmentState}
                     onChange={(e) =>
                       onPatchSlot({
@@ -903,7 +904,7 @@ export function Inspector({
                         {s}
                       </option>
                     ))}
-                  </select>
+                  </SiteSelect>
                 </div>
               </div>
               <div className="rounded-md border border-cyan-900/40 bg-cyan-950/20 p-2">
@@ -919,7 +920,7 @@ export function Inspector({
                   {t('mapEditor.inspector.slot.previewHint')}
                 </p>
                 <div className="flex flex-col gap-2">
-                  <select
+                  <SiteSelect
                     value={
                       slotPreview?.occupancy ??
                       sf.slotOccupancy
@@ -941,8 +942,8 @@ export function Inspector({
                         {s === 'Vacant' ? t('mapEditor.inspector.slot.vacantShort') : t('mapEditor.inspector.slot.occupiedShort')}
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </SiteSelect>
+                  <SiteSelect
                     value={
                       slotPreview?.equipment ??
                       sf.slotEquipmentState
@@ -964,7 +965,7 @@ export function Inspector({
                         {s}
                       </option>
                     ))}
-                  </select>
+                  </SiteSelect>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -1204,7 +1205,7 @@ export function Inspector({
         facility.type !== 'RoadLine' &&
         facility.type !== 'Waypoint' ? (
           <InspectorSection title={t('mapEditor.inspector.displayState', { type: facility.type })}>
-            <select
+            <SiteSelect
               id="facility-state"
               value={facility.currentState}
               disabled={readOnly}
@@ -1220,7 +1221,7 @@ export function Inspector({
                   {s}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
             {facility.type === 'PSD' && (
               <p className="text-[10px] text-zinc-600">
                 {t('mapEditor.inspector.psd.alarmHint')}

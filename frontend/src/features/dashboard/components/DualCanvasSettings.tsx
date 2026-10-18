@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import type { CanvasElementProps, DualCanvasGateOperator, WidgetDataBinding } from '../types';
 import { WidgetDataBindingSettings } from '../elements/WidgetDataBindingSettings';
 import { useTranslation } from 'react-i18next';
@@ -117,7 +118,7 @@ export function DualCanvasSettings({
             />
           </Field>
           <Field label={t('dashboard.dualCanvas.operator')}>
-            <select
+            <SiteSelect
               value={gate.operator ?? 'gte'}
               onChange={e => patchGate({ operator: e.target.value as DualCanvasGateOperator })}
               className={selectCls}
@@ -127,7 +128,7 @@ export function DualCanvasSettings({
                   {t(`dashboard.dualCanvas.ops.${value}`)}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </Field>
           <Field label={t('dashboard.dualCanvas.compareValue')}>
             <input

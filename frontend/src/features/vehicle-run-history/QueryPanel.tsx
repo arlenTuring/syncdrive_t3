@@ -1,3 +1,5 @@
+import { SiteDateTimeInput } from '../../components/SiteDateTimeInput';
+import { SiteSelect } from '../../components/SiteSelect';
 import { Clock3, Hash, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { GAP_REASON } from "../replay-core/replayLabels";
@@ -159,7 +161,7 @@ export function QueryPanel({
           />
           <label className="block">
             <span className="mb-1 block text-zinc-400">時區</span>
-            <select
+            <SiteSelect
               value={draft.timeZone}
               onChange={(event) => setDraft((current) => ({ ...current, timeZone: event.target.value }))}
               className="w-full rounded-lg bg-zinc-800 px-3 py-2"
@@ -169,11 +171,11 @@ export function QueryPanel({
                   {zone === REPLAY_TIME_ZONE ? `${zone}（台北，UTC+08:00）` : "UTC"}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </label>
           <label className="block">
             <span className="mb-1 block text-zinc-400">開始</span>
-            <input
+            <SiteDateTimeInput
               type="datetime-local"
               step={1}
               value={draft.from}
@@ -193,7 +195,7 @@ export function QueryPanel({
                 此刻
               </button>
             </span>
-            <input
+            <SiteDateTimeInput
               type="datetime-local"
               step={1}
               value={draft.to}

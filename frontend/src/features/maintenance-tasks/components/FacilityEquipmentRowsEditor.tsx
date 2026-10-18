@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -140,7 +141,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
               key={row.id}
               className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-3"
             >
-              <select
+              <SiteSelect
                 value={equipmentIdOf(row)}
                 onChange={(e) => {
                   const item = equipment.find((candidate) => candidate.equipmentId === e.target.value);
@@ -162,9 +163,9 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
                     {item.mapCode}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
 
-              <select
+              <SiteSelect
                 value={row.waypointCode}
                 title={t('maintenanceTasks.facilityRows.waypointAria')}
                 onChange={(e) =>
@@ -180,7 +181,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
                     {waypointOptionLabel(item)}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
 
               {renderExtraFields?.(row, (patch) => updateRow(row.id, patch))}
 

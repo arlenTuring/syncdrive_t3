@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 import { ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReplayCursor } from "./cursor";
@@ -83,7 +84,7 @@ export function VehicleDataPanel({
             <label className="sr-only" htmlFor="replay-vehicle-select">
               選取車輛
             </label>
-            <select
+            <SiteSelect
               id="replay-vehicle-select"
               value={vehicleCode}
               onChange={(event) => onSelect(event.target.value)}
@@ -95,7 +96,7 @@ export function VehicleDataPanel({
                   {hidden.some((item) => item.code === code) ? "（地圖未顯示）" : ""}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
           </>
         ) : (
           <p className="min-w-0 flex-1 truncate" data-testid="investigated-vehicle">

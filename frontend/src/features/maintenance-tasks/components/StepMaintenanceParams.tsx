@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -152,7 +153,7 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
                     placeholder={t('maintenanceTasks.maintenance.valuePlaceholder')}
                     className={SMALL_INPUT_CLASS}
                   />
-                  <select
+                  <SiteSelect
                     value={row.unit}
                     onChange={(e) =>
                       updateCondition(row.id, {
@@ -164,7 +165,7 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
                   >
                     <option value="mileage">{t('maintenanceTasks.maintenance.unitKm')}</option>
                     <option value="time">{t('maintenanceTasks.maintenance.unitHour')}</option>
-                  </select>
+                  </SiteSelect>
                   <span>{t('maintenanceTasks.maintenance.triggerMid')}</span>
                   <input
                     type="text"

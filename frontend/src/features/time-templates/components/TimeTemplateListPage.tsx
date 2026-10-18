@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import {
   ChevronLeft,
   ChevronRight,
@@ -225,7 +226,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-600 focus:outline-none"
           />
         </div>
-        <select
+        <SiteSelect
           value={publishStatus}
           onChange={(e) => {
             setPublishStatus(e.target.value as PublishStatusKey | 'all');
@@ -240,7 +241,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                 : t(`common.publishStatus.${opt.value}`)}
             </option>
           ))}
-        </select>
+        </SiteSelect>
         <button
           type="button"
           onClick={applySearch}

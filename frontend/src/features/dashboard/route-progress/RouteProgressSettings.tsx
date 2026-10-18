@@ -1,3 +1,5 @@
+import { SiteColorInput } from '../../../components/SiteColorInput';
+import { SiteSelect } from '../../../components/SiteSelect';
 import { NumberInput } from '../../../components/NumberInput'
 import { useTranslation } from 'react-i18next'
 import * as LucideIcons from 'lucide-react';
@@ -138,7 +140,7 @@ export function RouteProgressSettings({
       <SH icon={<LucideIcons.Route size={14} className="text-blue-400" />} label={t('dashboard.routeProgress.title')} color="#3b82f6" />
 
       <Field label={t('dashboard.routeProgress.variant')}>
-        <select
+        <SiteSelect
           value={w.variant ?? 'track'}
           onChange={(e) => onUpdate({ variant: e.target.value as RouteProgressWidget['variant'] })}
           className={selectCls}
@@ -146,7 +148,7 @@ export function RouteProgressSettings({
           <option value="track">{t('dashboard.routeProgress.track')}</option>
           <option value="detail-card">{t('dashboard.routeProgress.detailCard')}</option>
           <option value="service-card">{t('dashboard.routeProgress.serviceCard')}</option>
-        </select>
+        </SiteSelect>
       </Field>
       <Field label={t('dashboard.routeProgress.stationFontSize')}>
         <NumberInput
@@ -158,22 +160,20 @@ export function RouteProgressSettings({
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.routeProgress.stationLabelActiveColor')}>
-          <input
-            type="color"
+          <SiteColorInput
             value={w.stationLabelActiveColor ?? w.activeColor}
             onChange={(e) => onUpdate({ stationLabelActiveColor: e.target.value })}
             className={inputCls}
             style={{ height: 28 }}
-          />
+           />
         </Field>
         <Field label={t('dashboard.routeProgress.stationLabelInactiveColor')}>
-          <input
-            type="color"
+          <SiteColorInput
             value={w.stationLabelInactiveColor ?? w.inactiveColor}
             onChange={(e) => onUpdate({ stationLabelInactiveColor: e.target.value })}
             className={inputCls}
             style={{ height: 28 }}
-          />
+           />
         </Field>
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-300">
@@ -243,7 +243,7 @@ export function RouteProgressSettings({
       <div className="space-y-2 pt-2 border-t border-zinc-800">
         <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.stationSource')} color="#10b981" />
         <Field label={t('dashboard.routeProgress.mode')}>
-          <select
+          <SiteSelect
             value={stationSource}
             onChange={(e) => onUpdate({ stationSource: e.target.value as RouteStationSource })}
             className={selectCls}
@@ -251,7 +251,7 @@ export function RouteProgressSettings({
             <option value="json">{t('dashboard.routeProgress.modeJson')}</option>
             <option value="legacy-columns">{t('dashboard.routeProgress.modeLegacy')}</option>
             <option value="manual">{t('dashboard.routeProgress.modeManual')}</option>
-          </select>
+          </SiteSelect>
         </Field>
         {stationSource === 'json' && (
           <>
@@ -266,7 +266,7 @@ export function RouteProgressSettings({
               </p>
             </Field>
             <Field label={t('dashboard.routeProgress.stationFilter')}>
-              <select
+              <SiteSelect
                 value={w.stationDisplayFilter ?? 'stops'}
                 onChange={(e) =>
                   onUpdate({ stationDisplayFilter: e.target.value as 'all' | 'stops' })
@@ -275,7 +275,7 @@ export function RouteProgressSettings({
               >
                 <option value="stops">{t('dashboard.routeProgress.stationFilterStops')}</option>
                 <option value="all">{t('dashboard.routeProgress.stationFilterAll')}</option>
-              </select>
+              </SiteSelect>
               <p className="text-[9px] text-zinc-500 mt-1 leading-relaxed">
                 {t('dashboard.routeProgress.stationFilterHint')}
               </p>
@@ -411,7 +411,7 @@ export function RouteProgressSettings({
               style={{ fontSize: 10 }}
             />
             <div className="grid grid-cols-2 gap-1">
-              <select
+              <SiteSelect
                 value={rule.matchOp}
                 onChange={(e) => updateRule(i, { matchOp: e.target.value as RouteActionMatchOp })}
                 className={selectCls}
@@ -422,7 +422,7 @@ export function RouteProgressSettings({
                     {matchLabel(o)}
                   </option>
                 ))}
-              </select>
+              </SiteSelect>
               <input
                 value={rule.threshold ?? ''}
                 onChange={(e) => updateRule(i, { threshold: e.target.value })}
@@ -467,40 +467,36 @@ export function RouteProgressSettings({
         <SH icon={<Palette size={12} />} label={t('dashboard.routeProgress.appearance')} color="#ec4899" />
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.routeProgress.activeColor')}>
-            <input
-              type="color"
+            <SiteColorInput
               value={w.activeColor}
               onChange={(e) => onUpdate({ activeColor: e.target.value })}
               className={inputCls}
               style={{ height: 28 }}
-            />
+             />
           </Field>
           <Field label={t('dashboard.routeProgress.inactiveColor')}>
-            <input
-              type="color"
+            <SiteColorInput
               value={w.inactiveColor}
               onChange={(e) => onUpdate({ inactiveColor: e.target.value })}
               className={inputCls}
               style={{ height: 28 }}
-            />
+             />
           </Field>
           <Field label={t('dashboard.routeProgress.iconBg')}>
-            <input
-              type="color"
+            <SiteColorInput
               value={w.iconBgColor}
               onChange={(e) => onUpdate({ iconBgColor: e.target.value })}
               className={inputCls}
               style={{ height: 28 }}
-            />
+             />
           </Field>
           <Field label={t('dashboard.routeProgress.iconColor')}>
-            <input
-              type="color"
+            <SiteColorInput
               value={w.iconColor}
               onChange={(e) => onUpdate({ iconColor: e.target.value })}
               className={inputCls}
               style={{ height: 28 }}
-            />
+             />
           </Field>
         </div>
         <Field label={t('dashboard.routeProgress.vehicleIcon')}>

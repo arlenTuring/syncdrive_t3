@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../components/SiteSelect';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'; // HMR Trigger
 import { useTranslation } from 'react-i18next';
 import { useDashboardEditor } from './useDashboardEditor';
@@ -1145,7 +1146,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               })}
             </span>
             {(editingTemplateGroup?.genericGroup?.templates?.length ?? 0) > 1 ? (
-              <select
+              <SiteSelect
                 value={editingTemplateId ?? ''}
                 onChange={e => switchEditingTemplate(e.target.value)}
                 className="text-xs bg-zinc-800 border border-purple-500/40 text-purple-300 font-bold rounded-md px-2 py-1"
@@ -1154,7 +1155,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 {(editingTemplateGroup?.genericGroup?.templates ?? []).map(tpl => (
                   <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
                 ))}
-              </select>
+              </SiteSelect>
             ) : (
               <span className="text-xs font-bold text-purple-300">{editingTemplateDef?.name ?? ''}</span>
             )}

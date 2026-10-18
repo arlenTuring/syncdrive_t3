@@ -1,3 +1,4 @@
+import { SiteSelect } from '../../../components/SiteSelect';
 import { NumberInput } from '../../../components/NumberInput'
 import { ChevronDown } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
@@ -197,7 +198,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
 
           <span className={LABEL_CLASS}>{t('timeTemplates.taskSettings.taskType')}</span>
           <div className="relative min-w-0">
-            <select
+            <SiteSelect
               value={taskType}
               onChange={(e) => setTaskType(e.target.value as TaskTypeKey)}
               className={`${FIELD_CLASS} appearance-none pr-9`}
@@ -207,7 +208,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
                   {t(`timeTemplates.taskTypes.${opt.key}`)}
                 </option>
               ))}
-            </select>
+            </SiteSelect>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
           </div>
 

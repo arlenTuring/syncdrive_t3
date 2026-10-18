@@ -8,9 +8,10 @@ import { VehicleDataPanel } from "./VehicleDataPanel";
 
 function render(props: Record<string, unknown>) {
   const box = document.createElement("div");
+  document.body.appendChild(box);
   const root = createRoot(box);
   act(() => root.render(createElement(VehicleDataPanel, { vehicleCode: "PMS01", state: null, cursor: null, staleAfterMs: 5000, hidden: [], ...props } as never)));
-  return { box, unmount: () => act(() => root.unmount()) };
+  return { box, unmount: () => { act(() => root.unmount()); box.remove(); } };
 }
 
 describe("車輛資料面板的兩種用法", () => {
@@ -23,8 +24,9 @@ describe("車輛資料面板的兩種用法", () => {
 
   it("歷史降級播放器：維持原本可以在面板上切車", () => {
     const { box, unmount } = render({ vehicles: ["PMS01", "PMS02"], onSelect: () => undefined });
-    const select = box.querySelector("select")!;
-    expect([...select.options].map((option) => option.value)).toEqual(["PMS01", "PMS02"]);
+    const select = box.querySelector<HTMLButtonElement>('#replay-vehicle-select')!;
+    act(() => select.click());
+    expect([...document.querySelectorAll('[role="option"]')].map((option) => option.textContent?.trim())).toEqual(["PMS01", "PMS02"]);
     unmount();
   });
 });
