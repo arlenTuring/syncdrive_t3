@@ -47,6 +47,7 @@ import { DashboardPlane } from './database/entities/dashboard-plane.entity';
 import { MapEntity } from './database/entities/map.entity';
 import { MapVersion } from './database/entities/map-version.entity';
 import { MediaSchedule } from './database/entities/media-schedule.entity';
+import { MediaPlayBatch, MediaPlayDelivery, MediaPlaySchedule, MediaPlayScheduleItem } from './database/entities/media-play-schedule.entities';
 // 原僅存於瀏覽器 localStorage 的系統資產與流程狀態
 import { DataSource_ } from './database/entities/data-source.entity';
 import { VehicleDefinition } from './database/entities/vehicle-definition.entity';
@@ -125,7 +126,7 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
           // 營運核心層：全景圖台版面
           DashboardPlane,
           // 資源配置層：場域圖資版本庫與媒體排程
-          MapEntity, MapVersion, MediaSchedule,
+          MapEntity, MapVersion, MediaSchedule, MediaPlaySchedule, MediaPlayScheduleItem, MediaPlayBatch, MediaPlayDelivery,
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
           DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
           DegradedOperationPlan, DegradedOperationExecution, DegradedOperationEvent, DegradedOperationDraft,

@@ -35,4 +35,11 @@ export class MediaLibraryItem {
 
   @Column({ type: 'bigint', name: 'updated_at' })
   updatedAt: string;
+
+  /**
+   * 樂觀鎖版本：每次寫入 +1（分組成員異動、更名、媒體刪除時移除分組引用）。
+   * 不用 updated_at 判斷衝突，同一毫秒的兩次寫入也分得出來。
+   */
+  @Column({ type: 'int', name: 'row_version', default: 1 })
+  version: number;
 }

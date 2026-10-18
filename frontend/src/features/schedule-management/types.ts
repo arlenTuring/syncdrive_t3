@@ -14,6 +14,8 @@ export type ShellView =
   | 'vehicle-run-history'
   | 'vehicle-registry'
   | 'media-content'
+  | 'media-groups'
+  | 'media-schedule'
   | 'system-foundation'
   | 'account-management'
   | 'role-management';
@@ -75,6 +77,8 @@ export const PERMISSION_NAV_ITEMS: ShellNavItem[] = [
 
 export const MEDIA_NAV_ITEMS: ShellNavItem[] = [
   { id: 'media-content', label: 'nav.items.media-content', enabled: true, requiredPermission: 'media.content.view' },
+  { id: 'media-groups', label: 'nav.items.media-groups', enabled: true, requiredPermission: 'media.groups.view' },
+  { id: 'media-schedule', label: 'nav.items.media-schedule', enabled: true, requiredPermission: 'media.schedule.view' },
 ];
 
 export type ShellModuleGroup = {

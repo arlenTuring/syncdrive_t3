@@ -1,12 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource, Repository } from 'typeorm';
 import { MediaLibraryItem, MediaLibraryKind } from '../database/entities/media-library-item.entity';
 import { MediaSchedule } from '../database/entities/media-schedule.entity';
+import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { groupMediaIds, groupPlayability, mediaUnavailableReason } from './media-availability';
 import { MediaStorageService, MediaType, StoredMediaFile, UploadedMediaFile } from './media-storage.service';
 
-export type MediaLibraryOption = { id: string; name: string; kind: MediaLibraryKind };
+export type MediaLibraryOption = { id: string; name: string; kind: MediaLibraryKind; playable: boolean; unavailable_label: string | null };
+const MEDIA_LIBRARY_TAG = 'table:media_library_items';
 type MediaBody = { mediaType?: MediaType; description?: string; textContent?: string; file?: StoredMediaFile; mediaIds?: string[]; unavailableReason?: string };
 type MutationInput = { name?: string; description?: string; mediaType?: string; textContent?: string; expectedUpdatedAt?: string };
 const NAME_MAX = 120, DESCRIPTION_MAX = 500, TEXT_MAX = 10_000;
@@ -18,6 +21,7 @@ export class MediaLibraryService implements OnApplicationBootstrap {
     @InjectRepository(MediaSchedule) private readonly schedules: Repository<MediaSchedule>,
     private readonly dataSource: DataSource,
     private readonly storage: MediaStorageService,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -26,9 +30,24 @@ export class MediaLibraryService implements OnApplicationBootstrap {
     await this.storage.removeOrphans(keys);
   }
 
+  /**
+   * 班表／時間模板的媒體選項。分組只列「真的能播放」的：有成員、每個成員都存在且可播放；
+   * 只看成員數大於零不夠。單一媒體照舊全部列出，另標示能不能播放。
+   */
   async listOptions(): Promise<{ items: MediaLibraryOption[] }> {
     const rows = await this.repo.find({ order: { kind: 'ASC', name: 'ASC' } });
-    return { items: rows.filter((row) => row.kind !== MediaLibraryKind.GROUP || ((row.body as MediaBody).mediaIds?.length ?? 0) > 0).map((row) => ({ id: row.id, name: row.name, kind: row.kind })) };
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const items: MediaLibraryOption[] = [];
+    for (const row of rows) {
+      if (row.kind === MediaLibraryKind.GROUP) {
+        const playability = groupPlayability(groupMediaIds(row), byId);
+        if (playability.playable) items.push({ id: row.id, name: row.name, kind: row.kind, playable: true, unavailable_label: null });
+      } else {
+        const reason = mediaUnavailableReason(row);
+        items.push({ id: row.id, name: row.name, kind: row.kind, playable: reason === null, unavailable_label: reason });
+      }
+    }
+    return { items };
   }
 
   async listItems(args: { keyword?: string; kind?: MediaLibraryKind | 'all'; page?: number; page_size?: number; sort_by?: string; sort_direction?: string }) {
@@ -73,9 +92,10 @@ export class MediaLibraryService implements OnApplicationBootstrap {
       if (data.mediaType === 'text') body.textContent = data.textContent;
       else body.file = stored ?? (data.mediaType === oldBody.mediaType ? oldBody.file : undefined);
       if (!body.file && data.mediaType !== 'text') throw new BadRequestException('請選擇要上傳的檔案');
-      const result = await this.repo.createQueryBuilder().update(MediaLibraryItem).set({ name: data.name, body: body as any, updatedAt: String(Date.now()) }).where('media_id = :id AND updated_at = :updatedAt', { id, updatedAt: current.updatedAt }).execute();
+      const result = await this.repo.createQueryBuilder().update(MediaLibraryItem).set({ name: data.name, body: body as any, version: () => 'row_version + 1', updatedAt: String(Date.now()) }).where('media_id = :id AND updated_at = :updatedAt', { id, updatedAt: current.updatedAt }).execute();
       if (!result.affected) throw new ConflictException('媒體已被其他使用者修改，請重新載入');
       if (stored && oldBody.file?.storageKey) await this.storage.remove(oldBody.file.storageKey);
+      this.invalidation?.emit([MEDIA_LIBRARY_TAG], 'media_updated');
       return this.get(id);
     } catch (error) {
       if (stored) await this.storage.remove(stored.storageKey);
@@ -93,24 +113,41 @@ export class MediaLibraryService implements OnApplicationBootstrap {
     if (!expectedUpdatedAt || expectedUpdatedAt !== current.updatedAt) throw new ConflictException('刪除預覽已過期，請重新確認');
     const body = current.body as MediaBody;
     let affectedGroups: string[] = [];
-    await this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    /*
+     * 鎖定順序與分組操作一致：先鎖媒體（FOR UPDATE），再鎖含它的分組。正在加入／排序的請求
+     * 會等在媒體的 FOR SHARE 上，等這裡提交後看到媒體已不存在而失敗，不會把失效 ID 寫回分組。
+     * 每個受影響的分組版本 +1，持有舊版本的排序／加入請求會被拒絕。
+     */
+    await this.dataSource.transaction(async (manager) => {
       const itemRepo = manager.getRepository(MediaLibraryItem);
       const locked = await itemRepo.createQueryBuilder('m').setLock('pessimistic_write').where('m.media_id = :id', { id }).getOne();
       if (!locked || locked.updatedAt !== expectedUpdatedAt) throw new ConflictException('刪除預覽已過期，請重新確認');
-      const schedules = await manager.getRepository(MediaSchedule).find({ where: { mediaId: id }, select: { id: true, name: true } });
+      const schedules = [
+        ...(await manager.getRepository(MediaSchedule).find({ where: { mediaId: id }, select: { id: true, name: true } })),
+        ...(await playScheduleRefs(manager, id)),
+      ];
       if (schedules.length) throw new ConflictException(`媒體仍被排程引用：${schedules.map((row) => row.name).join('、')}`);
-      const groups = await itemRepo.find({ where: { kind: MediaLibraryKind.GROUP } });
-      const touched = groups.filter((group) => ((group.body as MediaBody).mediaIds ?? []).includes(id));
+      const touched = await itemRepo
+        .createQueryBuilder('g')
+        .setLock('pessimistic_write')
+        .where("g.kind = :kind AND g.body->'mediaIds' ? :id", { kind: MediaLibraryKind.GROUP, id })
+        .orderBy('g.media_id', 'ASC')
+        .getMany();
       affectedGroups = touched.map((group) => group.name);
       for (const group of touched) {
         const groupBody = group.body as MediaBody;
+        // 只拿掉這一個，其他成員順序不變
         const mediaIds = (groupBody.mediaIds ?? []).filter((mediaId) => mediaId !== id);
-        group.body = { ...groupBody, mediaIds, ...(mediaIds.length ? {} : { unavailableReason: 'empty' }) };
-        group.updatedAt = String(Date.now());
-        await itemRepo.save(group);
+        await itemRepo
+          .createQueryBuilder()
+          .update(MediaLibraryItem)
+          .set({ body: { ...groupBody, mediaIds } as any, version: () => 'row_version + 1', updatedAt: String(Date.now()) })
+          .where('media_id = :groupId', { groupId: group.id })
+          .execute();
       }
       await itemRepo.delete(id);
     });
+    this.invalidation?.emit([MEDIA_LIBRARY_TAG], 'media_deleted');
     const fileRemoved = await this.storage.remove(body.file?.storageKey);
     return { deleted: true, affected_groups: affectedGroups, file_cleanup_pending: !fileRemoved };
   }
@@ -128,7 +165,13 @@ export class MediaLibraryService implements OnApplicationBootstrap {
     return row;
   }
   private async referenceImpact(id: string) {
-    const [groups, schedules] = await Promise.all([this.repo.find({ where: { kind: MediaLibraryKind.GROUP } }), this.schedules.find({ where: { mediaId: id }, select: { id: true, name: true } })]);
+    const [groups, legacy, play] = await Promise.all([
+      this.repo.find({ where: { kind: MediaLibraryKind.GROUP } }),
+      this.schedules.find({ where: { mediaId: id }, select: { id: true, name: true } }),
+      playScheduleRefs(this.dataSource.manager, id),
+    ]);
+    // 舊的事件觸發排程（media_schedules）與媒體排程設定的播放清單都算引用
+    const schedules = [...legacy, ...play];
     const referencedGroups = groups.filter((group) => ((group.body as MediaBody).mediaIds ?? []).includes(id)).map((group) => ({ id: group.id, name: group.name }));
     return { groups: referencedGroups, schedules: schedules.map((row) => ({ id: row.id, name: row.name })), hasReferences: referencedGroups.length > 0 || schedules.length > 0 };
   }
@@ -145,4 +188,13 @@ export class MediaLibraryService implements OnApplicationBootstrap {
     const body = row.body as MediaBody;
     return { id: row.id, name: row.name, kind: row.kind, media_type: body.mediaType ?? null, description: body.description ?? '', text_content: body.textContent, file: body.file ? { original_name: body.file.originalName, mime_type: body.file.mimeType, size_bytes: body.file.sizeBytes, sha256: body.file.sha256, duration_seconds: body.file.durationSeconds, width: body.file.width, height: body.file.height, status: body.file.status, content_url: `/syncdrive-api/media-library/${encodeURIComponent(row.id)}/content` } : null, file_status: row.kind === MediaLibraryKind.MEDIA && !body.file && !body.textContent ? 'missing' : 'ready', created_at: row.createdAt, updated_at: row.updatedAt };
   }
+}
+
+/** 媒體排程設定（尚未刪除的排程）播放清單中引用這個媒體的排程 */
+function playScheduleRefs(manager: { query: DataSource['query'] }, mediaId: string): Promise<Array<{ id: string; name: string }>> {
+  return manager.query(
+    `SELECT DISTINCT s.id, s.name FROM media_play_schedule_items i JOIN media_play_schedules s ON s.id = i.schedule_id
+      WHERE i.media_id = $1 AND s.status <> 'deleted' ORDER BY s.name`,
+    [mediaId],
+  );
 }

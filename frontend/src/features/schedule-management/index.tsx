@@ -36,6 +36,8 @@ import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
 import { VehicleRegistryPage } from '../vehicle-registry/VehicleRegistryPage';
 import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
 import { MediaContentPage } from '../media-content/MediaContentPage';
+import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
+import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -148,6 +150,12 @@ function useWorkspaceChrome(
     }
     if (view === 'media-content') {
       return { title: t('nav.items.media-content'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    }
+    if (view === 'media-groups') {
+      return { title: t('nav.items.media-groups'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    }
+    if (view === 'media-schedule') {
+      return { title: t('nav.items.media-schedule'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
     }
     if (view === 'system-foundation') {
       return {
@@ -414,6 +422,18 @@ export default function ScheduleManagementApp({
         {view === 'media-content' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="媒體內容清單載入失敗"><MediaContentPage /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'media-groups' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="媒體分組清單載入失敗"><MediaGroupsPage /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {view === 'media-schedule' ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title="媒體排程設定載入失敗"><MediaSchedulesPage /></ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 

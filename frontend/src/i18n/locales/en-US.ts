@@ -66,6 +66,8 @@ const enUS: DeepStringify<typeof zhTW> = {
       'shift-list': 'Shift List',
       'maintenance-tasks': 'Maintenance Tasks',
       'media-content': 'Media Content',
+      'media-groups': 'Media Groups',
+      'media-schedule': 'Media Schedules',
       trajectory: 'Vehicle Trajectory',
       dashboard: 'Dashboard',
     },

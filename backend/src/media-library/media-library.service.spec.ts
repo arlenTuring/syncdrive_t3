@@ -37,11 +37,17 @@ describe('MediaLibraryService', () => {
 
   it('hides empty media groups from consumer options', async () => {
     const rows = [
-      { id: 'MED-1', name: '媒體', kind: MediaLibraryKind.MEDIA, body: {} },
+      { id: 'MED-1', name: '媒體', kind: MediaLibraryKind.MEDIA, body: { mediaType: 'text', textContent: '到站' } },
+      { id: 'MED-2', name: '缺檔', kind: MediaLibraryKind.MEDIA, body: { mediaType: 'audio' } },
+      { id: 'GROUP-BROKEN', name: '成員缺檔', kind: MediaLibraryKind.GROUP, body: { mediaIds: ['MED-2'] } },
+      { id: 'GROUP-GONE', name: '成員已刪', kind: MediaLibraryKind.GROUP, body: { mediaIds: ['MED-X'] } },
       { id: 'GROUP-EMPTY', name: '空群組', kind: MediaLibraryKind.GROUP, body: { mediaIds: [] } },
       { id: 'GROUP-OK', name: '可播放群組', kind: MediaLibraryKind.GROUP, body: { mediaIds: ['MED-1'] } },
     ];
     const { subject } = service({ find: jest.fn().mockResolvedValue(rows) });
-    expect((await subject.listOptions()).items.map((item) => item.id)).toEqual(['MED-1', 'GROUP-OK']);
+    const items = (await subject.listOptions()).items;
+    // 分組要每個成員都可播放才列出；單一媒體照舊列出並標示能否播放
+    expect(items.map((item) => item.id)).toEqual(['MED-1', 'MED-2', 'GROUP-OK']);
+    expect(items.find((item) => item.id === 'MED-2')?.playable).toBe(false);
   });
 });
