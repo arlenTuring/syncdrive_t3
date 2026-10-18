@@ -52,77 +52,28 @@ compose plugin（安裝包不含 Docker 本身）。
 sudo ./deploy/bootstrap.sh --build
 ```
 
-### 更新
+### 更新：唯一入口 `sync.sh`
 
-**正式機**：裝新的安裝包即可，同一支 `bootstrap.sh`，資料與 `.env` 都會保留。
-
-**開發機／打包機**：
+在 Mac 的任意目錄可用完整路徑，在專案或 `deploy` 目錄可直接執行；兩者結果相同：
 
 ```bash
-./deploy/deploy.sh              # 用目前目錄的程式碼重新部署
-./deploy/deploy.sh --pull       # 先 git pull 再部署
-./deploy/deploy.sh --rollback   # 回到上一個通過驗收的版本
+./deploy/sync.sh                 # 固定 main commit，程式、Migration、設定與檔案一次同步
+./deploy/sync.sh --dry-run       # 只查本機／遠端並產生計畫，不改資料或服務
+./deploy/sync.sh status
+./deploy/sync.sh logs backend
+./deploy/sync.sh health
+./deploy/sync.sh rollback
 ```
 
-先建置、再切換、然後驗收，**不通過就自動回滾**。手動部署最常見的失敗不是建置
-錯誤，而是換上去之後才發現不通、而舊的已經停掉了。
+`vm.sh` 只保留為同參數轉接；`git-sync.sh`、`data-sync.sh` 與 `deploy.sh` 不再各自
+維護完整部署順序。`sync.sh` 會拒絕未推送的版本、相關未提交 Migration，並固定同一個
+Git SHA 與資料快照。流程依序完成乾淨建置、可恢復備份、獨立 Migration、設定與地圖／
+媒體檔案同步、啟動、就緒等待及完整驗收；全部成功後才更新最後成功版本。
 
-### 用 git 更新 VM（取代 push.sh）
-
-程式碼在 GitHub（`arlenTuring/syncdrive_t3`，公開，VM 用 HTTPS 拉不需要金鑰）。在**本機**
-（已登入 gcloud 的那台）跑：
-
-```bash
-./deploy/git-sync.sh                                        # 預設：34.80.84.224（gcloud syncdrive-t3 / asia-east1-a）
-./deploy/git-sync.sh --gcloud <instance> <zone> [project] --api http://<VM 位址>   # 別台 GCP VM
-./deploy/git-sync.sh user@host --api http://<VM 位址>                             # 一般 ssh
-```
-
-第一次會把 VM 上的 `/opt/syncdrive_t3` 轉成 git 工作目錄，切到 GitHub 的 `main`，
-然後部署，接著升級儀表板裡存的舊系統查詢：先試跑再寫入，寫入前自動備份（預設目標會自動做，其他目標要加 `--api`）。
-`deploy/.env`、`deploy/.state`、`mosquitto/certs`、`backend/logs` 都在 `.gitignore`
-裡，切換時不會被動到。之後每次更新再跑同一支即可，或直接在 VM 上：
-
-```bash
-cd /opt/syncdrive_t3 && sudo ./deploy/deploy.sh --pull
-```
-
-接上 git 之後就不要再用 `push.sh`：rsync 會讓工作目錄跟 git 紀錄不一致。
-
-### 從 Mac 操作 34（`deploy/vm.sh`）
-
-日常操作的簡明版見 [`操作說明-34.md`](操作說明-34.md)。
-
-日常操作集中在這一支，預設目標同上（34）：
-
-```bash
-./deploy/vm.sh syncall           # 全部：synccode 再 syncdata
-./deploy/vm.sh synccode          # 程式碼：拉 GitHub 最新 main → 重建部署 → 升級儀表板查詢（= git-sync.sh；舊名 sync）
-./deploy/vm.sh syncdata          # 人為資料：本機的地圖、儀表板、班表清單等整份送上去（= data-sync.sh）
-./deploy/vm.sh update            # 在 VM 上 git pull → 重建部署
-./deploy/vm.sh restart           # 重啟前端＋後端（不重建、不換版本），之後跑健康檢查
-./deploy/vm.sh restart backend   # 只重啟後端；也可 web／postgres／redis／mosquitto／all
-./deploy/vm.sh status            # 目前版本、最後健康版本、容器狀態
-./deploy/vm.sh logs [服務] [-f]  # 看 log（預設後端）
-./deploy/vm.sh health            # 健康檢查
-./deploy/vm.sh check             # 儀表板存的查詢是否為新版、訂單筆數
-./deploy/vm.sh rollback          # 回到上一個健康版本
-./deploy/vm.sh ssh               # 登入 VM
-```
-
-`syncdata` 送的是人在本機做出來、不在 git 裡的資料：儀表板（含模組頁面、資料來源設定）、
-班表清單、時間模板、維護任務、路線與站點動作、格位、車輛與車型、媒體庫、系統基礎模組設定，
-以及 `backend/data/published-maps` 的每一張地圖和「使用中」設定。清單在 `data-snapshot.sh`。
-
-- 以本機為準**整份替換**；本機沒有資料的表略過，34 那張表保留原樣。
-- 不送執行痕跡與機器自己的東西：訂單、遙測、稽核、每日計畫採用紀錄、營運時鐘、協力廠商 API 金鑰、帳號。
-- 替換前在 34 備份到 `deploy/.state/data-backups/<時間>/`（保留 10 份）；資料表在同一個交易裡換，
-  失敗就整批不生效。倒回：`./deploy/vm.sh syncdata --restore [時間]`，列出：`--list-backups`。
-- 34 的資料表欄位比本機舊時會失敗：先 `synccode`，或直接 `syncall`。
-- 先看會送什麼：`./deploy/vm.sh syncdata --dry-run`（不連線）。
-
-在沒有原始碼的機器上跑 `deploy.sh` 會直接停下並告訴你改用安裝包——安裝包刻意
-不含原始碼，正式機不該保留原始碼，也不該在上面建置。
+設定資料採同 ID 更新與新增，不刪遠端獨有且仍被引用的資料；本機空表會略過。訂單、
+遙測、運行歷史、帳號／角色綁定、Session、API Key、憑證、最新狀態與執行中計畫皆不在
+同步範圍。正式環境固定 `DB_SYNCHRONIZE=false`，Migration 明確順序與校驗記錄在
+`deploy/migrations/order.txt`。
 
 ### 驗收
 

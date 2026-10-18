@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# 把「人做出來的資料」印成一份可直接倒回去的 SQL（標準輸出）。
+# 把「人做出來的資料」印成一份可安全合併的 SQL（標準輸出）。
 #
 #   ./deploy/data-snapshot.sh                 # 全部表，含空表（拿來當備份）
 #   ./deploy/data-snapshot.sh --skip-empty    # 略過沒有資料的表（拿來送上別台）
 #
-# 本機（vm.sh syncdata 匯出）和部署機（覆蓋前備份）都跑這一支，所以兩邊格式一樣：
-# 每張表是「DELETE 這張表 → COPY 整份資料」，用 psql -1 倒進去就是整批替換，
-# 中途有一張表失敗就整批不生效。備份檔也能用同一個方式倒回去。
+# 每張表先 COPY 到交易內暫存表，再依主鍵 UPDATE／INSERT。遠端獨有資料不刪除，
+# 避免訂單、歷史或執行中資料仍引用主檔時被 DELETE 破壞。整份輸出需用 psql -1
+# 套用；本機空表配合 --skip-empty 會明確略過，不清空遠端。
 #
 # 要找資料庫容器：DOCKER（預設 docker；部署機上傳 "sudo docker"）、
 # DB_CONTAINER（預設 syncdrive_postgres）。帳號與資料庫名稱讀容器自己的
@@ -43,13 +43,21 @@ SPECS=(
   "speed_limit_configs|"
   "media_library_items|"
   "media_schedules|"
+  "media_play_schedules|"
+  "media_play_schedule_items|"
   "maps|"
   "map_versions|"
   "system_settings|WHERE setting_key LIKE 'system.%'"
 )
 
 psql_in() {
-  $DOCKER exec -i "$CONTAINER" sh -c 'psql -X -q -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+  if [ -n "${DB_NAME_OVERRIDE:-}" ]; then
+    $DOCKER exec -i -e "POSTGRES_DB=$DB_NAME_OVERRIDE" "$CONTAINER" sh -c \
+      'psql -X -q -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+  else
+    $DOCKER exec -i "$CONTAINER" sh -c \
+      'psql -X -q -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+  fi
 }
 
 echo "-- SyncDrive 人為資料快照 $(date '+%Y-%m-%d %H:%M:%S')"
@@ -71,9 +79,30 @@ for spec in "${SPECS[@]}"; do
   cols="$(psql_in <<<"SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position)
                        FROM information_schema.columns
                        WHERE table_schema = 'public' AND table_name = '$table';")"
+  pk_cols="$(psql_in <<<"SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ordinality)
+    FROM pg_index i
+    CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY k(attnum, ordinality)
+    JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum
+    WHERE i.indrelid='public.$table'::regclass AND i.indisprimary;")"
+  [ -n "$pk_cols" ] || { echo "資料表 $table 沒有主鍵，拒絕產生不安全同步" >&2; exit 1; }
+  updates="$(psql_in <<<"SELECT string_agg(format('%1\$I = EXCLUDED.%1\$I', c.column_name), ', ' ORDER BY c.ordinal_position)
+    FROM information_schema.columns c
+    WHERE c.table_schema='public' AND c.table_name='$table'
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_index i
+        CROSS JOIN LATERAL unnest(i.indkey) k(attnum)
+        JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum
+        WHERE i.indrelid='public.$table'::regclass AND i.indisprimary AND a.attname=c.column_name
+      );")"
+  staging="sync_${table}"
   echo "-- ${table}：$count 筆"
-  echo "DELETE FROM public.$table $where;"
-  echo "COPY public.$table ($cols) FROM stdin;"
+  echo "CREATE TEMP TABLE $staging (LIKE public.$table INCLUDING DEFAULTS) ON COMMIT DROP;"
+  echo "COPY $staging ($cols) FROM stdin;"
   psql_in <<<"COPY (SELECT $cols FROM public.$table $where) TO STDOUT;"
   echo '\.'
+  if [ -n "$updates" ]; then
+    echo "INSERT INTO public.$table ($cols) SELECT $cols FROM $staging ON CONFLICT ($pk_cols) DO UPDATE SET $updates;"
+  else
+    echo "INSERT INTO public.$table ($cols) SELECT $cols FROM $staging ON CONFLICT ($pk_cols) DO NOTHING;"
+  fi
 done

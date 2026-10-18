@@ -154,6 +154,45 @@ fi
 echo "參數驗證"
 check "值域外的參數回 400"  "$EXTERNAL/syncdrive-api/vehicles/eta/by-station?limit_per_station=99" 400 "$API_KEY"
 
+echo "部署結構與同步資產"
+if docker ps >/dev/null 2>&1; then DOCKER="docker"; else DOCKER="sudo docker"; fi
+check_runtime() {
+  local label="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    printf '  \033[1;32m✓\033[0m %-46s OK\n' "$label"; pass=$((pass + 1))
+  else
+    printf '  \033[1;31m✗\033[0m %-46s 失敗\n' "$label"; fail=$((fail + 1))
+  fi
+}
+schema_ready() {
+  $DOCKER exec -i syncdrive_postgres sh -c \
+    'psql -X -q -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL' | grep -qx t
+SELECT
+  (SELECT character_maximum_length FROM information_schema.columns
+   WHERE table_name='vehicles' AND column_name='vehicle_code') >= 64
+  AND EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_name='vehicles' AND column_name='initial_mileage_km')
+  AND to_regclass('public.syncdrive_schema_migrations') IS NOT NULL
+  AND to_regclass('public.media_play_schedules') IS NOT NULL;
+SQL
+}
+check_runtime "Migration 與必要欄位已就緒" schema_ready
+active_map_ready() {
+  $DOCKER exec syncdrive_backend node -e '
+    const s=require("/app/scripts/map-published-store.js"); const id=s.getActiveMapId();
+    const hit=s.readPublishedEntry(id); if(!hit?.mapDocument) process.exit(1);
+  '
+}
+media_files_ready() {
+  $DOCKER exec syncdrive_backend node -e '
+    const {Client}=require("pg"),fs=require("fs"),path=require("path");
+    const c=new Client({host:process.env.DB_HOST,port:+process.env.DB_PORT,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});
+    (async()=>{await c.connect();const r=await c.query(`SELECT body #>> ARRAY[$$file$$,$$storageKey$$] key FROM media_library_items WHERE kind=$$media$$ AND COALESCE(body #>> ARRAY[$$file$$,$$storageKey$$],$$$$)<>$$$$`);await c.end();for(const x of r.rows){fs.accessSync(path.join(process.env.MEDIA_STORAGE_DIR||"/app/data/media","objects",x.key),fs.constants.R_OK)}})().catch(()=>process.exit(1));
+  '
+}
+check_runtime "啟用地圖檔可讀且內容有效" active_map_ready
+check_runtime "媒體資料庫引用的正式檔案可讀" media_files_ready
+
 # ── MQTT broker 的認證邊界 ────────────────────────────────────────
 #
 # 這一項是事後補的：broker 的設定曾經以「把 prod 蓋在 mosquitto.conf 上」的方式
@@ -164,7 +203,6 @@ check "值域外的參數回 400"  "$EXTERNAL/syncdrive-api/vehicles/eta/by-stat
 # 所以要真的去連一次。用 mosquitto_sub 從 broker 容器裡打，不必在主機上裝東西。
 echo "MQTT 認證邊界"
 # docker 可能需要 sudo，也可能不用——與上面讀 .env 同樣的處理方式
-if docker ps >/dev/null 2>&1; then DOCKER="docker"; else DOCKER="sudo docker"; fi
 mqtt_denied() {
   local label="$1"; shift
   local out
