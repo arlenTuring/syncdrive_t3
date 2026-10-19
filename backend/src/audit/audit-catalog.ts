@@ -92,6 +92,21 @@ export const AUDIT_ACTIONS = {
   DATA_RETENTION_POLICY: sys('修改資料保存政策', 'DATA_RETENTION'),
   DATA_LIVE_RESET: sys('重置即時資料', 'DATABASE'),
   EVENT_EXPORT: sys('匯出事件報表', 'EVENT'),
+  VIDEO_TAB_CREATE: sys('建立監控標籤', 'VIDEO_TAB'),
+  VIDEO_TAB_UPDATE: sys('修改監控標籤', 'VIDEO_TAB'),
+  VIDEO_TAB_DELETE: sys('刪除監控標籤', 'VIDEO_TAB'),
+  VIDEO_TAB_REORDER: sys('調整監控標籤順序', 'VIDEO_TAB'),
+  VIDEO_TILES_SAVE: sys('儲存監控格子設定', 'VIDEO_TAB'),
+  VIDEO_SOURCE_CREATE: sys('新增影像來源', 'VIDEO_SOURCE'),
+  VIDEO_SOURCE_UPDATE: sys('修改影像來源', 'VIDEO_SOURCE'),
+  VIDEO_SOURCE_DELETE: sys('移除影像來源', 'VIDEO_SOURCE'),
+  VIDEO_DEFAULTS_UPDATE: sys('修改影像來源全域預設', 'VIDEO_SOURCE'),
+  VIDEO_DEFAULTS_APPLY: sys('批次套用影像來源', 'VIDEO_TAB'),
+  VIDEO_SETTINGS_UPDATE: sys('修改影像連線範圍', 'VIDEO_SETTINGS'),
+  VIDEO_STORAGE_POLICY: sys('修改錄影儲存政策', 'VIDEO_SETTINGS'),
+  VIDEO_RECORDING_DELETE: sys('刪除錄影', 'VIDEO_RECORDING'),
+  VIDEO_RECORDING_PROTECT: sys('保護錄影片段', 'VIDEO_RECORDING'),
+  VIDEO_EXPORT: sys('下載錄影片段', 'VIDEO_RECORDING'),
   LOG_EXPORT: sys('匯出日誌', 'LOG'),
 } as const satisfies Record<string, AuditActionInfo>;
 
@@ -125,6 +140,10 @@ export const TARGET_TYPE_LABEL: Record<string, string> = {
   DATABASE: '資料庫',
   DATA_RETENTION: '資料保存',
   LOG: '日誌',
+  VIDEO_TAB: '監控標籤',
+  VIDEO_SOURCE: '影像來源',
+  VIDEO_SETTINGS: '影像設定',
+  VIDEO_RECORDING: '錄影',
 };
 
 /** 稽核內容不得保存的欄位（比對小寫、去掉 _ 與 -） */

@@ -2,7 +2,8 @@ import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { REQUIRE_PERMISSION } from '../access-control/access.guard';
 import { ACCESS_PERMISSIONS } from '../access-control/access.constants';
-import { EventsController, VideoController } from './events.controller';
+import { EventsController } from './events.controller';
+import { VideoController } from '../video/video.controller';
 import { LogsController } from './logs.controller';
 import { LogsService } from './logs.service';
 import { csvCell, toCsv } from './csv';
@@ -18,10 +19,13 @@ describe('事件／日誌權限', () => {
     expect(perms(EventsController, 'acknowledge')).toEqual(['events.events.manage']);
     expect(perms(EventsController, 'export')).toEqual(['events.events.export']);
     expect(perms(VideoController)).toEqual(['events.video.view']);
+    expect(perms(VideoController, 'createSource')).toEqual(['events.video.configure']);
+    expect(perms(VideoController, 'saveTiles')).toEqual(['events.video.configure']);
   });
 
   it('權限代碼都已登錄且接上（不是未接入口）', () => {
-    const codes = ['events.events.view', 'events.events.manage', 'events.events.export', 'events.video.view',
+    const codes = ['events.events.view', 'events.events.manage', 'events.events.export', 'events.video.view', 'events.video.configure', 'events.video.recording-manage',
+      'events.video-history.view', 'events.video-history.export', 'events.video-history.delete',
       ...['system', 'permissions', 'operations', 'authentication'].flatMap((c) => [`logs.${c}.view`, `logs.${c}.export`])];
     for (const code of codes) {
       const item = ACCESS_PERMISSIONS.find((p) => p.code === code);

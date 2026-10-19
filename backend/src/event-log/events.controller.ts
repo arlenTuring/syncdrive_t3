@@ -7,8 +7,6 @@ import { auditActor } from '../audit/audit-action.decorator';
 import { ActionResult } from '../database/entities/operator-action-log.entity';
 import { exportFileName } from './csv';
 import { EventsService } from './events.service';
-import { rangeParams, textParam } from './query-params';
-import { VideoService } from './video.service';
 
 /** 事件管理模組：事件資訊清單、歷史事件、事件報表、回放與影像。固定路由放在 :id 之前。 */
 @ApiTags('Events')
@@ -75,34 +73,5 @@ export class EventsController {
       ...result,
       permissions: { trajectory: permissions.includes('vehicle.log.view'), video: permissions.includes('events.video.view') },
     };
-  }
-}
-
-/** 影像來源：受權限保護；沒有設定來源時明確回報，不回成功的空影片 */
-@ApiTags('Video')
-@Controller('syncdrive-api/video')
-@RequirePermission('events.video.view')
-export class VideoController {
-  constructor(private readonly video: VideoService) {}
-
-  @Get('sources')
-  @ApiOperation({ summary: '影像來源與設定狀態（未設定時列出缺少的介接項目）' })
-  sources() {
-    return this.video.status();
-  }
-
-  @Get('streams/:id')
-  @ApiOperation({ summary: '即時串流的短效播放資訊（只解析後端設定的來源）' })
-  stream(@Param('id') id: string) {
-    return this.video.stream(id);
-  }
-
-  @Get('recordings')
-  @ApiOperation({ summary: '歷史片段查詢（載具＋時間區間）' })
-  recordings(@Query('vehicleCode') vehicleCode: unknown, @Query('from') from: unknown, @Query('to') to: unknown) {
-    const range = rangeParams(from, to);
-    const code = textParam(vehicleCode, '載具', 64);
-    if (!code) throw new ForbiddenException('請指定載具');
-    return this.video.recordings({ vehicleCode: code, ...range });
   }
 }

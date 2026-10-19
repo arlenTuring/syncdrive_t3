@@ -52,6 +52,30 @@ services:
       retries: 6
       start_period: 5s
 
+  # 影像媒體服務（本機開發）：接入、即時 HLS／WebRTC、分段錄影。API／回放只綁本機。
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.2-ffmpeg@sha256:c0feb4acc548d5f410d57d9046f62dfa355e2abc4098f5243de9e86430c77a95
+    container_name: syncdrive_mediamtx
+    restart: always
+    environment:
+      MTX_AUTHINTERNALUSERS_0_PASS: ${VIDEO_MEDIAMTX_PASSWORD:-vtms-local-dev}
+      MTX_AUTHINTERNALUSERS_1_PASS: ${VIDEO_PUBLISH_PASSWORD:-publish-local-dev}
+      MTX_WEBRTCADDITIONALHOSTS: 127.0.0.1
+      VTMS_HOOK_URL: http://host.docker.internal:3000/syncdrive-api/video/internal/segment-complete
+      VTMS_HOOK_SECRET: ${VIDEO_HOOK_SECRET:-hook-local-dev}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./deploy/mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - ./backend/data/video/recordings:/recordings
+    ports:
+      - "127.0.0.1:8554:8554"
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:8889:8889"
+      - "8189:8189/udp"
+      - "127.0.0.1:9996:9996"
+      - "127.0.0.1:9997:9997"
+
   adminer:
     image: adminer
     container_name: syncdrive_adminer

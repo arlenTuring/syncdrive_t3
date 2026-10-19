@@ -1,0 +1,70 @@
+# VTMS 影像媒體服務（MediaMTX v1.21.2，固定版本見 deploy/images.lock）。
+#
+# 正式與本機共用這份設定；差異（帳密、hook 網址、WebRTC 對外位址）由環境變數覆寫：
+#   MTX_AUTHINTERNALUSERS_0_PASS   後端呼叫 API／讀取／回放用的密碼（= VIDEO_MEDIAMTX_PASSWORD）
+#   MTX_AUTHINTERNALUSERS_1_PASS   測試串流推流用的密碼（正式環境給隨機值，不對外使用）
+#   MTX_WEBRTCADDITIONALHOSTS      瀏覽器連得到的媒體服務位址（WebRTC ICE）
+#   VTMS_HOOK_URL / VTMS_HOOK_SECRET  錄影片段完成時通知後端建立索引
+#
+# 來源路徑全部由後端透過 Control API 動態建立（vs_ 開頭＝正式來源，vt_ 開頭＝暫時測試），
+# 這裡不放任何攝影機設定。錄影刪除由後端保存政策統一處理（recordDeleteAfter: 0s）。
+
+logLevel: info
+logDestinations: [stdout]
+
+authMethod: internal
+authInternalUsers:
+  - user: vtms
+    pass: change-me
+    ips: []
+    permissions:
+      - action: api
+      - action: read
+      - action: playback
+  - user: publisher
+    pass: change-me-too
+    ips: []
+    permissions:
+      - action: publish
+
+api: yes
+apiAddress: :9997
+metrics: no
+pprof: no
+playback: yes
+playbackAddress: :9996
+
+rtsp: yes
+rtspTransports: [tcp]
+rtspAddress: :8554
+rtmp: no
+srt: no
+
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: []
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsMuxerCloseAfter: 60s
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: []
+webrtcLocalUDPAddress: :8189
+webrtcIPsFromInterfaces: yes
+webrtcAdditionalHosts: []
+
+pathDefaults:
+  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordPartDuration: 1s
+  recordSegmentDuration: 60s
+  recordDeleteAfter: 0s
+  runOnRecordSegmentComplete: >-
+    sh -c 'wget -q -T 5 -O /dev/null --header "X-Video-Hook-Secret: $VTMS_HOOK_SECRET"
+    "$VTMS_HOOK_URL?path=$MTX_PATH&segment=$MTX_SEGMENT_PATH&duration=$MTX_SEGMENT_DURATION" || true'
+
+paths:
+  all_others:

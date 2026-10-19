@@ -133,6 +133,12 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('events', '事件管理模組', 'events', 'export', '匯出報表', 802),
   // 影像監控與事件影像回放；沒有影像來源時頁面只顯示「尚未設定影像來源」
   permission('events', '事件管理模組', 'video', '影像監控管理', 'view', '檢視', 810),
+  // 設定來源／標籤／全域預設（含帳密寫入）與錄影政策（容量、保存、雲端、壓縮）分開授權
+  permission('events', '事件管理模組', 'video', 'configure', '設定來源與標籤', 811),
+  permission('events', '事件管理模組', 'video', 'recording-manage', '管理錄影政策', 812),
+  permission('events', '事件管理模組', 'video-history', '歷史影像查詢', 'view', '檢視', 820),
+  permission('events', '事件管理模組', 'video-history', 'export', '下載片段', 821),
+  permission('events', '事件管理模組', 'video-history', 'delete', '刪除錄影', 822),
 
   permission('logs', '日誌管理模組', 'system', '系統操作紀錄', 'view', '檢視', 850),
   permission('logs', '日誌管理模組', 'system', 'export', '匯出', 851),

@@ -68,6 +68,8 @@ import { OperationShiftModule } from './operation-shift/operation-shift.module';
 import { DispatchModule } from './dispatch/dispatch.module';
 import { MediaLibraryModule } from './media-library/media-library.module';
 import { EventLogModule } from './event-log/event-log.module';
+import { VideoModule } from './video/video.module';
+import { VIDEO_ENTITIES } from './database/entities/video.entities';
 import { AuditModule } from './audit/audit.module';
 import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition.module';
 import { ScheduleAdjustModule } from './schedule-adjust/schedule-adjust.module';
@@ -139,6 +141,8 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
           DataRetentionPolicy, DataCleanupPlan, DataCleanupJob,
           // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
           PartnerApiKey,
+          // 影像監控與歷史錄影
+          ...VIDEO_ENTITIES,
         ],
         /** 正式結構由 deploy/migrate.sh 管理；synchronize 僅供明確開啟的本機開發。 */
         synchronize: (() => {
@@ -172,6 +176,7 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
     MediaLibraryModule,
     AuditModule,
     EventLogModule,
+    VideoModule,
     VehicleDefinitionModule,
     ScheduleAdjustModule,
     DashboardPlaneModule,
