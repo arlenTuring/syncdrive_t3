@@ -35,7 +35,8 @@ hash_file() {
 
 [ ! -e "$OUTPUT" ] || { echo "輸出目錄已存在：$OUTPUT" >&2; exit 1; }
 mkdir -p "$OUTPUT/maps" "$OUTPUT/media"
-cp "$ROOT/deploy/migrations/order.txt" "$OUTPUT/migrations.order"
+# 順序表取自固定版本，不讀本機工作目錄（打包期間本機檔案被改也不會混進去）
+git -C "$ROOT" show "$SOURCE_SHA:deploy/migrations/order.txt" > "$OUTPUT/migrations.order"
 
 "$ROOT/deploy/data-snapshot.sh" --skip-empty > "$OUTPUT/data.sql"
 

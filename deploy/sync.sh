@@ -101,7 +101,8 @@ echo "    目標：gcloud $INSTANCE / $ZONE${PROJECT:+ / $PROJECT}"
 echo "    固定版本：$SOURCE_SHA"
 echo "    批次：$BATCH"
 echo "    Migration："
-sed '/^\s*#/d;/^\s*$/d;s/^/      /' "$ROOT/deploy/migrations/order.txt"
+# 列出固定版本裡的順序表（不是本機工作目錄），畫面上看到的就是遠端實際會跑的
+git -C "$ROOT" show "$SOURCE_SHA:deploy/migrations/order.txt" | sed '/^\s*#/d;/^\s*$/d;s/^/      /'
 echo "    遠端備份：$REMOTE_DIR/deploy/.state/sync/backups/$BATCH"
 
 if [ "$DRY_RUN" = true ]; then
