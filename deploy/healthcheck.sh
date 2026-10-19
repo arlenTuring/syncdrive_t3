@@ -169,6 +169,15 @@ if [ -n "$VEN_PASS" ]; then
   else
     printf '  \033[1;31m✗\033[0m %-46s 期望 200/201，實際 %s\n' "廠商帳號可登入系統" "$got"; fail=$((fail + 1))
   fi
+  # 登入後要真的維持登入：cookie 必須在這個協定下被保存並帶回（http 下 Secure cookie 會被丟掉）
+  jar="$(mktemp)"
+  curl -s -o /dev/null --max-time 10 -c "$jar" -H 'Content-Type: application/json' --data "$ven_body" "$INTERNAL/syncdrive-api/auth/login" || true
+  if curl -s --max-time 10 -b "$jar" "$INTERNAL/syncdrive-api/auth/me" | grep -q '"authenticated":true'; then
+    printf '  \033[1;32m✓\033[0m %-46s %s\n' "登入後維持登入狀態" "OK"; pass=$((pass + 1))
+  else
+    printf '  \033[1;31m✗\033[0m %-46s %s\n' "登入後維持登入狀態" "登入 cookie 沒有被帶回"; fail=$((fail + 1))
+  fi
+  rm -f "$jar"
   check "廠商帳號不可進內部 Swagger" "$INTERNAL/api/docs"  401 vendor
   check "廠商帳號不可進內部入口"   "$INTERNAL/portal"      401 vendor
 fi
