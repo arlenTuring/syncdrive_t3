@@ -159,6 +159,16 @@ if [ -n "$VEN_PASS" ]; then
   check "廠商帳號可進圖台"         "$INTERNAL/"            200 vendor
   check "廠商帳號可打內部 API"     "$INTERNAL/syncdrive-api/datasource/ping" 200 vendor
   check "廠商帳號不可進技術文件"   "$INTERNAL/docs/"       401 vendor
+  # 同一組帳密也是系統帳號（後端啟動時依 .env 建立），圖台登入頁要登得進去
+  ven_body="$(printf '{"account_name":"%s","password":"%s"}' \
+    "$(printf '%s' "${VEN_USER:-vendor}" | sed 's/[\\"]/\\&/g')" "$(printf '%s' "$VEN_PASS" | sed 's/[\\"]/\\&/g')")"
+  got="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'Content-Type: application/json' \
+    --data "$ven_body" "$INTERNAL/syncdrive-api/auth/login" || echo 000)"
+  if [ "$got" = 200 ] || [ "$got" = 201 ]; then
+    printf '  \033[1;32m✓\033[0m %-46s %s\n' "廠商帳號可登入系統" "$got"; pass=$((pass + 1))
+  else
+    printf '  \033[1;31m✗\033[0m %-46s 期望 200/201，實際 %s\n' "廠商帳號可登入系統" "$got"; fail=$((fail + 1))
+  fi
   check "廠商帳號不可進內部 Swagger" "$INTERNAL/api/docs"  401 vendor
   check "廠商帳號不可進內部入口"   "$INTERNAL/portal"      401 vendor
 fi

@@ -151,6 +151,12 @@ export const PERMISSION_BY_CODE = new Map(ACCESS_PERMISSIONS.map((item) => [item
 export const ADMIN_PERMISSIONS = ['access.accounts.manage', 'access.roles.manage'] as const;
 
 // shortcut: fixed development administrator, replace with deployment-generated credentials before production.
+/** 部署設定廠商帳號的預設角色：各模組檢視權限，不含權限管理與系統管理 */
+export const VENDOR_ROLE_CODE = 'VENDOR';
+export const VENDOR_ROLE_PERMISSIONS: readonly string[] = ACCESS_PERMISSIONS
+  .filter((item) => item.action === 'view' && item.moduleKey !== 'access' && item.moduleKey !== 'system')
+  .map((item) => item.code);
+
 export const FIXED_ADMIN_ACCOUNT = 'syncdrive';
 export const FIXED_ADMIN_PASSWORD = 'LWvG658liN1dZ25Tto';
 export const FIXED_ADMIN_DISPLAY_NAME = '系統管理員';

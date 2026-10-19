@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { DataSource, In, Repository } from 'typeorm';
@@ -12,10 +12,14 @@ import { RolePermission } from '../database/entities/role-permission.entity';
 import { Role } from '../database/entities/role.entity';
 import {
   ACCESS_PERMISSIONS,
+  ACCOUNT_NAME_PATTERN,
   FIXED_ADMIN_ACCOUNT,
   FIXED_ADMIN_DISPLAY_NAME,
   FIXED_ADMIN_PASSWORD,
   SESSION_TTL_MS,
+  validPassword,
+  VENDOR_ROLE_CODE,
+  VENDOR_ROLE_PERMISSIONS,
 } from './access.constants';
 import { hashPassword, verifyPassword } from './password';
 
@@ -49,6 +53,7 @@ export class AuthService implements OnModuleInit {
       );
     }
     await this.ensureFixedAdministrator();
+    await this.ensureVendorAccount();
     await this.dataSource.query('DELETE FROM account_sessions WHERE expires_at <= $1', [Date.now()]);
   }
 
@@ -115,6 +120,63 @@ export class AuthService implements OnModuleInit {
           sourceIp: null, createdAt: now,
         }));
       }
+    });
+  }
+
+  /**
+   * 部署設定的廠商帳號（deploy/.env 的 VENDOR_AUTH_USER／VENDOR_AUTH_PASSWORD）同時是系統帳號：
+   * 圖台改由系統登入後，廠商沿用同一組帳密登入。帳密以部署設定為準（密碼不同就更新），
+   * 角色預設唯讀；管理員停用或刪除這個帳號後不會被自動復原，角色權限調整也不會被覆蓋。
+   */
+  private async ensureVendorAccount() {
+    const name = (process.env.VENDOR_AUTH_USER ?? '').trim();
+    const password = process.env.VENDOR_AUTH_PASSWORD ?? '';
+    if (!name || !password) return;
+    const logger = new Logger('AuthService');
+    if (!ACCOUNT_NAME_PATTERN.test(name) || name.toLowerCase() === FIXED_ADMIN_ACCOUNT.toLowerCase()) {
+      logger.warn(`廠商帳號名稱不可用，略過建立：${name}`);
+      return;
+    }
+    if (!validPassword(password)) {
+      logger.warn('廠商帳號密碼不符合密碼規則（至少 8 字元並包含大小寫英文字母及數字），略過建立');
+      return;
+    }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext('access-control-vendor-account'))`);
+      const now = Date.now();
+      let role = await manager.findOne(Role, { where: { roleCode: VENDOR_ROLE_CODE } });
+      if (!role) {
+        role = await manager.save(Role, manager.create(Role, {
+          roleCode: VENDOR_ROLE_CODE, displayName: '廠商（唯讀）', description: '部署設定的廠商帳號使用；預設只有檢視權限',
+          isSystem: false, createdAt: now, updatedAt: now,
+        }));
+        const permissions = await manager.findBy(Permission, { permissionCode: In([...VENDOR_ROLE_PERMISSIONS]) });
+        if (permissions.length) {
+          await manager.insert(RolePermission, permissions.map((permission) => ({ roleId: role!.id, permissionId: permission.id, createdAt: now })));
+        }
+      }
+
+      const accountRepo = manager.getRepository(Account);
+      const existing = await accountRepo.createQueryBuilder('a').where('LOWER(a.account_name) = LOWER(:name)', { name }).getOne();
+      if (existing && (existing.deletedAt !== null || existing.status !== AccountStatus.ACTIVE)) return;
+      let account = existing;
+      if (!account) {
+        account = await accountRepo.save(accountRepo.create({
+          accountName: name, displayName: '廠商', passwordHash: await hashPassword(password), status: AccountStatus.ACTIVE,
+          failedLoginCount: 0, lockedUntil: null, deletedAt: null, createdAt: now, updatedAt: now,
+        }));
+        await manager.getRepository(AccountRole).insert({ accountId: account.id, roleId: role.id, assignedBy: account.id, createdAt: now });
+      } else if (!(await verifyPassword(password, account.passwordHash))) {
+        await accountRepo.update(account.id, { passwordHash: await hashPassword(password), failedLoginCount: 0, lockedUntil: null, updatedAt: now });
+      } else {
+        return;
+      }
+      await manager.save(PermissionChangeLog, manager.create(PermissionChangeLog, {
+        operatorId: account.id, targetType: PermissionTargetType.ACCOUNT, targetId: account.id,
+        changeType: existing ? PermissionChangeType.UPDATE : PermissionChangeType.CREATE,
+        beforeValue: null, afterValue: { account_name: account.accountName, vendor_account_synced_from_deploy: true },
+        sourceIp: null, createdAt: now,
+      }));
     });
   }
 

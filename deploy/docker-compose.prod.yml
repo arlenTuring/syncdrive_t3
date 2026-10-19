@@ -121,6 +121,9 @@ services:
       # 分兩組的話等於同一個廠商要記兩份，而它們保護的是同一個邊界。
       EXTERNAL_AUTH_USER: ${EXTERNAL_AUTH_USER}
       EXTERNAL_AUTH_PASSWORD: ${EXTERNAL_AUTH_PASSWORD}
+      # 廠商帳號：圖台改由系統帳號登入後，後端啟動時以這組帳密建立／更新同名系統帳號（唯讀角色）
+      VENDOR_AUTH_USER: ${VENDOR_AUTH_USER:-}
+      VENDOR_AUTH_PASSWORD: ${VENDOR_AUTH_PASSWORD:-}
       # 發金鑰時當場簽出車輛憑證，所以後端要讀得到中介 CA 的私鑰（唯讀掛載）
       MQTT_CERT_DIR: /mqtt-certs
       # 系統基礎模組上傳的 HTTPS 傳輸憑證（私鑰可寫；勿與 MQTT_CERT_DIR 混用）
