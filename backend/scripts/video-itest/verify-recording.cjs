@@ -63,7 +63,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await reconciler.reconcile();
     // 等兩個片段完成並由 hook 建立索引（本機分段 20 秒、正式 60 秒；等待時間依分段長度）
     let segs = [];
-    const rounds = Math.ceil((require(D + '/video/video.config.js').SEGMENT_SECONDS * 2 + 60) / 3);
+    const rounds = Math.ceil((require(D + '/video/video.config.js').segmentSeconds() * 2 + 60) / 3);
     for (let i = 0; i < rounds && segs.length < 2; i++) {
       await sleep(3000);
       segs = await ds.query(`SELECT * FROM video_recording_segments WHERE source_id = $1 AND status = 'READY' ORDER BY start_at`, [sid]);

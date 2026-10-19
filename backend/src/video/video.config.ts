@@ -41,8 +41,12 @@ export const PLAYBACK_SPAN_MAX_MS = 24 * 3_600_000;
 export const EXPORT_SPAN_MAX_MS = 30 * 60_000;
 export const SOURCE_TEST_TTL_MS = 2 * 60_000;
 export const SOURCE_TEST_CONCURRENCY = 3;
-/** 持久片段長度（初值約 60 秒；實際切分依關鍵幀）。VIDEO_SEGMENT_SECONDS 僅供測試縮短，最少 10 秒 */
-export const SEGMENT_SECONDS = Math.max(10, Number(process.env.VIDEO_SEGMENT_SECONDS) || 60);
+/**
+ * 持久片段長度（初值約 60 秒；實際切分依關鍵幀）。VIDEO_SEGMENT_SECONDS 僅供測試縮短，最少 10 秒。
+ * 用到時才讀：開發時 .env 由 ConfigModule 在模組載入之後才放進 process.env，
+ * 在載入時就算死的話，後端會用 60 秒、其他讀了 .env 的程序用 20 秒，兩邊輪流改媒體服務設定。
+ */
+export const segmentSeconds = () => Math.max(10, Number(process.env.VIDEO_SEGMENT_SECONDS) || 60);
 export const GIB = 1024 ** 3;
 
 export const mediaPathOf = (revisionId: string) => `${MEDIA_PATH_PREFIX}${revisionId.replace(/-/g, '')}`;

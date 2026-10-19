@@ -10,7 +10,7 @@ import { probeCapabilities } from './video-capabilities';
 import { MediaMtxClient } from './mediamtx.client';
 import { VideoConfigService } from './video-config.service';
 import { VideoReconcilerService } from './video-reconciler.service';
-import { GIB, MEDIA_PATH_PREFIX, SEGMENT_SECONDS, videoConfig } from './video.config';
+import { GIB, MEDIA_PATH_PREFIX, segmentSeconds, videoConfig } from './video.config';
 
 const DAY = 86_400_000;
 const FILE_RE = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})-(\d{1,6})\.mp4$/;
@@ -172,7 +172,7 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
         const span = spans.find((s) => Date.parse(s.start) <= start + 1_000 && Date.parse(s.start) + s.duration * 1000 > start);
         const spanEnd = span ? Date.parse(span.start) + span.duration * 1000 : null;
         const nextStart = next ? parseSegmentStart(next)! : null;
-        const end = Math.min(...[spanEnd, nextStart, start + SEGMENT_SECONDS * 3 * 1000].filter((v): v is number => v !== null && v > start));
+        const end = Math.min(...[spanEnd, nextStart, start + segmentSeconds() * 3 * 1000].filter((v): v is number => v !== null && v > start));
         await this.indexSegment(dir.name, `${dir.name}/${f}`, null, Number.isFinite(end) ? end : start);
         indexed += 1;
         mark = `${dir.name}/${f}`;

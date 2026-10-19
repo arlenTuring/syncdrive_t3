@@ -3,7 +3,7 @@ import { DataSource, In, IsNull, QueryRunner } from 'typeorm';
 import { VideoSource, VideoSourceRevision } from '../database/entities/video.entities';
 import { MediaMtxClient, type ManagedPathConfig, type RuntimePath } from './mediamtx.client';
 import { VideoConfigService } from './video-config.service';
-import { MEDIA_PATH_PREFIX, SEGMENT_SECONDS, videoConfig } from './video.config';
+import { MEDIA_PATH_PREFIX, segmentSeconds, videoConfig } from './video.config';
 
 export type StorageGate = () => Promise<{ ok: boolean; reason: string | null }>;
 
@@ -132,7 +132,7 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
           record,
           recordPath: `${cfg.mediamtxRecordingsDir}/%path/%Y-%m-%d_%H-%M-%S-%f`,
           recordFormat: 'fmp4',
-          recordSegmentDuration: `${SEGMENT_SECONDS}s`,
+          recordSegmentDuration: `${segmentSeconds()}s`,
           recordPartDuration: '1s',
           // 刪除由本系統的保存政策統一處理，媒體服務不自行按天數刪
           recordDeleteAfter: '0s',
