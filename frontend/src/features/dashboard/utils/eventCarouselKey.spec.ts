@@ -6,7 +6,9 @@ import { migratePlane, switchEventCarouselKey } from './migrateDashboardPlane';
 
 /** 2026-10-05 之前的系統版事件中心清單（沒有 event_key） */
 const OLD_EVENT_CENTER_LIST_SQL = EVENT_CENTER_LIST_SQL
-  .replace(/\n  -- event_key：[^\n]*\n  -- [^\n]*\n  id::text AS event_key,/, '');
+  .replace(/\n  -- event_key：[^\n]*\n  -- [^\n]*\n  id::text AS event_key,/, '')
+  // 2026-10-20 狀態文字由「已處理／尚未處理」改為「已確認／未確認」；還原成當時的原文
+  .replace("THEN '已確認' ELSE '未確認' END AS status_label", "THEN '已處理' ELSE '尚未處理' END AS status_label");
 
 function plane(sqlQuery: string, slotKeyField = 'event_id'): DashboardPlane {
   return {
