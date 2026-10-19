@@ -123,7 +123,8 @@ export class EventsService {
       clauses.push(sql.replace('?', `$${params.length}`));
     };
     if (snapshotId) add('e.id <= ?::bigint', snapshotId);
-    if (filters.vehicleCode) add('upper(e.vehicle_code) = upper(?)', filters.vehicleCode);
+    // 精確比對（選單給的是事件裡實際出現的車號）：走 (vehicle_code, created_at) 索引
+    if (filters.vehicleCode) add('e.vehicle_code = ?', filters.vehicleCode);
     if (filters.eventCode) add('e.event_code::text = ?', filters.eventCode);
     if (filters.severity) add('e.severity::text = ?', filters.severity);
     if (filters.sourceType) add('e.source_type = ?', filters.sourceType);
