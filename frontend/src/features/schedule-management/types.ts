@@ -16,6 +16,13 @@ export type ShellView =
   | 'media-content'
   | 'media-groups'
   | 'media-schedule'
+  | 'event-list'
+  | 'event-history'
+  | 'video-monitor'
+  | 'log-system'
+  | 'log-permissions'
+  | 'log-operations'
+  | 'log-authentication'
   | 'system-foundation'
   | 'account-management'
   | 'role-management';
@@ -81,6 +88,27 @@ export const MEDIA_NAV_ITEMS: ShellNavItem[] = [
   { id: 'media-schedule', label: 'nav.items.media-schedule', enabled: true, requiredPermission: 'media.schedule.view' },
 ];
 
+export const EVENTS_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'event-list', label: 'nav.items.event-list', enabled: true, requiredPermission: 'events.events.view' },
+  { id: 'event-history', label: 'nav.items.event-history', enabled: true, requiredPermission: 'events.events.view' },
+  { id: 'video-monitor', label: 'nav.items.video-monitor', enabled: true, requiredPermission: 'events.video.view' },
+];
+
+export const LOGS_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'log-system', label: 'nav.items.log-system', enabled: true, requiredPermission: 'logs.system.view' },
+  { id: 'log-permissions', label: 'nav.items.log-permissions', enabled: true, requiredPermission: 'logs.permissions.view' },
+  { id: 'log-operations', label: 'nav.items.log-operations', enabled: true, requiredPermission: 'logs.operations.view' },
+  { id: 'log-authentication', label: 'nav.items.log-authentication', enabled: true, requiredPermission: 'logs.authentication.view' },
+];
+
+export function isEventsView(view: string): boolean {
+  return EVENTS_NAV_ITEMS.some((item) => item.id === view);
+}
+
+export function isLogsView(view: string): boolean {
+  return LOGS_NAV_ITEMS.some((item) => item.id === view);
+}
+
 export type ShellModuleGroup = {
   id: string;
   /** i18n key；使用者自訂別名不經由此欄 */
@@ -127,6 +155,8 @@ export const SIDEBAR_MODULE_GROUPS: ShellModuleGroup[] = [
   },
   { id: 'service', label: 'nav.modules.service', enabled: false },
   { id: 'media', label: 'nav.modules.media', enabled: true, items: MEDIA_NAV_ITEMS },
+  { id: 'events', label: 'nav.modules.events', enabled: true, items: EVENTS_NAV_ITEMS },
+  { id: 'logs', label: 'nav.modules.logs', enabled: true, items: LOGS_NAV_ITEMS },
   // 系統基礎模組只從右上角齒輪進入，側欄不另設入口
   { id: 'permission', label: 'nav.modules.permission', enabled: true, items: PERMISSION_NAV_ITEMS },
 ];
@@ -141,7 +171,7 @@ export function isScheduleSubView(view: ShellView): view is ScheduleSubView {
 }
 
 export const VIEW_PERMISSIONS: Partial<Record<ShellView, string>> = Object.fromEntries(
-  [...OPERATIONS_NAV_ITEMS, ...SITE_NAV_ITEMS, ...SCHEDULE_NAV_ITEMS, ...VEHICLE_NAV_ITEMS, ...MEDIA_NAV_ITEMS, ...PERMISSION_NAV_ITEMS]
+  [...OPERATIONS_NAV_ITEMS, ...SITE_NAV_ITEMS, ...SCHEDULE_NAV_ITEMS, ...VEHICLE_NAV_ITEMS, ...MEDIA_NAV_ITEMS, ...EVENTS_NAV_ITEMS, ...LOGS_NAV_ITEMS, ...PERMISSION_NAV_ITEMS]
     .filter((item) => item.requiredPermission).map((item) => [item.id, item.requiredPermission!]),
 );
 VIEW_PERMISSIONS.dashboard = 'dashboard.dashboard.view';

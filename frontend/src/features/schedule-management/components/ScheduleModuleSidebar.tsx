@@ -25,11 +25,16 @@ import {
   UserRoundCog,
   Wrench,
   Volume2,
+  BellRing,
+  ScrollText,
+  Video,
+  KeyRound,
+  LogIn,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShellView } from '../types';
-import { isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS } from '../types';
+import { isEventsView, isLogsView, isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS } from '../types';
 import type { ModuleDashboardPage } from '../utils/moduleDashboardPages';
 import {
   moduleDashboardViewId,
@@ -51,6 +56,13 @@ type ScheduleModuleSidebarProps = {
 };
 
 const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
+  'event-list': BellRing,
+  'event-history': History,
+  'video-monitor': Video,
+  'log-system': ScrollText,
+  'log-permissions': KeyRound,
+  'log-operations': ClipboardList,
+  'log-authentication': LogIn,
   'shift-deployment': Activity,
   'degraded-operation': AlertTriangle,
   'dispatch-scheduling': Send,
@@ -79,6 +91,8 @@ function groupIcon(groupId: string) {
   if (groupId === 'operations') return Activity;
   if (groupId === 'permission') return Settings;
   if (groupId === 'media') return Volume2;
+  if (groupId === 'events') return BellRing;
+  if (groupId === 'logs') return ScrollText;
   if (groupId === 'service') {
     return LayoutDashboard;
   }
@@ -87,6 +101,8 @@ function groupIcon(groupId: string) {
 
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
   if (groupId === 'site') return isSiteView(activeView);
+  if (groupId === 'events') return isEventsView(activeView);
+  if (groupId === 'logs') return isLogsView(activeView);
   if (groupId === 'vehicle') return activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history';
   if (groupId === 'operations') return isOperationsView(activeView);
   if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
@@ -196,6 +212,8 @@ export function ScheduleModuleSidebar({
       setExpanded((prev) => ({ ...prev, vehicle: true }));
     }
     if (activeView === 'media-content' || activeView === 'media-groups' || activeView === 'media-schedule') setExpanded((prev) => ({ ...prev, media: true }));
+    if (isEventsView(activeView)) setExpanded((prev) => ({ ...prev, events: true }));
+    if (isLogsView(activeView)) setExpanded((prev) => ({ ...prev, logs: true }));
     const mdpId = parseModuleDashboardViewId(activeView);
     if (mdpId) {
       const page = moduleDashboardPages.find((item) => item.id === mdpId);

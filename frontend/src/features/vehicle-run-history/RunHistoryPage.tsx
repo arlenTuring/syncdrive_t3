@@ -112,7 +112,8 @@ function recordsOf(resolved: Resolved | null): VehicleRecords | null {
 
 const ONE = new Set<string>();
 
-function ReplayStage({ resolved, panelSlot }: { resolved: Resolved | null; panelSlot: HTMLElement | null }) {
+/** 也給事件回放共用（固定一台載具、固定時間窗） */
+export function ReplayStage({ resolved, panelSlot }: { resolved: Resolved | null; panelSlot: HTMLElement | null }) {
   const vehicle = appliedVehicle(resolved);
   const window_ = useMemo(() => replayWindow(resolved), [resolved]);
   const coverage = coverageOf(resolved);

@@ -38,6 +38,10 @@ import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
 import { MediaContentPage } from '../media-content/MediaContentPage';
 import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
 import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
+import { EventListPage } from '../event-management/EventListPage';
+import { VideoMonitorPage } from '../event-management/VideoMonitorPage';
+import { LogPage } from '../log-management/LogPage';
+import { isEventsView, isLogsView } from './types';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
 import {
@@ -154,6 +158,9 @@ function useWorkspaceChrome(
     }
     if (view === 'media-schedule') {
       return { title: t('nav.items.media-schedule'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    }
+    if (isEventsView(view) || isLogsView(view)) {
+      return { title: t(`nav.items.${view}`), icon: <ClipboardList className="size-4 text-sky-400" aria-hidden /> };
     }
     if (view === 'system-foundation') {
       return {
@@ -423,6 +430,20 @@ export default function ScheduleManagementApp({
         {view === 'media-schedule' ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title="媒體排程設定載入失敗"><MediaSchedulesPage /></ViewErrorBoundary>
+          </ShellWorkspaceFrame>
+        ) : null}
+
+        {isEventsView(view) || isLogsView(view) ? (
+          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
+            <ViewErrorBoundary title={`${chrome.title}載入失敗`}>
+              {view === 'event-list' ? <EventListPage key="live" mode="live" /> : null}
+              {view === 'event-history' ? <EventListPage key="history" mode="history" /> : null}
+              {view === 'video-monitor' ? <VideoMonitorPage /> : null}
+              {view === 'log-system' ? <LogPage key="system" category="system" /> : null}
+              {view === 'log-permissions' ? <LogPage key="permissions" category="permissions" /> : null}
+              {view === 'log-operations' ? <LogPage key="operations" category="operations" /> : null}
+              {view === 'log-authentication' ? <LogPage key="authentication" category="authentication" /> : null}
+            </ViewErrorBoundary>
           </ShellWorkspaceFrame>
         ) : null}
 
