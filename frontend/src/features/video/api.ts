@@ -46,6 +46,7 @@ export type StoragePolicy = {
   retentionDays: number;
   maxBytes: number | null;
   minFreeBytes: number | null;
+  localCacheMaxBytes: number | null;
   highWatermarkPct: number;
   lowWatermarkPct: number;
   gcsBucket: string | null;
@@ -70,6 +71,20 @@ export type StorageStatus = {
   earliestAvailableAt: number | null;
   paused: { reason: string } | null;
   measuredAt: number;
+  /** GCS bucket 的保護政策（只在 GCS 模式） */
+  gcs?: { ok: true; softDeleteDays: number; versioning: boolean; storageClass: string | null } | { ok: false; error: string } | null;
+  remoteSegments?: number;
+  compression?: { pending: number; kept: number; skipped: number; failed: number; savedBytes: number; avgVmaf: number | null } | null;
+};
+
+/** 伺服器實際偵測到的能力；畫面只開放偵測到的選項 */
+export type Capabilities = {
+  ffmpeg: boolean;
+  encoders: { h264: string[]; hevc: string[]; av1: string[] };
+  vmaf: boolean;
+  hwaccels: string[];
+  storage: { local: true; gcs: boolean };
+  checkedAt: number;
 };
 
 export type Bootstrap = { tabs: Tab[]; sources: VideoSourceItem[]; defaults: Defaults; settings: Settings; storage: StorageStatus | null };
@@ -150,6 +165,7 @@ export const videoApi = {
   deleteTest: (id: string) => send<{ deleted: boolean }>('DELETE', `/source-tests/${id}`),
   liveSession: (sourceId: string) => send<LiveSession>('POST', `/sources/${sourceId}/live-sessions`),
   storageStatus: (signal?: AbortSignal) => v('/storage-status', undefined, signal) as Promise<StorageStatus>,
+  capabilities: () => v('/capabilities') as Promise<Capabilities>,
   updateStoragePolicy: (body: Record<string, unknown>) => send<StorageStatus>('PUT', '/storage-policy', body),
   availability: (sourceIds: string[], from: number, to: number, signal?: AbortSignal) => v('/recordings/availability', { sourceIds: sourceIds.join(','), from, to }, signal) as Promise<Availability>,
   calendar: (sourceIds: string[], from: number, to: number, timeZone: string, signal?: AbortSignal) => v('/recordings/calendar', { sourceIds: sourceIds.join(','), from, to, timeZone }, signal) as Promise<{ days: string[] }>,

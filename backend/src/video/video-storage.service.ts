@@ -5,6 +5,8 @@ import { join, relative, sep } from 'node:path';
 import { DataSource, In } from 'typeorm';
 import type { AuthUser } from '../access-control/auth.service';
 import { VideoRecordingSegment, VideoSegmentObject, VideoSourceRevision, VideoStoragePolicy } from '../database/entities/video.entities';
+import { bucketPolicy, deleteObject } from './gcs.client';
+import { probeCapabilities } from './video-capabilities';
 import { MediaMtxClient } from './mediamtx.client';
 import { VideoConfigService } from './video-config.service';
 import { VideoReconcilerService } from './video-reconciler.service';
@@ -70,6 +72,10 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
   lease(segmentIds: string[], ttlMs = 120_000) {
     const until = Date.now() + ttlMs;
     for (const id of segmentIds) this.leases.set(id, Math.max(this.leases.get(id) ?? 0, until));
+  }
+
+  release(segmentIds: string[]) {
+    for (const id of segmentIds) this.leases.delete(id);
   }
 
   private leased(id: string) {
@@ -208,7 +214,8 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
     const fs = statfsSync(root);
     const totalBytes = Number(fs.blocks) * Number(fs.bsize);
     const freeBytes = Number(fs.bavail) * Number(fs.bsize);
-    const [{ used }] = await this.dataSource.query(`SELECT COALESCE(sum(bytes), 0)::bigint AS used FROM video_recording_segments WHERE status NOT IN ('DELETED')`);
+    // 本機用量＝本機上仍存在的檔案（原檔＋壓縮成品）；只在雲端的片段不算
+    const [{ used }] = await this.dataSource.query(`SELECT COALESCE(sum(bytes), 0)::bigint AS used FROM video_segment_objects WHERE storage_type = 'local' AND status = 'READY'`);
     const usedBytes = Number(used);
     let auto = p.autoBudgetBytes;
     if (!p.maxBytes && !auto) {
@@ -216,7 +223,9 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       auto = Math.floor(Math.min(50 * GIB, (freeBytes + usedBytes) * 0.25));
       await this.dataSource.manager.update(VideoStoragePolicy, { id: 'default' }, { autoBudgetBytes: auto });
     }
-    const budgetBytes = p.maxBytes ?? auto ?? 50 * GIB;
+    const configured = p.maxBytes ?? auto ?? 50 * GIB;
+    // GCS 模式：本機只是快取，另有快取上限時取較小者
+    const budgetBytes = p.storageType === 'gcs' && p.localCacheMaxBytes ? Math.min(configured, p.localCacheMaxBytes) : configured;
     const minFreeBytes = p.minFreeBytes ?? Math.max(5 * GIB, Math.floor(totalBytes * 0.1));
     // 實際可分配：預算與「已用＋剩餘－最低保留」較小者（檔案系統的其他用量也算進去）
     const allowedBytes = Math.max(0, Math.min(budgetBytes, usedBytes + freeBytes - minFreeBytes));
@@ -256,6 +265,7 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       retentionDays: p.retentionDays,
       maxBytes: p.maxBytes,
       minFreeBytes: p.minFreeBytes,
+      localCacheMaxBytes: p.localCacheMaxBytes,
       highWatermarkPct: p.highWatermarkPct,
       lowWatermarkPct: p.lowWatermarkPct,
       gcsBucket: p.gcsBucket,
@@ -297,6 +307,20 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       minVmaf: int(compressionIn.minVmaf ?? 90, 'VMAF 門檻', 50, 100),
       maxConcurrency: int(compressionIn.maxConcurrency ?? 1, '壓縮並行數', 1, 4),
     } as VideoStoragePolicy['compression'];
+    if (compression.enabled) {
+      // 只有實際偵測到的編碼器與品質評估可用時才允許開啟
+      const caps = await probeCapabilities(true);
+      const encoder = compression.codec === 'av1' ? 'libsvtav1' : 'libx265';
+      if (!caps.encoders[compression.codec].includes(encoder)) throw new BadRequestException(`此主機沒有 ${encoder} 編碼器，無法開啟壓縮`);
+      if (!caps.vmaf) throw new BadRequestException('此主機的 ffmpeg 沒有 libvmaf，無法驗證畫質，不能開啟壓縮');
+    }
+    if (storageType === 'gcs' && (current.storageType !== 'gcs' || gcsBucket !== current.gcsBucket)) {
+      try {
+        await bucketPolicy(gcsBucket!);
+      } catch (error) {
+        throw new BadRequestException(`無法存取 GCS bucket：${(error as Error).message}`);
+      }
+    }
     const high = int(input.highWatermarkPct ?? current.highWatermarkPct, '高水位', 50, 99);
     const low = int(input.lowWatermarkPct ?? current.lowWatermarkPct, '低水位', 10, 98);
     if (low >= high) throw new BadRequestException('低水位必須小於高水位');
@@ -305,6 +329,7 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       retentionDays: int(input.retentionDays ?? current.retentionDays, '保留天數', 1, 3650),
       maxBytes: input.maxBytes === undefined ? current.maxBytes : bytes(input.maxBytes, '影片最大用量'),
       minFreeBytes: input.minFreeBytes === undefined ? current.minFreeBytes : bytes(input.minFreeBytes, '最低剩餘容量'),
+      localCacheMaxBytes: input.localCacheMaxBytes === undefined ? current.localCacheMaxBytes : bytes(input.localCacheMaxBytes, '本機快取上限'),
       highWatermarkPct: high,
       lowWatermarkPct: low,
       gcsBucket,
@@ -335,7 +360,7 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
     const p = await this.policy();
     let deleted = 0;
     const expired = await this.dataSource.query(
-      `SELECT id FROM video_recording_segments WHERE status IN ('READY', 'FAILED') AND end_at < $1 AND (protected_until IS NULL OR protected_until < $2)
+      `SELECT id FROM video_recording_segments WHERE status IN ('READY', 'REMOTE_READY', 'FAILED') AND end_at < $1 AND (protected_until IS NULL OR protected_until < $2)
         ORDER BY start_at LIMIT 500`,
       [now - p.retentionDays * DAY, now],
     );
@@ -343,7 +368,14 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
     let n = await this.numbers(p);
     if (n.usedBytes > (n.allowedBytes * p.highWatermarkPct) / 100) {
       const target = (n.allowedBytes * p.lowWatermarkPct) / 100;
+      // 先回收「雲端已有完整副本」的本機檔：片段仍可從雲端播放，不算刪除錄影
       for (let round = 0; round < 20 && n.usedBytes > target; round += 1) {
+        const freed = await this.evictLocalCopies(n.usedBytes - target, now);
+        if (!freed) break;
+        n = await this.numbers(p);
+      }
+      // GCS 模式不刪尚未上傳的片段：仍超過就暫停新錄影，等上傳後再回收
+      for (let round = 0; p.storageType === 'local' && round < 20 && n.usedBytes > target; round += 1) {
         const batch = await this.dataSource.query(
           `SELECT id, bytes FROM video_recording_segments WHERE status = 'READY' AND (protected_until IS NULL OR protected_until < $1)
             ORDER BY start_at LIMIT 200`,
@@ -383,7 +415,16 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       if (this.leased(seg.id)) continue;
       await this.dataSource.manager.update(VideoRecordingSegment, { id: seg.id }, { status: 'DELETE_PENDING', updatedAt: Date.now() });
       try {
+        const objects = await this.dataSource.manager.find(VideoSegmentObject, { where: { segmentId: seg.id } });
         await fsp.rm(this.localPath(seg.segmentKey), { force: true });
+        for (const obj of objects.filter((o) => o.status !== 'DELETED')) {
+          if (obj.storageType === 'local') await fsp.rm(this.localPath(obj.objectKey), { force: true });
+          else {
+            const bucket = (await this.policy()).gcsBucket;
+            if (!bucket) throw new Error('雲端物件存在但未設定 bucket，無法刪除');
+            await deleteObject(bucket, obj.objectKey, obj.generation);
+          }
+        }
         await this.dataSource.manager.update(VideoSegmentObject, { segmentId: seg.id }, { status: 'DELETED', updatedAt: Date.now() });
         await this.dataSource.manager.update(VideoRecordingSegment, { id: seg.id }, { status: 'DELETED', failureReason: reason.slice(0, 300), updatedAt: Date.now() });
         count += 1;
@@ -392,6 +433,26 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return count;
+  }
+
+  /** 回收本機副本：只挑雲端已有同版本（rendition）完整物件的本機檔，最舊優先；回傳釋放的位元組 */
+  async evictLocalCopies(wantBytes: number, now = Date.now()) {
+    const rows: Array<{ id: string; segment_id: string; object_key: string; bytes: string }> = await this.dataSource.query(
+      `SELECT l.id, l.segment_id, l.object_key, l.bytes FROM video_segment_objects l
+         JOIN video_recording_segments s ON s.id = l.segment_id
+        WHERE l.storage_type = 'local' AND l.status = 'READY' AND s.status = 'REMOTE_READY'
+          AND EXISTS (SELECT 1 FROM video_segment_objects g WHERE g.segment_id = l.segment_id AND g.rendition = l.rendition AND g.storage_type = 'gcs' AND g.status = 'READY')
+        ORDER BY s.start_at LIMIT 200`,
+    );
+    let freed = 0;
+    for (const row of rows) {
+      if (freed >= wantBytes) break;
+      if (this.leased(row.segment_id)) continue;
+      await fsp.rm(this.localPath(row.object_key), { force: true });
+      await this.dataSource.manager.update(VideoSegmentObject, { id: row.id }, { status: 'DELETED', updatedAt: now });
+      freed += Number(row.bytes ?? 0);
+    }
+    return freed;
   }
 
   relativeKey(fullPath: string) {

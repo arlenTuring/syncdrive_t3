@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream, existsSync, promises as fsp } from 'node:fs';
 import { request as httpRequest } from 'node:http';
@@ -7,7 +7,8 @@ import type { Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { readCookie } from '../access-control/access.guard';
 import { AuthService, type AuthUser } from '../access-control/auth.service';
-import { VideoJob, VideoRecordingSegment, VideoSource, VideoSourceRevision } from '../database/entities/video.entities';
+import { VideoJob, VideoRecordingSegment, VideoSegmentObject, VideoSource, VideoSourceRevision } from '../database/entities/video.entities';
+import { readObject } from './gcs.client';
 import { maskedSourceUrl } from './source-address';
 import { addressOf } from './video-config.service';
 import { sessionHash } from './video-live.service';
@@ -253,7 +254,35 @@ export class VideoHistoryService implements OnModuleInit, OnModuleDestroy {
     if (!seg || seg.sourceId !== p.sub || seg.startAt >= Number(p.to) || seg.endAt <= Number(p.from)) throw new NotFoundException('片段不在授權範圍內');
     if (!['READY', 'REMOTE_READY', 'UPLOADING'].includes(seg.status)) throw new NotFoundException('片段已到期或無法播放');
     this.storage.lease([seg.id]);
-    this.sendFile(this.storage.localPath(seg.segmentKey), seg.segmentKey, res, 'video/mp4', null);
+    // 優先本機（原檔、再來壓縮成品），本機已回收才從雲端串流；同一版本內容一致
+    const objects = await this.dataSource.manager.find(VideoSegmentObject, { where: { segmentId: seg.id, status: 'READY' } });
+    const rank = (o: VideoSegmentObject) => (o.storageType === 'local' ? 0 : 2) + (o.rendition === 'original' ? 0 : 1);
+    const pick = objects.sort((a, b) => rank(a) - rank(b))[0];
+    if (!pick) {
+      // 舊索引沒有物件列時退回片段本身的路徑
+      this.sendFile(this.storage.localPath(seg.segmentKey), seg.segmentKey, res, 'video/mp4', null);
+      return;
+    }
+    if (pick.storageType === 'local') {
+      this.sendFile(this.storage.localPath(pick.objectKey), pick.objectKey, res, 'video/mp4', null);
+      return;
+    }
+    const bucket = (await this.storage.policy()).gcsBucket;
+    if (!bucket) throw new NotFoundException('片段只在雲端，但未設定 bucket');
+    const range = typeof req.headers.range === 'string' && /^bytes=\d*-\d*$/.test(req.headers.range) ? req.headers.range : undefined;
+    const remote = await readObject(bucket, pick.objectKey, range).catch((error: Error) => {
+      throw new ServiceUnavailableException(`雲端片段暫時無法讀取：${error.message}`);
+    });
+    res.status(remote.status);
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    for (const h of ['content-length', 'content-range']) {
+      const v = remote.headers.get(h);
+      if (v) res.setHeader(h, v);
+    }
+    remote.body.on('error', () => res.destroy());
+    remote.body.pipe(res);
   }
 
   private sendFile(full: string, key: string, res: Response, type: string, downloadName: string | null) {

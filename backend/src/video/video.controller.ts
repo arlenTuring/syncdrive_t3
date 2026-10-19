@@ -3,6 +3,9 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { PublicEndpoint, RequirePermission, type AuthenticatedRequest } from '../access-control/access.guard';
 import { AuditAction } from '../audit/audit-action.decorator';
+import { DataSource } from 'typeorm';
+import { VideoArchiveService } from './video-archive.service';
+import { probeCapabilities } from './video-capabilities';
 import { VideoConfigService } from './video-config.service';
 import { VideoHistoryService } from './video-history.service';
 import { VideoLiveService } from './video-live.service';
@@ -28,6 +31,8 @@ export class VideoController {
     private readonly live: VideoLiveService,
     private readonly storage: VideoStorageService,
     private readonly history: VideoHistoryService,
+    private readonly archive: VideoArchiveService,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Get('bootstrap')
@@ -193,8 +198,18 @@ export class VideoController {
   @Get('storage-status')
   @RequirePermission('events.video.view', 'events.video-history.view')
   @ApiOperation({ summary: '錄影容量：用量、預算、最低剩餘、預估可存天數、最早可用時間、是否暫停' })
-  storageStatus() {
-    return this.storage.status();
+  async storageStatus() {
+    const status = await this.storage.status();
+    const gcs = status.policy.storageType === 'gcs' ? await this.archive.bucketStatus(status.policy.gcsBucket) : null;
+    const [{ remote }] = await this.dataSource.query(`SELECT count(*)::int AS remote FROM video_recording_segments WHERE status = 'REMOTE_READY'`);
+    return { ...status, gcs, remoteSegments: remote, compression: status.policy.compression.enabled ? await this.archive.compressionStats() : null };
+  }
+
+  @Get('capabilities')
+  @RequirePermission('events.video.recording-manage')
+  @ApiOperation({ summary: '實際偵測：可用編碼器（H.264／HEVC／AV1）、libvmaf、硬體加速、可用儲存位置' })
+  capabilities(@Query('refresh') refresh?: string) {
+    return probeCapabilities(refresh === '1');
   }
 
   @Get('storage-policy')

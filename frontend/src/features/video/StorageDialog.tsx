@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/dialogs';
 import { formatDateTime } from '../event-log-shared/time';
-import { formatBytes, videoApi, type StorageStatus } from './api';
+import { formatBytes, videoApi, type Capabilities, type StorageStatus } from './api';
 
 const GIB = 1024 ** 3;
 const field = 'h-10 w-full rounded-lg bg-[#262a33] px-3 text-sm text-zinc-100 outline-none focus:ring-1 focus:ring-sky-500';
@@ -20,12 +20,30 @@ export function StorageDialog({ status, timeZone, onClose, onChanged }: { status
     storageType: p.storageType,
     gcsBucket: p.gcsBucket ?? '',
     gcsPrefix: p.gcsPrefix ?? '',
+    cacheGiB: p.localCacheMaxBytes ? (p.localCacheMaxBytes / GIB).toFixed(1) : '',
+    minSavingPct: String(p.compression.minSavingPct),
+    minVmaf: String(p.compression.minVmaf),
     compression: p.compression.enabled,
     codec: p.compression.codec,
     replaceOriginal: p.compression.replaceOriginal,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [caps, setCaps] = useState<Capabilities | null>(null);
+  const [capsError, setCapsError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    videoApi.capabilities().then(
+      (next) => !cancelled && setCaps(next),
+      (reason: Error) => !cancelled && setCapsError(reason.message),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const av1 = caps?.encoders.av1.includes('libsvtav1') ?? false;
+  const hevc = caps?.encoders.hevc.includes('libx265') ?? false;
+  const canCompress = Boolean(caps?.vmaf && (av1 || hevc));
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   const save = async () => {
@@ -43,7 +61,8 @@ export function StorageDialog({ status, timeZone, onClose, onChanged }: { status
         storageType: form.storageType,
         gcsBucket: form.gcsBucket || null,
         gcsPrefix: form.gcsPrefix || null,
-        compression: { ...p.compression, enabled: form.compression, codec: form.codec, replaceOriginal: form.replaceOriginal },
+        localCacheMaxBytes: form.cacheGiB ? Math.round(Number(form.cacheGiB) * GIB) : null,
+        compression: { ...p.compression, enabled: form.compression, codec: form.codec, replaceOriginal: form.replaceOriginal, minSavingPct: Number(form.minSavingPct), minVmaf: Number(form.minVmaf) },
       });
       onChanged(next);
     } catch (reason) {
@@ -77,24 +96,45 @@ export function StorageDialog({ status, timeZone, onClose, onChanged }: { status
         <summary className="cursor-pointer text-sm text-zinc-300">進階：儲存位置與高效率壓縮</summary>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className="flex items-center gap-2 text-sm"><input type="radio" checked={form.storageType === 'local'} onChange={() => set({ storageType: 'local' })} className="accent-blue-600" />本機錄影空間</label>
-          <label className="flex items-center gap-2 text-sm"><input type="radio" checked={form.storageType === 'gcs'} onChange={() => set({ storageType: 'gcs' })} className="accent-blue-600" />Google Cloud Storage（Standard）</label>
+          <label className={`flex items-center gap-2 text-sm ${caps && !caps.storage.gcs && p.storageType !== 'gcs' ? 'opacity-50' : ''}`}>
+            <input type="radio" checked={form.storageType === 'gcs'} disabled={Boolean(caps && !caps.storage.gcs && p.storageType !== 'gcs')} onChange={() => set({ storageType: 'gcs' })} className="accent-blue-600" />
+            <span>Google Cloud Storage（Standard）{caps && !caps.storage.gcs ? <span className="block text-xs text-zinc-500">此主機沒有 GCP 服務身分，無法使用</span> : null}</span>
+          </label>
           {form.storageType === 'gcs' ? (
             <>
+              {status.gcs ? (
+                <p className={`col-span-2 rounded-lg px-3 py-2 text-xs ${status.gcs.ok ? 'bg-[#232730] text-zinc-300' : 'bg-red-900/40 text-red-200'}`}>
+                  {status.gcs.ok
+                    ? `已上傳雲端 ${status.remoteSegments ?? 0} 段・儲存類別 ${status.gcs.storageClass ?? '未知'}・版本控制${status.gcs.versioning ? '開啟' : '關閉'}・soft delete ${status.gcs.softDeleteDays ? `${status.gcs.softDeleteDays} 天（應用刪除後雲端仍保留並計費）` : '關閉'}`
+                    : `無法讀取 bucket：${status.gcs.error}`}
+                </p>
+              ) : null}
               <label className="flex flex-col gap-1 text-xs text-zinc-400">Bucket<input className={field} value={form.gcsBucket} onChange={(e) => set({ gcsBucket: e.target.value })} /></label>
               <label className="flex flex-col gap-1 text-xs text-zinc-400">路徑前綴<input className={field} value={form.gcsPrefix} onChange={(e) => set({ gcsPrefix: e.target.value })} placeholder="vtms/recordings" /></label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-400">本機快取上限（GiB；空白＝同影片最大用量）<input className={field} value={form.cacheGiB} onChange={(e) => set({ cacheGiB: e.target.value })} /></label>
               <p className="col-span-2 text-xs text-zinc-500">使用部署主機的服務身分上傳，不需要貼金鑰。完成的片段驗證後才上傳，雲端確認後才回收本機副本；bucket 的 soft delete 會讓刪除後仍暫時佔用雲端空間。</p>
             </>
           ) : null}
-          <label className="col-span-2 flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={form.compression} onChange={(e) => set({ compression: e.target.checked })} className="mt-0.5 accent-blue-600" />
+          <label className={`col-span-2 flex items-start gap-2 text-sm ${!canCompress && !form.compression ? 'opacity-50' : ''}`}>
+            <input type="checkbox" checked={form.compression} disabled={!canCompress && !form.compression} onChange={(e) => set({ compression: e.target.checked })} className="mt-0.5 accent-blue-600" />
             <span>背景高效率壓縮已完成的錄影（預設關閉）
-              <span className="block text-xs text-zinc-500">低優先權、一次一個；容量至少省 15% 且品質通過門檻才保留，失敗保留原檔。</span>
+              <span className="block text-xs text-zinc-500">低優先權、限制並行；節省比例與 VMAF 都達標、時長一致才保留，否則丟掉成品保留原檔。</span>
+              {caps && !canCompress ? <span className="block text-xs text-amber-200/80">此主機的 ffmpeg {caps.vmaf ? '沒有 SVT-AV1／x265 編碼器' : '沒有 libvmaf（無法驗證畫質）'}，不能開啟。</span> : null}
+              {capsError ? <span className="block text-xs text-zinc-500">無法偵測主機能力：{capsError}</span> : null}
             </span>
           </label>
+          {status.compression ? (
+            <p className="col-span-2 rounded-lg bg-[#232730] px-3 py-2 text-xs text-zinc-300">
+              最近 7 天：保留 {status.compression.kept} 段、未達標 {status.compression.skipped} 段、失敗 {status.compression.failed} 段、排隊 {status.compression.pending} 段・共省 {formatBytes(status.compression.savedBytes)}
+              {status.compression.avgVmaf !== null ? `・平均 VMAF ${status.compression.avgVmaf}` : ''}
+            </p>
+          ) : null}
           {form.compression ? (
             <>
-              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={form.codec === 'av1'} onChange={() => set({ codec: 'av1' })} className="accent-blue-600" />AV1</label>
-              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={form.codec === 'hevc'} onChange={() => set({ codec: 'hevc' })} className="accent-blue-600" />HEVC</label>
+              <label className={`flex items-center gap-2 text-sm ${av1 ? '' : 'opacity-50'}`}><input type="radio" checked={form.codec === 'av1'} disabled={!av1} onChange={() => set({ codec: 'av1' })} className="accent-blue-600" />AV1（SVT-AV1，省最多、CPU 最重）</label>
+              <label className={`flex items-center gap-2 text-sm ${hevc ? '' : 'opacity-50'}`}><input type="radio" checked={form.codec === 'hevc'} disabled={!hevc} onChange={() => set({ codec: 'hevc' })} className="accent-blue-600" />HEVC（x265，Safari／Edge 相容較好）</label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-400">最低節省（%）<input className={field} value={form.minSavingPct} inputMode="numeric" onChange={(e) => set({ minSavingPct: e.target.value.replace(/\D/g, '') })} /></label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-400">VMAF 門檻<input className={field} value={form.minVmaf} inputMode="numeric" onChange={(e) => set({ minVmaf: e.target.value.replace(/\D/g, '') })} /></label>
               <label className="col-span-2 flex items-start gap-2 text-sm">
                 <input type="checkbox" checked={form.replaceOriginal} onChange={(e) => set({ replaceOriginal: e.target.checked })} className="mt-0.5 accent-blue-600" />
                 <span>驗證後以壓縮版取代原檔<span className="block text-xs text-amber-200/80">有損重新壓縮；受保護片段不取代。未勾選時保留原檔與壓縮版（佔用兩份空間）。</span></span>
