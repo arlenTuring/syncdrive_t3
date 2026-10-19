@@ -119,7 +119,7 @@ export function StorageDialog({ status, timeZone, onClose, onChanged }: { status
             <input type="checkbox" checked={form.compression} disabled={!canCompress && !form.compression} onChange={(e) => set({ compression: e.target.checked })} className="mt-0.5 accent-blue-600" />
             <span>背景高效率壓縮已完成的錄影（預設關閉）
               <span className="block text-xs text-zinc-500">低優先權、限制並行；節省比例與 VMAF 都達標、時長一致才保留，否則丟掉成品保留原檔。</span>
-              {caps && !canCompress ? <span className="block text-xs text-amber-200/80">此主機的 ffmpeg {caps.vmaf ? '沒有 SVT-AV1／x265 編碼器' : '沒有 libvmaf（無法驗證畫質）'}，不能開啟。</span> : null}
+              {caps && !canCompress ? <span className="block text-xs text-amber-200/80">此主機的 ffmpeg {caps.vmaf ? '沒有 SVT-AV1／x265 編碼器' : '沒有 VMAF 畫質評估工具（無法驗證畫質）'}，不能開啟。</span> : null}
               {capsError ? <span className="block text-xs text-zinc-500">無法偵測主機能力：{capsError}</span> : null}
             </span>
           </label>

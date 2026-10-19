@@ -28,6 +28,8 @@ export const videoConfig = () => {
     enabled: process.env.VIDEO_ENABLED !== '0' && process.env.NODE_ENV !== 'test',
     ffmpegPath: process.env.VIDEO_FFMPEG_PATH || 'ffmpeg',
     ffprobePath: process.env.VIDEO_FFPROBE_PATH || 'ffprobe',
+    /** ffmpeg 沒有 libvmaf 時改用 Netflix 的 vmaf 程式（正式映像建置時編譯） */
+    vmafPath: process.env.VIDEO_VMAF_PATH || 'vmaf',
   };
 };
 

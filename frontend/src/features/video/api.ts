@@ -82,6 +82,7 @@ export type Capabilities = {
   ffmpeg: boolean;
   encoders: { h264: string[]; hevc: string[]; av1: string[] };
   vmaf: boolean;
+  vmafTool: 'ffmpeg' | 'cli' | null;
   hwaccels: string[];
   storage: { local: true; gcs: boolean };
   checkedAt: number;

@@ -1,10 +1,16 @@
-import { ENCODER_ARGS, parseVmaf, renditionKey } from './video-archive.service';
+import { ENCODER_ARGS, parseVmaf, parseVmafJson, renditionKey } from './video-archive.service';
 import { parseSegmentStart } from './video-storage.service';
 
 describe('video archive helpers', () => {
   it('reads the pooled VMAF score from ffmpeg output', () => {
     expect(parseVmaf('[Parsed_libvmaf_4 @ 0x1] VMAF score: 93.215\n')).toBe(93.215);
     expect(parseVmaf('no score here')).toBeNull();
+  });
+
+  it('reads the pooled VMAF mean from the vmaf tool JSON', () => {
+    expect(parseVmafJson(JSON.stringify({ pooled_metrics: { vmaf: { min: 90, mean: 96.6501523 } } }))).toBe(96.650152);
+    expect(parseVmafJson('{"pooled_metrics":{}}')).toBeNull();
+    expect(parseVmafJson('not json')).toBeNull();
   });
 
   it('places renditions next to the original under a name the recorder never produces', () => {

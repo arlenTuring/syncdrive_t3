@@ -19,6 +19,20 @@ RUN npm run build
 # 重裝成只有正式依賴，dev 依賴不進最終映像
 RUN npm prune --omit=dev
 
+# VMAF 畫質評估（媒體 worker 驗證背景壓縮成品用）。
+# Alpine 與 Debian 的 ffmpeg 套件都沒有編進 libvmaf，Netflix 官方發布的執行檔是 glibc 版，
+# 放不進 Alpine；所以從官方原始碼（固定版本＋sha256）編出 vmaf 程式。只有這支執行檔進最終映像。
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS vmaf
+RUN apk add --no-cache build-base meson ninja nasm xxd
+RUN wget -q -O /tmp/vmaf.tar.gz https://github.com/Netflix/vmaf/archive/refs/tags/v3.0.0.tar.gz \
+  && echo "7178c4833639e6b989ecae73131d02f70735fdb3fc2c7d84bc36c9c3461d93b1  /tmp/vmaf.tar.gz" | sha256sum -c - \
+  && tar xzf /tmp/vmaf.tar.gz -C /tmp \
+  && cd /tmp/vmaf-3.0.0/libvmaf \
+  && meson setup build --buildtype=release -Ddefault_library=static -Denable_tests=false -Denable_docs=false -Dbuilt_in_models=true -Denable_float=false \
+  && ninja -C build \
+  && strip build/tools/vmaf \
+  && install -m 0755 build/tools/vmaf /usr/local/bin/vmaf
+
 FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -30,6 +44,7 @@ RUN apk add --no-cache tzdata ffmpeg \
   && chown -R node:node /app/data
 
 # scripts/ 要帶上：map.service 等模組會在執行期載入其中的產圖腳本
+COPY --from=vmaf /usr/local/bin/vmaf /usr/local/bin/vmaf
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/scripts ./scripts

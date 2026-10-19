@@ -312,7 +312,7 @@ export class VideoStorageService implements OnModuleInit, OnModuleDestroy {
       const caps = await probeCapabilities(true);
       const encoder = compression.codec === 'av1' ? 'libsvtav1' : 'libx265';
       if (!caps.encoders[compression.codec].includes(encoder)) throw new BadRequestException(`此主機沒有 ${encoder} 編碼器，無法開啟壓縮`);
-      if (!caps.vmaf) throw new BadRequestException('此主機的 ffmpeg 沒有 libvmaf，無法驗證畫質，不能開啟壓縮');
+      if (!caps.vmaf) throw new BadRequestException('此主機沒有 VMAF 畫質評估工具（ffmpeg libvmaf 或 vmaf 程式），無法驗證畫質，不能開啟壓縮');
     }
     if (storageType === 'gcs' && (current.storageType !== 'gcs' || gcsBucket !== current.gcsBucket)) {
       try {

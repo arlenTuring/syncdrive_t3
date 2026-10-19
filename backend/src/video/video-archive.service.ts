@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, promises as fsp } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { VideoJob, VideoRecordingSegment, VideoSegmentObject, type CompressionPolicy } from '../database/entities/video.entities';
 import { bucketPolicy, objectMeta, uploadFile } from './gcs.client';
@@ -22,6 +24,16 @@ export async function fileDigest(file: string, algorithm: 'md5' | 'sha256') {
   const hash = createHash(algorithm);
   await new Promise<void>((resolve, reject) => createReadStream(file).on('data', (c) => hash.update(c)).on('end', () => resolve()).on('error', reject));
   return hash;
+}
+
+/** 從 vmaf 程式的 JSON 輸出取平均分數 */
+export function parseVmafJson(raw: string): number | null {
+  try {
+    const mean = (JSON.parse(raw) as { pooled_metrics?: { vmaf?: { mean?: number } } }).pooled_metrics?.vmaf?.mean;
+    return typeof mean === 'number' && Number.isFinite(mean) ? Math.round(mean * 1e6) / 1e6 : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 從 libvmaf 的輸出取平均分數 */
@@ -250,7 +262,7 @@ export class VideoArchiveService implements OnModuleInit, OnModuleDestroy {
     const caps = await probeCapabilities();
     const spec = ENCODER_ARGS[codec];
     if (!caps.encoders[codec].includes(spec.encoder)) throw new Error(`此主機沒有 ${spec.encoder} 編碼器`);
-    if (!caps.vmaf) throw new Error('此主機的 ffmpeg 沒有 libvmaf，無法驗證品質，不壓縮');
+    if (!caps.vmafTool) throw new Error('此主機沒有 VMAF 畫質評估工具，無法驗證品質，不壓縮');
     const seg = await this.dataSource.manager.findOne(VideoRecordingSegment, { where: { id: segmentId } });
     if (!seg || !['READY', 'REMOTE_READY'].includes(seg.status)) throw new Error('片段不存在或不可用');
     const original = await this.dataSource.manager.findOne(VideoSegmentObject, { where: { segmentId, rendition: 'original', storageType: 'local', status: 'READY' } });
@@ -271,9 +283,8 @@ export class VideoArchiveService implements OnModuleInit, OnModuleDestroy {
       const base = { codec, encoder: spec.encoder, inBytes, outBytes, savingPct };
       if (savingPct < policy.minSavingPct) return this.discard(tmp, { ...base, kept: false, reason: `節省 ${savingPct}% 未達 ${policy.minSavingPct}%` });
       // VMAF：失真版本在前、參考在後；同時完整解碼一次成品
-      const vmaf = await run(cfg.ffmpegPath, ['-nostdin', '-hide_banner', '-i', tmp, '-i', input, '-lavfi', '[0:v]setpts=PTS-STARTPTS[d];[1:v]setpts=PTS-STARTPTS[r];[d][r]libvmaf=n_threads=2', '-f', 'null', '-'], timeout, true);
-      const score = parseVmaf(vmaf.stderr);
-      if (vmaf.code !== 0 || score === null) return this.discard(tmp, { ...base, kept: false, reason: '無法計算 VMAF' });
+      const score = await this.vmaf(tmp, input, caps.vmafTool, timeout);
+      if (score === null) return this.discard(tmp, { ...base, kept: false, reason: '無法計算 VMAF' });
       if (score < policy.minVmaf) return this.discard(tmp, { ...base, vmaf: score, kept: false, reason: `VMAF ${score} 低於 ${policy.minVmaf}` });
       const [dIn, dOut] = await Promise.all([this.duration(input), this.duration(tmp)]);
       if (dIn === null || dOut === null || Math.abs(dIn - dOut) > 0.5) return this.discard(tmp, { ...base, vmaf: score, kept: false, reason: `時長不一致（原 ${dIn}s／新 ${dOut}s）` });
@@ -298,6 +309,36 @@ export class VideoArchiveService implements OnModuleInit, OnModuleDestroy {
     } finally {
       await fsp.rm(tmp, { force: true }).catch(() => undefined);
       this.storage.release([segmentId]);
+    }
+  }
+
+  /**
+   * VMAF（失真版本對參考原檔，同時完整解碼一次成品）。
+   * ffmpeg 有 libvmaf 時直接用濾鏡；否則兩個 ffmpeg 解碼成 y4m 寫進具名管線，交給 vmaf 程式比對，不落地暫存檔。
+   */
+  async vmaf(distorted: string, reference: string, tool: 'ffmpeg' | 'cli', timeout: number): Promise<number | null> {
+    const cfg = videoConfig();
+    if (tool === 'ffmpeg') {
+      const r = await run(cfg.ffmpegPath, ['-nostdin', '-hide_banner', '-i', distorted, '-i', reference, '-lavfi', '[0:v]setpts=PTS-STARTPTS[d];[1:v]setpts=PTS-STARTPTS[r];[d][r]libvmaf=n_threads=2', '-f', 'null', '-'], timeout, true);
+      return r.code === 0 ? parseVmaf(r.stderr) : null;
+    }
+    const dir = await fsp.mkdtemp(join(tmpdir(), 'vtms-vmaf-'));
+    try {
+      const ref = join(dir, 'ref.y4m');
+      const dis = join(dir, 'dis.y4m');
+      const out = join(dir, 'vmaf.json');
+      const fifo = await run('mkfifo', [ref, dis], 10_000);
+      if (fifo.code !== 0) return null;
+      const decode = (src: string, dst: string) => run(cfg.ffmpegPath, ['-nostdin', '-v', 'error', '-i', src, '-map', '0:v:0', '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', '-y', dst], timeout, true);
+      const [, , score] = await Promise.all([
+        decode(reference, ref),
+        decode(distorted, dis),
+        run(cfg.vmafPath, ['-r', ref, '-d', dis, '--json', '-o', out, '-q', '--threads', '2'], timeout, true),
+      ]);
+      if (score.code !== 0) return null;
+      return parseVmafJson(await fsp.readFile(out, 'utf8'));
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
