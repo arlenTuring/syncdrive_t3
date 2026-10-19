@@ -143,7 +143,7 @@ LIMIT 1 OFFSET GREATEST(0, COALESCE({${indexVar}}, 0)::int)
 `.trim();
 }
 
-/** 未處理事件列尾藍點（已處理則回傳空字串，元件自動隱藏） */
+/** 未確認事件列尾藍點（已確認則回傳空字串，元件自動隱藏）；確認只代表中心端已閱覽，不代表故障解除 */
 export function listSqlRowUnreadDotByIndex(
   listSql: string,
   indexVar: string = LIST_INDEX_VAR,
@@ -165,7 +165,7 @@ SELECT
   event_id,
   COALESCE(category_label, '未分類') AS category,
   vehicle_code,
-  CASE WHEN COALESCE(is_acknowledged, false) THEN '已處理' ELSE '尚未處理' END AS status_label,
+  CASE WHEN COALESCE(is_acknowledged, false) THEN '已確認' ELSE '未確認' END AS status_label,
   to_char(to_timestamp((created_at::bigint) / 1000.0), 'YYYY.MM.DD HH24:MI:SS') AS event_time,
   COALESCE(display_message, detail, event_code::text) AS message,
   COALESCE(sub_label, vehicle_code) AS sub_label,

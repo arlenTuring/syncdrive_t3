@@ -1395,7 +1395,7 @@ elements[0].children = [
     labelUppercase: false,
     layoutGap: 2,
   }),
-  statCard(EVENT_PAD + EVENT_KPI_W + EVENT_KPI_GAP, eventKpiY, EVENT_KPI_W, EVENT_KPI_ROW_H, '未處理事件', 'unprocessed_events', EVENT_CENTER_SUMMARY_SQL, {
+  statCard(EVENT_PAD + EVENT_KPI_W + EVENT_KPI_GAP, eventKpiY, EVENT_KPI_W, EVENT_KPI_ROW_H, '未確認事件', 'unprocessed_events', EVENT_CENTER_SUMMARY_SQL, {
     valueFontSize: EVENT_FS.value,
     labelFontSize: EVENT_FS.label,
     labelColor: '#99A1AF',
@@ -1406,7 +1406,7 @@ elements[0].children = [
     labelUppercase: false,
     layoutGap: 2,
   }),
-  statCard(EVENT_PAD + (EVENT_KPI_W + EVENT_KPI_GAP) * 2, eventKpiY, EVENT_KPI_W, EVENT_KPI_ROW_H, '已處理事件', 'processed_events', EVENT_CENTER_SUMMARY_SQL, {
+  statCard(EVENT_PAD + (EVENT_KPI_W + EVENT_KPI_GAP) * 2, eventKpiY, EVENT_KPI_W, EVENT_KPI_ROW_H, '已確認事件', 'processed_events', EVENT_CENTER_SUMMARY_SQL, {
     valueFontSize: EVENT_FS.value,
     labelFontSize: EVENT_FS.label,
     labelColor: '#99A1AF',

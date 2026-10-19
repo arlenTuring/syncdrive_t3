@@ -6,7 +6,7 @@ import { TelemetryWriteQueue } from '../mqtt/telemetry-write.queue';
 import { VehicleHistoryRecorder } from '../vehicle-history/vehicle-history.recorder';
 import { DegradedReplayRecorder } from '../degraded-replay/degraded-replay.recorder';
 
-type CleanupCategory = 'vehicle_history' | 'degraded_replay' | 'telemetry' | 'bulk_logs';
+type CleanupCategory = 'vehicle_history' | 'degraded_replay' | 'telemetry' | 'bulk_logs' | 'security_events';
 type CleanupCriteria = { category: CleanupCategory; from?: number; to: number; vehicleCode?: string; sourceRun?: string; snapshotAt: number; purpose?: 'manual' | 'policy'; proposedPolicy?: Record<string, unknown> };
 
 const PLAN_TTL_MS = 10 * 60_000;
@@ -15,7 +15,9 @@ const CATEGORY_INFO: Record<CleanupCategory, { label: string; impact: string; ta
   vehicle_history: { label: '一般運行歷史', impact: '清除後該期間無法完整回放；系統會留下「已依保留政策清除」缺段。', tables: ['vehicle_history_frames', 'vehicle_history_segments', 'vehicle_history_gaps', 'vehicle_history_stream_keys'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間）' },
   degraded_replay: { label: '歷史降級回放', impact: '只處理已結束的回放 Session；進行中 Session 與仍被引用的地圖快照會保留。', tables: ['degraded_replay_frames', 'degraded_replay_sessions', 'degraded_replay_maps'], vehicleFilter: true, trustedTime: 'received_at／ended_real（後端時間）' },
   telemetry: { label: '原始遙測歷史', impact: '清除後無法查詢該期間原始遙測；最新車輛狀態快照不受影響。', tables: ['telemetry_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；舊資料缺值時排除）' },
-  bulk_logs: { label: '其他大量紀錄', impact: '只清理已完成的指令、已釋放的路口紀錄與一般事件；操作及安全稽核不在範圍內。', tables: ['command_logs', 'junction_interlock_logs', 'security_event_logs'], vehicleFilter: true, trustedTime: 'sent_at／requested_at／received_at（後端時間）' },
+  bulk_logs: { label: '其他大量紀錄', impact: '只清理已完成的指令與已釋放的路口紀錄；事件紀錄、操作及安全稽核不在範圍內。', tables: ['command_logs', 'junction_interlock_logs'], vehicleFilter: true, trustedTime: 'sent_at／requested_at（後端時間）' },
+  // 事件紀錄獨立設定（2026-10-20 起不再跟指令一起清）；預設不啟用自動清理
+  security_events: { label: '事件紀錄', impact: '清除後事件資訊清單、歷史事件與事件報表查不到該期間的事件（含人工確認狀態）；操作、權限與登入稽核不受影響。', tables: ['security_event_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；缺值的舊資料排除）' },
 };
 
 @Injectable()
@@ -96,7 +98,8 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
       vehicle_history: `SELECT min(received_at)::bigint oldest, max(received_at)::bigint newest FROM vehicle_history_frames`,
       degraded_replay: `SELECT min(received_at)::bigint oldest, max(received_at)::bigint newest FROM degraded_replay_frames`,
       telemetry: `SELECT min(received_at)::bigint oldest, max(received_at)::bigint newest FROM telemetry_logs WHERE received_at IS NOT NULL`,
-      bulk_logs: `SELECT min(t)::bigint oldest, max(t)::bigint newest FROM (SELECT sent_at t FROM command_logs UNION ALL SELECT requested_at FROM junction_interlock_logs UNION ALL SELECT received_at FROM security_event_logs WHERE received_at IS NOT NULL) x`,
+      bulk_logs: `SELECT min(t)::bigint oldest, max(t)::bigint newest FROM (SELECT sent_at t FROM command_logs UNION ALL SELECT requested_at FROM junction_interlock_logs) x`,
+      security_events: `SELECT min(received_at)::bigint oldest, max(received_at)::bigint newest FROM security_event_logs WHERE received_at IS NOT NULL`,
     };
     const [row] = await this.db.query(sql[category]);
     return { oldest: row?.oldest == null ? null : Number(row.oldest), newest: row?.newest == null ? null : Number(row.newest) };
@@ -166,11 +169,16 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
       const [legacy] = await this.db.query(`SELECT count(*)::bigint records FROM telemetry_logs WHERE received_at IS NULL`);
       return { records: Number(row.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: [`${legacy.records} 筆缺少可信接收時間的舊資料排除`], estimatedBytes: null };
     }
+    if (criteria.category === 'security_events') {
+      const s = this.clause(criteria, 'received_at');
+      const [events] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NOT NULL AND ${s.sql}`, s.values);
+      const [legacy] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NULL`);
+      return { records: Number(events.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: ['操作、權限與登入稽核', `${legacy.records} 筆缺少接收時間的舊事件排除`], estimatedBytes: null };
+    }
     const c = this.clause(criteria, 'sent_at');
     const [commands] = await this.db.query(`SELECT count(*)::bigint records FROM command_logs WHERE is_acked=true AND ${c.sql}`, c.values);
     const j = this.clause(criteria, 'requested_at'); const [junctions] = await this.db.query(`SELECT count(*)::bigint records FROM junction_interlock_logs WHERE status IN ('RELEASED','DENIED') AND ${j.sql}`, j.values);
-    const s = this.clause(criteria, 'received_at'); const [events] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NOT NULL AND ${s.sql}`, s.values);
-    return { records: Number(commands.records) + Number(junctions.records) + Number(events.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: ['未完成指令、持有中路權、操作稽核、清理稽核'], estimatedBytes: null };
+    return { records: Number(commands.records) + Number(junctions.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: ['未完成指令、持有中路權、事件紀錄、操作稽核、清理稽核'], estimatedBytes: null };
   }
 
   async execute(planId: string, operatorId: string) {
@@ -265,10 +273,10 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
       const rows = await this.db.query(`WITH targets AS (SELECT s.execution_id FROM degraded_replay_sessions s WHERE ${range} LIMIT ${BATCH_SIZE}), df AS (DELETE FROM degraded_replay_frames f USING targets t WHERE f.execution_id=t.execution_id RETURNING 1), ds AS (DELETE FROM degraded_replay_sessions s USING targets t WHERE s.execution_id=t.execution_id RETURNING 1) SELECT (SELECT count(*) FROM df)+(SELECT count(*) FROM ds) count`, values);
       return Number(rows[0]?.count ?? 0);
     }
+    if (c.category === 'security_events') return this.deleteCtid('security_event_logs', 'received_at', c, 'received_at IS NOT NULL');
     const a = await this.deleteCtid('command_logs', 'sent_at', c, 'is_acked=true');
     const b = await this.deleteCtid('junction_interlock_logs', 'requested_at', c, `status IN ('RELEASED','DENIED')`);
-    const d = await this.deleteCtid('security_event_logs', 'received_at', c, 'received_at IS NOT NULL');
-    return a + b + d;
+    return a + b;
   }
 
   private async deleteCtid(table: string, time: string, c: CleanupCriteria, extra: string) {

@@ -21,6 +21,7 @@ schema 提供，部署前由 `migrate.sh --plan` 唯讀檢查。
 | `20261018-media-play-schedules` | 前述 `uuid-ossp` | 播放排程、項目、批次、投遞及索引 | runner 單一交易 |
 | `20261019-virtual-fence-site-permissions` | `permissions`、`role_permissions` 及其唯一索引（`20261012-role-permissions`） | 虛擬圍籬權限代碼 `operations.virtual-fence.*` 改為 `site.virtual-fence.*`，保留角色授權（可重跑） | runner 單一交易 |
 | `20261020-event-and-log-management` | `security_event_logs`、`operator_action_logs`、`permission_change_logs`、`login_logs` | 事件來源／確認欄位、操作紀錄分類與快照（action_type 改 varchar）、權限異動相關帳號角色、查詢索引（可重跑） | runner 單一交易 |
+| `20261021-security-event-retention` | `data_retention_policies`（`20261015-data-retention-management`） | 新增「事件紀錄」保存政策（預設停用），事件不再隨「其他大量紀錄」清理（可重跑） | runner 單一交易 |
 
 runner 單一交易表示 SQL 與 ledger 成功紀錄一起提交；SQL 自管交易則保留已發布檔案的
 `BEGIN/COMMIT`，成功後才另記 ledger，失敗不記錄。
