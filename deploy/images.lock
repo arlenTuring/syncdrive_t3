@@ -18,3 +18,4 @@ nginx-runtime   nginx:1.27-alpine                   sha256:65645c7bb6a0661892a8b
 postgres        timescale/timescaledb:2.19.3-pg15   sha256:12d8f8ee714b8d20d91ea5380a40b39df4f95b41cf7f516d25de791bf2f7e1f8
 redis           redis:7-alpine                      sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
 mosquitto       eclipse-mosquitto:2                 sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797
+mediamtx        bluenviron/mediamtx:1.21.2-ffmpeg   sha256:c0feb4acc548d5f410d57d9046f62dfa355e2abc4098f5243de9e86430c77a95

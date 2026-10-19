@@ -148,6 +148,22 @@ services:
       DISPATCH_LEAD_SECONDS: ${DISPATCH_LEAD_SECONDS:-90}
       DISPATCH_CATCH_UP_SECONDS: ${DISPATCH_CATCH_UP_SECONDS:-300}
       DISPATCH_TASK_TYPES: ${DISPATCH_TASK_TYPES:-passenger,dispatch,maintenance}
+      # 影像監控：API 程序只負責查詢、播放授權與代理；同步、錄影維護、壓縮在 video-worker
+      VIDEO_ROLE: api
+      VIDEO_MEDIAMTX_API_URL: http://mediamtx:9997
+      VIDEO_MEDIAMTX_PLAYBACK_URL: http://mediamtx:9996
+      VIDEO_MEDIAMTX_HLS_URL: http://mediamtx:8888
+      VIDEO_MEDIAMTX_WEBRTC_URL: http://mediamtx:8889
+      VIDEO_MEDIAMTX_USER: vtms
+      VIDEO_MEDIAMTX_PASSWORD: ${VIDEO_MEDIAMTX_PASSWORD:?deploy/.env 缺 VIDEO_MEDIAMTX_PASSWORD，請執行 deploy/bootstrap.sh}
+      VIDEO_HOOK_SECRET: ${VIDEO_HOOK_SECRET:?deploy/.env 缺 VIDEO_HOOK_SECRET}
+      VIDEO_SECRET_KEY: ${VIDEO_SECRET_KEY:?deploy/.env 缺 VIDEO_SECRET_KEY}
+      VIDEO_RECORDINGS_DIR: /video/recordings
+      VIDEO_MEDIAMTX_RECORDINGS_DIR: /recordings
+      VIDEO_EXPORTS_DIR: /video/exports
+      VIDEO_SEGMENT_SECONDS: ${VIDEO_SEGMENT_SECONDS:-60}
+      # 歷史片段由 nginx 直接送檔（Range／206），Node 不讀整段影片
+      VIDEO_ACCEL_REDIRECT_PREFIX: /_video_recordings
     # 兩個埠都不發布到主機：對外流量由 nginx 從 3100 轉進來（它要先過對外那組
     # Basic Auth 才到得了文件與 Swagger）。後端仍然看得到自己的 localPort 是 3100，
     # ExternalPortGuard 的判定不受影響。
@@ -168,6 +184,11 @@ services:
       # HTTPS 傳輸憑證：管理員經系統基礎模組上傳，後端寫入此 volume。
       # nginx／LB 之後可掛同一份（唯讀）做 443；私鑰不進 DB、不進 git。
       - httpscerts:/https-certs
+      # 錄影與下載檔：API 只讀（索引、播放、下載）；刪除與回收只在 video-worker。
+      # 刻意<strong>不放在 /app/data 底下</strong>：同步備份會整包複製 /app/data、回復時會清空它，
+      # 錄影動輒數十 GB，放進去會塞爆備份並在回復時被刪光。
+      - videorecordings:/video/recordings:ro
+      - videoexports:/video/exports:ro
     # 不對 postgres 下 depends_on：資料庫獨立部署時那個服務根本不存在，
     # 硬相依會讓整個 compose 起不來。連線重試由 TypeORM 自己負責。
     depends_on:
@@ -207,6 +228,8 @@ services:
       - ./.htpasswd:/etc/nginx/.htpasswd:ro
       - ./.htpasswd-web:/etc/nginx/.htpasswd-web:ro
       - ./.htpasswd-external:/etc/nginx/.htpasswd-external:ro
+      # 歷史片段由 nginx 以 X-Accel-Redirect 直接送檔（唯讀；只有 internal location 讀得到）
+      - videorecordings:/var/lib/vtms/recordings:ro
     depends_on:
       - backend
     healthcheck:
@@ -214,6 +237,97 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # ── 影像監控 ──────────────────────────────────────────────
+  # 錄影 volume 第一次建立時擁有者是 root；MediaMTX 與 worker 都以 uid 1000 執行，
+  # 先由這個一次性容器調整擁有者，否則 MediaMTX 寫不進錄影、worker 刪不掉過期片段。
+  video-volume-init:
+    image: syncdrive-backend:${IMAGE_TAG:-latest}
+    pull_policy: never
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown 1000:1000 /video/recordings /video/exports && chmod 0755 /video/recordings /video/exports"]
+    volumes:
+      - videorecordings:/video/recordings
+      - videoexports:/video/exports
+    restart: "no"
+
+  # 媒體服務：RTSP 接入、即時 HLS／WebRTC、分段錄影（固定版本見 images.lock）。
+  # 控制 API、回放、HLS、WHEP 只在 docker 網路內，由後端代理並做權限檢查；
+  # 對外只開 WebRTC 媒體 UDP（瀏覽器直連），不通時播放器 5 秒內自動改走 HLS。
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.2-ffmpeg@sha256:c0feb4acc548d5f410d57d9046f62dfa355e2abc4098f5243de9e86430c77a95
+    container_name: syncdrive_mediamtx
+    restart: always
+    user: "1000:1000"
+    environment:
+      MTX_AUTHINTERNALUSERS_0_PASS: ${VIDEO_MEDIAMTX_PASSWORD:?deploy/.env 缺 VIDEO_MEDIAMTX_PASSWORD}
+      MTX_AUTHINTERNALUSERS_1_PASS: ${VIDEO_PUBLISH_PASSWORD:?deploy/.env 缺 VIDEO_PUBLISH_PASSWORD}
+      # 瀏覽器連得到的主機位址（GCP 外部 IP／現場伺服器 IP）；不填則 WebRTC 連不上、自動改走 HLS
+      MTX_WEBRTCADDITIONALHOSTS: ${VIDEO_WEBRTC_PUBLIC_HOST:-127.0.0.1}
+      VTMS_HOOK_URL: http://backend:3000/syncdrive-api/video/internal/segment-complete
+      VTMS_HOOK_SECRET: ${VIDEO_HOOK_SECRET:?deploy/.env 缺 VIDEO_HOOK_SECRET}
+      TZ: UTC
+    expose:
+      - "8554"
+      - "8888"
+      - "8889"
+      - "9996"
+      - "9997"
+    ports:
+      - "${VIDEO_WEBRTC_BIND:-0.0.0.0}:8189:8189/udp"
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - videorecordings:/recordings
+    depends_on:
+      video-volume-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "${VIDEO_MEDIAMTX_CPUS:-2}"
+          memory: 1g
+
+  # 媒體 worker：同一份後端映像、只載入影像服務（沒有 HTTP、MQTT、調度引擎）。
+  # 負責來源同步、索引補漏、保存與容量回收、GCS 上傳、背景壓縮、下載工作。
+  # CPU 上限讓壓縮／轉檔不會擠掉主後端的 MQTT 與車控；ffmpeg 另以 nice 19 執行。
+  video-worker:
+    image: syncdrive-backend:${IMAGE_TAG:-latest}
+    pull_policy: never
+    container_name: syncdrive_video_worker
+    restart: always
+    command: ["node", "dist/video-worker.main.js"]
+    environment:
+      NODE_ENV: production
+      TZ: ${TZ:-Asia/Taipei}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      VIDEO_ROLE: worker
+      VIDEO_MEDIAMTX_API_URL: http://mediamtx:9997
+      VIDEO_MEDIAMTX_PLAYBACK_URL: http://mediamtx:9996
+      VIDEO_MEDIAMTX_USER: vtms
+      VIDEO_MEDIAMTX_PASSWORD: ${VIDEO_MEDIAMTX_PASSWORD:?deploy/.env 缺 VIDEO_MEDIAMTX_PASSWORD}
+      VIDEO_SECRET_KEY: ${VIDEO_SECRET_KEY:?deploy/.env 缺 VIDEO_SECRET_KEY}
+      VIDEO_RECORDINGS_DIR: /video/recordings
+      VIDEO_MEDIAMTX_RECORDINGS_DIR: /recordings
+      VIDEO_EXPORTS_DIR: /video/exports
+      VIDEO_SEGMENT_SECONDS: ${VIDEO_SEGMENT_SECONDS:-60}
+    volumes:
+      - videorecordings:/video/recordings
+      - videoexports:/video/exports
+    depends_on:
+      video-volume-init:
+        condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "${VIDEO_WORKER_CPUS:-2}"
+          memory: 2g
 
 # 這裡曾經有一個 simulator 服務（vtms-shift-demo-simulator.js），已移除。
 #
@@ -228,3 +342,5 @@ volumes:
   httpscerts:
   redisdata:
   mosquitto_data:
+  videorecordings:
+  videoexports:

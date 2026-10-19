@@ -96,6 +96,17 @@ append_if_missing "EXTERNAL_AUTH_USER="
 append_if_missing "EXTERNAL_AUTH_PASSWORD="
 append_if_missing "MQTT_PUBLIC_HOST="
 append_if_missing "MQTT_PUBLIC_PORT=8883"
+append_if_missing "VIDEO_MEDIAMTX_PASSWORD="
+append_if_missing "VIDEO_PUBLISH_PASSWORD="
+append_if_missing "VIDEO_HOOK_SECRET="
+append_if_missing "VIDEO_SECRET_KEY="
+append_if_missing "VIDEO_WEBRTC_PUBLIC_HOST="
+
+# 影像監控的內部密鑰：只補空的，不覆寫（VIDEO_SECRET_KEY 換掉會讓已存的來源密碼解不開）
+for key in VIDEO_MEDIAMTX_PASSWORD VIDEO_PUBLISH_PASSWORD VIDEO_HOOK_SECRET; do
+  [ -n "$(read_env "$key")" ] || set_env "$key" "$(openssl rand -hex 18)"
+done
+[ -n "$(read_env VIDEO_SECRET_KEY)" ] || set_env VIDEO_SECRET_KEY "$(openssl rand -hex 32)"
 
 if [ -z "$(read_env MQTT_PUBLIC_HOST)" ]; then
   DETECTED_IP="$(curl -fsS -m 3 https://ifconfig.me 2>/dev/null || true)"
@@ -105,6 +116,10 @@ if [ -z "$(read_env MQTT_PUBLIC_HOST)" ]; then
   else
     log "警告：MQTT_PUBLIC_HOST 未設定且自動偵測失敗，回應中的 mqtt.host 將是 127.0.0.1，廠商連不上。請手動設定 deploy/.env 後重啟 backend"
   fi
+fi
+# WebRTC 的 ICE 位址：瀏覽器要直連媒體服務的 UDP 8189，預設與 MQTT 對外位址相同
+if [ -z "$(read_env VIDEO_WEBRTC_PUBLIC_HOST)" ] && [ -n "$(read_env MQTT_PUBLIC_HOST)" ]; then
+  set_env VIDEO_WEBRTC_PUBLIC_HOST "$(read_env MQTT_PUBLIC_HOST)"
 fi
 
 # ── 2b. 兩組瀏覽帳密 ────────────────────────────────────────

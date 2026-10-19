@@ -224,6 +224,25 @@ media_files_ready() {
 check_runtime "啟用地圖檔可讀且內容有效" active_map_ready
 check_runtime "媒體資料庫引用的正式檔案可讀" media_files_ready
 
+# ── 影像監控 ─────────────────────────────────────────────────
+# 媒體服務要活著且後端連得到它的 API（帳密正確）；worker 要在跑；hook 不可從外面打到。
+video_media_ready() {
+  $DOCKER exec syncdrive_backend node -e '
+    const a="Basic "+Buffer.from("vtms:"+process.env.VIDEO_MEDIAMTX_PASSWORD).toString("base64");
+    fetch(process.env.VIDEO_MEDIAMTX_API_URL+"/v3/info",{headers:{Authorization:a}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1));
+  '
+}
+video_worker_running() {
+  [ "$($DOCKER inspect -f '{{.State.Running}}' syncdrive_video_worker 2>/dev/null)" = true ]
+}
+video_recordings_writable() {
+  $DOCKER exec syncdrive_video_worker sh -c 'f=/video/recordings/.hc.$$ && : > "$f" && rm -f "$f"'
+}
+check_runtime "影像媒體服務在線且後端帳密正確" video_media_ready
+check_runtime "影像 worker 執行中" video_worker_running
+check_runtime "錄影空間 worker 可寫入" video_recordings_writable
+check "錄影 hook 不可從 nginx 打到" "$INTERNAL/syncdrive-api/video/internal/segment-complete" 404 noauth
+
 # ── MQTT broker 的認證邊界 ────────────────────────────────────────
 #
 # 這一項是事後補的：broker 的設定曾經以「把 prod 蓋在 mosquitto.conf 上」的方式

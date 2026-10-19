@@ -6,7 +6,7 @@ import { VideoJob, VideoRecordingSegment, VideoSegmentObject, type CompressionPo
 import { bucketPolicy, objectMeta, uploadFile } from './gcs.client';
 import { probeCapabilities, run } from './video-capabilities';
 import { VideoStorageService } from './video-storage.service';
-import { videoConfig } from './video.config';
+import { GIB, videoConfig } from './video.config';
 
 /** 壓縮成品放在原片段旁，檔名不符合媒體服務的命名規則，不會被當成錄影或被掃描重複索引 */
 export const renditionKey = (segmentKey: string, codec: string) => `${segmentKey}.${codec}.mp4`;
@@ -65,6 +65,12 @@ export class VideoArchiveService implements OnModuleInit, OnModuleDestroy {
       const policy = await this.storage.policy();
       if (policy.storageType === 'gcs' && policy.gcsBucket) await this.uploadPending(policy.gcsBucket, policy.gcsPrefix);
       if (policy.compression?.enabled) {
+        // 磁碟壓力時暫停背景壓縮：重新編碼需要額外空間，不能把剩餘空間擠到最低保留以下
+        const n = await this.storage.numbers(policy);
+        if (n.freeBytes < n.minFreeBytes + GIB) {
+          this.logger.warn('剩餘空間接近最低保留，暫停背景壓縮');
+          return;
+        }
         await this.enqueueCompression(policy.compression);
         await this.runCompression(policy.compression);
       }

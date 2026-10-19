@@ -310,8 +310,15 @@ export class VideoHistoryService implements OnModuleInit, OnModuleDestroy {
       .getMany();
     if (!revs.length) throw new NotFoundException('這段期間沒有這個來源的錄影');
     if (revs.length > 1) throw new BadRequestException('這段期間來源設定有變更，請分段下載');
-    const [{ n }] = await this.dataSource.query(`SELECT count(*)::int AS n FROM video_recording_segments WHERE source_id = $1 AND start_at < $3 AND end_at > $2 AND status = 'READY'`, [sourceId, from, to]);
+    const [{ n, missing }] = await this.dataSource.query(
+      `SELECT count(*)::int AS n,
+              count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM video_segment_objects o WHERE o.segment_id = s.id AND o.rendition = 'original' AND o.storage_type = 'local' AND o.status = 'READY'))::int AS missing
+         FROM video_recording_segments s WHERE s.source_id = $1 AND s.start_at < $3 AND s.end_at > $2 AND s.status IN ('READY', 'REMOTE_READY', 'UPLOADING')`,
+      [sourceId, from, to],
+    );
     if (!Number(n)) throw new NotFoundException('這段期間沒有可下載的錄影');
+    // 快速下載由媒體服務讀本機原檔；本機副本已回收（只在雲端）或已被壓縮版取代時先說明，不排一個必然失敗的工作
+    if (Number(missing)) throw new BadRequestException(`這段期間有 ${missing} 段錄影只在雲端或已被壓縮版取代，暫不支援快速下載；可在歷史頁直接播放`);
     const now = Date.now();
     const job = await this.dataSource.manager.save(VideoJob, this.dataSource.manager.create(VideoJob, {
       kind: 'export', dedupeKey: null, status: 'queued', payload: { sourceId, mediaPath: revs[0].mediaPath, from, to, mode: 'fast' }, result: null, progress: '0', attempts: 0, maxAttempts: 2,

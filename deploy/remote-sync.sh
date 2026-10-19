@@ -47,6 +47,36 @@ set_env() {
   mv "$tmp" "$file" || return 1
 }
 
+# 由同步啟停的服務：影像的 MediaMTX 與媒體 worker 跟著主程式版本一起更新。
+# 只列「目前 checkout 的 compose 檔裡有的」服務：回復到還沒有影像服務的舊版時，
+# 寫死清單會讓 compose up 因找不到服務而失敗，回復跟著失敗。
+app_services() {
+  local all svc
+  all="$(compose config --services 2>/dev/null)" || all="backend
+web"
+  for svc in backend web mediamtx video-worker; do
+    printf '%s\n' "$all" | grep -qx "$svc" && printf '%s ' "$svc"
+  done
+  return 0
+}
+
+random_hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+
+# 影像監控的內部密鑰：舊主機的 .env 沒有這幾項時自動產生（只補缺的，不覆寫既有值）。
+# VIDEO_SECRET_KEY 加密來源密碼，換掉會讓已存的來源密碼解不開，所以只在第一次產生。
+ensure_video_secrets() {
+  local file="$1" key
+  for key in VIDEO_MEDIAMTX_PASSWORD VIDEO_PUBLISH_PASSWORD VIDEO_HOOK_SECRET; do
+    grep -q "^${key}=." "$file" || set_env "$file" "$key" "$(random_hex 18)" || return 1
+  done
+  grep -q "^VIDEO_SECRET_KEY=." "$file" || set_env "$file" VIDEO_SECRET_KEY "$(random_hex 32)" || return 1
+  if ! grep -q "^VIDEO_WEBRTC_PUBLIC_HOST=." "$file"; then
+    local host
+    host="$(grep '^MQTT_PUBLIC_HOST=' "$file" | cut -d= -f2)"
+    [ -z "$host" ] || set_env "$file" VIDEO_WEBRTC_PUBLIC_HOST "$host" || return 1
+  fi
+}
+
 compose() {
   (cd "$LIVE_ROOT" && IMAGE_TAG="$IMAGE_TAG" DB_SYNCHRONIZE=false \
     docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env "$@")
@@ -73,6 +103,8 @@ restore_backup() {
   log "回復資料庫、檔案與映像 $old_tag"
   IMAGE_TAG="$old_tag"
   docker stop syncdrive_web syncdrive_backend >/dev/null 2>&1 || return 1
+  # 回復資料庫時影像 worker 不能還在寫；舊版沒有這個服務時會留在停止狀態
+  docker stop syncdrive_video_worker >/dev/null 2>&1 || true
   docker cp "$backup/database.dump" syncdrive_postgres:/tmp/syncdrive-restore.dump || return 1
   docker exec syncdrive_postgres sh -c 'pg_restore --list /tmp/syncdrive-restore.dump >/dev/null' || return 1
   docker exec syncdrive_postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"' || return 1
@@ -95,7 +127,7 @@ chown -R 1000:1000 /app/data
   git -C "$LIVE_ROOT" checkout -q -f --detach "$old_sha" || return 1
   set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$old_tag" || return 1
   set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false || return 1
-  compose up -d --no-build backend web || return 1
+  compose up -d --no-build $(app_services) || return 1
   wait_ready || return 1
   "$LIVE_ROOT/deploy/healthcheck.sh" 2>&1 | tee "$STATE_ROOT/last-restore-health.log" || return 1
   RESTORE_HEALTH_SUMMARY="$(tail -1 "$STATE_ROOT/last-restore-health.log")"
@@ -112,7 +144,13 @@ case "$ACTION" in
   health) exec "$LIVE_ROOT/deploy/healthcheck.sh" ;;
   logs)
     service="${2:-backend}"
-    case "$service" in backend) container=syncdrive_backend ;; web|frontend) container=syncdrive_web ;; *) die "logs 僅支援 backend 或 web" ;; esac
+    case "$service" in
+      backend) container=syncdrive_backend ;;
+      web|frontend) container=syncdrive_web ;;
+      mediamtx|media) container=syncdrive_mediamtx ;;
+      video-worker|worker) container=syncdrive_video_worker ;;
+      *) die "logs 僅支援 backend、web、mediamtx 或 video-worker" ;;
+    esac
     exec docker logs --tail 300 "$container"
     ;;
   rollback)
@@ -209,7 +247,7 @@ rollback_on_error() {
     fi
   elif [ "$STOPPED" = true ]; then
     IMAGE_TAG="$previous_tag"
-    if compose up -d --no-build backend web && wait_ready \
+    if compose up -d --no-build $(app_services) && wait_ready \
       && "$LIVE_ROOT/deploy/healthcheck.sh" 2>&1 | tee "$STATE_ROOT/last-restore-health.log"; then
       rollback_result=成功
       RESTORE_HEALTH_SUMMARY="$(tail -1 "$STATE_ROOT/last-restore-health.log")"
@@ -233,6 +271,9 @@ trap rollback_on_error ERR INT TERM
 # Stop writers before taking the database and /app/data snapshots so they share
 # one maintenance boundary. A failed backup only restarts the untouched version.
 docker stop syncdrive_web syncdrive_backend >/dev/null
+# 媒體 worker 也停：Migration 期間不要有程序寫影像資料表。MediaMTX 照常錄影，
+# 恢復後由 worker 補建索引。第一次部署時這個容器還不存在，不算失敗。
+docker stop syncdrive_video_worker >/dev/null 2>&1 || true
 STOPPED=true
 docker exec syncdrive_postgres sh -c 'rm -f /tmp/syncdrive-backup.dump && pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/syncdrive-backup.dump' \
   || { echo "資料庫備份失敗" >&2; false; }
@@ -315,7 +356,8 @@ CURRENT_STAGE=啟動
 git -C "$LIVE_ROOT" checkout -q -f --detach "$SOURCE_SHA"
 set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false
 set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$IMAGE_TAG"
-compose up -d --no-build backend web
+ensure_video_secrets "$LIVE_ROOT/deploy/.env"
+compose up -d --no-build $(app_services)
 wait_ready
 
 log "[7/7] 完整驗收"

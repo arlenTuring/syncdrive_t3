@@ -51,7 +51,9 @@ COMPOSE="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env
 
 # ── 1. 建置自家映像 ────────────────────────────────────────
 log "建置 backend 與 web"
-IMAGE_TAG="$TAG" $COMPOSE build
+# 只建映像：compose 解析整份設定時影像密鑰是必填，給建置用的佔位值（不進映像、不進安裝包）
+IMAGE_TAG="$TAG" VIDEO_MEDIAMTX_PASSWORD=build VIDEO_PUBLISH_PASSWORD=build VIDEO_HOOK_SECRET=build VIDEO_SECRET_KEY=build \
+  $COMPOSE build
 
 # ── 2. 連同第三方映像一起存 ────────────────────────────────
 # 第三方映像也要帶。進場主機拉不到 Docker Hub，少一個就起不來。
@@ -61,8 +63,8 @@ IMAGE_TAG="$TAG" $COMPOSE build
 THIRD_PARTY=()
 while IFS= read -r line; do
   [ -n "$line" ] && THIRD_PARTY+=("$line")
-done < <(awk '$1=="postgres"||$1=="redis"||$1=="mosquitto" {print $2"@"$3}' deploy/images.lock)
-[ "${#THIRD_PARTY[@]}" -eq 3 ] || die "images.lock 讀不到三個第三方映像"
+done < <(awk '$1=="postgres"||$1=="redis"||$1=="mosquitto"||$1=="mediamtx" {print $2"@"$3}' deploy/images.lock)
+[ "${#THIRD_PARTY[@]}" -eq 4 ] || die "images.lock 讀不到四個第三方映像"
 log "第三方映像（釘在 digest）："
 printf '     %s\n' "${THIRD_PARTY[@]}"
 for image in "${THIRD_PARTY[@]}"; do
