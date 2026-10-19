@@ -19,6 +19,7 @@ schema 提供，部署前由 `migrate.sh --plan` 唯讀檢查。
 | `20261015-data-retention-management` | 前一份的 `vehicle_history_gaps`、`telemetry_logs` | 保留政策、清理計畫/工作、可信接收時間索引 | runner 單一交易 |
 | `20261017-media-group-version` | `media_library_items` | 樂觀鎖版本欄位 | runner 單一交易 |
 | `20261018-media-play-schedules` | 前述 `uuid-ossp` | 播放排程、項目、批次、投遞及索引 | runner 單一交易 |
+| `20261019-virtual-fence-site-permissions` | `permissions`、`role_permissions` 及其唯一索引（`20261012-role-permissions`） | 虛擬圍籬權限代碼 `operations.virtual-fence.*` 改為 `site.virtual-fence.*`，保留角色授權（可重跑） | runner 單一交易 |
 
 runner 單一交易表示 SQL 與 ledger 成功紀錄一起提交；SQL 自管交易則保留已發布檔案的
 `BEGIN/COMMIT`，成功後才另記 ledger，失敗不記錄。

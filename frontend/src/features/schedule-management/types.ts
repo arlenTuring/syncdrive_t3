@@ -39,7 +39,6 @@ export type ScheduleNavItem = ShellNavItem;
 export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
   { id: 'shift-deployment', label: 'nav.items.shift-deployment', enabled: true, requiredPermission: 'operations.shift-deployment.view' },
   { id: 'degraded-operation', label: 'nav.items.degraded-operation', enabled: true, requiredPermission: 'operations.degraded.view' },
-  { id: 'virtual-fence', label: 'nav.items.virtual-fence', enabled: true, requiredPermission: 'operations.virtual-fence.view' },
   { id: 'dispatch-scheduling', label: 'nav.items.dispatch-scheduling', enabled: true, requiredPermission: 'operations.dispatch.view' },
   { id: 'psd-control', label: 'nav.items.psd-control', enabled: true, requiredPermission: 'operations.psd-control.view' },
 ];
@@ -48,8 +47,9 @@ export function isOperationsView(view: string): boolean {
   return OPERATIONS_NAV_ITEMS.some((item) => item.id === view);
 }
 
-/** 場域管理模組子選單（對齊 TP13C 場域管理） */
+/** 場域管理模組子選單（對齊 TP13C 場域管理：虛擬圍籬管理、圖資資料管理） */
 export const SITE_NAV_ITEMS: ShellNavItem[] = [
+  { id: 'virtual-fence', label: 'nav.items.virtual-fence', enabled: true, requiredPermission: 'site.virtual-fence.view' },
   { id: 'map', label: 'nav.items.map', enabled: true, requiredPermission: 'site.map.view' },
 ];
 

@@ -79,6 +79,7 @@ validate_order() {
   assert_before backend/src/database/migrations/20261009-create-degraded-operation-plans.sql backend/src/database/migrations/20261010-create-degraded-replay.sql
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261010-vehicle-model-management.sql
   assert_before backend/src/database/migrations/20261011-access-control.sql backend/src/database/migrations/20261012-role-permissions.sql
+  assert_before backend/src/database/migrations/20261012-role-permissions.sql backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261015-vehicle-run-history.sql
   assert_before backend/src/database/migrations/20261015-vehicle-run-history.sql backend/src/database/migrations/20261015-data-retention-management.sql
 }
@@ -115,7 +116,8 @@ WITH checks(migration_id, valid) AS (
     ('backend/src/database/migrations/20261015-vehicle-run-history.sql', to_regclass('public.vehicle_history_frames') IS NOT NULL AND to_regclass('public.vehicle_history_gaps') IS NOT NULL),
     ('backend/src/database/migrations/20261015-data-retention-management.sql', to_regclass('public.data_retention_policies') IS NOT NULL AND to_regclass('public.data_cleanup_jobs') IS NOT NULL),
     ('backend/src/database/migrations/20261017-media-group-version.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='media_library_items' AND column_name='row_version')),
-    ('backend/src/database/migrations/20261018-media-play-schedules.sql', to_regclass('public.media_play_schedules') IS NOT NULL)
+    ('backend/src/database/migrations/20261018-media-play-schedules.sql', to_regclass('public.media_play_schedules') IS NOT NULL),
+    ('backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql', NOT EXISTS(SELECT 1 FROM permissions WHERE permission_code LIKE 'operations.virtual-fence.%'))
 )
 SELECT string_agg(c.migration_id, ', ' ORDER BY c.migration_id)
 FROM checks c JOIN syncdrive_schema_migrations m USING(migration_id)

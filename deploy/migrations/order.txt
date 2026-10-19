@@ -16,3 +16,4 @@ backend/src/database/migrations/20261015-vehicle-run-history.sql
 backend/src/database/migrations/20261015-data-retention-management.sql
 backend/src/database/migrations/20261017-media-group-version.sql
 backend/src/database/migrations/20261018-media-play-schedules.sql
+backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql

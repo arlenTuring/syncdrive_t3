@@ -42,10 +42,6 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('operations', '營運管理模組', 'degraded', 'create', '新增計劃', 212),
   permission('operations', '營運管理模組', 'degraded', 'edit', '編輯計劃', 213),
   permission('operations', '營運管理模組', 'degraded', 'delete', '刪除計劃', 214),
-  permission('operations', '營運管理模組', 'virtual-fence', '虛擬圍籬管理', 'view', '檢視', 220, false),
-  permission('operations', '營運管理模組', 'virtual-fence', 'create', '建立', 221, false),
-  permission('operations', '營運管理模組', 'virtual-fence', 'edit', '編輯', 222, false),
-  permission('operations', '營運管理模組', 'virtual-fence', 'delete', '刪除', 223, false),
   permission('operations', '營運管理模組', 'dispatch', '派遣調度管理', 'view', '檢視', 230),
   permission('operations', '營運管理模組', 'dispatch', 'create', '建立', 231),
   permission('operations', '營運管理模組', 'dispatch', 'edit', '編輯', 232),
@@ -101,6 +97,11 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('site', '場域管理模組', 'map', 'import', '匯入', 522),
   permission('site', '場域管理模組', 'map', 'export', '匯出', 523),
   permission('site', '場域管理模組', 'map', 'publish', '發布', 524),
+  // 虛擬圍籬管理由營運管理模組移入（舊代碼 operations.virtual-fence.* 由 20261019 migration 改名，保留角色授權）
+  permission('site', '場域管理模組', 'virtual-fence', '虛擬圍籬管理', 'view', '檢視', 530, false),
+  permission('site', '場域管理模組', 'virtual-fence', 'create', '建立', 531, false),
+  permission('site', '場域管理模組', 'virtual-fence', 'edit', '編輯', 532, false),
+  permission('site', '場域管理模組', 'virtual-fence', 'delete', '刪除', 533, false),
 
   permission('service', '服務管理模組', 'route', '路線任務規劃', 'view', '檢視', 600, false),
   permission('service', '服務管理模組', 'route', 'create', '建立', 601, false),
