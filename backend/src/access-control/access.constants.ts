@@ -127,9 +127,21 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('media', '媒體管理模組', 'schedule', 'delete', '刪除', 723),
   permission('media', '媒體管理模組', 'order-records', '訂單紀錄清單', 'view', '檢視', 730, false),
 
-  permission('events', '事件管理模組', 'events', '事件管理', 'view', '檢視', 800, false),
-  permission('events', '事件管理模組', 'events', 'manage', '處理', 801, false),
-  permission('events', '事件管理模組', 'events', 'export', '匯出', 802, false),
+  // 事件資訊清單與歷史事件檢視共用：view＝清單與詳情、manage＝人工確認（不下發車控）、export＝事件報表 CSV
+  permission('events', '事件管理模組', 'events', '事件資訊與歷史事件', 'view', '檢視', 800),
+  permission('events', '事件管理模組', 'events', 'manage', '人工確認', 801),
+  permission('events', '事件管理模組', 'events', 'export', '匯出報表', 802),
+  // 影像監控與事件影像回放；沒有影像來源時頁面只顯示「尚未設定影像來源」
+  permission('events', '事件管理模組', 'video', '影像監控管理', 'view', '檢視', 810),
+
+  permission('logs', '日誌管理模組', 'system', '系統操作紀錄', 'view', '檢視', 850),
+  permission('logs', '日誌管理模組', 'system', 'export', '匯出', 851),
+  permission('logs', '日誌管理模組', 'permissions', '權限異動查詢', 'view', '檢視', 860),
+  permission('logs', '日誌管理模組', 'permissions', 'export', '匯出', 861),
+  permission('logs', '日誌管理模組', 'operations', '營運操作紀錄', 'view', '檢視', 870),
+  permission('logs', '日誌管理模組', 'operations', 'export', '匯出', 871),
+  permission('logs', '日誌管理模組', 'authentication', '登入登出紀錄', 'view', '檢視', 880),
+  permission('logs', '日誌管理模組', 'authentication', 'export', '匯出', 881),
 
   permission('system', '系統管理模組', 'health', '系統監測狀態', 'view', '檢視', 900),
   permission('system', '系統管理模組', 'foundation', '系統基礎設定', 'view', '檢視', 910),
@@ -151,10 +163,10 @@ export const PERMISSION_BY_CODE = new Map(ACCESS_PERMISSIONS.map((item) => [item
 export const ADMIN_PERMISSIONS = ['access.accounts.manage', 'access.roles.manage'] as const;
 
 // shortcut: fixed development administrator, replace with deployment-generated credentials before production.
-/** 部署設定廠商帳號的預設角色：各模組檢視權限，不含權限管理與系統管理 */
+/** 部署設定廠商帳號的預設角色：各模組檢視權限，不含權限管理、系統管理與稽核日誌 */
 export const VENDOR_ROLE_CODE = 'VENDOR';
 export const VENDOR_ROLE_PERMISSIONS: readonly string[] = ACCESS_PERMISSIONS
-  .filter((item) => item.action === 'view' && item.moduleKey !== 'access' && item.moduleKey !== 'system')
+  .filter((item) => item.action === 'view' && !['access', 'system', 'logs'].includes(item.moduleKey))
   .map((item) => item.code);
 
 export const FIXED_ADMIN_ACCOUNT = 'syncdrive';

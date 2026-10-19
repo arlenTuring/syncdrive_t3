@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import {
   Body,
   Controller,
@@ -54,6 +55,7 @@ export class MapController {
     return this.mapService.getActivePublishedMapLibrary();
   }
 
+  @AuditAction('MAP_SET_ACTIVE')
   @Put('library/active')
   @RequirePermission('site.map.publish')
   @ApiOperation({ summary: '地圖庫：設為當前使用地圖（可同時發佈最新內容）' })
@@ -77,6 +79,7 @@ export class MapController {
     return this.mapService.getPublishedMapLibrary(mapId);
   }
 
+  @AuditAction('MAP_SAVE', { param: 'mapId', detail: () => ({}) })
   @Put('library/:mapId')
   @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '地圖庫：發佈／更新地圖（地圖編輯器儲存時同步）' })
@@ -94,6 +97,7 @@ export class MapController {
     return this.mapService.publishMapLibrary(mapId, body);
   }
 
+  @AuditAction('MAP_DELETE', { param: 'mapId' })
   @Delete('library/:mapId')
   @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '地圖庫：刪除已發佈的地圖（使用中的不給刪）' })

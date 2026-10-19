@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../access-control/access.guard';
@@ -30,6 +31,7 @@ export class SystemFoundationController {
     return this.foundationSettings.get();
   }
 
+  @AuditAction('SYSTEM_SETTINGS_UPDATE')
   @Put('settings')
   @RequirePermission('system.foundation.edit')
   @ApiOperation({ summary: '儲存系統基礎設定（全系統共用）' })
@@ -48,6 +50,7 @@ export class SystemFoundationController {
     return this.httpsCertificates.getStatus();
   }
 
+  @AuditAction('SYSTEM_SSL_UPDATE', { detail: () => ({}) })
   @Put('ssl/certificate')
   @RequirePermission('system.foundation.edit')
   @ApiOperation({

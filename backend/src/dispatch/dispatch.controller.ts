@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { BadRequestException, Body, ConflictException, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { maintenancePayloadFields } from './dispatch.charging';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -43,6 +44,7 @@ export class DispatchController {
     return { adopted: true, ...summarizeAdoption(adoption), history: adoption.history };
   }
 
+  @AuditAction('DISPATCH_PLAN_ADOPT')
   @Post('daily-plan/adopt')
   @AllowApiKey()
   @RequirePermission('operations.shift-deployment.deploy')
@@ -95,6 +97,7 @@ export class DispatchController {
     return this.operatingClock.snapshot();
   }
 
+  @AuditAction('DISPATCH_CLOCK_SET', { detail: (req) => ({ ...(req.body ?? {}) }) })
   @Post('operating-clock')
   @AllowApiKey()
   @RequirePermission('operations.dispatch.edit')
@@ -237,6 +240,7 @@ export class DispatchController {
     };
   }
 
+  @AuditAction('DISPATCH_ENABLE', { detail: (req) => ({ ...(req.body ?? {}) }) })
   @Post('enable')
   @AllowApiKey()
   @RequirePermission('operations.shift-deployment.deploy')

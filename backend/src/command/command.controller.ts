@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Req, BadRequestException, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { auditActor } from '../audit/audit-action.decorator';
 import { ApiTags, ApiOperation, ApiBody, ApiSecurity } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CommandService } from './command.service';
@@ -41,14 +42,13 @@ export class CommandController {
   })
   async executeCommand(@Body() dto: ExecuteCommandDto, @Req() req: Request) {
     const { vehicle_code, action } = dto;
-    const sourceIp = req.ip || req.socket.remoteAddress;
 
     // 只驗證協議格式；已登錄／授權範圍由各入口的身分與 scope 驗證。
     const validVehicleCode = REGISTERED_VEHICLE_CODE_OR_ALL_PATTERN.test(vehicle_code);
     if (!validVehicleCode) {
       // 稽核：驗證失敗的操作也要留紀錄
       await this.auditService.write({
-        sourceIp,
+        ...auditActor(req),
         actionType: OperatorActionType.COMMAND_DISPATCH,
         targetVehicle: vehicle_code,
         actionDetail: { action, params: dto.params },
@@ -64,7 +64,7 @@ export class CommandController {
     const validActions = Object.values(CommandType) as string[];
     if (!validActions.includes(action)) {
       await this.auditService.write({
-        sourceIp,
+        ...auditActor(req),
         actionType: OperatorActionType.COMMAND_DISPATCH,
         targetVehicle: vehicle_code,
         actionDetail: { action, params: dto.params },
@@ -80,9 +80,10 @@ export class CommandController {
 
     // 規格書 §系統操作紀錄：成功下發後留下稽核紀錄
     await this.auditService.write({
-      sourceIp,
+      ...auditActor(req),
       actionType: OperatorActionType.COMMAND_DISPATCH,
       targetVehicle: vehicle_code,
+      correlationId: result.commandId,
       actionDetail: {
         command_id: result.commandId,
         action,

@@ -319,8 +319,40 @@ export class AccessService {
     return Number(count);
   }
 
-  private audit(manager: EntityManager, operatorId: string, targetType: PermissionTargetType, targetId: string,
+  /**
+   * 權限異動紀錄（與異動同一筆交易）。另存操作當下的操作者與目標名稱快照、可查詢的相關帳號與角色；
+   * permission_ids 旁附可讀的 permission_codes（ID 仍保留）。
+   */
+  private async audit(manager: EntityManager, operatorId: string, targetType: PermissionTargetType, targetId: string,
     changeType: PermissionChangeType, beforeValue: any, afterValue: any, sourceIp?: string) {
-    return manager.insert(PermissionChangeLog, { operatorId, targetType, targetId, changeType, beforeValue, afterValue, sourceIp: sourceIp ?? null, createdAt: Date.now() });
+    const withCodes = async (value: any) => {
+      if (!value || !Array.isArray(value.permission_ids) || !value.permission_ids.length) return value;
+      const rows: Array<{ id: string; permission_code: string }> = await manager.query(
+        `SELECT id, permission_code FROM permissions WHERE id = ANY($1::uuid[])`, [value.permission_ids]);
+      const byId = new Map(rows.map((row) => [row.id, row.permission_code]));
+      return { ...value, permission_codes: value.permission_ids.map((id: string) => byId.get(id) ?? null) };
+    };
+    const accountName = async (id: string) => {
+      const [row] = await manager.query(`SELECT display_name, account_name FROM accounts WHERE id::text = $1`, [id]);
+      return row ? `${row.display_name}（${row.account_name}）` : null;
+    };
+    const roleName = async (id: string) => {
+      const [row] = await manager.query(`SELECT display_name FROM roles WHERE id::text = $1`, [id]);
+      return row?.display_name ?? null;
+    };
+    const accountTarget = targetType === PermissionTargetType.ACCOUNT || targetType === PermissionTargetType.ACCOUNT_ROLE;
+    const roleTarget = targetType === PermissionTargetType.ROLE || targetType === PermissionTargetType.ROLE_PERMISSION;
+    const roleIds = new Set<string>(roleTarget ? [targetId] : []);
+    for (const value of [beforeValue, afterValue]) if (accountTarget && Array.isArray(value?.role_ids)) value.role_ids.forEach((id: string) => roleIds.add(String(id)));
+    const snapshotName = beforeValue?.display_name ?? afterValue?.display_name ?? null;
+    return manager.insert(PermissionChangeLog, {
+      operatorId, targetType, targetId, changeType,
+      beforeValue: await withCodes(beforeValue), afterValue: await withCodes(afterValue),
+      sourceIp: sourceIp ?? null, createdAt: Date.now(),
+      operatorNameSnapshot: await accountName(operatorId),
+      targetNameSnapshot: (accountTarget ? await accountName(targetId) : roleTarget ? await roleName(targetId) : null) ?? snapshotName,
+      relatedAccountId: accountTarget ? targetId : null,
+      relatedRoleIds: [...roleIds],
+    });
   }
 }

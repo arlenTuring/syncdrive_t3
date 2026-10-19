@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission, type AuthenticatedRequest } from '../access-control/access.guard';
@@ -43,6 +44,7 @@ export class MediaPlaySchedulesController {
     return this.schedules.mediaOptions({ keyword, page: Number(page), page_size: Number(pageSize) });
   }
 
+  @AuditAction('MEDIA_SCHEDULE_CREATE')
   @Post()
   @RequirePermission('media.schedule.create')
   create(@Body() body: ScheduleInput, @Req() request: AuthenticatedRequest) {
@@ -60,12 +62,14 @@ export class MediaPlaySchedulesController {
     return this.schedules.get(id);
   }
 
+  @AuditAction('MEDIA_SCHEDULE_UPDATE')
   @Put(':id')
   @RequirePermission('media.schedule.edit')
   update(@Param('id') id: string, @Body() body: ScheduleInput) {
     return this.schedules.update(id, body ?? {});
   }
 
+  @AuditAction('MEDIA_SCHEDULE_DELETE')
   @Delete(':id')
   @RequirePermission('media.schedule.delete')
   remove(@Param('id') id: string, @Query('expected_version') expectedVersion?: string) {

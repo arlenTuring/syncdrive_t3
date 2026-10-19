@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -60,6 +61,7 @@ export class MaintenanceTaskController {
     return this.maintenanceTaskService.getTaskDetail(id);
   }
 
+  @AuditAction('MAINTENANCE_TASK_CREATE')
   @Post('draft')
   @RequirePermission('schedule.maintenance.create')
   @ApiOperation({ summary: '建立整備任務草稿' })
@@ -70,6 +72,7 @@ export class MaintenanceTaskController {
     });
   }
 
+  @AuditAction('MAINTENANCE_TASK_UPDATE')
   @Patch('detail/:id')
   @RequirePermission('schedule.maintenance.edit')
   @ApiOperation({ summary: '更新整備任務草稿' })
@@ -83,6 +86,7 @@ export class MaintenanceTaskController {
     });
   }
 
+  @AuditAction('MAINTENANCE_TASK_DELETE')
   @Delete('detail/:id')
   @RequirePermission('schedule.maintenance.delete')
   @ApiOperation({ summary: '刪除整備任務' })

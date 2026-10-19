@@ -21,6 +21,10 @@ export function substituteOperatingTime(query: string, operatingNow: number, day
     .replace(/\boperating_day\(\s*\)/gi, `'${day}'`);
 }
 
+/** 通用 SQL 資料來源禁止讀取的表（以字邊界比對，含 schema 前綴或引號寫法） */
+export const PROTECTED_TABLES =
+  /\b(login_logs|operator_action_logs|permission_change_logs|accounts|account_sessions|account_roles|roles|role_permissions|permissions|partner_api_keys)\b/i;
+
 @Injectable()
 export class DatasourceService {
   constructor(
@@ -79,6 +83,12 @@ export class DatasourceService {
     const FORBIDDEN = /\b(pg_read_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|copy|dblink)\b/i;
     if (FORBIDDEN.test(query)) {
       throw new BadRequestException('查詢包含禁止使用的函數或關鍵字');
+    }
+
+    // 稽核日誌、帳號與金鑰不能經由通用 SQL 讀取：它們各自有專屬權限的 API（日誌管理模組、帳號管理），
+    // 不能讓有資料來源權限的人繞過（含 password_hash、session、API 金鑰）
+    if (PROTECTED_TABLES.test(query)) {
+      throw new BadRequestException('此查詢涉及受保護的資料表（稽核日誌、帳號、權限或金鑰），請改用對應的管理頁面');
     }
 
     // 若查詢中沒有 LIMIT，自動加上防護上限

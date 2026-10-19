@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
+import { Check, Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 // §四 規格書定義之合法事件代碼（閉鎖式管理）
 export enum EventCode {
@@ -10,6 +10,8 @@ export enum EventCode {
   // 預留：由 Health Monitor 連動產生的內部告警標記（僅記錄，不觸發 MRM）
   SYSTEM_HEALTH_DEGRADED = 'SYSTEM_HEALTH_DEGRADED',
 }
+
+export type EventSourceType = 'VEHICLE' | 'FACILITY' | 'SYSTEM';
 
 export enum Severity {
   INFO = 'INFO',
@@ -40,6 +42,13 @@ export function securityEventDedupKey(vehicleCode: string, eventId: string, time
 @Index('IDX_EVENT_SEVERITY', ['severity']) // 快速撈取所有 CRITICAL 警報
 @Index('IDX_EVENT_VEHICLE_EVENT_ID', ['vehicleCode', 'eventId'])
 @Index('UQ_EVENT_DEDUP_KEY', ['dedupKey'], { unique: true })
+@Index('IDX_EVENT_TIME_ID', ['createdAt', 'id'])
+@Index('IDX_EVENT_SOURCE_TIME', ['sourceType', 'sourceId', 'createdAt'])
+@Index('IDX_EVENT_CODE_TIME', ['eventCode', 'createdAt'])
+// 與 migration 20261020 相同的約束（開發環境 synchronize 也保留）
+@Check('CHK_EVENT_SOURCE_TYPE', `source_type IN ('VEHICLE', 'FACILITY', 'SYSTEM')`)
+@Check('CHK_EVENT_ORIGIN', `origin IN ('REPORTED', 'CENTER')`)
+@Check('CHK_EVENT_VEHICLE_SOURCE', `source_type <> 'VEHICLE' OR vehicle_code IS NOT NULL`)
 export class SecurityEventLog {
   /** 中心端內部識別（2026-10-05 起）；車端原始 event_id 另存，不改寫 */
   @PrimaryGeneratedColumn({ type: 'bigint', name: 'id' })
@@ -57,8 +66,29 @@ export class SecurityEventLog {
   @Column({ type: 'bigint', name: 'received_at', nullable: true })
   receivedAt: string | null;
 
-  @Column({ name: 'vehicle_code' })
-  vehicleCode: string;
+  /** 載具事件的車號；設施／系統事件沒有車號（不偽造） */
+  @Column({ name: 'vehicle_code', type: 'varchar', nullable: true })
+  vehicleCode: string | null;
+
+  /** 事件來源：VEHICLE（車端）、FACILITY（設施／SCADA）、SYSTEM（中心端系統） */
+  @Column({ name: 'source_type', type: 'varchar', length: 16, default: 'VEHICLE' })
+  sourceType: EventSourceType;
+
+  /** 來源識別：車號、設施 ID 或系統元件名稱 */
+  @Column({ name: 'source_id', type: 'varchar', length: 64, nullable: true })
+  sourceId: string | null;
+
+  /** 接收當下的來源名稱（之後改名仍可理解）；舊資料為空，不追溯 */
+  @Column({ name: 'source_name_snapshot', type: 'varchar', length: 120, nullable: true })
+  sourceNameSnapshot: string | null;
+
+  /** REPORTED＝來源端回報；CENTER＝中心端依其他資料衍生（例如健康劣化） */
+  @Column({ type: 'varchar', length: 16, default: 'REPORTED' })
+  origin: 'REPORTED' | 'CENTER';
+
+  /** created_at 是否為來源提供的有效發生時間；false＝來源缺時間、以接收時間代替；舊資料為 null（未知） */
+  @Column({ name: 'occurred_at_valid', type: 'boolean', nullable: true })
+  occurredAtValid: boolean | null;
 
   @Column({ type: 'enum', enum: EventCode, name: 'event_code' })
   eventCode: EventCode;
@@ -93,6 +123,19 @@ export class SecurityEventLog {
   @Column({ name: 'sub_label', nullable: true, length: 32 })
   subLabel: string;
 
+  /** 人工確認（中心端閱覽確認，不代表故障解除或設備恢復） */
   @Column({ name: 'is_acknowledged', default: false })
   isAcknowledged: boolean;
+
+  @Column({ name: 'acknowledged_by', type: 'varchar', length: 64, nullable: true })
+  acknowledgedBy: string | null;
+
+  @Column({ name: 'acknowledged_by_name', type: 'varchar', length: 120, nullable: true })
+  acknowledgedByName: string | null;
+
+  @Column({ name: 'acknowledged_at', type: 'bigint', nullable: true })
+  acknowledgedAt: string | null;
+
+  @Column({ name: 'acknowledgement_note', type: 'varchar', length: 500, nullable: true })
+  acknowledgementNote: string | null;
 }

@@ -155,15 +155,19 @@ export class MqttController {
       this.logger.warn(`[Health Degradation] ${vehicleCode} health dropped from ${previousHealth} to ERROR.`);
 
       // 持久化以供稽核（先前僅 broadcast，DB 無紀錄）
-      await this.mqttService.recordHealthDegradedEvent(vehicleCode, data);
+      const eventId = await this.mqttService.recordHealthDegradedEvent(vehicleCode, data);
 
-      this.eventsGateway.broadcastEvent({
-        vehicleCode,
-        event_code: 'SYSTEM_HEALTH_DEGRADED',
-        severity: 'CRITICAL',
-        timestamp: data.timestamp,
-        source: 'HEALTH_MONITOR',
-      });
+      // 只在持久化成功後推播，帶中心端事件 ID（前端以 REST 重查詳情）
+      if (eventId) {
+        this.eventsGateway.broadcastEvent({
+          id: eventId,
+          vehicleCode,
+          event_code: 'SYSTEM_HEALTH_DEGRADED',
+          severity: 'CRITICAL',
+          timestamp: data.timestamp,
+          source: 'HEALTH_MONITOR',
+        });
+      }
     }
 
     this.replayRecorder.capture('health', vehicleCode, null, data);
@@ -221,8 +225,9 @@ export class MqttController {
     if (!(await this.acceptsVehicle(vehicleCode))) return;
     this.historyRecorder.capture('event', { vehicleCode, topic, payload: raw });
 
-    await this.mqttService.handleEventReport(vehicleCode, data);
-    this.eventsGateway.broadcastEvent({ vehicleCode, ...data });
+    // 只在新事件持久化成功後推播（重送、格式錯誤、寫入失敗都不推），帶中心端事件 ID
+    const saved = await this.mqttService.handleEventReport(vehicleCode, data);
+    if (saved) this.eventsGateway.broadcastEvent({ vehicleCode, ...data, id: saved.id });
   }
 
   @MessagePattern('v1/vtms/+/slot/status')

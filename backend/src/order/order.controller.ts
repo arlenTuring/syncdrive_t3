@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Post, Get, Put, Body, Query, Param, Req, UseFilters } from '@nestjs/common';
+import { auditActor } from '../audit/audit-action.decorator';
 import { OrderErrorFilter } from './order-error.filter';
 import type { Request } from 'express';
 import { OrderService } from './order.service';
@@ -100,9 +101,10 @@ export class OrderController {
     const result = await this.orderService.createOrder(createOrderDto as Parameters<OrderService['createOrder']>[0]);
 
     await this.auditService.write({
-      sourceIp: req.ip,
+      ...auditActor(req),
       actionType: OperatorActionType.ORDER_CREATE,
       targetVehicle: String(createOrderDto.vehicle_code ?? ''),
+      correlationId: String(result.id),
       actionDetail: {
         order_id: result.id,
         trip_code: result.tripCode,
@@ -223,9 +225,10 @@ export class OrderController {
     });
 
     await this.auditService.write({
-      sourceIp: req.ip,
+      ...auditActor(req),
       actionType: OperatorActionType.ORDER_UPDATE,
       targetVehicle: result.vehicleCode,
+      correlationId: String(id),
       actionDetail: { order_id: id, new_status: status },
       result: ActionResult.SUCCESS,
     });
@@ -254,9 +257,10 @@ export class OrderController {
     const result = await this.orderService.requestCancel(id);
 
     await this.auditService.write({
-      sourceIp: req.ip,
+      ...auditActor(req),
       actionType: OperatorActionType.ORDER_CANCEL,
       targetVehicle: result.vehicleCode,
+      correlationId: String(id),
       actionDetail: { order_id: id },
       result: ActionResult.SUCCESS,
     });
@@ -284,9 +288,12 @@ export class OrderController {
     const result = await this.orderService.updateActionStatus(actionId, body);
 
     await this.auditService.write({
-      sourceIp: req.ip,
-      actionType: OperatorActionType.ORDER_UPDATE,
-      targetVehicle: actionId,
+      ...auditActor(req),
+      // 原本把 actionId 誤記成目標車號；改記為站點動作目標
+      actionType: 'ORDER_ACTION_UPDATE',
+      targetType: 'ORDER_ACTION',
+      targetId: actionId,
+      correlationId: actionId,
       actionDetail: { action_id: actionId, status: body.status },
       result: ActionResult.SUCCESS,
     });

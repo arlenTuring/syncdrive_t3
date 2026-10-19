@@ -56,7 +56,9 @@ describe('MqttService', () => {
         rows.filter((r) => r.vehicleCode === where.vehicleCode && r.eventId === where.eventId)),
       insert: jest.fn(async (row: Record<string, unknown>) => {
         if (rows.some((r) => r.dedupKey === row.dedupKey)) throw Object.assign(new Error('duplicate key'), { code: '23505' });
-        rows.push({ ...row, id: String(rows.length + 1) });
+        const id = String(rows.length + 1);
+        rows.push({ ...row, id });
+        return { identifiers: [{ id }] };
       }),
     };
     const module: TestingModule = await Test.createTestingModule({

@@ -80,6 +80,7 @@ validate_order() {
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261010-vehicle-model-management.sql
   assert_before backend/src/database/migrations/20261011-access-control.sql backend/src/database/migrations/20261012-role-permissions.sql
   assert_before backend/src/database/migrations/20261012-role-permissions.sql backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql
+  assert_before backend/src/database/migrations/20261011-access-control.sql backend/src/database/migrations/20261020-event-and-log-management.sql
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261015-vehicle-run-history.sql
   assert_before backend/src/database/migrations/20261015-vehicle-run-history.sql backend/src/database/migrations/20261015-data-retention-management.sql
 }
@@ -101,7 +102,11 @@ WITH required(kind, name, present) AS (
     ('table','telemetry_logs',to_regclass('public.telemetry_logs') IS NOT NULL),
     ('table','operation_orders',to_regclass('public.operation_orders') IS NOT NULL),
     ('table','order_action_states',to_regclass('public.order_action_states') IS NOT NULL),
-    ('table','media_library_items',to_regclass('public.media_library_items') IS NOT NULL)
+    ('table','media_library_items',to_regclass('public.media_library_items') IS NOT NULL),
+    ('table','security_event_logs',to_regclass('public.security_event_logs') IS NOT NULL),
+    ('table','operator_action_logs',to_regclass('public.operator_action_logs') IS NOT NULL),
+    ('table','permission_change_logs',to_regclass('public.permission_change_logs') IS NOT NULL),
+    ('table','login_logs',to_regclass('public.login_logs') IS NOT NULL)
 )
 SELECT string_agg(kind || ':' || name, ', ' ORDER BY kind, name) FROM required WHERE NOT present;
 SQL
@@ -117,7 +122,8 @@ WITH checks(migration_id, valid) AS (
     ('backend/src/database/migrations/20261015-data-retention-management.sql', to_regclass('public.data_retention_policies') IS NOT NULL AND to_regclass('public.data_cleanup_jobs') IS NOT NULL),
     ('backend/src/database/migrations/20261017-media-group-version.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='media_library_items' AND column_name='row_version')),
     ('backend/src/database/migrations/20261018-media-play-schedules.sql', to_regclass('public.media_play_schedules') IS NOT NULL),
-    ('backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql', NOT EXISTS(SELECT 1 FROM permissions WHERE permission_code LIKE 'operations.virtual-fence.%'))
+    ('backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql', NOT EXISTS(SELECT 1 FROM permissions WHERE permission_code LIKE 'operations.virtual-fence.%')),
+    ('backend/src/database/migrations/20261020-event-and-log-management.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='security_event_logs' AND column_name='acknowledged_at') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='operator_action_logs' AND column_name='category'))
 )
 SELECT string_agg(c.migration_id, ', ' ORDER BY c.migration_id)
 FROM checks c JOIN syncdrive_schema_migrations m USING(migration_id)

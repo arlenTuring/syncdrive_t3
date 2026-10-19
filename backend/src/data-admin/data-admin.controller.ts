@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { type AuthenticatedRequest, RequirePermission } from '../access-control/access.guard';
 import { DataAdminService, type ExecuteAdminQuery } from './data-admin.service';
@@ -28,6 +29,7 @@ export class DataAdminController {
     return this.retention.preview(body, request.authUser!.id);
   }
 
+  @AuditAction('DATA_CLEANUP', { param: 'planId' })
   @Post('cleanup/plans/:planId/execute')
   @RequirePermission('system.data-admin.cleanup')
   cleanupExecute(@Param('planId') planId: string, @Req() request: AuthenticatedRequest) {
@@ -47,6 +49,7 @@ export class DataAdminController {
     return this.retention.previewPolicy(category, body, request.authUser!.id);
   }
 
+  @AuditAction('DATA_RETENTION_POLICY', { param: 'category' })
   @Put('retention/policies/:category')
   @RequirePermission('system.data-admin.policy')
   policySave(@Param('category') category: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
@@ -72,6 +75,7 @@ export class DataAdminController {
     return this.service.orderCleanupPreview();
   }
 
+  @AuditAction('DATA_QUERY_EXECUTE', { detail: () => ({}) })
   @Post('execute')
   @RequirePermission('system.data-admin.execute')
   execute(@Body() body: ExecuteAdminQuery, @Req() request: AuthenticatedRequest) {
@@ -92,6 +96,7 @@ export class DataAdminController {
     return this.liveReset.preview();
   }
 
+  @AuditAction('DATA_LIVE_RESET')
   @Post('live-reset/execute')
   @RequirePermission('system.data-admin.execute')
   liveResetExecute(@Body() body: { vehicleCodes: string[] }) {

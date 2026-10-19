@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TimeTemplatePublishStatus } from '../database/entities/time-template.entity';
@@ -38,6 +39,7 @@ export class TimeTemplateController {
     return this.timeTemplateService.getTemplateDetail(id);
   }
 
+  @AuditAction('TIME_TEMPLATE_UPDATE')
   @Patch('detail/:id')
   @RequirePermission('schedule.time-template.edit')
   @ApiOperation({ summary: '更新時間模板草稿' })
@@ -51,6 +53,7 @@ export class TimeTemplateController {
     });
   }
 
+  @AuditAction('TIME_TEMPLATE_DELETE')
   @Delete('detail/:id')
   @RequirePermission('schedule.time-template.delete')
   @ApiOperation({ summary: '刪除時間模板' })
@@ -59,6 +62,7 @@ export class TimeTemplateController {
     return { ok: true };
   }
 
+  @AuditAction('TIME_TEMPLATE_DUPLICATE')
   @Post('detail/:id/duplicate')
   @RequirePermission('schedule.time-template.duplicate')
   @ApiOperation({ summary: '複製時間模板為新草稿（原名＋「 複製模板」）' })
@@ -66,6 +70,7 @@ export class TimeTemplateController {
     return this.timeTemplateService.duplicateAsNewDraft(id);
   }
 
+  @AuditAction('TIME_TEMPLATE_CREATE')
   @Post('draft')
   @RequirePermission('schedule.time-template.create')
   @ApiOperation({ summary: '建立時間模板草稿' })
@@ -76,6 +81,7 @@ export class TimeTemplateController {
     });
   }
 
+  @AuditAction('TIME_TEMPLATE_EXPORT', { detail: () => ({}) })
   @Post('export')
   @RequirePermission('schedule.time-template.export')
   @ApiOperation({ summary: '匯出時間模板 JSON（依 template_id 列表）' })

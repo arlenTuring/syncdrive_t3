@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import {
   Body,
   Controller,
@@ -154,6 +155,7 @@ export class OperationShiftController {
     return this.operationShiftService.getShiftDetail(id);
   }
 
+  @AuditAction('SHIFT_CREATE')
   @Post('draft')
   @RequirePermission('schedule.shift-list.create')
   @ApiOperation({ summary: '建立班表草稿' })
@@ -166,6 +168,7 @@ export class OperationShiftController {
     });
   }
 
+  @AuditAction('SHIFT_PUBLISH')
   @Post('detail/:id/publish')
   @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({ summary: '發布班表（供 timetable API 優先讀取）' })
@@ -173,6 +176,7 @@ export class OperationShiftController {
     return this.operationShiftService.publishShift(id);
   }
 
+  @AuditAction('SHIFT_DEPLOY')
   @Post('detail/:id/deploy')
   @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({
@@ -207,6 +211,7 @@ export class OperationShiftController {
     };
   }
 
+  @AuditAction('SHIFT_DUPLICATE')
   @Post('detail/:id/duplicate')
   @RequirePermission('schedule.shift-list.duplicate')
   @ApiOperation({ summary: '以此複製新版班表草稿' })
@@ -214,6 +219,7 @@ export class OperationShiftController {
     return this.operationShiftService.duplicateAsNewDraft(id);
   }
 
+  @AuditAction('SHIFT_DUPLICATE')
   @Post('detail/:id/duplicate-as-manual')
   @RequirePermission('schedule.shift-list.duplicate')
   @ApiOperation({ summary: '參數生成班表複製成手動製作草稿' })
@@ -221,6 +227,7 @@ export class OperationShiftController {
     return this.operationShiftService.duplicateAsManualDraft(id);
   }
 
+  @AuditAction('SHIFT_UPDATE')
   @Patch('detail/:id')
   @RequirePermission('schedule.shift-list.edit')
   @ApiOperation({ summary: '更新班表草稿' })
@@ -234,6 +241,7 @@ export class OperationShiftController {
     });
   }
 
+  @AuditAction('SHIFT_DELETE')
   @Delete('detail/:id')
   @RequirePermission('schedule.shift-list.delete')
   @ApiOperation({ summary: '刪除班表' })

@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MapService } from '../map/map.service';
@@ -29,6 +30,7 @@ export class MapActivationController {
     return this.activation.check(mapId);
   }
 
+  @AuditAction('MAP_ACTIVATE', { param: 'mapId', detail: () => ({}) })
   @Post(':mapId')
   @RequirePermission('site.map.publish')
   @ApiOperation({ summary: '設為主要地圖（檢查不過回 409，附檢查結果）' })

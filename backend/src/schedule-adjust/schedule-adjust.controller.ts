@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import {
   Body,
   Controller,
@@ -41,6 +42,7 @@ export class ScheduleAdjustController {
     return this.service.list(toStatus(status));
   }
 
+  @AuditAction('SCHEDULE_ADJUST_APPLY')
   @Post()
   @RequirePermission('operations.shift-deployment.adjust')
   @ApiOperation({ summary: '送出班表調整申請（進入待核准）' })
@@ -48,6 +50,7 @@ export class ScheduleAdjustController {
     return this.service.create(body);
   }
 
+  @AuditAction('SCHEDULE_ADJUST_REVIEW')
   @Patch(':id/review')
   @RequirePermission('operations.shift-deployment.review')
   @ApiOperation({ summary: '核准／駁回／套用／取消一筆請求' })
@@ -62,6 +65,7 @@ export class ScheduleAdjustController {
     });
   }
 
+  @AuditAction('SCHEDULE_ADJUST_RESOLVE')
   @Patch('pending/resolve')
   @RequirePermission('operations.shift-deployment.revoke', 'operations.shift-deployment.review')
   @ApiOperation({ summary: '把目前待核准的那一筆結案（不指定狀態時記為取消）' })

@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { DatasourceService } from './datasource.service';
@@ -24,6 +25,7 @@ export class DatasourceController {
     return this.definitions.list();
   }
 
+  @AuditAction('DATASOURCE_SAVE', { param: 'sourceKey', detail: () => ({}) })
   @Put('definitions/:sourceKey')
   @RequirePermission('system.datasource.manage')
   async saveDefinition(
@@ -33,6 +35,7 @@ export class DatasourceController {
     return this.definitions.save(sourceKey, body);
   }
 
+  @AuditAction('DATASOURCE_DELETE', { param: 'sourceKey' })
   @Delete('definitions/:sourceKey')
   @RequirePermission('system.datasource.manage')
   async deleteDefinition(@Param('sourceKey') sourceKey: string) {
@@ -92,6 +95,7 @@ export class DatasourceController {
   }
 
   /** 寫入事件中心／班次中心示範資料（可重複執行） */
+  @AuditAction('DATASOURCE_SEED', { target: () => ({ id: 'seed-panels' }) })
   @Post('seed-panels')
   @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板事件／班次示範資料到資料庫' })
@@ -100,6 +104,7 @@ export class DatasourceController {
   }
 
   /** 寫入 11 台 PMS 車輛與調度訂單（車輛狀態列，可重複執行） */
+  @AuditAction('DATASOURCE_SEED', { target: () => ({ id: 'seed-vehicles' }) })
   @Post('seed-vehicles')
   @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板 PMS 車輛與調度訂單示範資料' })
@@ -108,6 +113,7 @@ export class DatasourceController {
   }
 
   /** 一次載入儀表板全部示範 SQL 種子 */
+  @AuditAction('DATASOURCE_SEED', { target: () => ({ id: 'seed-dashboard' }) })
   @Post('seed-dashboard')
   @RequirePermission('system.datasource.manage')
   @ApiOperation({ summary: '載入儀表板全部示範資料（車輛 + 事件 + 運能 + 整備）' })

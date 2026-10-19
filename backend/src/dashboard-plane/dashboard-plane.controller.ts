@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../access-control/access.guard';
@@ -31,6 +32,7 @@ export class DashboardPlaneController {
     return this.service.findPlane(planeId);
   }
 
+  @AuditAction('DASHBOARD_UPDATE', { detail: () => ({}) })
   @Put('planes')
   @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '整批覆寫圖台版面（送進來的清單即為完整結果）' })
@@ -40,6 +42,7 @@ export class DashboardPlaneController {
     return this.service.replacePlanes(body?.items ?? [], body?.updatedBy);
   }
 
+  @AuditAction('DASHBOARD_UPDATE', { param: 'planeId', detail: () => ({}) })
   @Put('planes/:planeId')
   @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '新增或更新單一圖台版面（不刪除其他版面）' })
@@ -56,6 +59,7 @@ export class DashboardPlaneController {
     return this.service.listPages(moduleId);
   }
 
+  @AuditAction('DASHBOARD_UPDATE', { detail: () => ({}) })
   @Put('module-pages')
   @RequirePermission('dashboard.dashboard.edit')
   @ApiOperation({ summary: '整批覆寫模組與版面對應' })

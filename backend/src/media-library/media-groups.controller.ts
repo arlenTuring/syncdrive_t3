@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../access-control/access.guard';
@@ -28,6 +29,7 @@ export class MediaGroupsController {
     return this.groups.candidates({ group_id: groupId, keyword, page: Number(page), page_size: Number(pageSize) });
   }
 
+  @AuditAction('MEDIA_GROUP_CREATE')
   @Post()
   @RequirePermission('media.groups.create')
   @ApiOperation({ summary: '建立空分組' })
@@ -48,6 +50,7 @@ export class MediaGroupsController {
     return this.groups.get(id);
   }
 
+  @AuditAction('MEDIA_GROUP_UPDATE')
   @Patch(':id')
   @RequirePermission('media.groups.edit')
   @ApiOperation({ summary: '更名（只改名稱，不動成員）' })
@@ -55,6 +58,7 @@ export class MediaGroupsController {
     return this.groups.rename(id, body ?? {});
   }
 
+  @AuditAction('MEDIA_GROUP_MEMBERS')
   @Post(':id/members')
   @RequirePermission('media.groups.edit')
   @ApiOperation({ summary: '加入成員（依請求順序附加在最後）' })
@@ -62,6 +66,7 @@ export class MediaGroupsController {
     return this.groups.addMembers(id, body ?? {});
   }
 
+  @AuditAction('MEDIA_GROUP_MEMBERS')
   @Put(':id/members/order')
   @RequirePermission('media.groups.edit')
   @ApiOperation({ summary: '更新成員順序（必須是完整且相同的成員集合）' })
@@ -69,6 +74,7 @@ export class MediaGroupsController {
     return this.groups.reorder(id, body ?? {});
   }
 
+  @AuditAction('MEDIA_GROUP_MEMBERS')
   @Delete(':id/members/:mediaId')
   @RequirePermission('media.groups.edit')
   @ApiOperation({ summary: '從此分組移除成員（不刪除媒體）' })
@@ -76,6 +82,7 @@ export class MediaGroupsController {
     return this.groups.removeMember(id, mediaId, expectedVersion);
   }
 
+  @AuditAction('MEDIA_GROUP_DELETE')
   @Delete(':id')
   @RequirePermission('media.groups.delete')
   @ApiOperation({ summary: '刪除分組（有直接引用時拒絕；不刪媒體）' })

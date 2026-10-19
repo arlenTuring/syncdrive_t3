@@ -1,3 +1,4 @@
+import { OnModuleDestroy } from '@nestjs/common';
 import { WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../access-control/auth.service';
@@ -15,25 +16,71 @@ function resolveSocketCorsOrigin(): string | string[] | boolean {
     origin: resolveSocketCorsOrigin(),
   },
 })
-export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
   server: Server;
 
+  private revalidateTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(private readonly auth: AuthService) {}
+
+  /**
+   * 依權限決定可加入的房間。'invalidate' 只送無敏感內容的失效訊號（實際資料仍走有權限的 REST）；
+   * 有內容的推播（事件、即時車況）各有專屬權限房間。
+   */
+  private roomsFor(permissions: Set<string>) {
+    const rooms: string[] = [];
+    if ([...permissions].some((code) => code.endsWith('.view'))) rooms.push('invalidate');
+    if (['dashboard.monitor.view','dashboard.dashboard.view','vehicle.realtime.view','vehicle.trajectory.view','operations.psd-control.view','site.map.view'].some((code) => permissions.has(code))) rooms.push('live');
+    if (permissions.has('vehicle.realtime.view')) rooms.push('vehicle-realtime');
+    if (permissions.has('events.events.view')) rooms.push('events');
+    return rooms;
+  }
 
   async handleConnection(client: Socket) {
     const request = client.request as any;
     const session = await this.auth.authenticate(readCookie(request));
     if (!session) return client.disconnect(true);
-    const permissions = new Set(session.user.permissions);
-    if ([...permissions].some((code) => code.endsWith('.view'))) client.join('invalidate');
-    if (['dashboard.monitor.view','dashboard.dashboard.view','vehicle.realtime.view','vehicle.trajectory.view','operations.psd-control.view','site.map.view'].some((code) => permissions.has(code))) client.join('live');
-    if (permissions.has('vehicle.realtime.view')) client.join('vehicle-realtime');
-    if (permissions.has('events.events.view')) client.join('events');
+    for (const room of this.roomsFor(new Set(session.user.permissions))) client.join(room);
+    this.ensureRevalidation();
   }
 
   handleDisconnect(_client: Socket) {
     /* 見 handleConnection */
+  }
+
+  onModuleDestroy() {
+    if (this.revalidateTimer) clearInterval(this.revalidateTimer);
+  }
+
+  /**
+   * 連線不是只在建立時驗證一次：每 30 秒重新檢查 Session 與權限。
+   * 登出、Session 到期、帳號停用 → 斷線；權限被撤銷 → 退出對應房間。
+   */
+  private ensureRevalidation() {
+    if (this.revalidateTimer || process.env.NODE_ENV === 'test') return;
+    this.revalidateTimer = setInterval(() => void this.revalidateAll(), 30_000);
+    this.revalidateTimer.unref?.();
+  }
+
+  async revalidateAll() {
+    const sockets = await this.server?.fetchSockets?.();
+    for (const socket of sockets ?? []) {
+      try {
+        const session = await this.auth.authenticate(readCookie({ headers: socket.handshake.headers } as any));
+        if (!session) {
+          socket.disconnect(true);
+          continue;
+        }
+        const allowed = new Set(this.roomsFor(new Set(session.user.permissions)));
+        for (const room of ['invalidate', 'live', 'vehicle-realtime', 'events']) {
+          if (allowed.has(room)) socket.join(room);
+          else socket.leave(room);
+        }
+      } catch {
+        socket.disconnect(true);
+      }
+    }
   }
 
   // 供其他 Service 呼叫以推播資料給前端

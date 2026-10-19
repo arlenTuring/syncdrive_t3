@@ -435,28 +435,28 @@ export class MqttService {
     // 1. 驗證必填欄位
     if (!event_id || !event_code) {
       this.logger.warn(`[Event Report] Missing event_id or event_code from ${vehicleCode}, discarding.`);
-      return;
+      return null;
     }
 
     // 2. 驗證 event_id 格式：EVT-YYYYMMDD-XXXX
     const eventIdPattern = /^EVT-\d{8}-\d{4}$/;
     if (!eventIdPattern.test(event_id)) {
       this.logger.warn(`[Event Report] Invalid event_id format: '${event_id}' from ${vehicleCode}, discarding.`);
-      return;
+      return null;
     }
 
     // 3. 驗證 event_code 是否在規格書定義的白名單內（閉鎖式管理）
     const validEventCodes = Object.values(EventCode) as string[];
     if (!validEventCodes.includes(event_code)) {
       this.logger.warn(`[Event Report] Unknown event_code: '${event_code}' from ${vehicleCode}, discarding.`);
-      return;
+      return null;
     }
 
     // 4. 驗證 severity
     const validSeverities = Object.values(Severity) as string[];
     if (!validSeverities.includes(severity)) {
       this.logger.warn(`[Event Report] Invalid severity: '${severity}' from ${vehicleCode}, discarding.`);
-      return;
+      return null;
     }
 
     // 5. 儲存車端上報的安全事件（去重規則見 securityEventDedupKey）
@@ -469,7 +469,7 @@ export class MqttService {
     if (sameId.some((row) => row.dedupKey === dedupKey)) {
       // QoS 1 重送、延遲到達的同一則：不重複新增，也不重複觸發後續處置
       this.logger.debug(`[Event Report] duplicate ${event_id} from ${vehicleCode}, ignored`);
-      return;
+      return null;
     }
     if (sameId.length > 0) {
       this.logger.warn(
@@ -477,20 +477,27 @@ export class MqttService {
       );
     }
     const displayMessage = this.resolveEventDisplayMessage(event_code, detail);
-    const inserted = await this.insertSecurityEvent({
+    const occurredValid = typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0;
+    const insertedId = await this.insertSecurityEvent({
       eventId: event_id,
       dedupKey,
       vehicleCode,
+      sourceType: 'VEHICLE',
+      sourceId: vehicleCode,
+      sourceNameSnapshot: await this.vehicleNameSnapshot(vehicleCode),
+      origin: 'REPORTED',
+      // 車端沒給有效時間：以接收時間代替並標示「來源時間不可用」，不冒充真實發生時間
+      occurredAtValid: occurredValid,
       eventCode: event_code as EventCode,
       severity,
       location,
       detail,
       ...(displayMessage ? { displayMessage } : {}),
       params: sameId.length > 0 ? { ...(payload.params ?? {}), event_id_reused: true } : payload.params,
-      createdAt: timestamp || (new Date().getTime()).toString(),
+      createdAt: occurredValid ? String(Math.trunc(timestamp)) : String(Date.now()),
       receivedAt: String(Date.now()),
     });
-    if (!inserted) return; // 同時到達的重送：另一筆已經寫入並處理
+    if (!insertedId) return null; // 同時到達的重送：另一筆已經寫入並處理
     this.datasourceInvalidation.emitEventCenter();
     this.logger.warn(`[Security Event] Vehicle ${vehicleCode} reported ${severity} event: ${event_code}`);
 
@@ -499,19 +506,31 @@ export class MqttService {
     if (severity === 'CRITICAL') {
       await this.orderService.markVehicleFaultOnActiveOrder(vehicleCode, event_code);
     }
+    return { id: insertedId, eventId: event_id, eventCode: event_code, severity, vehicleCode };
   }
 
   /**
    * 新增一筆告警；去重鍵衝突（同一則同時到達兩次）回 false，不更新既有列。
    * 一律 insert，不用 save——save 遇到相同主鍵會改成更新別人的資料。
    */
-  private async insertSecurityEvent(row: Partial<SecurityEventLog>): Promise<boolean> {
+  private async insertSecurityEvent(row: Partial<SecurityEventLog>): Promise<string | null> {
     try {
-      await this.securityEventLogRepository.insert(row);
-      return true;
+      const result = await this.securityEventLogRepository.insert(row);
+      return String(result.identifiers[0]?.id ?? '');
     } catch (err) {
-      if ((err as { code?: string })?.code === '23505') return false;
+      if ((err as { code?: string })?.code === '23505') return null;
       throw err;
+    }
+  }
+
+  /** 接收當下的車輛名稱（事件日後仍可理解）；查不到就不填，不猜 */
+  private async vehicleNameSnapshot(vehicleCode: string): Promise<string | null> {
+    try {
+      const [row] = await this.securityEventLogRepository.manager.query(
+        `SELECT display_name FROM vehicles WHERE lower(vehicle_code) = lower($1) ORDER BY is_active DESC LIMIT 1`, [vehicleCode]);
+      return row?.display_name?.trim() || null;
+    } catch {
+      return null;
     }
   }
 
@@ -535,8 +554,9 @@ export class MqttService {
    * 注意：依協議 §五.5，P3 健康與 P4 事件嚴重度脫鉤——本事件僅供稽核/告警，
    * 不經 handleEventReport，故不會自動將營運訂單轉為 FAULTED。
    */
-  async recordHealthDegradedEvent(vehicleCode: string, payload: any) {
-    const ts = typeof payload?.timestamp === 'number' ? payload.timestamp : Date.now();
+  async recordHealthDegradedEvent(vehicleCode: string, payload: any): Promise<string | null> {
+    const occurredValid = typeof payload?.timestamp === 'number' && Number.isFinite(payload.timestamp) && payload.timestamp > 0;
+    const ts = occurredValid ? payload.timestamp : Date.now();
     const dateStr = new Date(ts).toISOString().slice(0, 10).replace(/-/g, '');
     const eventId = `EVT-${dateStr}-${String(ts % 10000).padStart(4, '0')}`;
 
@@ -545,11 +565,17 @@ export class MqttService {
       .map(([name]) => name);
 
     try {
-      await this.insertSecurityEvent({
+      const id = await this.insertSecurityEvent({
         eventId,
         dedupKey: securityEventDedupKey(vehicleCode, eventId, ts),
         receivedAt: String(Date.now()),
         vehicleCode,
+        sourceType: 'VEHICLE',
+        sourceId: vehicleCode,
+        sourceNameSnapshot: await this.vehicleNameSnapshot(vehicleCode),
+        // 中心端依健康心跳衍生，不是車端事件契約（§四）回報的事件
+        origin: 'CENTER',
+        occurredAtValid: occurredValid,
         eventCode: EventCode.SYSTEM_HEALTH_DEGRADED,
         severity: Severity.CRITICAL,
         detail: errorSubsystems.length
@@ -559,8 +585,11 @@ export class MqttService {
         params: { subsystems: payload?.subsystems },
         createdAt: String(ts),
       });
+      if (id) this.datasourceInvalidation.emitEventCenter();
+      return id;
     } catch (err) {
       this.logger.debug(`[Health Degraded] persist skipped for ${vehicleCode}: ${(err as Error)?.message}`);
+      return null;
     }
   }
 

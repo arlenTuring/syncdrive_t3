@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../access-control/access.guard';
@@ -78,6 +79,7 @@ export class SystemHealthController {
     return this.thresholds.get();
   }
 
+  @AuditAction('SYSTEM_HEALTH_THRESHOLDS')
   @Put('thresholds')
   @RequirePermission('system.foundation.edit')
   @ApiOperation({

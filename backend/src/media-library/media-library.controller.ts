@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import { Controller, Delete, Get, Param, Patch, Post, Query, Body, UploadedFile, UseInterceptors, Req, Res, HttpStatus } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -29,6 +30,7 @@ export class MediaLibraryController {
     return this.service.listItems({ keyword, kind: resolvedKind, page: page ? Number(page) : undefined, page_size: pageSize ? Number(pageSize) : undefined, sort_by: sortBy, sort_direction: sortDirection });
   }
 
+  @AuditAction('MEDIA_CREATE', { detail: () => ({}) })
   @Post()
   @RequirePermission('media.content.create')
   @UseInterceptors(upload)
@@ -70,12 +72,14 @@ export class MediaLibraryController {
   @Get(':id')
   get(@Param('id') id: string) { return this.service.get(id); }
 
+  @AuditAction('MEDIA_UPDATE')
   @Patch(':id')
   @RequirePermission('media.content.edit')
   @UseInterceptors(upload)
   @ApiConsumes('multipart/form-data')
   update(@Param('id') id: string, @Body() body: Record<string, string>, @UploadedFile() file?: UploadedMediaFile) { return this.service.update(id, body, file); }
 
+  @AuditAction('MEDIA_DELETE')
   @Delete(':id')
   @RequirePermission('media.content.delete')
   remove(@Param('id') id: string, @Query('expected_updated_at') expectedUpdatedAt?: string) { return this.service.remove(id, expectedUpdatedAt); }

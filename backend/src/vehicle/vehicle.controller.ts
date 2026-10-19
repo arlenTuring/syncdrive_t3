@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { auditActor } from '../audit/audit-action.decorator';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { RequirePermission } from '../access-control/access.guard';
@@ -70,8 +71,7 @@ export class VehicleController {
   async createRegistry(@Body() body: CreateVehicleDto, @Req() request: AuthenticatedRequest) {
     const result = await this.vehicleService.createRegistration(body);
     await this.audit.write({
-      operatorId: request.authUser?.id,
-      sourceIp: request.ip || request.socket.remoteAddress,
+      ...auditActor(request),
       actionType: OperatorActionType.VEHICLE_REGISTER,
       targetVehicle: result.vehicleCode,
       actionDetail: { displayName: result.displayName, initialMileageKm: result.initialMileageKm },
@@ -93,8 +93,7 @@ export class VehicleController {
   async updateRegistry(@Param() params: VehicleIdDto, @Body() body: UpdateVehicleDto, @Req() request: AuthenticatedRequest) {
     const result = await this.vehicleService.updateRegistration(params.id, body);
     await this.audit.write({
-      operatorId: request.authUser?.id,
-      sourceIp: request.ip || request.socket.remoteAddress,
+      ...auditActor(request),
       actionType: OperatorActionType.VEHICLE_UPDATE,
       targetVehicle: result.vehicleCode,
       actionDetail: { displayName: result.displayName, initialMileageKm: result.initialMileageKm, version: result.version },
@@ -109,8 +108,7 @@ export class VehicleController {
   async updateService(@Param() params: VehicleIdDto, @Body() body: UpdateVehicleServiceDto, @Req() request: AuthenticatedRequest) {
     const result = await this.vehicleService.updateServiceSetting(params.id, body);
     await this.audit.write({
-      operatorId: request.authUser?.id,
-      sourceIp: request.ip || request.socket.remoteAddress,
+      ...auditActor(request),
       actionType: OperatorActionType.VEHICLE_SERVICE_SETTING,
       targetVehicle: result.vehicleCode,
       actionDetail: { serviceEnabled: result.serviceEnabled, version: result.version },
@@ -125,8 +123,7 @@ export class VehicleController {
   async removeRegistry(@Param() params: VehicleIdDto, @Req() request: AuthenticatedRequest) {
     const result = await this.vehicleService.removeRegistration(params.id);
     await this.audit.write({
-      operatorId: request.authUser?.id,
-      sourceIp: request.ip || request.socket.remoteAddress,
+      ...auditActor(request),
       actionType: OperatorActionType.VEHICLE_REMOVE,
       targetVehicle: result.vehicleCode,
       actionDetail: { displayName: result.displayName, credentialsRevoked: true },

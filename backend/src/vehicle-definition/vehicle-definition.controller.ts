@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import {
   Body,
   Controller,
@@ -50,6 +51,7 @@ export class VehicleDefinitionController {
     return this.service.references(definitionKey);
   }
 
+  @AuditAction('VEHICLE_MODEL_SAVE', { param: 'definitionKey' })
   @Put(':definitionKey')
   @RequirePermission('site.map.edit', 'vehicle.registry.edit')
   @ApiOperation({
@@ -68,6 +70,7 @@ export class VehicleDefinitionController {
     );
   }
 
+  @AuditAction('VEHICLE_MODEL_DELETE', { param: 'definitionKey' })
   @Delete(':definitionKey')
   @RequirePermission('site.map.edit', 'vehicle.registry.delete')
   @ApiOperation({ summary: '刪除模型（仍被引用時拒絕）' })
@@ -88,6 +91,7 @@ export class MapVehicleSettingsController {
     return this.service.list();
   }
 
+  @AuditAction('MAP_VEHICLE_SETTINGS_SAVE', { target: () => ({ id: 'default', name: '系統預設' }) })
   @Put()
   @RequirePermission('site.map.edit')
   @ApiOperation({
@@ -106,6 +110,7 @@ export class MapVehicleSettingsController {
     return this.service.listMigrations();
   }
 
+  @AuditAction('VEHICLE_MODEL_MIGRATE')
   @Post('migrations')
   @RequirePermission('site.map.import')
   @ApiOperation({
@@ -118,6 +123,7 @@ export class MapVehicleSettingsController {
     return this.service.migrateFromDashboards(dryRun === '1' || dryRun === 'true', operator);
   }
 
+  @AuditAction('VEHICLE_MODEL_ROLLBACK', { param: 'migrationId' })
   @Post('migrations/:migrationId/rollback')
   @RequirePermission('site.map.import')
   @ApiOperation({ summary: '回復一次遷移（只刪除遷移後沒被改過的設定）' })
@@ -134,6 +140,7 @@ export class MapVehicleSettingsController {
     return this.service.resolve(mapId);
   }
 
+  @AuditAction('MAP_VEHICLE_SETTINGS_SAVE', { param: 'mapId' })
   @Put(':mapId')
   @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '設定某張地圖的車輛模型與顯示尺寸' })
@@ -145,6 +152,7 @@ export class MapVehicleSettingsController {
     return this.service.putSetting(mapId, body, operator);
   }
 
+  @AuditAction('MAP_VEHICLE_SETTINGS_DELETE', { param: 'mapId' })
   @Delete(':mapId')
   @RequirePermission('site.map.edit')
   @ApiOperation({ summary: '移除某張地圖的車輛模型設定（改用系統預設）' })

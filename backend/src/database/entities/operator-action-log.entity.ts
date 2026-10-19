@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
+import { Check, Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 export enum OperatorActionType {
   COMMAND_DISPATCH = 'COMMAND_DISPATCH', // 下發控制指令
@@ -12,6 +12,9 @@ export enum OperatorActionType {
   VEHICLE_SERVICE_SETTING = 'VEHICLE_SERVICE_SETTING',
   VEHICLE_REMOVE = 'VEHICLE_REMOVE',
 }
+
+/** 日誌分類：SYSTEM＝系統操作紀錄；OPERATIONS＝營運操作紀錄（對照表見 audit/audit-catalog.ts） */
+export type AuditCategory = 'SYSTEM' | 'OPERATIONS';
 
 export enum ActionResult {
   SUCCESS = 'SUCCESS',
@@ -28,6 +31,10 @@ export enum ActionResult {
 @Index('IDX_ACTION_OPERATOR_TIME', ['operatorId', 'createdAt'])
 @Index('IDX_ACTION_VEHICLE_TIME', ['targetVehicle', 'createdAt'])
 @Index('IDX_ACTION_TYPE', ['actionType'])
+@Index('IDX_ACTION_CATEGORY_TIME', ['category', 'createdAt', 'id'])
+@Index('IDX_ACTION_TIME_ID', ['createdAt', 'id'])
+@Index('IDX_ACTION_TARGET_TIME', ['targetType', 'targetId', 'createdAt'])
+@Check('CHK_ACTION_CATEGORY', `category IS NULL OR category IN ('SYSTEM', 'OPERATIONS')`)
 export class OperatorActionLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -40,9 +47,33 @@ export class OperatorActionLog {
   @Column({ name: 'source_ip', nullable: true })
   sourceIp: string;
 
-  // 操作類型（閉鎖式 Enum）
-  @Column({ type: 'enum', enum: OperatorActionType, name: 'action_type' })
-  actionType: OperatorActionType;
+  // 操作代碼（白名單見 audit/audit-catalog.ts；2026-10-20 起由 enum 改為 varchar 方便擴充）
+  @Column({ type: 'varchar', length: 64, name: 'action_type' })
+  actionType: string;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  category: AuditCategory | null;
+
+  /** 操作當下的操作者顯示名稱 */
+  @Column({ name: 'operator_name_snapshot', type: 'varchar', length: 120, nullable: true })
+  operatorNameSnapshot: string | null;
+
+  @Column({ name: 'target_type', type: 'varchar', length: 32, nullable: true })
+  targetType: string | null;
+
+  @Column({ name: 'target_id', type: 'varchar', length: 128, nullable: true })
+  targetId: string | null;
+
+  /** 操作當下的目標名稱 */
+  @Column({ name: 'target_name_snapshot', type: 'varchar', length: 200, nullable: true })
+  targetNameSnapshot: string | null;
+
+  /** 連結 command／order／degraded 等業務紀錄 */
+  @Column({ name: 'correlation_id', type: 'varchar', length: 128, nullable: true })
+  correlationId: string | null;
+
+  @Column({ name: 'user_agent', type: 'varchar', length: 300, nullable: true })
+  userAgent: string | null;
 
   // 操作對象車輛（'all' 代表廣播全車隊）
   @Column({ name: 'target_vehicle', nullable: true })

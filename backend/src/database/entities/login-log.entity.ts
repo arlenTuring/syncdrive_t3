@@ -13,6 +13,7 @@ export enum LoginEventType {
 @Entity('login_logs')
 @Index('IDX_LOGIN_ACCOUNT_TIME', ['accountName', 'createdAt'])
 @Index('IDX_LOGIN_EVENT', ['eventType'])
+@Index('IDX_LOGIN_TIME_ID', ['createdAt', 'id'])
 export class LoginLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

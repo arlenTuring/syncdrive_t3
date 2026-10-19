@@ -67,6 +67,8 @@ import { MaintenanceTaskModule } from './maintenance-task/maintenance-task.modul
 import { OperationShiftModule } from './operation-shift/operation-shift.module';
 import { DispatchModule } from './dispatch/dispatch.module';
 import { MediaLibraryModule } from './media-library/media-library.module';
+import { EventLogModule } from './event-log/event-log.module';
+import { AuditModule } from './audit/audit.module';
 import { VehicleDefinitionModule } from './vehicle-definition/vehicle-definition.module';
 import { ScheduleAdjustModule } from './schedule-adjust/schedule-adjust.module';
 import { DashboardPlaneModule } from './dashboard-plane/dashboard-plane.module';
@@ -168,6 +170,8 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
     OperationShiftModule,
     DispatchModule,
     MediaLibraryModule,
+    AuditModule,
+    EventLogModule,
     VehicleDefinitionModule,
     ScheduleAdjustModule,
     DashboardPlaneModule,

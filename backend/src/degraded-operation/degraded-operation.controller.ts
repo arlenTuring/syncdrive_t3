@@ -1,3 +1,4 @@
+import { AuditAction } from '../audit/audit-action.decorator';
 import {
   Body,
   Controller,
@@ -125,6 +126,7 @@ export class DegradedOperationController {
     return this.service.get(id);
   }
 
+  @AuditAction('DEGRADED_PLAN_CREATE')
   @Post('plans')
   @RequirePermission('operations.degraded.create')
   @ApiOperation({ summary: '建立降級計畫（不啟用、不下發速限）' })
@@ -137,6 +139,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_PLAN_UPDATE')
   @Patch('plans/:id')
   @RequirePermission('operations.degraded.edit')
   @ApiOperation({ summary: '更新降級計畫（不啟用、不下發速限）' })
@@ -150,6 +153,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_PLAN_DELETE')
   @Delete('plans/:id')
   @RequirePermission('operations.degraded.delete')
   @ApiOperation({ summary: '刪除降級計畫（不解除執行狀態、不刪除歷史快照）' })
@@ -162,6 +166,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_EXECUTE', { correlation: (_req, result) => (result as { id?: string } | undefined)?.id })
   @Post('executions')
   @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '建立降級執行快照；控制流程未接通時不下發指令' })
@@ -177,6 +182,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_CANCEL', { correlation: (req) => String(req.params.id) })
   @Post('executions/:id/cancel')
   @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '取消待執行的降級預約' })
@@ -193,6 +199,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_PARAMETERS', { correlation: (req) => String(req.params.id) })
   @Patch('executions/:id/parameters')
   @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '調整目前降級執行參數（不修改來源範本）' })
@@ -209,6 +216,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_CONTENT', { correlation: (req) => String(req.params.id) })
   @Patch('executions/:id/content')
   @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '更新本次降級內容（不修改來源範本）' })
@@ -225,6 +233,7 @@ export class DegradedOperationController {
     );
   }
 
+  @AuditAction('DEGRADED_RESTORE', { correlation: (req) => String(req.params.id) })
   @Post('executions/:id/restore')
   @RequirePermission('operations.degraded.execute')
   @ApiOperation({ summary: '完成安全確認並解除本次降級管理狀態' })
