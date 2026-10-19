@@ -72,7 +72,7 @@ while IFS=$'\t' read -r key expected || [ -n "$key" ]; do
   [ -r "$source" ] || { echo "媒體缺檔：$source" >&2; exit 1; }
   actual="$(hash_file "$source")"
   [ -n "$expected" ] && [ "$actual" != "$expected" ] \
-    && { echo "媒體校驗不符：$key（DB=$expected file=$actual）" >&2; exit 1; }
+    && { echo "媒體校驗不符：${key}（DB=${expected} file=${actual}）" >&2; exit 1; }
   cp "$source" "$OUTPUT/media/$key"
 done < "$OUTPUT/media.tsv"
 

@@ -114,4 +114,4 @@ gcloud compute scp "$WORK/$BATCH.tar.gz" "$INSTANCE:/tmp/$BATCH.tar.gz" "${GCLOU
 gcloud compute scp "$ROOT/deploy/remote-sync.sh" "$INSTANCE:/tmp/syncdrive-remote-sync.sh" "${GCLOUD_ARGS[@]}"
 
 remote "sudo REMOTE_DIR='$REMOTE_DIR' bash /tmp/syncdrive-remote-sync.sh apply '$BATCH' '$SOURCE_SHA' '/tmp/$BATCH.tar.gz' '$BUNDLE_SHA'"
-log "完成。版本 $SOURCE_SHA，批次 $BATCH"
+log "完成。版本 ${SOURCE_SHA}，批次 ${BATCH}"

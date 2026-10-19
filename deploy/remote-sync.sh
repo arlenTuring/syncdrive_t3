@@ -125,7 +125,7 @@ case "$ACTION" in
       log "回復完成並通過驗收"
       exit 0
     fi
-    echo "回復失敗；備份保持於 $ROLLBACK_BACKUP，未宣稱服務健康" >&2
+    echo "回復失敗；備份保持於 ${ROLLBACK_BACKUP}，未宣稱服務健康" >&2
     exit 1
     ;;
   apply) ;;
