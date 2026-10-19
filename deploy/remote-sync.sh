@@ -40,9 +40,11 @@ set_env() {
     $0 ~ "^" key "=" {print key "=" value; done=1; next}
     {print}
     END{if(!done) print key "=" value}
-  ' "$file" > "$tmp"
-  chmod --reference="$file" "$tmp" 2>/dev/null || chmod 600 "$tmp"
-  mv "$tmp" "$file"
+  ' "$file" > "$tmp" || return 1
+  if ! chmod --reference="$file" "$tmp" 2>/dev/null; then
+    chmod 600 "$tmp" || return 1
+  fi
+  mv "$tmp" "$file" || return 1
 }
 
 compose() {
@@ -60,17 +62,25 @@ capture_failure() {
 
 restore_backup() {
   local backup="$1"
-  [ -f "$backup/database.dump" ] || die "回復備份缺少 database.dump：$backup"
-  [ -f "$backup/deploy.env" ] || die "回復備份缺少 deploy.env：$backup"
+  [ -r "$backup/database.dump" ] || { echo "回復備份缺少 database.dump：$backup" >&2; return 1; }
+  [ -r "$backup/deploy.env" ] || { echo "回復備份缺少 deploy.env：$backup" >&2; return 1; }
+  [ -r "$backup/image-tag" ] || { echo "回復備份缺少 image-tag：$backup" >&2; return 1; }
+  [ -r "$backup/git-sha" ] || { echo "回復備份缺少 git-sha：$backup" >&2; return 1; }
   local old_tag old_sha
-  old_tag="$(cat "$backup/image-tag")"
-  old_sha="$(cat "$backup/git-sha")"
+  old_tag="$(cat "$backup/image-tag")" || return 1
+  old_sha="$(cat "$backup/git-sha")" || return 1
+  [ -n "$old_tag" ] && [ -n "$old_sha" ] || { echo "回復版本資訊為空" >&2; return 1; }
   log "回復資料庫、檔案與映像 $old_tag"
   IMAGE_TAG="$old_tag"
-  docker stop syncdrive_web syncdrive_backend >/dev/null 2>&1 || true
-  docker exec syncdrive_postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-  docker exec -i syncdrive_postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges' < "$backup/database.dump"
-  cp "$backup/deploy.env" "$LIVE_ROOT/deploy/.env"
+  docker stop syncdrive_web syncdrive_backend >/dev/null 2>&1 || return 1
+  docker cp "$backup/database.dump" syncdrive_postgres:/tmp/syncdrive-restore.dump || return 1
+  docker exec syncdrive_postgres sh -c 'pg_restore --list /tmp/syncdrive-restore.dump >/dev/null' || return 1
+  docker exec syncdrive_postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"' || return 1
+  docker exec syncdrive_postgres sh -c 'createdb -U "$POSTGRES_USER" "$POSTGRES_DB"' || return 1
+  docker exec syncdrive_postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE" -c "SELECT timescaledb_pre_restore()"' || return 1
+  docker exec syncdrive_postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/syncdrive-restore.dump' || return 1
+  docker exec syncdrive_postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT timescaledb_post_restore()"' || return 1
+  cp "$backup/deploy.env" "$LIVE_ROOT/deploy/.env" || return 1
   if [ -d "$backup/backend-data" ]; then
     # Restore an exact /app/data snapshot.  Copying over the directory would
     # leave newly synchronized maps/media behind and make rollback incomplete.
@@ -80,15 +90,15 @@ set -eu
 find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 cp -a /restore/. /app/data/
 chown -R 1000:1000 /app/data
-'
+' || return 1
   fi
-  git -C "$LIVE_ROOT" checkout -q -f --detach "$old_sha"
-  set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$old_tag"
-  set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false
-  compose up -d --no-build backend web
-  wait_ready
-  "$LIVE_ROOT/deploy/healthcheck.sh"
-  printf '%s\n' "$old_tag" > "$LIVE_ROOT/deploy/.state/last-good-tag"
+  git -C "$LIVE_ROOT" checkout -q -f --detach "$old_sha" || return 1
+  set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$old_tag" || return 1
+  set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false || return 1
+  compose up -d --no-build backend web || return 1
+  wait_ready || return 1
+  "$LIVE_ROOT/deploy/healthcheck.sh" 2>&1 | tee "$STATE_ROOT/last-restore-health.log" || return 1
+  RESTORE_HEALTH_SUMMARY="$(tail -1 "$STATE_ROOT/last-restore-health.log")"
 }
 
 status() {
@@ -111,9 +121,12 @@ case "$ACTION" in
     [ -f "$state" ] || die "沒有成功批次可回復"
     # shellcheck disable=SC1090
     source "$state"
-    restore_backup "$ROLLBACK_BACKUP"
-    log "回復完成並通過驗收"
-    exit 0
+    if restore_backup "$ROLLBACK_BACKUP"; then
+      log "回復完成並通過驗收"
+      exit 0
+    fi
+    echo "回復失敗；備份保持於 $ROLLBACK_BACKUP，未宣稱服務健康" >&2
+    exit 1
     ;;
   apply) ;;
   *) die "用法：remote-sync.sh apply <batch> <sha> <bundle.tar.gz> <sha256> | status | health | logs | rollback" ;;
@@ -169,41 +182,80 @@ previous_tag="${previous_tag:-$(docker inspect -f '{{.Config.Image}}' syncdrive_
 previous_sha="$(git -C "$LIVE_ROOT" rev-parse HEAD)"
 printf '%s\n' "$previous_tag" > "$BACKUP/image-tag"
 printf '%s\n' "$previous_sha" > "$BACKUP/git-sha"
+printf 'backup=%s\nprevious_tag=%s\nprevious_sha=%s\n' "$BACKUP" "$previous_tag" "$previous_sha" >> "$RUN_DIR/status.env"
 cp "$LIVE_ROOT/deploy/.env" "$BACKUP/deploy.env"
 cp "$LIVE_ROOT/deploy/docker-compose.prod.yml" "$BACKUP/docker-compose.prod.yml"
 docker inspect syncdrive_backend syncdrive_web > "$BACKUP/images.json"
-docker exec syncdrive_postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP/database.dump"
-mkdir -p "$BACKUP/backend-data"
-docker cp syncdrive_backend:/app/data/. "$BACKUP/backend-data/"
-
 MUTATED=false
+STOPPED=false
+CURRENT_STAGE=backup
+FAILED_FILE='—'
+RESTORE_HEALTH_SUMMARY='未執行'
 rollback_on_error() {
   code=$?
   trap - ERR INT TERM
   capture_failure "$RUN_DIR"
-  printf 'stage=failed\nexit_code=%s\nfailed_at=%s\n' "$code" "$(date -u +%FT%TZ)" >> "$RUN_DIR/status.env"
+  printf 'stage=failed\nfailed_stage=%s\nfailed_file=%s\nexit_code=%s\nfailed_at=%s\n' \
+    "$CURRENT_STAGE" "$FAILED_FILE" "$code" "$(date -u +%FT%TZ)" >> "$RUN_DIR/status.env"
+  rollback_result=未執行
   if [ "$MUTATED" = true ]; then
     echo "同步失敗，開始受控回復…" >&2
     if restore_backup "$BACKUP"; then
-      echo "已回復舊資料與版本，並通過健康檢查" >&2
+      rollback_result=成功
     else
+      rollback_result=失敗
       echo "自動回復失敗。服務保持維護狀態；精確備份位置：$BACKUP" >&2
       echo "修正後執行：sudo $LIVE_ROOT/deploy/remote-sync.sh rollback" >&2
     fi
+  elif [ "$STOPPED" = true ]; then
+    IMAGE_TAG="$previous_tag"
+    if compose up -d --no-build backend web && wait_ready \
+      && "$LIVE_ROOT/deploy/healthcheck.sh" 2>&1 | tee "$STATE_ROOT/last-restore-health.log"; then
+      rollback_result=成功
+      RESTORE_HEALTH_SUMMARY="$(tail -1 "$STATE_ROOT/last-restore-health.log")"
+    else
+      rollback_result=失敗
+    fi
   fi
+  {
+    echo "新版同步：失敗"
+    echo "失敗階段：$CURRENT_STAGE"
+    echo "失敗檔案：$FAILED_FILE"
+    echo "舊版回復：$rollback_result"
+    echo "目前版本：$previous_tag"
+    echo "健康檢查：$RESTORE_HEALTH_SUMMARY"
+    echo "診斷紀錄：$RUN_DIR/failure"
+  } >&2
   exit "$code"
 }
 trap rollback_on_error ERR INT TERM
 
+# Stop writers before taking the database and /app/data snapshots so they share
+# one maintenance boundary. A failed backup only restarts the untouched version.
+docker stop syncdrive_web syncdrive_backend >/dev/null
+STOPPED=true
+docker exec syncdrive_postgres sh -c 'rm -f /tmp/syncdrive-backup.dump && pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/syncdrive-backup.dump' \
+  || { echo "資料庫備份失敗" >&2; false; }
+docker exec syncdrive_postgres sh -c 'pg_restore --list /tmp/syncdrive-backup.dump >/dev/null' \
+  || { echo "資料庫備份不可讀" >&2; false; }
+docker cp syncdrive_postgres:/tmp/syncdrive-backup.dump "$BACKUP/database.dump" || false
+mkdir -p "$BACKUP/backend-data"
+docker cp syncdrive_backend:/app/data/. "$BACKUP/backend-data/" || false
+
 log "[4/7] 維護模式與資料庫升級"
 mark_stage migration
-docker stop syncdrive_web syncdrive_backend >/dev/null
+CURRENT_STAGE=Migration
 MUTATED=true
-DOCKER=docker DB_CONTAINER=syncdrive_postgres "$RELEASE/deploy/migrate.sh" 2>&1 \
-  | tee "$RUN_DIR/migration.log"
+if ! DOCKER=docker DB_CONTAINER=syncdrive_postgres "$RELEASE/deploy/migrate.sh" 2>&1 \
+  | tee "$RUN_DIR/migration.log"; then
+  FAILED_FILE="$(sed -n 's/^Migration 失敗：//p' "$RUN_DIR/migration.log" | tail -1)"
+  [ -n "$FAILED_FILE" ] || FAILED_FILE='未知 Migration（見 migration.log）'
+  false
+fi
 
 log "[5/7] 同步設定、地圖與媒體檔案"
 mark_stage data-sync
+CURRENT_STAGE=設定與檔案同步
 docker run --rm --user 0 --entrypoint sh --volumes-from syncdrive_backend \
   -v "$BUNDLE:/bundle:ro" "syncdrive-backend:$IMAGE_TAG" -c '
 set -eu
@@ -259,6 +311,7 @@ done < /bundle/media.tsv
 
 log "[6/7] 啟動固定版本並等待服務"
 mark_stage startup
+CURRENT_STAGE=啟動
 git -C "$LIVE_ROOT" checkout -q -f --detach "$SOURCE_SHA"
 set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false
 set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$IMAGE_TAG"
@@ -267,6 +320,7 @@ wait_ready
 
 log "[7/7] 完整驗收"
 mark_stage verification
+CURRENT_STAGE=驗收
 "$LIVE_ROOT/deploy/healthcheck.sh" 2>&1 | tee "$RUN_DIR/healthcheck.log"
 printf 'BATCH=%q\nSOURCE_SHA=%q\nDEPLOYED_TAG=%q\nROLLBACK_BACKUP=%q\nCOMPLETED_AT=%q\n' \
   "$BATCH" "$SOURCE_SHA" "$IMAGE_TAG" "$BACKUP" "$(date -u +%FT%TZ)" > "$STATE_ROOT/last-success.env"

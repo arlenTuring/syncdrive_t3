@@ -1,5 +1,8 @@
 # Explicit dependency order. Never infer migration order from directory names.
-deploy/migrations/20260917-partner-vehicle-scope.sql
+# Base schema prerequisites: vehicles, partner_api_keys, vehicle_definitions,
+# accounts/roles/permissions, vehicle_monitor_demo, telemetry_logs,
+# operation_orders/order_action_states and media_library_items.
+deploy/migrations/20261008-required-extensions.sql
 backend/src/database/migrations/20261009-create-degraded-operation-plans.sql
 backend/src/database/migrations/20261010-create-degraded-replay.sql
 backend/src/database/migrations/20261010-vehicle-model-management.sql
@@ -7,8 +10,9 @@ backend/src/database/migrations/20261011-access-control.sql
 backend/src/database/migrations/20261012-role-permissions.sql
 backend/src/database/migrations/20261013-vehicle-realtime-snapshot.sql
 backend/src/database/migrations/20261014-vehicle-registration.sql
-backend/src/database/migrations/20261015-data-retention-management.sql
 backend/src/database/migrations/20261015-vehicle-identity-removal.sql
+deploy/migrations/20260917-partner-vehicle-scope.sql
 backend/src/database/migrations/20261015-vehicle-run-history.sql
+backend/src/database/migrations/20261015-data-retention-management.sql
 backend/src/database/migrations/20261017-media-group-version.sql
 backend/src/database/migrations/20261018-media-play-schedules.sql

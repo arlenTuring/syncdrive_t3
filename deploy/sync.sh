@@ -79,6 +79,7 @@ for file in deploy/sync.sh deploy/remote-sync.sh deploy/migrate.sh deploy/build-
     || die "$file 尚未推送到 GitHub $BRANCH"
   [ "$committed" = "$(hash_file "$ROOT/$file")" ] || die "$file 與 GitHub 固定版本不同"
 done
+"$ROOT/deploy/migrate.sh" --validate
 
 remote "set -e; test -d '$REMOTE_DIR/.git'; test -f '$REMOTE_DIR/deploy/.env'; docker info >/dev/null; docker compose version >/dev/null; df -h '$REMOTE_DIR'; echo; grep '^DB_SYNCHRONIZE=' '$REMOTE_DIR/deploy/.env' 2>/dev/null || true; echo; sudo docker ps --filter name=syncdrive_ --format '{{.Names}} {{.Image}} {{.Status}}'"
 
@@ -89,6 +90,12 @@ BATCH="$(date -u +%Y%m%dT%H%M%SZ)-${SOURCE_SHA:0:12}"
 LC_ALL=C COPYFILE_DISABLE=1 tar --no-xattrs -czf "$WORK/$BATCH.tar.gz" -C "$WORK/bundle" .
 BUNDLE_SHA="$(hash_file "$WORK/$BATCH.tar.gz")"
 
+# Read-only target-schema preflight using the exact fixed-version migrations.
+git -C "$ROOT" archive --format=tar.gz -o "$WORK/$BATCH-migrations.tar.gz" "$SOURCE_SHA" \
+  deploy/migrate.sh deploy/migrations backend/src/database/migrations
+gcloud compute scp "$WORK/$BATCH-migrations.tar.gz" "$INSTANCE:/tmp/$BATCH-migrations.tar.gz" "${GCLOUD_ARGS[@]}" >/dev/null
+remote "set -e; rm -rf '/tmp/$BATCH-migrations'; mkdir -p '/tmp/$BATCH-migrations'; tar -xzf '/tmp/$BATCH-migrations.tar.gz' -C '/tmp/$BATCH-migrations'; sudo DOCKER=docker DB_CONTAINER=syncdrive_postgres bash '/tmp/$BATCH-migrations/deploy/migrate.sh' --plan"
+
 echo "    來源：本機設定資料 + GitHub $BRANCH"
 echo "    目標：gcloud $INSTANCE / $ZONE${PROJECT:+ / $PROJECT}"
 echo "    固定版本：$SOURCE_SHA"
@@ -98,7 +105,7 @@ sed '/^\s*#/d;/^\s*$/d;s/^/      /' "$ROOT/deploy/migrations/order.txt"
 echo "    遠端備份：$REMOTE_DIR/deploy/.state/sync/backups/$BATCH"
 
 if [ "$DRY_RUN" = true ]; then
-  log "試跑完成：未上傳、未備份、未執行 Migration、未切版本、未重啟"
+  log "試跑完成：僅上傳暫存的 Migration 預檢包；未備份、未執行 DDL、未切版本、未重啟"
   exit 0
 fi
 
