@@ -19,6 +19,7 @@ export type ShellView =
   | 'event-list'
   | 'event-history'
   | 'video-monitor'
+  | 'video-history'
   | 'log-system'
   | 'log-permissions'
   | 'log-operations'
@@ -92,6 +93,7 @@ export const EVENTS_NAV_ITEMS: ShellNavItem[] = [
   { id: 'event-list', label: 'nav.items.event-list', enabled: true, requiredPermission: 'events.events.view' },
   { id: 'event-history', label: 'nav.items.event-history', enabled: true, requiredPermission: 'events.events.view' },
   { id: 'video-monitor', label: 'nav.items.video-monitor', enabled: true, requiredPermission: 'events.video.view' },
+  { id: 'video-history', label: 'nav.items.video-history', enabled: true, requiredPermission: 'events.video-history.view' },
 ];
 
 export const LOGS_NAV_ITEMS: ShellNavItem[] = [

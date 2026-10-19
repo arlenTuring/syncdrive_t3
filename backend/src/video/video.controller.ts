@@ -4,7 +4,11 @@ import type { Request, Response } from 'express';
 import { PublicEndpoint, RequirePermission, type AuthenticatedRequest } from '../access-control/access.guard';
 import { AuditAction } from '../audit/audit-action.decorator';
 import { VideoConfigService } from './video-config.service';
+import { VideoHistoryService } from './video-history.service';
 import { VideoLiveService } from './video-live.service';
+import { VideoStorageService } from './video-storage.service';
+import { videoConfig } from './video.config';
+import { safeEqual } from './video-secrets';
 
 const user = (req: AuthenticatedRequest) => {
   if (!req.authUser) throw new ForbiddenException('請先登入');
@@ -19,13 +23,18 @@ const user = (req: AuthenticatedRequest) => {
 @Controller('syncdrive-api/video')
 @RequirePermission('events.video.view')
 export class VideoController {
-  constructor(private readonly config: VideoConfigService, private readonly live: VideoLiveService) {}
+  constructor(
+    private readonly config: VideoConfigService,
+    private readonly live: VideoLiveService,
+    private readonly storage: VideoStorageService,
+    private readonly history: VideoHistoryService,
+  ) {}
 
   @Get('bootstrap')
   @ApiOperation({ summary: '監控頁初始資料：標籤與格子、來源（遮蔽帳密）、全域預設（不含密碼）、連線範圍' })
   async bootstrap() {
-    const [tabs, sources, defaults, settings] = await Promise.all([this.config.listTabs(), this.config.listSources(), this.config.getDefaults(), this.config.settings()]);
-    return { tabs, sources, defaults, settings: { allowedNetworks: settings.allowedNetworks, maxTabs: settings.maxTabs, maxSources: settings.maxSources, version: settings.version } };
+    const [tabs, sources, defaults, settings, storage] = await Promise.all([this.config.listTabs(), this.config.listSources(), this.config.getDefaults(), this.config.settings(), this.storage.status().catch(() => null)]);
+    return { tabs, sources, defaults, settings: { allowedNetworks: settings.allowedNetworks, maxTabs: settings.maxTabs, maxSources: settings.maxSources, version: settings.version }, storage };
   }
 
   // ── 標籤與格子 ──
@@ -178,6 +187,121 @@ export class VideoController {
   @ApiOperation({ summary: '取得即時播放資訊（WebRTC 優先、HLS 備援；短效權杖）' })
   liveSession(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.live.createLiveSession(id, user(req), req);
+  }
+
+  // ── 儲存與錄影政策 ──
+  @Get('storage-status')
+  @RequirePermission('events.video.view', 'events.video-history.view')
+  @ApiOperation({ summary: '錄影容量：用量、預算、最低剩餘、預估可存天數、最早可用時間、是否暫停' })
+  storageStatus() {
+    return this.storage.status();
+  }
+
+  @Get('storage-policy')
+  @RequirePermission('events.video.view', 'events.video-history.view')
+  async storagePolicy() {
+    return (await this.storage.status()).policy;
+  }
+
+  @Put('storage-policy')
+  @RequirePermission('events.video.recording-manage')
+  @AuditAction('VIDEO_STORAGE_POLICY', { detail: (req) => ({ ...(req.body as object) }) })
+  updateStoragePolicy(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
+    return this.storage.updatePolicy(body ?? {}, user(req));
+  }
+
+  // ── 歷史影像 ──
+  @Get('recordings/availability')
+  @RequirePermission('events.video-history.view')
+  @ApiOperation({ summary: '可用區間與缺段（sourceIds 最多 12、區間最長 31 天）' })
+  availability(@Query() query: Record<string, unknown>) {
+    return this.history.availability(query);
+  }
+
+  @Get('recordings/calendar')
+  @RequirePermission('events.video-history.view')
+  calendar(@Query() query: Record<string, unknown>) {
+    return this.history.calendar(query);
+  }
+
+  @Get('recordings')
+  @RequirePermission('events.video-history.view')
+  @ApiOperation({ summary: '錄影片段清單（分頁；支援舊的 vehicleCode 條件，以當時來源版本的載具關聯查）' })
+  recordings(@Query() query: Record<string, unknown>) {
+    return this.history.recordings(query);
+  }
+
+  @Post('playback-sessions')
+  @RequirePermission('events.video-history.view')
+  @ApiOperation({ summary: '建立歷史播放（最多 12 來源、24 小時）' })
+  playback(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
+    return this.history.createPlayback(body ?? {}, user(req), req);
+  }
+
+  @Post('exports')
+  @RequirePermission('events.video-history.export')
+  @AuditAction('VIDEO_EXPORT', { detail: (req) => ({ ...(req.body as object) }), correlation: (_req, result) => (result as { id?: string })?.id })
+  createExport(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
+    return this.history.createExport(body ?? {}, user(req));
+  }
+
+  @Get('jobs/:id')
+  @RequirePermission('events.video-history.view', 'events.video-history.export', 'events.video-history.delete')
+  job(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.history.job(id, user(req));
+  }
+
+  @Post('recordings/delete-preview')
+  @RequirePermission('events.video-history.delete')
+  deletePreview(@Body() body: Record<string, unknown>) {
+    return this.history.deletePreview(body ?? {});
+  }
+
+  @Post('recordings/deletions')
+  @RequirePermission('events.video-history.delete')
+  @AuditAction('VIDEO_RECORDING_DELETE', { detail: (req) => ({ ...(req.body as object) }), correlation: (_req, result) => (result as { id?: string })?.id })
+  deletion(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
+    return this.history.createDeletion(body ?? {}, user(req));
+  }
+
+  @Post('recordings/protect')
+  @RequirePermission('events.video.recording-manage')
+  @AuditAction('VIDEO_RECORDING_PROTECT', { detail: (req) => ({ ...(req.body as object) }) })
+  protect(@Body() body: Record<string, unknown>) {
+    return this.history.protect(body ?? {});
+  }
+}
+
+/** 歷史播放與下載：短效權杖網址（綁帳號 Session、來源與時間窗），每次都重新確認權限 */
+@ApiTags('Video')
+@Controller('syncdrive-api/video')
+@PublicEndpoint()
+export class VideoMediaController {
+  constructor(private readonly history: VideoHistoryService, private readonly storage: VideoStorageService) {}
+
+  @Get('playback/:token/manifest')
+  manifest(@Param('token') token: string, @Req() req: Request) {
+    return this.history.manifest(token, req);
+  }
+
+  @Get('playback/:token/segments/:id')
+  async segment(@Param('token') token: string, @Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+    await this.history.sendSegment(token, id, req, res);
+  }
+
+  @Get('exports/:token/:name')
+  async download(@Param('token') token: string, @Req() req: Request, @Res() res: Response) {
+    await this.history.download(token, req, res);
+  }
+
+  /** 媒體服務的片段完成通知（只接受部署設定的共享密鑰；不經瀏覽器） */
+  @Get('internal/segment-complete')
+  async segmentComplete(@Req() req: Request, @Query('path') path: string, @Query('segment') segment: string, @Query('duration') duration: string) {
+    const secret = videoConfig().hookSecret;
+    const given = String(req.headers['x-video-hook-secret'] ?? '');
+    if (!secret || !safeEqual(given, secret)) throw new ForbiddenException();
+    const id = await this.storage.indexFromHook(String(path ?? ''), String(segment ?? ''), String(duration ?? ''));
+    return { indexed: Boolean(id) };
   }
 }
 

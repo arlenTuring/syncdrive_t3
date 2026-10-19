@@ -1,5 +1,5 @@
 import { AlertTriangle, PanelRightOpen, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchActiveMapId } from "../degraded-operation/api";
 import { MapViewport } from "../degraded-operation/MapViewport";
@@ -113,7 +113,16 @@ function recordsOf(resolved: Resolved | null): VehicleRecords | null {
 const ONE = new Set<string>();
 
 /** 也給事件回放共用（固定一台載具、固定時間窗） */
-export function ReplayStage({ resolved, panelSlot }: { resolved: Resolved | null; panelSlot: HTMLElement | null }) {
+export function ReplayStage({
+  resolved,
+  panelSlot,
+  onClock,
+}: {
+  resolved: Resolved | null;
+  panelSlot: HTMLElement | null;
+  /** 選用：回報回放時間游標（事件回放的影像用同一時間軸對齊） */
+  onClock?: (clock: { t: number | null; playing: boolean; speed: number }) => void;
+}) {
   const vehicle = appliedVehicle(resolved);
   const window_ = useMemo(() => replayWindow(resolved), [resolved]);
   const coverage = coverageOf(resolved);
@@ -132,6 +141,10 @@ export function ReplayStage({ resolved, panelSlot }: { resolved: Resolved | null
     [playable, resolved, vehicle, window_],
   );
   const player = useReplayPlayer(source);
+  const cursorT = player.cursor?.t ?? null;
+  useEffect(() => {
+    onClock?.({ t: cursorT, playing: player.playing, speed: player.speed });
+  }, [onClock, cursorT, player.playing, player.speed]);
   const background = useBackgroundState(backgroundSource, player.cursor);
   const gaps = useMemo<TimelineGap[]>(
     () => (coverage?.gaps ?? []).map((gap) => ({ from: gap.from_real, to: gap.to_real, reason: gap.reason, count: gap.count })),

@@ -39,7 +39,9 @@ import { MediaContentPage } from '../media-content/MediaContentPage';
 import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
 import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
 import { EventListPage } from '../event-management/EventListPage';
-import { VideoMonitorPage } from '../event-management/VideoMonitorPage';
+import { VideoMonitorPage } from '../video/VideoMonitorPage';
+import { OPEN_VIDEO_HISTORY_EVENT } from '../video/history-link';
+import { VideoHistoryPage } from '../video/VideoHistoryPage';
 import { LogPage } from '../log-management/LogPage';
 import { isEventsView, isLogsView } from './types';
 import { useAuth } from '../access-control/AuthContext';
@@ -253,6 +255,13 @@ export default function ScheduleManagementApp({
     return () => window.removeEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
   }, []);
 
+  // 事件回放「在歷史影像查詢開啟」：切到歷史影像頁（參數由該頁讀取）
+  useEffect(() => {
+    const onOpen = () => setView('video-history');
+    window.addEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
+  }, []);
+
   useEffect(() => {
     if (!modulePagesSyncedRef.current) return;
     writeModuleDashboardPages(modulePages);
@@ -439,6 +448,7 @@ export default function ScheduleManagementApp({
               {view === 'event-list' ? <EventListPage key="live" mode="live" /> : null}
               {view === 'event-history' ? <EventListPage key="history" mode="history" /> : null}
               {view === 'video-monitor' ? <VideoMonitorPage /> : null}
+              {view === 'video-history' ? <VideoHistoryPage /> : null}
               {view === 'log-system' ? <LogPage key="system" category="system" /> : null}
               {view === 'log-permissions' ? <LogPage key="permissions" category="permissions" /> : null}
               {view === 'log-operations' ? <LogPage key="operations" category="operations" /> : null}

@@ -73,6 +73,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       'event-list': 'Event List',
       'event-history': 'Event History',
       'video-monitor': 'Video Monitoring',
+      'video-history': 'Video History',
       'log-system': 'System Operation Logs',
       'log-permissions': 'Permission Changes',
       'log-operations': 'Operation Logs',

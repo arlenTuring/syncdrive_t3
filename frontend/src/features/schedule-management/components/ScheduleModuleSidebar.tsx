@@ -30,6 +30,7 @@ import {
   Video,
   KeyRound,
   LogIn,
+  Film,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +60,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'event-list': BellRing,
   'event-history': History,
   'video-monitor': Video,
+  'video-history': Film,
   'log-system': ScrollText,
   'log-permissions': KeyRound,
   'log-operations': ClipboardList,

@@ -63,19 +63,9 @@ export type Playback = {
   permissions: { trajectory: boolean; video: boolean };
 };
 
-export type VideoStatus = {
-  configured: boolean;
-  provider: string | null;
-  sources: Array<{ id: string; vehicleCode: string | null; name: string; kind: string }>;
-  missing: string[];
-  recording: { enabled: boolean; note: string };
-};
-
 export const fetchEventOptions = (signal?: AbortSignal) => getJson<EventOptions>('/events/options', undefined, signal);
 export const fetchEvents = (query: EventQuery & { page: number; snapshot?: string }, signal?: AbortSignal) => getJson<EventList>('/events', query, signal);
 export const fetchEvent = (id: string, signal?: AbortSignal) => getJson<EventDetail>(`/events/${encodeURIComponent(id)}`, undefined, signal);
 export const acknowledgeEvent = (id: string, note: string) => postJson<EventDetail>(`/events/${encodeURIComponent(id)}/acknowledgement`, note ? { note } : {});
 export const fetchPlayback = (id: string, signal?: AbortSignal) => getJson<Playback>(`/events/${encodeURIComponent(id)}/playback`, undefined, signal);
 export const exportEvents = (query: EventQuery) => downloadCsv('/events/export', query);
-export const fetchVideoStatus = (signal?: AbortSignal) => getJson<VideoStatus>('/video/sources', undefined, signal);
-export const fetchRecordings = (query: { vehicleCode: string; from: number; to: number }, signal?: AbortSignal) => getJson<unknown[]>('/video/recordings', query, signal);

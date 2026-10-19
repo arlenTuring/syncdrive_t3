@@ -52,3 +52,13 @@ describe('影像密碼與權杖', () => {
     expect(verifyToken(signToken({ kind: 'live', sub: 'p', sid: 's', uid: 'u', exp: Date.now() - 1 }), 'live')).toBeNull();
   });
 });
+
+import { __test } from './video-reconciler.service';
+describe('媒體服務設定比較', () => {
+  it('Go duration 與空字串（0s）視為相同，避免每次重送設定重啟錄影', () => {
+    expect(__test.normalize('1m0s', 'recordSegmentDuration')).toBe(__test.normalize('60s', 'recordSegmentDuration'));
+    expect(__test.normalize('', 'recordDeleteAfter')).toBe(__test.normalize('0s', 'recordDeleteAfter'));
+    expect(__test.normalize('20s', 'recordSegmentDuration')).not.toBe(__test.normalize('1m0s', 'recordSegmentDuration'));
+    expect(__test.goDurationSeconds('1h2m3.5s')).toBe(3723.5);
+  });
+});

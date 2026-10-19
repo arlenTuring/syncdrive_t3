@@ -1,25 +1,32 @@
-import { VideoOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Film } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { Dialog, ErrorLine, GhostButton } from '../media-groups/dialogs';
 import { formatDateTime } from '../event-log-shared/time';
 import { resolveRange } from '../vehicle-run-history/api';
 import type { Resolved } from '../vehicle-run-history/queryConditions';
 import { ReplayStage } from '../vehicle-run-history/RunHistoryPage';
-import { fetchPlayback, fetchVideoStatus, type Playback, type VideoStatus } from './api';
+import { videoApi, type Manifest } from '../video/api';
+import { SegmentFollower } from '../video/SegmentFollower';
+import { openVideoHistory } from '../video/history-link';
+import { fetchPlayback, type Playback } from './api';
 
 /**
- * 事件回放：固定該事件與該載具，時間窗為事件前 30 秒到後 30 秒。
+ * 事件回放：固定該事件與該載具，事件前 30 秒到後 30 秒。
  *
- * 左側沿用運行管理紀錄的回放（同一份歷史資料與播放器，地圖高亮該車、逐幀只走該車、不換車、不拿即時位置填補）。
- * 右側事件影像：目前沒有影像來源，明確顯示「尚未設定影像來源」，軌跡照常可看；有來源後再與同一時間軸對齊。
+ * 左側沿用運行管理紀錄的回放（地圖高亮該車、逐幀只走該車、不換車、不拿即時位置填補）。
+ * 右側事件影像用歷史影像的同一套播放服務，跟著左側的時間游標對齊（同一絕對時間軸）；
+ * 影像來源以「當時」綁定這台車的來源版本為準，不用現在的標籤位置推定。
  */
-export function EventReplayDialog({ id, onClose }: { id: string; onClose: () => void }) {
+export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; onClose: () => void; onOpenHistory?: () => void }) {
   const [playback, setPlayback] = useState<Playback | null>(null);
   const [resolved, setResolved] = useState<Resolved | null>(null);
-  const [video, setVideo] = useState<VideoStatus | null>(null);
-  const [videoError, setVideoError] = useState('');
   const [error, setError] = useState('');
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null);
+  const [manifests, setManifests] = useState<Manifest[] | null>(null);
+  const [videoError, setVideoError] = useState('');
+  const [clock, setClock] = useState<{ t: number | null; playing: boolean; speed: number }>({ t: null, playing: false, speed: 1 });
+  const [drift, setDrift] = useState<number | null>(null);
+  const onClock = useCallback((c: { t: number | null; playing: boolean; speed: number }) => setClock(c), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -27,8 +34,17 @@ export function EventReplayDialog({ id, onClose }: { id: string; onClose: () => 
       try {
         const pb = await fetchPlayback(id, controller.signal);
         setPlayback(pb);
-        if (pb.permissions.video) {
-          fetchVideoStatus(controller.signal).then(setVideo, (reason: Error) => !controller.signal.aborted && setVideoError(reason.message));
+        if (pb.permissions.video && pb.event.vehicleCode) {
+          // 以當時的來源版本找這台車的影像
+          void videoApi.sources(true).then(async (sources) => {
+            const ids = sources.map((s) => s.id).slice(0, 12);
+            if (!ids.length) return setManifests([]);
+            const avail = await videoApi.availability(ids, pb.window.from, pb.window.to);
+            const matched = avail.sources.filter((s) => s.revisions.some((r) => r.vehicleCode === pb.event.vehicleCode)).map((s) => s.sourceId).slice(0, 4);
+            if (!matched.length) return setManifests([]);
+            const session = await videoApi.playback({ sourceIds: matched, from: pb.window.from, to: pb.window.to });
+            setManifests(await Promise.all(session.sessions.map((s) => videoApi.manifest(s.manifestUrl))));
+          }).catch((reason: Error) => !controller.signal.aborted && setVideoError(reason.message));
         }
         if (!pb.vehicle || !pb.permissions.trajectory) return;
         const value = await resolveRange(
@@ -44,6 +60,12 @@ export function EventReplayDialog({ id, onClose }: { id: string; onClose: () => 
   }, [id]);
 
   const tz = playback?.timeZone ?? 'Asia/Taipei';
+  const openHistory = () => {
+    if (!playback) return;
+    openVideoHistory({ from: playback.window.from, to: playback.window.to, vehicleCode: playback.event.vehicleCode, sourceIds: manifests?.map((m) => m.sourceId), at: playback.window.from });
+    onOpenHistory?.();
+    onClose();
+  };
   return (
     <Dialog title="事件回放" width="max-w-[min(96vw,1600px)]" onClose={onClose} footer={<GhostButton onClick={onClose}>關閉</GhostButton>}>
       {playback ? (
@@ -65,24 +87,39 @@ export function EventReplayDialog({ id, onClose }: { id: string; onClose: () => 
           ) : !playback.permissions.trajectory ? (
             <p className="m-auto text-zinc-400">權限不足：需要「運行管理紀錄」檢視權限才能看軌跡</p>
           ) : (
-            <ReplayStage key={resolved?.id ?? 'pending'} resolved={resolved} panelSlot={panelSlot} />
+            <ReplayStage key={resolved?.id ?? 'pending'} resolved={resolved} panelSlot={panelSlot} onClock={onClock} />
           )}
         </section>
         <aside className="flex min-h-0 flex-col gap-3">
-          <section className="rounded-xl border border-zinc-800 bg-[#121214] p-4">
-            <h3 className="text-sm font-medium">事件影像</h3>
+          <section className="rounded-xl border border-zinc-800 bg-[#121214] p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-medium">事件影像</h3>
+              {drift !== null ? <span className="text-xs text-zinc-500">與軌跡誤差 {drift} ms</span> : null}
+              {playback?.permissions.video && playback.event.vehicleCode ? (
+                <button type="button" onClick={openHistory} className="ml-auto inline-flex items-center gap-1 text-xs text-sky-300 hover:underline"><Film className="size-3.5" />在歷史影像查詢開啟</button>
+              ) : null}
+            </div>
             {!playback ? null : !playback.permissions.video ? (
-              <p className="mt-2 text-sm text-zinc-400">權限不足：需要「影像監控管理」檢視權限</p>
+              <p className="text-sm text-zinc-400">權限不足：需要「影像監控管理」檢視權限</p>
+            ) : !playback.event.vehicleCode ? (
+              <p className="text-sm text-zinc-400">非載具事件，沒有對應的車載影像</p>
             ) : videoError ? (
-              <p className="mt-2 text-sm text-red-300">影像來源查詢失敗：{videoError}</p>
-            ) : video && !video.configured ? (
-              <div className="mt-3 flex flex-col items-center gap-2 rounded-lg bg-black/40 py-8 text-center text-zinc-400">
-                <VideoOff className="size-8" />
-                <span>尚未設定影像來源</span>
-                <span className="text-xs text-zinc-500">軌跡回放不受影響；接上影像來源後，影像會與同一時間軸對齊</span>
-              </div>
+              <p className="text-sm text-red-300">影像查詢失敗：{videoError}</p>
+            ) : manifests === null ? (
+              <p className="text-sm text-zinc-500">查詢影像中…</p>
+            ) : !manifests.length ? (
+              <p className="text-sm text-zinc-400">這段時間沒有綁定 {playback.event.vehicleCode} 的影像來源；軌跡回放不受影響</p>
             ) : (
-              <p className="mt-2 text-sm text-zinc-500">查詢影像來源中…</p>
+              <div className="space-y-2">
+                {manifests.map((m, i) => (
+                  <div key={m.sourceId}>
+                    <div className="mb-1 text-xs text-zinc-400">{m.name}</div>
+                    <div className="aspect-video overflow-hidden rounded-lg">
+                      <SegmentFollower manifest={m} cursor={clock.t ?? playback.window.from} playing={clock.playing} speed={clock.speed} onDrift={i === 0 ? setDrift : undefined} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
           <div ref={setPanelSlot} className="min-h-0 flex-1 overflow-auto rounded-xl border border-zinc-800 bg-[#121214]" aria-label="車輛資料" />

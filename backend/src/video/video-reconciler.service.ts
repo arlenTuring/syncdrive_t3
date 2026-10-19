@@ -143,15 +143,28 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
     }
 
     let runtime: RuntimePath[] = [];
+    const stats = { added: 0, patched: 0, deleted: 0, differences: [] as string[] };
     try {
       const existing = (await this.media.listConfigPaths()).filter((p) => p.name.startsWith(MEDIA_PATH_PREFIX));
       const existingByName = new Map(existing.map((p) => [p.name, p]));
       for (const [name, want] of desired) {
         const have = existingByName.get(name);
-        if (!have) await this.media.addPath(name, want.config);
-        else if ((Object.keys(want.config) as Array<keyof ManagedPathConfig>).some((k) => normalize(have[k]) !== normalize(want.config[k]))) await this.media.patchPath(name, want.config);
+        if (!have) {
+          await this.media.addPath(name, want.config);
+          stats.added += 1;
+          continue;
+        }
+        const diff = (Object.keys(want.config) as Array<keyof ManagedPathConfig>).filter((k) => normalize(have[k], k) !== normalize(want.config[k], k));
+        if (diff.length) {
+          await this.media.patchPath(name, want.config);
+          stats.patched += 1;
+          stats.differences.push(...diff.filter((k) => k !== 'source'));
+        }
       }
-      for (const have of existing) if (!desired.has(have.name)) await this.media.deletePath(have.name);
+      for (const have of existing) if (!desired.has(have.name)) {
+        await this.media.deletePath(have.name);
+        stats.deleted += 1;
+      }
       runtime = (await this.media.listRuntimePaths()).filter((p) => p.name.startsWith(MEDIA_PATH_PREFIX));
     } catch (error) {
       await this.writeStatus(sources, () => ({ state: 'media_unavailable', recording: false, reason: '影像服務暫時無法連線', tracks: [], readers: 0 }), demand);
@@ -171,6 +184,8 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
       const state = rt?.ready ? 'online' : want.config.sourceOnDemand ? 'idle' : 'connecting';
       return { state, recording, reason, tracks: rt?.tracks ?? [], readers: rt?.readers?.length ?? 0 };
     }, demand);
+    if (stats.patched) this.logger.log(`已更新 ${stats.patched} 個媒體路徑（${[...new Set(stats.differences)].join('、') || '來源'}）`);
+    return stats;
   }
 
   private async writeStatus(sources: VideoSource[], compute: (s: VideoSource) => Omit<ActualStatus, 'checkedAt' | 'desiredRecording'>, demand: Map<string, { recording: boolean }>) {
@@ -194,7 +209,11 @@ function goDurationSeconds(value: string): number | null {
   return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0) + Number(m[4] ?? 0) / 1000;
 }
 
-function normalize(value: unknown) {
+const DURATION_KEYS = new Set(['recordSegmentDuration', 'recordPartDuration', 'recordDeleteAfter']);
+
+function normalize(value: unknown, key?: string) {
+  // 媒體服務把 0s 回成空字串
+  if (key && DURATION_KEYS.has(key) && (value === '' || value === null || value === undefined)) return '0s';
   if (typeof value === 'string') {
     const seconds = goDurationSeconds(value);
     return seconds === null ? value.trim() : `${seconds}s`;

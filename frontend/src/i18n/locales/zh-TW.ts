@@ -66,6 +66,7 @@ const zhTW = {
       'event-list': '事件資訊清單',
       'event-history': '歷史事件檢視',
       'video-monitor': '影像監控管理',
+      'video-history': '歷史影像查詢',
       'log-system': '系統操作紀錄',
       'log-permissions': '權限異動查詢',
       'log-operations': '營運操作紀錄',
