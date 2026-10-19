@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Optional
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ApiKeyGuard } from '../common/api-key.guard';
+import { ExternalPortGuard } from '../common/external-port.guard';
 import { AuthService, type AuthUser } from './auth.service';
 import { SESSION_COOKIE } from './access.constants';
 
@@ -36,6 +37,9 @@ export class AccessGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext) {
+    // APP_GUARD 比 main.ts 的全域守衛先跑：對外 port 上未開放的路由要先回 404（不洩漏路徑存在），
+    // 不能先被登入檢查回成 401
+    if (!new ExternalPortGuard(this.reflector).canActivate(context)) return false;
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const permissions = this.reflector.getAllAndOverride<string[]>(REQUIRE_PERMISSION, [context.getHandler(), context.getClass()]);
     if (!permissions?.length) return true;

@@ -1,4 +1,4 @@
-import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
+import { NotFoundException, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AccessGuard, AllowApiKey, PublicEndpoint, RequirePermission } from './access.guard';
 import type { AuthService } from './auth.service';
@@ -21,9 +21,10 @@ class ProtectedController {
   }
 }
 
-function contextFor(handler: () => unknown, apiKey?: string): ExecutionContext {
-  const request = { method: 'GET', headers: {}, header: (name: string) => name === 'x-api-key' ? apiKey : undefined };
+function contextFor(handler: () => unknown, apiKey?: string, localPort = 3000): ExecutionContext {
+  const request = { method: 'GET', url: '/x', headers: {}, socket: { localPort }, header: (name: string) => name === 'x-api-key' ? apiKey : undefined };
   return {
+    getType: () => 'http',
     getHandler: () => handler,
     getClass: () => ProtectedController,
     switchToHttp: () => ({ getRequest: () => request }),
@@ -49,5 +50,17 @@ describe('AccessGuard', () => {
     const context = contextFor(ProtectedController.prototype.simulator, 'valid-key');
     await expect(apiKeyGuard.canActivate(context)).resolves.toBe(true);
     expect(apiKey.canActivate).toHaveBeenCalledWith(context);
+  });
+
+  it('returns 404 (not 401) for internal routes hit on the external port, before any login check', async () => {
+    const previous = process.env.EXTERNAL_PORT;
+    process.env.EXTERNAL_PORT = '3100';
+    try {
+      await expect(guard.canActivate(contextFor(ProtectedController.prototype.tables, undefined, 3100))).rejects.toBeInstanceOf(NotFoundException);
+      await expect(guard.canActivate(contextFor(ProtectedController.prototype.tables, undefined, 3000))).rejects.toBeInstanceOf(UnauthorizedException);
+    } finally {
+      if (previous === undefined) delete process.env.EXTERNAL_PORT;
+      else process.env.EXTERNAL_PORT = previous;
+    }
   });
 });

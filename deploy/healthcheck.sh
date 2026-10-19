@@ -93,7 +93,9 @@ check() {
 
 echo "內部（${INTERNAL}）"
 check "前端首頁"            "$INTERNAL/"                                        200
-check "內部 API：班表清單"   "$INTERNAL/syncdrive-api/operation-shift/list"      200
+# 內部 API 有帳號登入：只帶 nginx 帳密時，公開的健康端點應通、需要登入的端點應被擋
+check "內部 API：健康端點"   "$INTERNAL/syncdrive-api/datasource/ping"          200
+check "內部 API 未登入必須被拒" "$INTERNAL/syncdrive-api/operation-shift/list"    401
 check "內部 Swagger"        "$INTERNAL/api/docs"                                200
 check "文件站"              "$INTERNAL/docs/"                                   200
 
@@ -130,10 +132,8 @@ if [ -n "$EXT_PASS" ]; then
 fi
 
 echo "存取控制"
-# 圖台與內部 API 刻意開放（圖台靠內部 API 運作，鎖了就活不了）；
-# 要保護的是演算法與系統結構，那些在文件與內部 Swagger 裡。
-# 80 埠整個要帳密：圖台、內部 API、文件、Swagger 都一樣。在沒有帳號權限系統
-# 之前，這是內部 API 唯一的保護。
+# 80 埠整個要 nginx 帳密：圖台、內部 API、文件、Swagger 都一樣。
+# 通過 nginx 之後，內部 API 還要系統帳號登入（Session）與權限，所以驗收只能用公開的健康端點驗「打得到」。
 check "圖台沒帶帳密必須被拒"     "$INTERNAL/"                                   401 noauth
 check "內部 API 沒帶帳密必須被拒" "$INTERNAL/syncdrive-api/operation-shift/list" 401 noauth
 if [ -n "$WEB_PASS" ]; then
@@ -145,7 +145,7 @@ fi
 if [ -n "$VEN_PASS" ]; then
   # 廠商帳號的邊界：圖台進得去，技術文件與內部 Swagger 進不去
   check "廠商帳號可進圖台"         "$INTERNAL/"            200 vendor
-  check "廠商帳號可打內部 API"     "$INTERNAL/syncdrive-api/operation-shift/list" 200 vendor
+  check "廠商帳號可打內部 API"     "$INTERNAL/syncdrive-api/datasource/ping" 200 vendor
   check "廠商帳號不可進技術文件"   "$INTERNAL/docs/"       401 vendor
   check "廠商帳號不可進內部 Swagger" "$INTERNAL/api/docs"  401 vendor
   check "廠商帳號不可進內部入口"   "$INTERNAL/portal"      401 vendor
