@@ -32,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (csrf && !['GET','HEAD','OPTIONS'].includes(method)) headers.set('x-csrf-token', decodeURIComponent(csrf));
       }
       const response = await nativeFetch(input, { ...init, credentials: url.origin === window.location.origin ? 'include' : init.credentials, headers });
-      if (url.origin === window.location.origin && (response.status === 401 || response.status === 403)) {
+      // 查詢登入狀態本身失敗時不再觸發重查，避免 401 → 重查 → 401 的無限循環
+      if (url.origin === window.location.origin && !url.pathname.endsWith('/syncdrive-api/auth/me') && (response.status === 401 || response.status === 403)) {
         window.dispatchEvent(new CustomEvent('syncdrive-auth-error', { detail: { status: response.status } }));
       }
       return response;

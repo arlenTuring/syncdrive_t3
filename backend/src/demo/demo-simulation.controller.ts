@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpException, HttpStatus, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../access-control/access.guard';
 import { DemoSimulationService } from './demo-simulation.service';
 
 class UpdateTransportDto {
@@ -31,8 +32,10 @@ class StepTransportDto {
   direction?: 'next' | 'prev';
 }
 
+/** 只有前端儀表板會呼叫；需登入且能看數據監控或儀表板（避免未登入者控制模擬、觸發故障） */
 @ApiTags('Demo Simulation')
 @Controller('syncdrive-api/demo/simulation')
+@RequirePermission('dashboard.monitor.view', 'dashboard.dashboard.view')
 export class DemoSimulationController {
   constructor(private readonly demoSimulation: DemoSimulationService) {}
 

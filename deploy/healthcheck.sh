@@ -71,7 +71,7 @@ check() {
     case "$url" in
       "$EXTERNAL"/syncdrive-api/*) ;;   # API 走 x-api-key，不帶瀏覽帳密
       "$EXTERNAL"*) auth=("${EXT_AUTH[@]+"${EXT_AUTH[@]}"}") ;;
-      # 80 埠只有文件與內部 Swagger 需要帳密，圖台與內部 API 是開放的
+      # 80 埠只有內部入口、文件與內部 Swagger 需要 nginx 帳密；圖台與內部 API 由系統帳號登入保護
       "$INTERNAL"*) auth=("${WEB_AUTH[@]+"${WEB_AUTH[@]}"}") ;;
     esac
   else
@@ -132,10 +132,22 @@ if [ -n "$EXT_PASS" ]; then
 fi
 
 echo "存取控制"
-# 80 埠整個要 nginx 帳密：圖台、內部 API、文件、Swagger 都一樣。
-# 通過 nginx 之後，內部 API 還要系統帳號登入（Session）與權限，所以驗收只能用公開的健康端點驗「打得到」。
-check "圖台沒帶帳密必須被拒"     "$INTERNAL/"                                   401 noauth
-check "內部 API 沒帶帳密必須被拒" "$INTERNAL/syncdrive-api/operation-shift/list" 401 noauth
+# 圖台與內部 API 不掛 nginx 帳密，改由系統帳號登入（Session）與權限保護；
+# 內部入口、技術文件、內部 Swagger 仍要 nginx 帳密。
+check "圖台不需 nginx 帳密（進系統登入頁）" "$INTERNAL/"                         200 noauth
+check "內部 API 未登入必須被拒"   "$INTERNAL/syncdrive-api/operation-shift/list" 401 noauth
+check "模擬控制未登入必須被拒"    "$INTERNAL/syncdrive-api/demo/simulation/status" 401 noauth
+check "登入狀態查詢不需帳密"      "$INTERNAL/syncdrive-api/auth/me"              200 noauth
+# 圖台與 API 不能再回 Basic 挑戰：瀏覽器一收到就會跳原生帳密視窗（2026-10-19 無限跳窗）
+for path in / /syncdrive-api/auth/me /syncdrive-api/operation-shift/list; do
+  if curl -s -o /dev/null -D - --max-time 10 "$INTERNAL$path" | grep -qi '^www-authenticate:'; then
+    printf '  \033[1;31m✗\033[0m %-46s %s\n' "不可回 Basic 挑戰：$path" "收到 WWW-Authenticate"
+    fail=$((fail + 1))
+  else
+    printf '  \033[1;32m✓\033[0m %-46s %s\n' "不可回 Basic 挑戰：$path" "無"
+    pass=$((pass + 1))
+  fi
+done
 if [ -n "$WEB_PASS" ]; then
   check "內部文件沒帶帳密必須被拒" "$INTERNAL/docs/"                            401 noauth
   check "內部 Swagger 沒帶帳密必須被拒" "$INTERNAL/api/docs"                     401 noauth
@@ -143,7 +155,7 @@ if [ -n "$WEB_PASS" ]; then
   check "內部入口帶帳密可進入"         "$INTERNAL/portal"                        200
 fi
 if [ -n "$VEN_PASS" ]; then
-  # 廠商帳號的邊界：圖台進得去，技術文件與內部 Swagger 進不去
+  # 廠商 nginx 帳號的邊界：技術文件、內部 Swagger、內部入口進不去（圖台本身不再需要 nginx 帳密）
   check "廠商帳號可進圖台"         "$INTERNAL/"            200 vendor
   check "廠商帳號可打內部 API"     "$INTERNAL/syncdrive-api/datasource/ping" 200 vendor
   check "廠商帳號不可進技術文件"   "$INTERNAL/docs/"       401 vendor
