@@ -83,6 +83,7 @@ export type FoundationSectionId =
   | 'security'
   | 'mqtt'
   | 'globalParams'
+  | 'operation'
 
 export const FOUNDATION_SECTIONS: Array<{
   id: FoundationSectionId
@@ -96,6 +97,7 @@ export const FOUNDATION_SECTIONS: Array<{
   { id: 'security', labelKey: 'security' },
   { id: 'mqtt', labelKey: 'mqtt' },
   { id: 'globalParams', labelKey: 'globalParams' },
+  { id: 'operation', labelKey: 'operation' },
 ]
 
 export const UI_LOCALE_OPTIONS = [

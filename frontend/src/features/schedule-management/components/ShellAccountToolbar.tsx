@@ -19,19 +19,11 @@ import { useAuth } from '../../access-control/AuthContext';
 
 type ShellAccountToolbarProps = {
   notificationCount?: number;
-  adminMode: boolean;
-  onAdminModeChange: (enabled: boolean) => void;
-  supervisorApproval: boolean;
-  onSupervisorApprovalChange: (enabled: boolean) => void;
   onOpenSystemFoundation: () => void;
 };
 
 export function ShellAccountToolbar({
   notificationCount = 0,
-  adminMode,
-  onAdminModeChange,
-  supervisorApproval,
-  onSupervisorApprovalChange,
   onOpenSystemFoundation,
 }: ShellAccountToolbarProps) {
   const { t, i18n } = useTranslation();
@@ -123,9 +115,9 @@ export function ShellAccountToolbar({
         </button>
 
         {settingsOpen && auth.user ? (
-          <div id={panelId} role="dialog" aria-label="帳號設定" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50">
+          <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50">
             <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-              <h2 className="text-sm font-semibold text-zinc-100">帳號設定</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">帳號資訊</h2>
               <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200" aria-label="關閉">
                 <X className="size-4" />
               </button>
@@ -138,8 +130,6 @@ export function ShellAccountToolbar({
                   {auth.user.roles.map((role) => <span key={role.id} className="rounded bg-zinc-700 px-2 py-0.5 text-xs">{role.name}</span>)}
                 </div>
               </div>
-              <SettingsSwitch title={t('shell.switchAdmin')} description={t('shell.switchAdminHint')} checked={adminMode} onChange={onAdminModeChange} />
-              <SettingsSwitch title={t('shell.supervisorApproval')} description={t('shell.supervisorApprovalHint')} checked={supervisorApproval} onChange={onSupervisorApprovalChange} />
               <button type="button" onClick={() => { setSettingsOpen(false); void auth.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 py-2 text-zinc-300 transition hover:bg-white/5 hover:text-white">
                 <LogOut className="size-4" />登出
               </button>
@@ -148,19 +138,5 @@ export function ShellAccountToolbar({
         ) : null}
       </div>
     </>
-  );
-}
-
-function SettingsSwitch({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (enabled: boolean) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-zinc-100">{title}</div>
-        <div className="mt-0.5 text-xs text-zinc-500">{description}</div>
-      </div>
-      <button type="button" role="switch" aria-checked={checked} aria-label={title} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? 'bg-sky-500' : 'bg-zinc-700'}`}>
-        <span className={`absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-      </button>
-    </div>
   );
 }

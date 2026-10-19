@@ -7,10 +7,6 @@ type ShellWorkspaceFrameProps = {
   children: ReactNode;
   /** 地圖／全螢幕編輯器可不套圓角卡片內距 */
   flush?: boolean;
-  adminMode: boolean;
-  onAdminModeChange: (enabled: boolean) => void;
-  supervisorApproval: boolean;
-  onSupervisorApprovalChange: (enabled: boolean) => void;
   onOpenSystemFoundation: () => void;
 };
 
@@ -22,10 +18,6 @@ export function ShellWorkspaceFrame({
   titleIcon,
   children,
   flush = false,
-  adminMode,
-  onAdminModeChange,
-  supervisorApproval,
-  onSupervisorApprovalChange,
   onOpenSystemFoundation,
 }: ShellWorkspaceFrameProps) {
   return (
@@ -37,10 +29,6 @@ export function ShellWorkspaceFrame({
             <h1 className="truncate text-[15px] font-semibold tracking-tight">{title}</h1>
           </div>
           <ShellAccountToolbar
-            adminMode={adminMode}
-            onAdminModeChange={onAdminModeChange}
-            supervisorApproval={supervisorApproval}
-            onSupervisorApprovalChange={onSupervisorApprovalChange}
             onOpenSystemFoundation={onOpenSystemFoundation}
           />
         </header>

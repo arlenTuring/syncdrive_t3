@@ -40,6 +40,8 @@ import {
   TimeField,
   ToggleRow,
 } from './SettingsFormControls'
+import { useAdminModePreference } from '../../schedule-management/utils/adminModePreference'
+import { useSupervisorApprovalPreference } from '../../schedule-management/utils/supervisorApprovalPreference'
 
 function SectionTitle({ children }: { children: string }) {
   return (
@@ -50,6 +52,8 @@ function SectionTitle({ children }: { children: string }) {
 export function SystemFoundationSettingsPanel() {
   const { t, i18n } = useTranslation()
   const [section, setSection] = useState<FoundationSectionId>('locale')
+  const [adminMode, setAdminMode] = useAdminModePreference()
+  const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference()
   const [saved, setSaved] = useState<SystemFoundationSettings>(() =>
     createDefaultSystemFoundationSettings(),
   )
@@ -933,14 +937,43 @@ export function SystemFoundationSettingsPanel() {
                   </div>
                 </>
               ) : null}
+              {section === 'operation' ? (
+                <>
+                  <SectionTitle>{sectionLabel}</SectionTitle>
+                  <p className="mb-4 text-[12px] text-zinc-500">
+                    {t('systemFoundation.operation.hint')}
+                  </p>
+                  <div className="max-w-xl space-y-4">
+                    <div>
+                      <ToggleRow
+                        label={t('shell.switchAdmin')}
+                        checked={adminMode}
+                        onChange={setAdminMode}
+                      />
+                      <p className="text-[12px] text-zinc-500">{t('shell.switchAdminHint')}</p>
+                    </div>
+                    <div>
+                      <ToggleRow
+                        label={t('shell.supervisorApproval')}
+                        checked={supervisorApproval}
+                        onChange={setSupervisorApproval}
+                      />
+                      <p className="text-[12px] text-zinc-500">{t('shell.supervisorApprovalHint')}</p>
+                    </div>
+                  </div>
+                </>
+              ) : null}
             </div>
 
-            <SettingsFooter
-              saving={saving}
-              error={error}
-              onCancel={onCancel}
-              onSave={onSave}
-            />
+            {/* 操作模式是這台瀏覽器的偏好、切換即生效，不走系統設定的儲存流程 */}
+            {section === 'operation' ? null : (
+              <SettingsFooter
+                saving={saving}
+                error={error}
+                onCancel={onCancel}
+                onSave={onSave}
+              />
+            )}
           </>
         )}
       </section>

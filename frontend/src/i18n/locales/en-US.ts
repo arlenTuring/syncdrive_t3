@@ -178,6 +178,10 @@ const enUS: DeepStringify<typeof zhTW> = {
       security: 'Security & dual confirmation',
       mqtt: 'External messaging (MQTT)',
       globalParams: 'Global & module parameters',
+      operation: 'Operation mode & approval',
+    },
+    operation: {
+      hint: 'Applies to this browser only and takes effect immediately; no save needed.',
     },
     locale: {
       uiLocale: 'Default UI language',

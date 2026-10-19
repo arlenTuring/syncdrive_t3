@@ -170,6 +170,10 @@ const zhTW = {
       security: '安全政策與雙重確認',
       mqtt: '外部通訊 (MQTT)',
       globalParams: '全域與模組參數管理',
+      operation: '操作模式與簽核',
+    },
+    operation: {
+      hint: '只影響這台瀏覽器，切換後立即生效，不需儲存。',
     },
     locale: {
       uiLocale: '預設使用者介面語系',

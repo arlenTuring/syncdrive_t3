@@ -50,10 +50,8 @@ import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
 import { AttachModuleDashboardDialog } from './components/AttachModuleDashboardDialog';
 import { ModuleDashboardRuntimeView } from './components/ModuleDashboardRuntimeView';
 import {
-  readAdminModePreference,
-  writeAdminModePreference,
+  useAdminModePreference,
 } from './utils/adminModePreference';
-import { useSupervisorApprovalPreference } from './utils/supervisorApprovalPreference';
 import {
   createModuleDashboardPageId,
   moduleDashboardViewId,
@@ -200,8 +198,7 @@ export default function ScheduleManagementApp({
   const [view, setView] = useState<string>(initialView);
   const auth = useAuth(); const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
-  const [adminMode, setAdminMode] = useState(readAdminModePreference);
-  const [supervisorApproval, setSupervisorApproval] = useSupervisorApprovalPreference();
+  const [adminMode] = useAdminModePreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
   const [accountRoleFilter,setAccountRoleFilter]=useState<string|null>(null);
@@ -250,10 +247,6 @@ export default function ScheduleManagementApp({
   }, []);
 
   useEffect(() => {
-    writeAdminModePreference(adminMode);
-  }, [adminMode]);
-
-  useEffect(() => {
     if (!modulePagesSyncedRef.current) return;
     writeModuleDashboardPages(modulePages);
   }, [modulePages]);
@@ -274,10 +267,6 @@ export default function ScheduleManagementApp({
   })();
 
   const frameProps = {
-    adminMode,
-    onAdminModeChange: setAdminMode,
-    supervisorApproval,
-    onSupervisorApprovalChange: setSupervisorApproval,
     onOpenSystemFoundation: () => { if (auth.require('system.health.view')) setView('system-foundation'); },
   };
   const requiredPermission = parseModuleDashboardViewId(view) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[view as ShellView];
