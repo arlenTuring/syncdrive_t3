@@ -77,6 +77,7 @@ validate_order() {
   }
   assert_before deploy/migrations/20261008-required-extensions.sql backend/src/database/migrations/20261018-media-play-schedules.sql
   assert_before deploy/migrations/20261008-required-extensions.sql backend/src/database/migrations/20261023-video-monitoring.sql
+  assert_before backend/src/database/migrations/20261023-video-monitoring.sql backend/src/database/migrations/20261024-video-resources-and-layout.sql
   assert_before backend/src/database/migrations/20261009-create-degraded-operation-plans.sql backend/src/database/migrations/20261010-create-degraded-replay.sql
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261010-vehicle-model-management.sql
   assert_before backend/src/database/migrations/20261011-access-control.sql backend/src/database/migrations/20261012-role-permissions.sql
@@ -127,7 +128,8 @@ WITH checks(migration_id, valid) AS (
     ('backend/src/database/migrations/20261019-virtual-fence-site-permissions.sql', NOT EXISTS(SELECT 1 FROM permissions WHERE permission_code LIKE 'operations.virtual-fence.%')),
     ('backend/src/database/migrations/20261020-event-and-log-management.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='security_event_logs' AND column_name='acknowledged_at') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='operator_action_logs' AND column_name='category')),
     ('backend/src/database/migrations/20261021-security-event-retention.sql', to_regclass('public.data_retention_policies') IS NULL OR EXISTS(SELECT 1 FROM data_retention_policies WHERE category='security_events')),
-    ('backend/src/database/migrations/20261023-video-monitoring.sql', to_regclass('public.video_sources') IS NOT NULL AND to_regclass('public.video_recording_segments') IS NOT NULL)
+    ('backend/src/database/migrations/20261023-video-monitoring.sql', to_regclass('public.video_sources') IS NOT NULL AND to_regclass('public.video_recording_segments') IS NOT NULL),
+    ('backend/src/database/migrations/20261024-video-resources-and-layout.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_sources' AND column_name='recording_enabled') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_monitor_tiles' AND column_name='x'))
 )
 SELECT string_agg(c.migration_id, ', ' ORDER BY c.migration_id)
 FROM checks c JOIN syncdrive_schema_migrations m USING(migration_id)

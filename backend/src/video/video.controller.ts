@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Patch, Post, Put, Query, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { PublicEndpoint, RequirePermission, type AuthenticatedRequest } from '../access-control/access.guard';
@@ -18,13 +18,22 @@ const user = (req: AuthenticatedRequest) => {
   return req.authUser;
 };
 
+const VIEW = 'events.video.view';
+const CONFIGURE = 'events.video.configure';
+const RECORDING = 'events.video.recording-manage';
+const HISTORY = 'events.video-history.view';
+
+const perm = (req: AuthenticatedRequest) => ({ canManageRecording: user(req).permissions.includes(RECORDING) });
+
 /**
- * 影像監控：標籤頁、格子、來源、全域預設、連線範圍、測試／預覽與即時播放。
- * 檢視需要 events.video.view；修改連線與標籤需要 events.video.configure。
+ * 影像：兩個頁面共用的 API。
+ * - 即時影像監控：監控標籤頁、版面、格子綁定來源（events.video.view 看、events.video.configure 改）。
+ * - 影像資源管理：來源清單與設定（configure）、儲存錄影與全域儲存（recording-manage）、歷史（events.video-history.*）。
+ * 每個方法都明確標示權限（方法上的設定會取代類別預設）。
  */
 @ApiTags('Video')
 @Controller('syncdrive-api/video')
-@RequirePermission('events.video.view')
+@RequirePermission(VIEW)
 export class VideoController {
   constructor(
     private readonly config: VideoConfigService,
@@ -36,133 +45,194 @@ export class VideoController {
   ) {}
 
   @Get('bootstrap')
-  @ApiOperation({ summary: '監控頁初始資料：標籤與格子、來源（遮蔽帳密）、全域預設（不含密碼）、連線範圍' })
+  @RequirePermission(VIEW)
+  @ApiOperation({ summary: '即時影像監控初始資料：監控標籤頁與版面、安全來源選項（不含任何連線資訊）、錄影容量短狀態' })
   async bootstrap() {
-    const [tabs, sources, defaults, settings, storage] = await Promise.all([this.config.listTabs(), this.config.listSources(), this.config.getDefaults(), this.config.settings(), this.storage.status().catch(() => null)]);
-    return { tabs, sources, defaults, settings: { allowedNetworks: settings.allowedNetworks, maxTabs: settings.maxTabs, maxSources: settings.maxSources, version: settings.version }, storage };
+    const [tabs, options, storage] = await Promise.all([this.config.listTabs(), this.config.sourceOptions({}), this.storage.status().catch(() => null)]);
+    return { tabs, sources: options.items, storage: storage && { paused: storage.paused, usagePct: storage.usagePct, recordingSources: storage.recordingSources } };
   }
 
-  // ── 標籤與格子 ──
+  // ── 監控標籤頁與版面 ──
   @Get('tabs')
+  @RequirePermission(VIEW)
   tabs() {
     return this.config.listTabs();
   }
 
   @Post('tabs')
-  @RequirePermission('events.video.configure')
-  @AuditAction('VIDEO_TAB_CREATE')
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_TAB_CREATE', { target: (_req, result) => ({ id: (result as { id?: string })?.id, name: (result as { name?: string })?.name }) })
+  @ApiOperation({ summary: '新增監控標籤頁：名稱＋版面草稿（1–12 格，0–10000 正規化座標，沒有來源也可存）' })
   createTab(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
     return this.config.createTab(body ?? {}, user(req));
   }
 
   @Post('tabs/reorder')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_TAB_REORDER')
   reorder(@Body() body: { ids?: unknown }) {
     return this.config.reorderTabs(body?.ids);
   }
 
-  @Get('tabs/:id/tile-count-preview')
-  tileCountPreview(@Param('id') id: string, @Query('tileCount') tileCount: string) {
-    return this.config.previewTileCount(id, tileCount);
-  }
-
   @Patch('tabs/:id')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_TAB_UPDATE')
   updateTab(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.config.updateTab(id, body ?? {});
   }
 
+  @Put('tabs/:id/layout')
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_LAYOUT_SAVE', { target: (req) => ({ id: (req.params as Record<string, string>).id }), detail: (req) => ({ tiles: Array.isArray((req.body as Record<string, unknown>)?.tiles) ? ((req.body as Record<string, unknown>).tiles as unknown[]).length : null }) })
+  @ApiOperation({ summary: '保存版面：expectedVersion＋完整正規化矩形；同一交易增刪改格子，檢查邊界與重疊；不改來源綁定' })
+  saveLayout(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.config.saveLayout(id, body ?? {});
+  }
+
+  @Patch('tabs/:id/tiles/:tileId/source')
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_TILE_BIND', { target: (req) => ({ id: (req.params as Record<string, string>).tileId }), detail: (req) => ({ tabId: (req.params as Record<string, string>).id, sourceId: (req.body as Record<string, unknown>)?.sourceId ?? null }) })
+  @ApiOperation({ summary: '只換這一格的來源（或清除）；不改版面、不改來源錄影' })
+  bindTile(@Param('id') id: string, @Param('tileId') tileId: string, @Body() body: Record<string, unknown>) {
+    return this.config.bindTileSource(id, tileId, body ?? {});
+  }
+
   @Delete('tabs/:id')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_TAB_DELETE')
   deleteTab(@Param('id') id: string, @Query('expectedVersion') expected: string) {
     return this.config.deleteTab(id, expected);
   }
 
   @Post('tabs/:id/duplicate')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_TAB_CREATE')
   duplicate(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.config.duplicateTab(id, user(req));
   }
 
   @Put('tabs/:id/tiles')
-  @RequirePermission('events.video.configure')
-  @AuditAction('VIDEO_TILES_SAVE')
-  saveTiles(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.config.saveTiles(id, body ?? {});
+  @RequirePermission(CONFIGURE)
+  @ApiOperation({ summary: '已停用：舊的整頁格子保存（含每格錄影開關）；回 400 CONTRACT_CHANGED' })
+  saveTiles() {
+    return this.config.saveTilesDeprecated();
   }
 
-  // ── 全域預設與批次套用 ──
+  // ── 全域預設與批次套用（影像資源管理 › 進階設定；作用對象是來源） ──
   @Get('defaults')
+  @RequirePermission(CONFIGURE)
   defaults() {
     return this.config.getDefaults();
   }
 
   @Put('defaults')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_DEFAULTS_UPDATE', { detail: (req) => ({ fields: Object.keys((req.body as object) ?? {}) }) })
   updateDefaults(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
     return this.config.updateDefaults(body ?? {}, user(req));
   }
 
   @Post('defaults/preview-apply')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
+  @ApiOperation({ summary: '預覽全域預設套用到來源的差異（scope：sources／tags／all）' })
   previewApply(@Body() body: Record<string, unknown>) {
     return this.config.previewApply(body ?? {});
   }
 
   @Post('defaults/apply')
-  @RequirePermission('events.video.configure')
-  @AuditAction('VIDEO_DEFAULTS_APPLY', { detail: (req, result) => ({ scope: (req.body as Record<string, unknown>)?.scope, overwrite: (req.body as Record<string, unknown>)?.overwrite, applied: (result as { applied?: unknown[] })?.applied?.length }) })
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_DEFAULTS_APPLY', { detail: (req, result) => ({ scope: (req.body as Record<string, unknown>)?.scope, applied: (result as { applied?: unknown[] })?.applied?.length }) })
   apply(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
     return this.config.apply(body ?? {}, user(req));
   }
 
   // ── 連線範圍 ──
   @Get('settings')
+  @RequirePermission(CONFIGURE)
   async settings() {
     const s = await this.config.settings();
     return { allowedNetworks: s.allowedNetworks, maxTabs: s.maxTabs, maxSources: s.maxSources, version: s.version };
   }
 
   @Put('settings')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_SETTINGS_UPDATE', { detail: (req) => ({ allowedNetworks: (req.body as Record<string, unknown>)?.allowedNetworks }) })
   updateSettings(@Body() body: Record<string, unknown>) {
     return this.config.updateSettings(body ?? {});
   }
 
-  // ── 來源 ──
+  // ── 來源（影像資源管理） ──
   @Get('sources')
-  sources(@Query('includeDeleted') includeDeleted?: string) {
-    return this.config.listSources(includeDeleted === 'true');
+  @RequirePermission(CONFIGURE, RECORDING)
+  @ApiOperation({ summary: '來源清單：分頁（page、pageSize）、q、tags（逗號分隔）、enabled、online（online／offline／unknown／disabled）；含 checkedAt／stale，不含密碼、不建立播放' })
+  sources(@Query() query: Record<string, unknown>) {
+    return this.config.querySources(query ?? {});
+  }
+
+  @Get('source-tags')
+  @RequirePermission(VIEW, CONFIGURE, RECORDING, HISTORY)
+  sourceTags() {
+    return this.config.sourceTags();
+  }
+
+  @Get('source-options')
+  @RequirePermission(VIEW, CONFIGURE, HISTORY)
+  @ApiOperation({ summary: '安全來源選項（名稱、標籤、載具、位置、啟用與狀態）；給監控格子選單與歷史查詢，不含任何連線資訊' })
+  sourceOptions(@Query() query: Record<string, unknown>) {
+    return this.config.sourceOptions(query ?? {});
   }
 
   @Post('sources')
-  @RequirePermission('events.video.configure')
-  @AuditAction('VIDEO_SOURCE_CREATE', { target: (_req, result) => ({ id: (result as { id?: string })?.id, name: (result as { name?: string })?.name }) })
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_SOURCE_CREATE', { target: (_req, result) => ({ id: (result as { id?: string })?.id, name: (result as { name?: string })?.name }), detail: (req) => ({ recordingEnabled: (req.body as Record<string, unknown>)?.recordingEnabled ?? true, tags: (req.body as Record<string, unknown>)?.tags }) })
+  @ApiOperation({ summary: '新增來源；儲存錄影預設 true（需要錄影管理權限，否則整個拒絕）' })
   async createSource(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
-    const id = await this.config.createSource(body ?? {}, user(req));
+    const id = await this.config.createSource(body ?? {}, user(req), perm(req));
     return this.config.getSource(id);
   }
 
   @Get('sources/:id')
+  @RequirePermission(CONFIGURE, RECORDING)
   source(@Param('id') id: string) {
     return this.config.getSource(id);
   }
 
   @Patch('sources/:id')
-  @RequirePermission('events.video.configure')
-  @AuditAction('VIDEO_SOURCE_UPDATE')
+  @RequirePermission(CONFIGURE, RECORDING)
+  @AuditAction('VIDEO_SOURCE_UPDATE', { target: (req) => ({ id: (req.params as Record<string, string>).id }), detail: (req) => ({ fields: Object.keys((req.body as object) ?? {}).filter((k) => k !== 'connection'), connection: Boolean((req.body as Record<string, unknown>)?.connection), recordingEnabled: (req.body as Record<string, unknown>)?.recordingEnabled }) })
   updateSource(@Param('id') id: string, @Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
-    return this.config.updateSource(id, body ?? {}, user(req));
+    // 只有錄影管理權限的人只能改「儲存錄影」，不能動連線與其他設定
+    if (!user(req).permissions.includes(CONFIGURE) && Object.keys(body ?? {}).some((k) => !['recordingEnabled', 'expectedVersion'].includes(k))) {
+      throw new ForbiddenException('只能變更「儲存錄影」；修改來源設定需要影像設定權限');
+    }
+    return this.config.updateSource(id, body ?? {}, user(req), perm(req));
+  }
+
+  @Patch('sources/:id/enabled')
+  @RequirePermission(CONFIGURE)
+  @AuditAction('VIDEO_SOURCE_ENABLE', { target: (req) => ({ id: (req.params as Record<string, string>).id }), detail: (req) => ({ enabled: (req.body as Record<string, unknown>)?.enabled }) })
+  @ApiOperation({ summary: '清單直接啟停（expectedVersion＋enabled）；回設定已接受與目前實際狀態，網路協調非同步' })
+  setEnabled(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.config.setEnabled(id, body ?? {});
+  }
+
+  @Post('sources/:id/duplicate')
+  @RequirePermission(CONFIGURE)
+  @HttpCode(201)
+  @AuditAction('VIDEO_SOURCE_DUPLICATE', { target: (_req, result) => ({ id: (result as { id?: string })?.id, name: (result as { name?: string })?.name }), detail: (req) => ({ from: (req.params as Record<string, string>).id }) })
+  @ApiOperation({ summary: '一鍵複製來源（expectedVersion＋requestId 冪等）；新 sourceId／revision／媒體路徑，不複製歷史' })
+  duplicateSource(@Param('id') id: string, @Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
+    return this.config.duplicateSource(id, body ?? {}, user(req), perm(req));
+  }
+
+  @Get('sources/:id/delete-impact')
+  @RequirePermission(CONFIGURE)
+  deleteImpact(@Param('id') id: string) {
+    return this.config.deleteImpact(id);
   }
 
   @Delete('sources/:id')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @AuditAction('VIDEO_SOURCE_DELETE')
   deleteSource(@Param('id') id: string, @Query('expectedVersion') expected: string) {
     return this.config.deleteSource(id, expected);
@@ -170,7 +240,7 @@ export class VideoController {
 
   // ── 測試／預覽與即時 ──
   @Post('source-tests')
-  @RequirePermission('events.video.configure')
+  @RequirePermission(CONFIGURE)
   @ApiOperation({ summary: '暫時測試連線並預覽（不錄影、有時限）' })
   createTest(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
     return this.live.createTest(body ?? {}, user(req), req);
@@ -189,6 +259,7 @@ export class VideoController {
   }
 
   @Post('sources/:id/live-sessions')
+  @RequirePermission(VIEW)
   @ApiOperation({ summary: '取得即時播放資訊（WebRTC 優先、HLS 備援；短效權杖）' })
   liveSession(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.live.createLiveSession(id, user(req), req);
@@ -196,7 +267,7 @@ export class VideoController {
 
   // ── 儲存與錄影政策 ──
   @Get('storage-status')
-  @RequirePermission('events.video.view', 'events.video-history.view')
+  @RequirePermission(VIEW, HISTORY, CONFIGURE, RECORDING)
   @ApiOperation({ summary: '錄影容量：用量、預算、最低剩餘、預估可存天數、最早可用時間、是否暫停' })
   async storageStatus() {
     const status = await this.storage.status();
@@ -213,7 +284,7 @@ export class VideoController {
   }
 
   @Get('storage-policy')
-  @RequirePermission('events.video.view', 'events.video-history.view')
+  @RequirePermission(VIEW, HISTORY, CONFIGURE, RECORDING)
   async storagePolicy() {
     return (await this.storage.status()).policy;
   }

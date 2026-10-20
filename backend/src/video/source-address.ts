@@ -84,7 +84,8 @@ function hostForUrl(host: string) {
 
 /** 給媒體服務用的完整網址（含帳密；只在後端組出、送給 MediaMTX，不回傳給畫面） */
 export function buildSourceUrl(address: SourceAddress, password: string | null, connectHost?: string): string {
-  const auth = address.username ? `${encodeURIComponent(address.username)}${password ? `:${encodeURIComponent(password)}` : ''}@` : '';
+  // 只有帳號沒有密碼時要寫成 user:@host（媒體服務不接受只有帳號）
+  const auth = address.username ? `${encodeURIComponent(address.username)}:${password ? encodeURIComponent(password) : ''}@` : '';
   const port = address.port ? `:${address.port}` : '';
   const query = address.query ? `?${address.query}` : '';
   return `${address.protocol}://${auth}${hostForUrl(connectHost ?? address.host)}${port}${address.path || ''}${query}`;

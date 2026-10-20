@@ -80,6 +80,8 @@ export type RecordingProfile = 'original' | 'balanced' | 'saving';
 
 @Entity('video_sources')
 @Check('CHK_VIDEO_SOURCE_PROFILE', `recording_profile IN ('original', 'balanced', 'saving')`)
+@Check('CHK_VIDEO_SOURCE_TAGS', `jsonb_typeof(tags) = 'array' AND jsonb_array_length(tags) <= 10`)
+@Index('UQ_VIDEO_SOURCE_REQUEST', ['requestId'], { unique: true, where: 'request_id IS NOT NULL' })
 export class VideoSource {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_VIDEO_SOURCES' })
   id: string;
@@ -99,6 +101,18 @@ export class VideoSource {
 
   @Column({ name: 'recording_profile', type: 'varchar', length: 16, default: 'original' })
   recordingProfile: RecordingProfile;
+
+  /** 來源是否儲存錄影（錄影以來源為準，不再看格子）；新來源預設 true */
+  @Column({ name: 'recording_enabled', type: 'boolean', default: true })
+  recordingEnabled: boolean;
+
+  /** 來源分類標籤（顯示文字，最多 10 個；與監控標籤頁無關） */
+  @Column({ type: 'jsonb', default: () => `'[]'::jsonb` })
+  tags: string[];
+
+  /** 一鍵複製的冪等鍵：同一請求重送不建立第二份 */
+  @Column({ name: 'request_id', type: 'varchar', length: 80, nullable: true })
+  requestId: string | null;
 
   /** worker 回報的實際狀態（與需求分開） */
   @Column({ name: 'actual_status', type: 'jsonb', default: () => `'{}'::jsonb` })
@@ -198,6 +212,7 @@ export class VideoSourceRevision {
 @Entity('video_monitor_tabs')
 @Index('IDX_VIDEO_TAB_POSITION', ['position'], { where: 'deleted_at IS NULL' })
 @Check('CHK_VIDEO_TAB_TILE_COUNT', `tile_count BETWEEN 1 AND 12`)
+@Check('CHK_VIDEO_TAB_ASPECT', `canvas_aspect_ratio BETWEEN 0.25 AND 4`)
 export class VideoMonitorTab {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_VIDEO_MONITOR_TABS' })
   id: string;
@@ -210,6 +225,13 @@ export class VideoMonitorTab {
 
   @Column({ name: 'tile_count', type: 'int', default: 4 })
   tileCount: number;
+
+  @Column({ name: 'layout_schema_version', type: 'int', default: 1 })
+  layoutSchemaVersion: number;
+
+  /** 監看畫布長寬比（初值 16:9，與影像比例無關）；格子座標是 0–10000 正規化整數 */
+  @Column({ name: 'canvas_aspect_ratio', type: 'numeric', precision: 6, scale: 4, default: 1.7778, transformer: { to: (v: number) => v, from: (v: string | number) => Number(v) } })
+  canvasAspectRatio: number;
 
   @Column({ name: 'row_version', type: 'int', default: 1 })
   version: number;
@@ -228,9 +250,10 @@ export class VideoMonitorTab {
 }
 
 @Entity('video_monitor_tiles')
-@Unique('UQ_VIDEO_TILE_POSITION', ['tabId', 'position'])
+@Unique('UQ_VIDEO_TILE_POSITION', ['tabId', 'position'], { deferrable: 'INITIALLY DEFERRED' })
 @Index('IDX_VIDEO_TILE_SOURCE', ['sourceId'])
 @Check('CHK_VIDEO_TILE_POSITION', `position BETWEEN 0 AND 11`)
+@Check('CHK_VIDEO_TILE_RECT', `x >= 0 AND y >= 0 AND w >= 500 AND h >= 500 AND x + w <= 10000 AND y + h <= 10000`)
 export class VideoMonitorTile {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_VIDEO_MONITOR_TILES' })
   id: string;
@@ -255,6 +278,20 @@ export class VideoMonitorTile {
   @Column({ name: 'display_name', type: 'varchar', length: 120, nullable: true })
   displayName: string | null;
 
+  /** 正規化矩形（0–10000）；版面由使用者決定，不依格數自動排 */
+  @Column({ type: 'int' })
+  x: number;
+
+  @Column({ type: 'int' })
+  y: number;
+
+  @Column({ type: 'int' })
+  w: number;
+
+  @Column({ type: 'int' })
+  h: number;
+
+  /** @deprecated 錄影改以來源 recording_enabled 為準；欄位保留到確認沒有舊呼叫者後移除 */
   @Column({ name: 'recording_requested', type: 'boolean', default: true })
   recordingRequested: boolean;
 
