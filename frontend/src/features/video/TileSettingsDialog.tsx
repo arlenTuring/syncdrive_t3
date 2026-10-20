@@ -64,6 +64,7 @@ export function TileSettingsDialog({
     path: current?.connection?.path ?? '',
     username: current?.connection?.username ?? '',
     password: '',
+    clearPassword: false,
     url: '',
     vehicleCode: current?.vehicleCode ?? '',
     cameraId: current?.cameraId ?? '',
@@ -88,8 +89,8 @@ export function TileSettingsDialog({
   const connection = (): ConnectionInput =>
     connMode === 'url'
       ? { mode: 'url', url: form.url.trim() }
-      : { mode: 'fields', protocol: form.protocol, host: form.host.trim(), port: form.port.trim() || null, path: form.path.trim(), username: form.username.trim(), password: form.password || undefined };
-  const connectionTouched = connMode === 'url' ? Boolean(form.url.trim()) : !editing || form.protocol !== editing.connection?.protocol || form.host !== editing.connection?.host || form.port !== String(editing.connection?.port ?? '') || form.path !== editing.connection?.path || form.username !== (editing.connection?.username ?? '') || Boolean(form.password);
+      : { mode: 'fields', protocol: form.protocol, host: form.host.trim(), port: form.port.trim() || null, path: form.path.trim(), username: form.username.trim(), password: form.password || undefined, clearPassword: form.clearPassword || undefined };
+  const connectionTouched = connMode === 'url' ? Boolean(form.url.trim()) : !editing || form.protocol !== editing.connection?.protocol || form.host !== editing.connection?.host || form.port !== String(editing.connection?.port ?? '') || form.path !== editing.connection?.path || form.username !== (editing.connection?.username ?? '') || Boolean(form.password) || form.clearPassword;
 
   const runTest = async () => {
     setTesting(true);
@@ -216,12 +217,18 @@ export function TileSettingsDialog({
                     </Labeled>
                   </div>
                   <div className="col-span-3 grid grid-cols-2 gap-2">
-                    <Labeled label="帳號">
+                    <Labeled label="帳號（選填）" hint="攝影機沒有設帳密就留空">
                       <input className={field} value={form.username} onChange={(e) => set({ username: e.target.value })} autoComplete="off" />
                     </Labeled>
-                    <Labeled label="密碼" hint={editing?.connection?.hasPassword ? '已設定；空白＝保留原密碼' : undefined}>
-                      <input className={field} type="password" value={form.password} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" placeholder={editing?.connection?.hasPassword ? '••••••（保留）' : ''} />
+                    <Labeled label="密碼（選填）" hint={editing?.connection?.hasPassword ? (form.clearPassword ? '儲存後移除已存的密碼' : '已設定；空白＝保留原密碼') : undefined}>
+                      <input className={field} type="password" value={form.password} disabled={form.clearPassword} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" placeholder={editing?.connection?.hasPassword && !form.clearPassword ? '••••••（保留）' : ''} />
                     </Labeled>
+                    {editing?.connection?.hasPassword ? (
+                      <label className="col-span-2 flex items-center gap-2 text-xs text-zinc-400">
+                        <input type="checkbox" checked={form.clearPassword} onChange={(e) => set({ clearPassword: e.target.checked, password: '' })} className="accent-blue-600" />
+                        移除已存的密碼（攝影機改成不需密碼時勾選；清空帳號也會一併移除）
+                      </label>
+                    ) : null}
                   </div>
                 </div>
               )}
