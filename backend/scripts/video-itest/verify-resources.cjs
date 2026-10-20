@@ -3,7 +3,7 @@
 //   VIDEO_ITEST_ALLOW=1 VIDEO_ITEST_ENV=backend/.env node backend/scripts/video-itest/verify-resources.cjs [攝影機主機 IP]
 //
 // 有給攝影機主機時（例如模擬器或 scripts/video-test-cameras.sh），另外驗證背景健康探測：
-//   SIM_URL（預設 http://127.0.0.1:4300）存在時用模擬器 PMS01/front 的讀取帳密，否則用 cam/camtest 與 /cam1。
+//   設定 SIM_URL（例如 http://127.0.0.1:4300）時用模擬器 PMS01/front 的讀取帳密，否則用測試攝影機 cam/camtest 與 /cam1。
 // 只建立並刪除自己標記 itest-video 的資料。
 const path = require('path');
 if (process.env.VIDEO_ITEST_ALLOW !== '1') {
@@ -142,10 +142,11 @@ const rid = () => `itest${Date.now().toString(36)}${Math.random().toString(36).s
     // ── 背景健康探測（沒人看、沒錄影的來源） ──
     if (IP) {
       let good = { path: '/cam1', username: 'cam', password: 'camtest' };
-      try {
+      if (process.env.SIM_URL) {
+        // 明確指定模擬器時，用模擬器 PMS01/front（通道要在發布中）
         const cred = await (await fetch(`${SIM}/api/video/read-credential`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
         if (cred.password) good = { path: '/sim/pms01/front', username: cred.username, password: cred.password };
-      } catch { /* 沒有模擬器就用測試攝影機 */ }
+      }
       const live = await config.createSource({ name: 'itest 探測可連', connection: { mode: 'fields', protocol: 'rtsp', host: IP, port: 18554, ...good }, recordingEnabled: false }, actor, full);
       const dead = await config.createSource({ name: 'itest 探測連不上', connection: { mode: 'fields', protocol: 'rtsp', host: IP, port: 18555, path: '/x' }, recordingEnabled: false }, actor, full);
       created.sources.push(live, dead);

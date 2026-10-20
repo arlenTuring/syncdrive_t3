@@ -1,14 +1,22 @@
-import { Download, Maximize2, Pause, Play, Shield, Trash2 } from 'lucide-react';
+import { ChevronLeft, Download, Maximize2, Pause, Play, Shield, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { SiteSelect } from '../../components/SiteSelect';
 import { useAuth } from '../access-control/AuthContext';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
 import { QueryActions, RangeFilter } from '../event-log-shared/ui';
 import { formatDateTime, rangeToQuery, toLocalInput, type RangeDraft } from '../event-log-shared/time';
-import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Manifest, type Tab, type TimelineItem, type VideoSourceItem } from './api';
+import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Manifest, type SourceOption, type Tab, type TimelineItem } from './api';
 import { SegmentFollower } from './SegmentFollower';
-import { gridColumns } from './layout';
-import { OPEN_VIDEO_HISTORY_EVENT, takeHistoryRequest } from './history-link';
+import { tagKey } from './layout';
+import type { HistoryRequest } from './history-link';
+
+/** 歷史多畫面：依路數決定欄數（歷史回放的格子大小不需保存） */
+function historyGrid(count: number) {
+  if (count <= 1) return 'grid-cols-1';
+  if (count <= 4) return 'grid-cols-1 sm:grid-cols-2';
+  if (count <= 9) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+}
 
 const TZ = 'Asia/Taipei';
 const HOUR = 3_600_000;
@@ -99,12 +107,14 @@ function Timeline({ items, from, to, cursor, onSeek }: { items: TimelineItem[]; 
 }
 
 /**
- * 事件管理模組 → 歷史影像查詢。
+ * 影像資源管理 › 歷史錄影（子畫面）。
  * 先查可用區間（只讀索引），需要時才載入片段；多畫面共用絕對時間游標，缺段的畫面顯示空白狀態，不暫停其他畫面。
+ * 可查停用或已刪除但仍有錄影的來源；來源清單只用安全摘要，不需要也拿不到連線資訊。
  */
-export function VideoHistoryPage() {
+export function VideoHistoryPage({ request, title, onBack }: { request?: HistoryRequest | null; title?: string; onBack?: () => void }) {
   const auth = useAuth();
-  const [sources, setSources] = useState<VideoSourceItem[]>([]);
+  const [sources, setSources] = useState<SourceOption[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [vehicleFilter, setVehicleFilter] = useState('');
@@ -127,8 +137,9 @@ export function VideoHistoryPage() {
   const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void videoApi.sources(true).then(setSources, (e: Error) => setError(e.message));
-    void videoApi.bootstrap().then((b) => setTabs(b.tabs), () => undefined);
+    void videoApi.sourceOptions(true).then((r) => setSources(r.items), (e: Error) => setError(e.message));
+    // 監控標籤頁只是輔助的來源集合；沒有即時監看權限時就不顯示
+    void videoApi.tabs().then(setTabs, () => undefined);
   }, []);
   useEffect(() => {
     if (!notice) return undefined;
@@ -155,11 +166,13 @@ export function VideoHistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 從事件詳情帶參數開啟：依當時的載具關聯找來源
+  // 帶條件進來（事件前後、舊的歷史連結、清單的「歷史錄影」）：依當時的載具關聯找來源
+  const consumed = useRef(false);
   useEffect(() => {
-    const consume = async () => {
-      const req = takeHistoryRequest();
-      if (!req) return;
+    if (!request || consumed.current || !sources.length) return;
+    consumed.current = true;
+    const req = request;
+    void (async () => {
       setRange({ from: toLocalInput(req.from, TZ), to: toLocalInput(req.to, TZ) });
       let ids = req.sourceIds ?? [];
       if (!ids.length && req.vehicleCode) {
@@ -171,12 +184,8 @@ export function VideoHistoryPage() {
       setMulti(ids.length > 1);
       if (ids.length) await query(ids, { from: req.from, to: req.to }, req.at);
       else setError(req.vehicleCode ? `找不到 ${req.vehicleCode} 在這段期間的影像來源` : '請選擇影像來源');
-    };
-    if (sources.length) void consume();
-    const onOpen = () => void consume();
-    window.addEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
-  }, [sources, query]);
+    })();
+  }, [request, sources, query]);
 
   const search = () => {
     const r = rangeToQuery(range, TZ);
@@ -193,7 +202,17 @@ export function VideoHistoryPage() {
     return () => clearTimeout(timer);
   }, [job]);
 
-  const filteredSources = sources.filter((s) => !vehicleFilter || (s.vehicleCode ?? '').toLowerCase().includes(vehicleFilter.toLowerCase()));
+  const tagOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of sources) for (const t of s.tags) if (!map.has(tagKey(t))) map.set(tagKey(t), t);
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, 'zh-Hant'));
+  }, [sources]);
+  const filteredSources = sources.filter((s) => {
+    const v = vehicleFilter.toLowerCase();
+    if (v && !`${s.vehicleCode ?? ''} ${s.location ?? ''}`.toLowerCase().includes(v)) return false;
+    if (tagFilter.length && !s.tags.some((t) => tagFilter.includes(tagKey(t)))) return false;
+    return true;
+  });
   const playing = useMemo(() => (multi ? selected : selected.slice(0, 1)).filter((id) => manifests[id]), [multi, selected, manifests]);
   const toggleSource = (id: string) => setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : multi ? (cur.length >= 12 ? cur : [...cur, id]) : [id]));
 
@@ -227,11 +246,21 @@ export function VideoHistoryPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4 text-zinc-100">
+      {onBack ? (
+        <div className="flex items-center gap-2 text-sm">
+          <button type="button" onClick={onBack} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-zinc-200 hover:bg-white/5">
+            <ChevronLeft className="size-4" />返回來源清單
+          </button>
+          <nav aria-label="麵包屑" className="text-zinc-400">
+            影像資源管理 <span className="px-1">›</span> {title ? <>{title} <span className="px-1">›</span> </> : null}<span className="text-zinc-100">歷史錄影</span>
+          </nav>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-end gap-3">
         <RangeFilter value={range} onChange={setRange} timeZone={TZ} error={rangeError} />
         <label className="flex min-w-[11rem] flex-col gap-1.5">
-          <span className="text-xs text-zinc-400">監控標籤（帶入該頁來源）</span>
-          <SiteSelect aria-label="監控標籤" value="" options={[{ value: '', label: '選擇標籤' }, ...tabs.map((t) => ({ value: t.id, label: t.name }))]}
+          <span className="text-xs text-zinc-400">監控標籤頁（帶入該頁來源）</span>
+          <SiteSelect aria-label="監控標籤頁" value="" options={[{ value: '', label: '選擇監控標籤頁' }, ...tabs.map((t) => ({ value: t.id, label: t.name }))]}
             onChange={(e) => {
               const tab = tabs.find((t) => t.id === e.target.value);
               if (!tab) return;
@@ -245,6 +274,17 @@ export function VideoHistoryPage() {
           <span className="text-xs text-zinc-400">載具／位置</span>
           <input value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)} placeholder="篩選來源" className="h-10 w-36 rounded-xl bg-[#222831] px-3 text-sm outline-none focus:ring-1 focus:ring-sky-500" />
         </label>
+        {tagOptions.length ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-zinc-400">來源標籤</span>
+            <div className="flex max-w-md flex-wrap gap-1">
+              {tagOptions.map(([key, label]) => (
+                <button key={key} type="button" aria-pressed={tagFilter.includes(key)} onClick={() => setTagFilter((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))}
+                  className={`rounded-md border px-2 py-1 text-xs ${tagFilter.includes(key) ? 'border-sky-500 bg-sky-500/15 text-sky-100' : 'border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>{label}</button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 pb-2 text-sm">
           <label className="flex items-center gap-1.5"><input type="radio" checked={!multi} onChange={() => { setMulti(false); setSelected((s) => s.slice(0, 1)); }} className="accent-blue-600" />單一來源</label>
           <label className="flex items-center gap-1.5"><input type="radio" checked={multi} onChange={() => setMulti(true)} className="accent-blue-600" />多來源同步（最多 12）</label>
@@ -256,7 +296,7 @@ export function VideoHistoryPage() {
         {filteredSources.map((s) => (
           <button key={s.id} type="button" onClick={() => toggleSource(s.id)} aria-pressed={selected.includes(s.id)}
             className={`rounded-lg border px-2.5 py-1 text-xs ${selected.includes(s.id) ? 'border-blue-500 bg-blue-500/15 text-white' : 'border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>
-            {s.name}{s.vehicleCode ? `（${s.vehicleCode}）` : ''}{s.deleted ? '［已移除］' : ''}
+            {s.name}{s.vehicleCode ? `（${s.vehicleCode}）` : ''}{s.deleted ? '［已刪除］' : !s.enabled ? '［已停用］' : ''}
           </button>
         ))}
         {!filteredSources.length ? <span className="text-sm text-zinc-500">沒有影像來源</span> : null}
@@ -301,7 +341,7 @@ export function VideoHistoryPage() {
             </div>
           </div>
 
-          <div ref={stageRef} className={`grid min-h-[20rem] flex-1 gap-2 ${gridColumns(playing.length || 1)}`}>
+          <div ref={stageRef} className={`grid min-h-[20rem] flex-1 gap-2 ${historyGrid(playing.length || 1)}`}>
             {playing.map((id) => (
               <div key={id} className="flex flex-col overflow-hidden rounded-xl border border-zinc-800">
                 <div className="flex items-center gap-2 bg-[#141416] px-3 py-1 text-xs">

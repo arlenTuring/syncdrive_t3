@@ -55,5 +55,5 @@ for i in $(seq 1 "$count"); do
     docker exec -d "$NAME" ffmpeg "${args[@]}" "rtsp://cam:$pass@127.0.0.1:8554/cam$i"
   fi
 done
-ip="$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || true)"
+ip="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || true)"
 echo "已啟動 $count 路測試攝影機（$seconds 秒）：rtsp://cam:***@${ip}:18554/cam1 …"

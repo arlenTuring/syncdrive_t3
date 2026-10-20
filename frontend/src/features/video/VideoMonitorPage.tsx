@@ -1,17 +1,16 @@
-import { HardDrive, MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { HardDrive, LayoutDashboard, MoreHorizontal, Plus } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
-import { formatBytes, videoApi, type Bootstrap, type Tab, type Tile } from './api';
-import { DefaultsDialog } from './DefaultsDialog';
-import { StorageDialog } from './StorageDialog';
-import { TileSettingsDialog } from './TileSettingsDialog';
-import { gridColumns } from './layout';
+import { videoApi, type Bootstrap, type Tab, type Tile } from './api';
+import { openVideoResources } from './history-link';
+import { CANVAS } from './layout';
+import { LayoutEditorDialog } from './LayoutEditorDialog';
+import { SourcePicker } from './SourcePicker';
 import { TileView } from './TileView';
 
 const PREF_KEY = 'vtms.video.monitor';
-const QUICK = [1, 4, 9, 12];
 
 function readPref(): { tabId?: string; audio?: string } {
   try {
@@ -28,14 +27,13 @@ function writePref(pref: { tabId?: string; audio?: string }) {
   }
 }
 
-type ShrinkPrompt = { tab: Tab; count: number; removed: Array<{ position: number; displayName: string | null }>; stopping: Array<{ name: string }> };
-
 /**
- * 事件管理模組 → 影像監控管理：使用者自建的監控標籤頁（每頁 1–12 格，每格都能用）。
+ * 即時影像監控：使用者自訂的監控標籤頁（每頁 1–12 格、自由版面），格子綁定既有來源後播放。
  *
- * - 標籤與格子是場站共用設定（存在後端）；目前所在標籤與開聲音的格子是個人偏好（只存在這台瀏覽器）。
- * - 只有目前標籤的格子會播放；切換標籤會釋放播放器，後端錄影照常。
- * - 錄影由伺服器持續進行，與這個頁面是否開著無關。
+ * - 版面與綁定存在後端，所有有權帳號看到相同版面；目前所在標籤頁與開聲音的格子是個人偏好（只存在這台瀏覽器）。
+ * - 平常監看時版面鎖定，要調整請按「編輯版面」；螢幕大小改變只等比例縮放整個畫布，不重排。
+ * - 只有目前標籤頁的格子會播放；切換會釋放播放器。錄影是來源的設定，與這個頁面無關。
+ * - 這裡不能建立攝影機連線或改錄影；來源在「影像資源管理」設定。
  */
 export function VideoMonitorPage() {
   const auth = useAuth();
@@ -43,19 +41,17 @@ export function VideoMonitorPage() {
   const [error, setError] = useState('');
   const [tabId, setTabId] = useState<string | undefined>(() => readPref().tabId);
   const [audioTile, setAudioTile] = useState<string | undefined>(() => readPref().audio);
-  const [zoomed, setZoomed] = useState<string | null>(null);
-  const [editingTile, setEditingTile] = useState<Tile | null>(null);
+  const [rebinding, setRebinding] = useState<Tile | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
-  const [showDefaults, setShowDefaults] = useState(false);
-  const [showStorage, setShowStorage] = useState(false);
-  const [shrink, setShrink] = useState<ShrinkPrompt | null>(null);
+  const [editor, setEditor] = useState<{ tab: Tab | null } | null>(null);
   const [deleting, setDeleting] = useState<Tab | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'success' | 'error'; id: number } | null>(null);
   const notify = useCallback((text: string, tone: 'success' | 'error') => setNotice((n) => ({ text, tone, id: (n?.id ?? 0) + 1 })), []);
-  const [customCount, setCustomCount] = useState('');
   const dragging = useRef<string | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState({ w: 0, h: 0 });
 
   const load = useCallback(async () => {
     try {
@@ -72,7 +68,7 @@ export function VideoMonitorPage() {
       cancelled = true;
     };
   }, []);
-  // 來源狀態（連線、錄影）變化與其他人修改設定：重新取得
+  // 來源狀態與其他人修改的版面：重新取得
   useEffect(() => subscribeDatasourceInvalidation((payload) => {
     if (payload.tags.includes('table:video_sources')) void load();
   }), [load]);
@@ -81,10 +77,20 @@ export function VideoMonitorPage() {
     const timer = window.setTimeout(() => setNotice(null), 3200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return undefined;
+    const update = () => setStage({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
 
   const tabs = useMemo(() => data?.tabs ?? [], [data]);
   const current = tabs.find((t) => t.id === tabId) ?? tabs[0] ?? null;
-  const sourceById = useMemo(() => new Map((data?.sources ?? []).map((s) => [s.id, s])), [data]);
+  const options = useMemo(() => data?.sources ?? [], [data]);
+  const optionById = useMemo(() => new Map(options.map((s) => [s.id, s])), [options]);
   useEffect(() => writePref({ tabId: current?.id, audio: audioTile }), [current?.id, audioTile]);
 
   const mutate = async (fn: () => Promise<unknown>, success?: string) => {
@@ -100,32 +106,19 @@ export function VideoMonitorPage() {
       setSaving(false);
     }
   };
-  const canConfigure = () => auth.require('events.video.configure');
+  const canConfigure = auth.can('events.video.configure');
+  const requireConfigure = () => auth.require('events.video.configure');
 
-  const addTab = () => canConfigure() && mutate(async () => {
-    const tab = await videoApi.createTab({ name: `監控 ${tabs.length + 1}`, tileCount: 4 });
-    setTabId(tab.id);
-    setRenaming(tab.id);
-  }, '已新增標籤');
-
-  const setTileCount = async (count: number) => {
-    if (!current || count === current.tileCount || !canConfigure()) return;
-    if (count < 1 || count > 12) return notify('每頁格數必須是 1–12', 'error');
-    if (count < current.tileCount) {
-      const impact = await videoApi.tileCountPreview(current.id, count);
-      if (impact.removedTiles.length || impact.stoppingRecordings.length) {
-        setShrink({ tab: current, count, removed: impact.removedTiles, stopping: impact.stoppingRecordings });
-        return;
-      }
-    }
-    await mutate(() => videoApi.updateTab(current.id, { tileCount: count, expectedVersion: current.version }));
+  const bind = (tile: Tile, sourceId: string | null) => {
+    if (!current || !requireConfigure()) return;
+    void mutate(() => videoApi.bindTile(current.id, tile.id, { expectedVersion: tile.version, sourceId }), sourceId ? undefined : '已清除這一格的來源');
   };
 
   const onDrop = (event: DragEvent, targetId: string) => {
     event.preventDefault();
     const from = dragging.current;
     dragging.current = null;
-    if (!from || from === targetId || !canConfigure()) return;
+    if (!from || from === targetId || !requireConfigure()) return;
     const ids = tabs.map((t) => t.id).filter((id) => id !== from);
     ids.splice(ids.indexOf(targetId), 0, from);
     void mutate(() => videoApi.reorderTabs(ids));
@@ -134,16 +127,22 @@ export function VideoMonitorPage() {
     const ids = tabs.map((t) => t.id);
     const i = ids.indexOf(tab.id);
     const j = i + delta;
-    if (j < 0 || j >= ids.length || !canConfigure()) return;
+    if (j < 0 || j >= ids.length || !requireConfigure()) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
     void mutate(() => videoApi.reorderTabs(ids));
   };
 
+  // 畫布依保存的長寬比等比例 fit 到可用區；格子座標依畫布換算，不依影片大小
+  const aspect = current?.canvasAspectRatio ?? 16 / 9;
+  const minW = 640;
+  const fitW = Math.max(minW, Math.min(stage.w, stage.h > 0 ? stage.h * aspect : stage.w));
+  const fitH = fitW / aspect;
   const storage = data?.storage;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-zinc-100">
       <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-1" role="tablist" aria-label="監控標籤">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-1" role="tablist" aria-label="監控標籤頁">
           {tabs.map((tab, index) => (
             <div
               key={tab.id}
@@ -158,7 +157,7 @@ export function VideoMonitorPage() {
                   autoFocus
                   defaultValue={tab.name}
                   maxLength={60}
-                  aria-label="標籤名稱"
+                  aria-label="標籤頁名稱"
                   onBlur={(e) => {
                     setRenaming(null);
                     const name = e.target.value.trim();
@@ -171,7 +170,7 @@ export function VideoMonitorPage() {
                   className="h-8 w-36 rounded bg-[#1b1d23] px-2 text-sm outline-none"
                 />
               ) : (
-                <button type="button" role="tab" aria-selected={tab.id === current?.id} onClick={() => setTabId(tab.id)} onDoubleClick={() => canConfigure() && setRenaming(tab.id)} className="h-8 px-3 text-sm">
+                <button type="button" role="tab" aria-selected={tab.id === current?.id} onClick={() => setTabId(tab.id)} onDoubleClick={() => requireConfigure() && setRenaming(tab.id)} className="h-8 px-3 text-sm">
                   {tab.name}
                   <span className="ml-1.5 text-xs text-zinc-500">{tab.tileCount} 格</span>
                 </button>
@@ -182,11 +181,12 @@ export function VideoMonitorPage() {
               {menu === tab.id ? (
                 <div role="menu" className="absolute top-full left-0 z-30 mt-1 w-40 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] py-1 text-sm shadow-xl">
                   {[
-                    ['改名', () => canConfigure() && setRenaming(tab.id)],
-                    ['複製', () => canConfigure() && mutate(async () => setTabId((await videoApi.duplicateTab(tab.id)).id), '已複製標籤（共用相同來源，不複製錄影）')],
+                    ['編輯版面', () => requireConfigure() && setEditor({ tab })],
+                    ['改名', () => requireConfigure() && setRenaming(tab.id)],
+                    ['複製', () => requireConfigure() && mutate(async () => setTabId((await videoApi.duplicateTab(tab.id)).id), '已複製標籤頁（引用相同來源，不複製來源或錄影）')],
                     ['往左移', () => move(tab, -1), index === 0],
                     ['往右移', () => move(tab, 1), index === tabs.length - 1],
-                    ['刪除', () => canConfigure() && setDeleting(tab)],
+                    ['刪除', () => requireConfigure() && setDeleting(tab)],
                   ].map(([label, fn, disabled]) => (
                     <button key={label as string} type="button" role="menuitem" disabled={Boolean(disabled)} onClick={() => { setMenu(null); (fn as () => void)(); }} className={`block w-full px-3 py-1.5 text-left hover:bg-white/5 disabled:opacity-40 ${label === '刪除' ? 'text-red-300' : ''}`}>
                       {label as string}
@@ -196,86 +196,116 @@ export function VideoMonitorPage() {
               ) : null}
             </div>
           ))}
-          <button type="button" onClick={() => void addTab()} aria-label="新增標籤" className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-white">
-            <Plus className="size-4" />新增標籤
+          <button type="button" onClick={() => requireConfigure() && setEditor({ tab: null })} aria-label="新增監控標籤頁" className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-white">
+            <Plus className="size-4" />新增標籤頁
           </button>
         </div>
-        <span className="shrink-0 text-xs text-zinc-500" aria-live="polite">{saving ? '儲存中…' : '設定已儲存'}</span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-zinc-400">每頁格數</span>
-        {QUICK.map((n) => (
-          <button key={n} type="button" onClick={() => void setTileCount(n)} aria-pressed={current?.tileCount === n} className={`rounded-lg px-3 py-1 text-sm ${current?.tileCount === n ? 'bg-blue-600 text-white' : 'border border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>
-            {n}
+        {current ? (
+          <button type="button" onClick={() => requireConfigure() && setEditor({ tab: current })} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5">
+            <LayoutDashboard className="size-3.5" />編輯版面
           </button>
-        ))}
-        <input
-          value={customCount}
-          inputMode="numeric"
-          maxLength={2}
-          aria-label="自訂格數（1–12）"
-          placeholder="1–12"
-          onChange={(e) => setCustomCount(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && customCount) {
-              void setTileCount(Number(customCount));
-              setCustomCount('');
-            }
-          }}
-          className="h-8 w-16 rounded-lg bg-[#222831] px-2 text-sm outline-none focus:ring-1 focus:ring-sky-500"
-        />
-        <div className="ml-auto flex items-center gap-2">
-          {storage ? (
-            <button type="button" onClick={() => setShowStorage(true)} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${storage.paused ? 'border-amber-500/40 text-amber-200' : 'border-zinc-700 text-zinc-300'} hover:bg-white/5`}>
-              <HardDrive className="size-3.5" />
-              {storage.paused ? `錄影暫停：${storage.paused.reason}` : `錄影用量 ${storage.usagePct}%（${formatBytes(storage.usedBytes)}）${storage.estimatedDays !== null ? `・可存約 ${storage.estimatedDays} 天` : ''}`}
-            </button>
-          ) : null}
-          <button type="button" onClick={() => canConfigure() && setShowDefaults(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5">
-            <SlidersHorizontal className="size-3.5" />全域來源預設
+        ) : null}
+        {storage ? (
+          <button
+            type="button"
+            onClick={() => openVideoResources()}
+            title="錄影儲存設定在「影像資源管理」"
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${storage.paused ? 'border-amber-500/40 text-amber-200' : 'border-zinc-700 text-zinc-300'} hover:bg-white/5`}
+          >
+            <HardDrive className="size-3.5" />
+            {storage.paused ? `錄影暫停：${storage.paused.reason}` : `錄影用量 ${storage.usagePct}%`}
           </button>
-        </div>
+        ) : null}
+        <span className="shrink-0 text-xs text-zinc-500" aria-live="polite">{saving ? '儲存中…' : ''}</span>
       </div>
 
       {error ? <ErrorLine text={`載入失敗：${error}`} /> : null}
       {!data && !error ? <p className="py-16 text-center text-zinc-500">載入中…</p> : null}
+      {data && !current ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
+          <p>還沒有監控標籤頁</p>
+          <PrimaryButton onClick={() => requireConfigure() && setEditor({ tab: null })}>新增標籤頁</PrimaryButton>
+        </div>
+      ) : null}
       {current ? (
-        <div className={`grid min-h-0 flex-1 auto-rows-max gap-2 overflow-auto ${gridColumns(current.tileCount)}`}>
-          {current.tiles.map((tile) => (
-            <TileView
-              key={tile.id}
-              tile={tile}
-              source={tile.sourceId ? sourceById.get(tile.sourceId) : undefined}
-              active
-              zoomed={zoomed === tile.id}
-              audio={audioTile === tile.id}
-              onZoom={() => setZoomed(zoomed === tile.id ? null : tile.id)}
-              onAudio={() => setAudioTile(audioTile === tile.id ? undefined : tile.id)}
-              onSettings={() => canConfigure() && setEditingTile(tile)}
-            />
-          ))}
+        <div ref={stageRef} className="min-h-0 flex-1 overflow-auto">
+          <div className="relative mx-auto" style={{ width: fitW, height: fitH }} aria-label={`${current.name} 監控畫面`}>
+            {current.tiles.map((tile) => (
+              <div
+                key={tile.id}
+                className="absolute p-1"
+                style={{ left: `${(tile.x / CANVAS) * 100}%`, top: `${(tile.y / CANVAS) * 100}%`, width: `${(tile.w / CANVAS) * 100}%`, height: `${(tile.h / CANVAS) * 100}%` }}
+              >
+                <TileView
+                  tile={tile}
+                  source={tile.sourceId ? optionById.get(tile.sourceId) : undefined}
+                  options={options}
+                  active
+                  audio={audioTile === tile.id}
+                  canConfigure={canConfigure}
+                  onAudio={() => setAudioTile(audioTile === tile.id ? undefined : tile.id)}
+                  onBind={(sourceId) => bind(tile, sourceId)}
+                  onSettings={() => requireConfigure() && setRebinding(tile)}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
-      {editingTile && current && data ? (
-        <TileSettingsDialog tab={current} tile={editingTile} sources={data.sources} onClose={() => setEditingTile(null)} onSaved={() => { setEditingTile(null); void load(); notify('已儲存格子設定', 'success'); }} />
+      {rebinding && current ? (
+        <RebindDialog
+          tile={rebinding}
+          options={options}
+          onClose={() => setRebinding(null)}
+          onPick={(sourceId) => {
+            const tile = rebinding;
+            setRebinding(null);
+            bind(tile, sourceId);
+          }}
+        />
       ) : null}
-      {showDefaults && data ? <DefaultsDialog defaults={data.defaults} settings={data.settings} tabs={tabs} currentTab={current} onClose={() => setShowDefaults(false)} onChanged={() => void load()} /> : null}
-      {showStorage && storage ? <StorageDialog status={storage} timeZone="Asia/Taipei" onClose={() => setShowStorage(false)} onChanged={(next) => { setData((d) => (d ? { ...d, storage: next } : d)); notify('已儲存錄影設定', 'success'); }} /> : null}
-      {shrink ? (
-        <Dialog title="減少格數" onClose={() => setShrink(null)} footer={<><GhostButton onClick={() => setShrink(null)}>取消</GhostButton><PrimaryButton onClick={() => { const s = shrink; setShrink(null); void mutate(() => videoApi.updateTab(s.tab.id, { tileCount: s.count, expectedVersion: s.tab.version, confirm: true })); }}>確認減少</PrimaryButton></>}>
-          <p className="text-sm text-zinc-300">改成 {shrink.count} 格後，這些格子會從「{shrink.tab.name}」移除（不刪來源、不刪錄影）：</p>
-          <ul className="mt-2 list-disc pl-5 text-sm text-zinc-200">{shrink.removed.map((r) => <li key={r.position}>第 {r.position + 1} 格{r.displayName ? `：${r.displayName}` : ''}</li>)}</ul>
-          {shrink.stopping.length ? <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-100">這些來源沒有其他格子要求錄影，會停止新的錄影（已錄的保留到期）：{shrink.stopping.map((s) => s.name).join('、')}</p> : null}
-        </Dialog>
+      {editor ? (
+        <LayoutEditorDialog
+          tab={editor.tab}
+          options={options}
+          onClose={() => setEditor(null)}
+          onSaved={(saved) => {
+            setEditor(null);
+            setTabId(saved.id);
+            void load();
+            notify(editor.tab ? '已儲存版面' : '已新增標籤頁', 'success');
+          }}
+        />
       ) : null}
       {deleting ? (
-        <Dialog title="刪除監控標籤" onClose={() => setDeleting(null)} footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => { const t = deleting; setDeleting(null); void mutate(() => videoApi.deleteTab(t.id, t.version), '已刪除標籤'); }}>刪除</PrimaryButton></>}>
-          <p className="text-sm text-zinc-300">確定刪除「{deleting.name}」？只移除這一頁的設定，不刪影像來源，也不刪已錄的影片；若某來源沒有其他格子要求錄影，會停止新的錄影。</p>
+        <Dialog title="刪除監控標籤頁" onClose={() => setDeleting(null)} footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => { const t = deleting; setDeleting(null); void mutate(() => videoApi.deleteTab(t.id, t.version), '已刪除標籤頁'); }}>刪除</PrimaryButton></>}>
+          <p className="text-sm text-zinc-300">確定刪除「{deleting.name}」？只移除這個版面，不刪影像來源，也不影響任何來源的錄影。</p>
         </Dialog>
       ) : null}
       {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
     </div>
+  );
+}
+
+/** 已綁定格子的設定：只能重新選來源或清除綁定；取消沒有任何副作用 */
+function RebindDialog({ tile, options, onClose, onPick }: { tile: Tile; options: import('./api').SourceOption[]; onClose: () => void; onPick: (sourceId: string | null) => void }) {
+  const [picked, setPicked] = useState<string | null>(tile.sourceId);
+  const current = options.find((o) => o.id === tile.sourceId);
+  return (
+    <Dialog
+      title={`第 ${tile.position + 1} 格的來源`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={() => onPick(null)} className="mr-auto text-sm text-zinc-400 hover:text-red-300">清除綁定</button>
+          <GhostButton onClick={onClose}>取消</GhostButton>
+          <PrimaryButton onClick={() => (picked && picked !== tile.sourceId ? onPick(picked) : onClose())} disabled={!picked}>套用</PrimaryButton>
+        </>
+      }
+    >
+      <p className="mb-2 text-xs text-zinc-400">目前：{current ? current.name : tile.sourceId ? '來源已刪除' : '未設定'}。換來源不改版面，也不影響任何來源的錄影；連線與錄影請到「影像資源管理」設定。</p>
+      <SourcePicker options={options} value={picked} onPick={setPicked} className="w-full" />
+    </Dialog>
   );
 }

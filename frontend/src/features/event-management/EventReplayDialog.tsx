@@ -36,7 +36,8 @@ export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; 
         setPlayback(pb);
         if (pb.permissions.video && pb.event.vehicleCode) {
           // 以當時的來源版本找這台車的影像
-          void videoApi.sources(true).then(async (sources) => {
+          // 只用安全來源摘要（含已刪除但仍有錄影的來源），不需要來源連線權限
+          void videoApi.sourceOptions(true).then(async ({ items: sources }) => {
             const ids = sources.map((s) => s.id).slice(0, 12);
             if (!ids.length) return setManifests([]);
             const avail = await videoApi.availability(ids, pb.window.from, pb.window.to);
@@ -62,7 +63,7 @@ export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; 
   const tz = playback?.timeZone ?? 'Asia/Taipei';
   const openHistory = () => {
     if (!playback) return;
-    openVideoHistory({ from: playback.window.from, to: playback.window.to, vehicleCode: playback.event.vehicleCode, sourceIds: manifests?.map((m) => m.sourceId), at: playback.window.from });
+    openVideoHistory({ from: playback.window.from, to: playback.window.to, vehicleCode: playback.event.vehicleCode, sourceIds: manifests?.map((m) => m.sourceId), at: playback.window.from, eventId: playback.event.id });
     onOpenHistory?.();
     onClose();
   };
@@ -96,7 +97,7 @@ export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; 
               <h3 className="text-sm font-medium">事件影像</h3>
               {drift !== null ? <span className="text-xs text-zinc-500">與軌跡誤差 {drift} ms</span> : null}
               {playback?.permissions.video && playback.event.vehicleCode ? (
-                <button type="button" onClick={openHistory} className="ml-auto inline-flex items-center gap-1 text-xs text-sky-300 hover:underline"><Film className="size-3.5" />在歷史影像查詢開啟</button>
+                <button type="button" onClick={openHistory} className="ml-auto inline-flex items-center gap-1 text-xs text-sky-300 hover:underline"><Film className="size-3.5" />在影像資源管理的歷史錄影開啟</button>
               ) : null}
             </div>
             {!playback ? null : !playback.permissions.video ? (

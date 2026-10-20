@@ -6,19 +6,25 @@ export type Protocol = 'rtsp' | 'rtsps' | 'rtmp' | 'rtmps' | 'http' | 'https' | 
 export type RecordingProfile = 'original' | 'balanced' | 'saving';
 
 export type ActualStatus = {
-  state?: 'online' | 'connecting' | 'idle' | 'error' | 'disabled' | 'media_unavailable';
+  state?: 'online' | 'offline' | 'unknown' | 'connecting' | 'error' | 'disabled' | 'media_unavailable';
   recording?: boolean;
   desiredRecording?: boolean;
   reason?: string | null;
   tracks?: string[];
   readers?: number;
-  checkedAt?: number;
+  checkedAt?: number | null;
+  /** 狀態太久沒更新：不能當成目前在線 */
+  stale?: boolean;
 };
 
 export type VideoSourceItem = {
   id: string;
   name: string;
   enabled: boolean;
+  /** 來源是否儲存錄影（錄影以來源為準） */
+  recordingEnabled: boolean;
+  /** 來源分類標籤（與監控標籤頁無關） */
+  tags: string[];
   version: number;
   recordingProfile: RecordingProfile;
   revisionId: string | null;
@@ -28,15 +34,33 @@ export type VideoSourceItem = {
   cameraId: string | null;
   location: string | null;
   timestampBasis: 'center' | 'source';
-  usage: { tiles: number; recording: number };
+  usage: { tiles: number; tabs: number };
   desiredRecording: boolean;
   actualStatus: ActualStatus;
   deleted?: boolean;
-  usedBy?: Array<{ tab_id: string; tab_name: string; position: number; display_name: string | null; recording_requested: boolean }>;
+  usedBy?: Array<{ tab_id: string; tab_name: string; tile_id: string; position: number; display_name: string | null }>;
+  settingAccepted?: boolean;
 };
 
-export type Tile = { id: string; position: number; sourceId: string | null; displayName: string | null; recordingRequested: boolean; enabled: boolean; templateVars: Record<string, string>; version: number };
-export type Tab = { id: string; name: string; position: number; tileCount: number; version: number; tiles: Tile[] };
+/** 安全來源選項（不含任何連線資訊）：監控格子選單、歷史查詢 */
+export type SourceOption = {
+  id: string;
+  name: string;
+  tags: string[];
+  vehicleCode: string | null;
+  location: string | null;
+  enabled: boolean;
+  deleted: boolean;
+  state: 'online' | 'offline' | 'unknown' | 'connecting' | 'error' | 'disabled' | 'deleted' | 'media_unavailable';
+};
+
+export type SourcePage = { page: number; pageSize: number; total: number; items: VideoSourceItem[] };
+export type SourceQuery = { page?: number; pageSize?: number; q?: string; tags?: string[]; enabled?: 'true' | 'false' | ''; online?: '' | 'online' | 'offline' | 'unknown' | 'disabled' };
+
+/** 格子：0–10000 正規化座標（與螢幕像素無關） */
+export type Tile = { id: string; position: number; sourceId: string | null; displayName: string | null; x: number; y: number; w: number; h: number; version: number };
+export type Tab = { id: string; name: string; position: number; tileCount: number; canvasAspectRatio: number; canvas: number; version: number; tiles: Tile[] };
+export type LayoutRectInput = { tileId?: string | null; x: number; y: number; w: number; h: number };
 
 export type Defaults = { protocol: Protocol; host: string | null; port: number | null; pathPrefix: string | null; pathTemplate: string | null; username: string | null; hasPassword: boolean; recordingDefault: boolean; version: number };
 export type Settings = { allowedNetworks: string[]; maxTabs: number; maxSources: number; version: number };
@@ -88,7 +112,8 @@ export type Capabilities = {
   checkedAt: number;
 };
 
-export type Bootstrap = { tabs: Tab[]; sources: VideoSourceItem[]; defaults: Defaults; settings: Settings; storage: StorageStatus | null };
+/** 即時影像監控初始資料：沒有任何連線資訊 */
+export type Bootstrap = { tabs: Tab[]; sources: SourceOption[]; storage: { paused: { reason: string } | null; usagePct: number; recordingSources: number } | null };
 
 export type ConnectionInput = {
   mode: 'fields' | 'url';
@@ -106,16 +131,13 @@ export type LiveSession = { sourceId: string; expiresAt: number; hlsUrl: string;
 export type SourceTest = { id: string | null; status: 'connecting' | 'ready' | 'failed'; error: string | null; tracks: string[]; maskedUrl: string; expiresAt?: number; hlsUrl: string | null; whepUrl: string | null };
 
 export type ApplyItem = {
-  tileId: string;
-  tabId: string;
-  tabName: string;
-  position: number;
-  displayName: string | null;
-  action: 'skip' | 'create' | 'replace' | 'error';
+  sourceId: string;
+  name: string;
+  version: number;
+  action: 'same' | 'update' | 'error';
   before: string | null;
   after: string | null;
   reason: string | null;
-  sharedWith: { sourceId: string; name: string } | null;
 };
 
 export type TimelineItem = { kind: 'available' | 'gap' | 'expired' | 'failed' | 'recording'; from: number; to: number; protected?: boolean; reason?: string | null };
@@ -144,22 +166,30 @@ const v = (path: string, params?: Record<string, string | number | boolean | und
 
 export const videoApi = {
   bootstrap: (signal?: AbortSignal) => v('/bootstrap', undefined, signal) as Promise<Bootstrap>,
-  createTab: (body: { name: string; tileCount: number }) => send<Tab>('POST', '/tabs', body),
-  updateTab: (id: string, body: { name?: string; tileCount?: number; expectedVersion: number; confirm?: boolean }) => send<Tab>('PATCH', `/tabs/${id}`, body),
+  tabs: (signal?: AbortSignal) => v('/tabs', undefined, signal) as Promise<Tab[]>,
+  createTab: (body: { name: string; tiles: LayoutRectInput[]; canvasAspectRatio: number }) => send<Tab>('POST', '/tabs', body),
+  updateTab: (id: string, body: { name: string; expectedVersion: number }) => send<Tab>('PATCH', `/tabs/${id}`, body),
+  saveLayout: (id: string, body: { expectedVersion: number; name?: string; canvasAspectRatio?: number; tiles: LayoutRectInput[] }) => send<Tab>('PUT', `/tabs/${id}/layout`, body),
+  bindTile: (tabId: string, tileId: string, body: { expectedVersion: number; sourceId: string | null }) => send<Tab>('PATCH', `/tabs/${tabId}/tiles/${tileId}/source`, body),
   deleteTab: (id: string, version: number) => send<{ deleted: boolean }>('DELETE', `/tabs/${id}?expectedVersion=${version}`),
   reorderTabs: (ids: string[]) => send<Tab[]>('POST', '/tabs/reorder', { ids }),
   duplicateTab: (id: string) => send<Tab>('POST', `/tabs/${id}/duplicate`),
-  tileCountPreview: (id: string, tileCount: number) => v(`/tabs/${id}/tile-count-preview`, { tileCount }) as Promise<{ removedTiles: Array<{ tileId: string; position: number; displayName: string | null; sourceId: string | null }>; stoppingRecordings: Array<{ sourceId: string; name: string }> }>,
-  saveTiles: (id: string, body: { expectedVersion: number; tiles: Array<Partial<Tile> & { position: number }> }) => send<Tab>('PUT', `/tabs/${id}/tiles`, body),
-  sources: (includeDeleted = false) => v('/sources', { includeDeleted }) as Promise<VideoSourceItem[]>,
+  sources: (query: SourceQuery, signal?: AbortSignal) =>
+    v('/sources', { page: query.page, pageSize: query.pageSize, q: query.q || undefined, tags: query.tags?.length ? query.tags.join(',') : undefined, enabled: query.enabled || undefined, online: query.online || undefined }, signal) as Promise<SourcePage>,
+  sourceTags: (signal?: AbortSignal) => v('/source-tags', undefined, signal) as Promise<Array<{ tag: string; count: number }>>,
+  sourceOptions: (includeDeleted = false, signal?: AbortSignal) => v('/source-options', { includeDeleted: includeDeleted || undefined }, signal) as Promise<{ items: SourceOption[]; total: number }>,
   source: (id: string) => v(`/sources/${id}`) as Promise<VideoSourceItem>,
   createSource: (body: Record<string, unknown>) => send<VideoSourceItem>('POST', '/sources', body),
   updateSource: (id: string, body: Record<string, unknown>) => send<VideoSourceItem>('PATCH', `/sources/${id}`, body),
+  setSourceEnabled: (id: string, body: { expectedVersion: number; enabled: boolean }) => send<VideoSourceItem>('PATCH', `/sources/${id}/enabled`, body),
+  duplicateSource: (id: string, body: { expectedVersion: number; requestId: string }) => send<VideoSourceItem>('POST', `/sources/${id}/duplicate`, body),
+  deleteImpact: (id: string) => v(`/sources/${id}/delete-impact`) as Promise<{ sourceId: string; name: string; tabs: number; tiles: number; stopsRecording: boolean }>,
   deleteSource: (id: string, version: number) => send<{ deleted: boolean }>('DELETE', `/sources/${id}?expectedVersion=${version}`),
+  settings: () => v('/settings') as Promise<Settings>,
   defaults: () => v('/defaults') as Promise<Defaults>,
   updateDefaults: (body: Record<string, unknown>) => send<Defaults>('PUT', '/defaults', body),
   previewApply: (body: Record<string, unknown>) => send<{ defaultsVersion: number; items: ApplyItem[] }>('POST', '/defaults/preview-apply', body),
-  apply: (body: Record<string, unknown>) => send<{ applied: Array<{ tileId: string; sourceId: string; created: boolean }>; skipped: number }>('POST', '/defaults/apply', body),
+  apply: (body: Record<string, unknown>) => send<{ applied: Array<{ sourceId: string }>; unchanged: number }>('POST', '/defaults/apply', body),
   updateSettings: (body: { allowedNetworks: string[]; expectedVersion: number }) => send<Settings>('PUT', '/settings', body),
   createTest: (body: { connection?: ConnectionInput; sourceId?: string }) => send<SourceTest>('POST', '/source-tests', body),
   getTest: (id: string) => v(`/source-tests/${id}`) as Promise<SourceTest>,

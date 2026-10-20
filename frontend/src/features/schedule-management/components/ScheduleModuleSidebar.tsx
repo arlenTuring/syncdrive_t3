@@ -35,7 +35,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShellView } from '../types';
-import { isEventsView, isLogsView, isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS } from '../types';
+import { isEventsView, isLogsView, isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS, permissionSatisfied } from '../types';
 import type { ModuleDashboardPage } from '../utils/moduleDashboardPages';
 import {
   moduleDashboardViewId,
@@ -60,7 +60,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'event-list': BellRing,
   'event-history': History,
   'video-monitor': Video,
-  'video-history': Film,
+  'video-resources': Film,
   'log-system': ScrollText,
   'log-permissions': KeyRound,
   'log-operations': ClipboardList,
@@ -299,7 +299,7 @@ export function ScheduleModuleSidebar({
           const GroupIcon = groupIcon(group.id);
           const dashPages = permissions.includes('dashboard.dashboard.view') ? moduleDashboardPages.filter((page) => page.moduleId === group.id) : [];
           const visibleItems = group.items?.filter(
-            (item) => !item.requiredPermission || permissions.includes(item.requiredPermission),
+            (item) => !item.requiredPermission || permissionSatisfied(item.requiredPermission, (p) => permissions.includes(p)),
           ) ?? [];
           if (group.items && visibleItems.length === 0 && dashPages.length === 0) return null;
           const hasBuiltinItems = visibleItems.length > 0;

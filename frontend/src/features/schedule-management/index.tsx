@@ -40,8 +40,8 @@ import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
 import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
 import { EventListPage } from '../event-management/EventListPage';
 import { VideoMonitorPage } from '../video/VideoMonitorPage';
-import { OPEN_VIDEO_HISTORY_EVENT } from '../video/history-link';
-import { VideoHistoryPage } from '../video/VideoHistoryPage';
+import { OPEN_VIDEO_RESOURCES_EVENT } from '../video/history-link';
+import { VideoResourcesPage } from '../video/VideoResourcesPage';
 import { LogPage } from '../log-management/LogPage';
 import { isEventsView, isLogsView } from './types';
 import { useAuth } from '../access-control/AuthContext';
@@ -50,7 +50,7 @@ import {
   OPEN_VEHICLE_MODELS_EVENT,
   type OpenVehicleModelsDetail,
 } from '../../lib/vehicleModelNavigation';
-import { SIDEBAR_MODULE_GROUPS, VIEW_PERMISSIONS } from './types';
+import { SIDEBAR_MODULE_GROUPS, VIEW_PERMISSIONS, permissionSatisfied } from './types';
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
 import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
 import { AttachModuleDashboardDialog } from './components/AttachModuleDashboardDialog';
@@ -204,7 +204,8 @@ function useWorkspaceChrome(
 export default function ScheduleManagementApp({
   initialView = 'shift-records',
 }: ScheduleManagementAppProps) {
-  const [view, setView] = useState<string>(initialView);
+  // 舊的歷史影像頁 ID（書籤、偏好）導向影像資源管理
+  const [view, setView] = useState<string>(initialView === 'video-history' ? 'video-resources' : initialView);
   const auth = useAuth(); const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === 'map');
   const [adminMode] = useAdminModePreference();
@@ -255,12 +256,13 @@ export default function ScheduleManagementApp({
     return () => window.removeEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
   }, []);
 
-  // 事件回放「在歷史影像查詢開啟」：切到歷史影像頁（參數由該頁讀取）
+  // 事件回放、舊的歷史影像連結、即時監控的容量提示：切到影像資源管理（帶條件時由該頁開歷史錄影子畫面）
   useEffect(() => {
-    const onOpen = () => setView('video-history');
-    window.addEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_VIDEO_HISTORY_EVENT, onOpen);
+    const onOpen = () => setView('video-resources');
+    window.addEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
   }, []);
+
 
   useEffect(() => {
     if (!modulePagesSyncedRef.current) return;
@@ -286,7 +288,7 @@ export default function ScheduleManagementApp({
     onOpenSystemFoundation: () => { if (auth.require('system.health.view')) setView('system-foundation'); },
   };
   const requiredPermission = parseModuleDashboardViewId(view) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[view as ShellView];
-  const viewAllowed = !requiredPermission || auth.can(requiredPermission);
+  const viewAllowed = !requiredPermission || permissionSatisfied(requiredPermission, auth.can);
 
   const scheduleContent = (
     <>
@@ -301,7 +303,7 @@ export default function ScheduleManagementApp({
     <div className="flex h-full min-h-0 w-full bg-black">
       <ScheduleModuleSidebar
         activeView={view}
-        onViewChange={(next) => { const required = parseModuleDashboardViewId(next) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[next as ShellView]; if (!required || auth.require(required)) setView(next); }}
+        onViewChange={(next) => { const required = parseModuleDashboardViewId(next) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[next as ShellView]; if (!required || permissionSatisfied(required, auth.can) || auth.require(required.split('|')[0])) setView(next); }}
         adminMode={adminMode}
         moduleDashboardPages={modulePages}
         onAddModuleDashboard={setAttachModuleId}
@@ -448,7 +450,7 @@ export default function ScheduleManagementApp({
               {view === 'event-list' ? <EventListPage key="live" mode="live" /> : null}
               {view === 'event-history' ? <EventListPage key="history" mode="history" /> : null}
               {view === 'video-monitor' ? <VideoMonitorPage /> : null}
-              {view === 'video-history' ? <VideoHistoryPage /> : null}
+              {view === 'video-resources' ? <VideoResourcesPage /> : null}
               {view === 'log-system' ? <LogPage key="system" category="system" /> : null}
               {view === 'log-permissions' ? <LogPage key="permissions" category="permissions" /> : null}
               {view === 'log-operations' ? <LogPage key="operations" category="operations" /> : null}

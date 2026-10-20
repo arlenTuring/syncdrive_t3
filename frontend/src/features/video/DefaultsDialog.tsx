@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { SiteSelect } from '../../components/SiteSelect';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/dialogs';
-import { videoApi, type ApplyItem, type Defaults, type Protocol, type Settings, type Tab } from './api';
+import { videoApi, type ApplyItem, type Defaults, type Protocol, type Settings } from './api';
 
 const field = 'h-10 w-full rounded-lg bg-[#262a33] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500';
-const ACTION_LABEL: Record<ApplyItem['action'], string> = { create: '建立來源', replace: '改綁新來源', skip: '略過', error: '無法套用' };
+const ACTION_LABEL: Record<ApplyItem['action'], string> = { update: '更新連線', same: '不需變更', error: '無法套用' };
 
 /**
- * 全域來源預設與批次套用。
- * - 「儲存全域預設」只影響之後新建的來源；「套用到既有格子」才修改現有格子，套用前先看變更前後。
- * - 預設只填尚未設定的格子；勾選「覆蓋已自訂的格子」才會改綁已設定的格子（不修改共用來源本身）。
- * - 進階：影像連線範圍（允許的攝影機網段／主機）。
+ * 影像資源管理 › 進階設定：全域來源預設、批次套用到來源、影像連線範圍。
+ * - 「儲存全域預設」只影響之後新建的來源，不會自動改既有連線。
+ * - 「套用到來源」先預覽每個來源的變更前後，明確按下才修改（有變化的來源建立新版本）。
+ * - 樣板只允許白名單變數，密碼只在後端解開。
  */
-export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, onChanged }: { defaults: Defaults; settings: Settings; tabs: Tab[]; currentTab: Tab | null; onClose: () => void; onChanged: () => void }) {
+export function DefaultsDialog({ defaults, settings, selectedSourceIds, tagOptions, onClose, onChanged }: { defaults: Defaults; settings: Settings; selectedSourceIds: string[]; tagOptions: string[]; onClose: () => void; onChanged: () => void }) {
   const [form, setForm] = useState({
     protocol: defaults.protocol,
     host: defaults.host ?? '',
@@ -21,12 +21,10 @@ export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, 
     pathTemplate: defaults.pathTemplate ?? '',
     username: defaults.username ?? '',
     password: '',
-    recordingDefault: defaults.recordingDefault,
   });
   const [version, setVersion] = useState(defaults.version);
-  const [scope, setScope] = useState<'tab' | 'tiles' | 'all'>('tab');
-  const [picked, setPicked] = useState<string[]>([]);
-  const [overwrite, setOverwrite] = useState(false);
+  const [scope, setScope] = useState<'sources' | 'tags' | 'all'>(selectedSourceIds.length ? 'sources' : 'tags');
+  const [pickedTags, setPickedTags] = useState<string[]>([]);
   const [preview, setPreview] = useState<{ defaultsVersion: number; items: ApplyItem[] } | null>(null);
   const [networks, setNetworks] = useState(settings.allowedNetworks.join('\n'));
   const [busy, setBusy] = useState(false);
@@ -48,19 +46,20 @@ export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, 
   };
   const saveDefaults = () =>
     run(async () => {
-      const next = await videoApi.updateDefaults({ ...form, port: form.port || null, password: form.password || undefined, expectedVersion: version });
+      const next = await videoApi.updateDefaults({ ...form, recordingDefault: defaults.recordingDefault, port: form.port || null, password: form.password || undefined, expectedVersion: version });
       setVersion(next.version);
       set({ password: '' });
       setPreview(null);
       setInfo('已儲存全域預設（只影響之後新建的來源）');
       onChanged();
     });
-  const doPreview = () => run(async () => setPreview(await videoApi.previewApply({ scope, tabId: currentTab?.id, tileIds: scope === 'tiles' ? picked : undefined, overwrite })));
+  const scopeBody = () => ({ scope, sourceIds: scope === 'sources' ? selectedSourceIds : undefined, tags: scope === 'tags' ? pickedTags : undefined });
+  const doPreview = () => run(async () => setPreview(await videoApi.previewApply(scopeBody())));
   const doApply = () =>
     run(async () => {
       if (!preview) return;
-      const result = await videoApi.apply({ scope, tabId: currentTab?.id, tileIds: scope === 'tiles' ? picked : undefined, overwrite, defaultsVersion: preview.defaultsVersion });
-      setInfo(`已套用 ${result.applied.length} 格（略過 ${result.skipped} 格）；連線由後端依序套用，格子上會顯示連線狀態`);
+      const result = await videoApi.apply({ ...scopeBody(), defaultsVersion: preview.defaultsVersion });
+      setInfo(`已更新 ${result.applied.length} 個來源的連線（${result.unchanged} 個不需變更）；連線由背景依序套用，清單會顯示實際狀態`);
       setPreview(null);
       onChanged();
     });
@@ -72,7 +71,7 @@ export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, 
     });
 
   return (
-    <Dialog title="全域來源預設" width="max-w-4xl" onClose={busy ? undefined : onClose} footer={<GhostButton onClick={onClose} disabled={busy}>關閉</GhostButton>}>
+    <Dialog title="全域來源預設與連線範圍" width="max-w-4xl" onClose={busy ? undefined : onClose} footer={<GhostButton onClick={onClose} disabled={busy}>關閉</GhostButton>}>
       <section className="space-y-3">
         <div className="grid grid-cols-[8rem_minmax(0,1fr)_6rem] gap-2">
           <label className="flex flex-col gap-1 text-xs text-zinc-400">協定
@@ -99,44 +98,37 @@ export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, 
             <input className={field} type="password" value={form.password} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" />
           </label>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.recordingDefault} onChange={(e) => set({ recordingDefault: e.target.checked })} className="accent-blue-600" />
-          新來源預設勾選「儲存錄影」
-        </label>
         <div className="flex justify-end">
           <PrimaryButton onClick={() => void saveDefaults()} disabled={busy}>儲存全域預設</PrimaryButton>
         </div>
       </section>
 
       <section className="mt-6 space-y-3 border-t border-zinc-800 pt-5">
-        <h3 className="text-sm font-medium">套用到既有格子</h3>
-        <p className="text-xs text-zinc-400">每一格依它的樣板變數（第幾格＝{'{index}'}）算出路徑，可再到各格修改最終路徑。相同連線的格子會共用同一個來源，只錄一份。</p>
+        <h3 className="text-sm font-medium">套用到來源</h3>
+        <p className="text-xs text-zinc-400">依每個來源的載具（{'{vehicleCode}'}）、攝影機識別（{'{cameraId}'}）與在這批中的順序（{'{index}'}）算出路徑；先預覽，確認後才修改。</p>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'tab'} onChange={() => setScope('tab')} className="accent-blue-600" />目前標籤（{currentTab?.name ?? '—'}）</label>
-          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'tiles'} onChange={() => setScope('tiles')} className="accent-blue-600" />勾選格子</label>
-          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} className="accent-blue-600" />全部標籤（{tabs.length} 頁）</label>
-          <label className="flex items-center gap-1.5"><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} className="accent-blue-600" />覆蓋已自訂的格子</label>
-          <button type="button" onClick={() => void doPreview()} disabled={busy || (scope !== 'all' && !currentTab) || (scope === 'tiles' && !picked.length)} className="ml-auto rounded-lg border border-zinc-600 px-3 py-1.5 hover:bg-white/5 disabled:opacity-50">預覽變更</button>
+          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'sources'} onChange={() => setScope('sources')} disabled={!selectedSourceIds.length} className="accent-blue-600" />清單勾選的來源（{selectedSourceIds.length} 個）</label>
+          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'tags'} onChange={() => setScope('tags')} className="accent-blue-600" />依來源標籤</label>
+          <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} className="accent-blue-600" />全部來源</label>
+          <button type="button" onClick={() => void doPreview()} disabled={busy || (scope === 'sources' && !selectedSourceIds.length) || (scope === 'tags' && !pickedTags.length)} className="ml-auto rounded-lg border border-zinc-600 px-3 py-1.5 hover:bg-white/5 disabled:opacity-50">預覽變更</button>
         </div>
-        {scope === 'tiles' && currentTab ? (
-          <div className="flex flex-wrap gap-2 text-xs" aria-label="勾選要套用的格子">
-            {currentTab.tiles.map((t) => (
-              <label key={t.id} className="flex items-center gap-1 rounded-md bg-[#232730] px-2 py-1">
-                <input type="checkbox" checked={picked.includes(t.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, t.id] : p.filter((x) => x !== t.id)))} className="accent-blue-600" />
-                第 {t.position + 1} 格{t.sourceId ? '（已設定）' : ''}
-              </label>
-            ))}
+        {scope === 'tags' ? (
+          <div className="flex flex-wrap gap-1.5 text-xs" aria-label="選擇來源標籤">
+            {tagOptions.length ? tagOptions.map((t) => (
+              <button key={t} type="button" aria-pressed={pickedTags.includes(t)} onClick={() => setPickedTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))}
+                className={`rounded-md border px-2 py-1 ${pickedTags.includes(t) ? 'border-sky-500 bg-sky-500/15 text-sky-100' : 'border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>{t}</button>
+            )) : <span className="text-zinc-500">還沒有來源標籤</span>}
           </div>
         ) : null}
         {preview ? (
           <div className="max-h-64 overflow-auto rounded-lg border border-zinc-800">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-[#16181d] text-zinc-400"><tr><th className="px-3 py-2">格子</th><th className="px-3 py-2">動作</th><th className="px-3 py-2">變更前</th><th className="px-3 py-2">變更後</th></tr></thead>
+              <thead className="sticky top-0 bg-[#16181d] text-zinc-400"><tr><th className="px-3 py-2">來源</th><th className="px-3 py-2">動作</th><th className="px-3 py-2">變更前</th><th className="px-3 py-2">變更後</th></tr></thead>
               <tbody>
                 {preview.items.map((item) => (
-                  <tr key={item.tileId} className="border-t border-zinc-800">
-                    <td className="px-3 py-1.5">{item.tabName} 第 {item.position + 1} 格</td>
-                    <td className={`px-3 py-1.5 ${item.action === 'error' ? 'text-red-300' : item.action === 'skip' ? 'text-zinc-500' : 'text-sky-200'}`}>{ACTION_LABEL[item.action]}{item.sharedWith ? `（共用「${item.sharedWith.name}」）` : ''}{item.reason ? `：${item.reason}` : ''}</td>
+                  <tr key={item.sourceId} className="border-t border-zinc-800">
+                    <td className="px-3 py-1.5">{item.name}</td>
+                    <td className={`px-3 py-1.5 ${item.action === 'error' ? 'text-red-300' : item.action === 'same' ? 'text-zinc-500' : 'text-sky-200'}`}>{ACTION_LABEL[item.action]}{item.reason && item.action === 'error' ? `：${item.reason}` : ''}</td>
                     <td className="max-w-[14rem] truncate px-3 py-1.5 text-zinc-400" title={item.before ?? ''}>{item.before ?? '—'}</td>
                     <td className="max-w-[14rem] truncate px-3 py-1.5 text-zinc-200" title={item.after ?? ''}>{item.after ?? '—'}</td>
                   </tr>
@@ -147,8 +139,8 @@ export function DefaultsDialog({ defaults, settings, tabs, currentTab, onClose, 
         ) : null}
         {preview ? (
           <div className="flex justify-end">
-            <PrimaryButton onClick={() => void doApply()} disabled={busy || !preview.items.some((i) => i.action === 'create' || i.action === 'replace')}>
-              套用 {preview.items.filter((i) => i.action === 'create' || i.action === 'replace').length} 格
+            <PrimaryButton onClick={() => void doApply()} disabled={busy || !preview.items.some((i) => i.action === 'update') || preview.items.some((i) => i.action === 'error')}>
+              更新 {preview.items.filter((i) => i.action === 'update').length} 個來源
             </PrimaryButton>
           </div>
         ) : null}

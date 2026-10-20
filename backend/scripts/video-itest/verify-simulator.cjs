@@ -119,9 +119,10 @@ async function waitFor(fn, timeoutMs, stepMs = 1000) {
     // ── 主系統：建立來源、兩格同源並要求錄影 ──
     const sid = await config.createSource({ name: sc.name, connection, vehicleCode: sc.vehicleCode, cameraId: sc.cameraId, recordingProfile: 'original', timestampBasis: 'center' }, actor);
     created.sources.push(sid);
-    const tab = await config.createTab({ name: '模擬器整合測試', tileCount: 4 }, actor);
+    const tab = await config.createTab({ name: '模擬器整合測試', tiles: [{ x: 0, y: 0, w: 5000, h: 10000 }, { x: 5000, y: 0, w: 5000, h: 10000 }] }, actor);
     created.tabs.push(tab.id);
-    let tiles = await config.saveTiles(tab.id, { expectedVersion: tab.version, tiles: [{ position: 0, sourceId: sid }, { position: 1, sourceId: sid }] });
+    await config.bindTileSource(tab.id, tab.tiles[0].id, { expectedVersion: tab.tiles[0].version, sourceId: sid });
+    await config.bindTileSource(tab.id, tab.tiles[1].id, { expectedVersion: tab.tiles[1].version, sourceId: sid });
     await reconciler.reconcile();
     const rev = (await config.getSource(sid));
     const revRow = (await ds.query(`SELECT id, media_path FROM video_source_revisions WHERE source_id = $1`, [sid]))[0];
@@ -204,11 +205,11 @@ async function waitFor(fn, timeoutMs, stepMs = 1000) {
 
     // ── 取消錄影需求：即時仍可看、不再新增正式錄影、歷史保留 ──
     const before = Number((await ds.query(`SELECT count(*) FROM video_recording_segments WHERE source_id = $1 AND status = 'READY'`, [sid]))[0].count);
-    tiles = await config.saveTiles(tab.id, { expectedVersion: tiles.version, tiles: [{ position: 0, sourceId: sid, recordingRequested: false }, { position: 1, sourceId: sid, recordingRequested: false }] });
+    await config.updateSource(sid, { expectedVersion: (await config.getSource(sid)).version, recordingEnabled: false }, actor);
     const cancelAt = Date.now();
     await reconciler.reconcile();
     const pathAfter = (await media.listConfigPaths()).find((p) => p.name === revRow.media_path);
-    ok(pathAfter && pathAfter.record === false, '取消錄影需求後媒體服務停止錄影（路徑仍在供即時）', JSON.stringify(pathAfter && { record: pathAfter.record }));
+    ok(pathAfter && pathAfter.record === false, '來源取消儲存錄影後媒體服務停止錄影（路徑仍在供即時）', JSON.stringify(pathAfter && { record: pathAfter.record }));
     await sleep((SEGMENT_SECONDS + 15) * 1000);
     const newer = await ds.query(`SELECT count(*) FROM video_recording_segments WHERE source_id = $1 AND start_at > $2`, [sid, cancelAt + 3000]);
     const after = Number((await ds.query(`SELECT count(*) FROM video_recording_segments WHERE source_id = $1 AND status = 'READY'`, [sid]))[0].count);

@@ -40,8 +40,10 @@ const fname = (t) => new Date(t).toISOString().replace(/T/, '_').replace(/:/g, '
   // 測試期間暫時放寬容量（預算 50 GiB、最低剩餘 0）：同時運行的 worker 會依正式政策回收片段或暫停錄影，
   // 主機剩餘空間低於自動最低保留時，測試片段會被當成要回收的錄影刪掉。結束時還原。
   const [held] = await ds.query(`SELECT max_bytes, min_free_bytes FROM video_storage_policies WHERE id = 'default'`);
-  await ds.query(`UPDATE video_storage_policies SET max_bytes = 53687091200, min_free_bytes = 0 WHERE id = 'default'`);
-  const releaseHold = () => ds.query(`UPDATE video_storage_policies SET max_bytes = $1, min_free_bytes = $2 WHERE id = 'default'`, [held?.max_bytes ?? null, held?.min_free_bytes ?? null]);
+  // 測試期間暫停背景壓縮：同時運行的 worker 若開著壓縮，會把測試片段另外轉檔，干擾用量與播放來源的判斷
+  const [heldComp] = await ds.query(`SELECT compression FROM video_storage_policies WHERE id = 'default'`);
+  await ds.query(`UPDATE video_storage_policies SET max_bytes = 53687091200, min_free_bytes = 0, compression = compression || '{"enabled": false}'::jsonb WHERE id = 'default'`);
+  const releaseHold = () => ds.query(`UPDATE video_storage_policies SET max_bytes = $1, min_free_bytes = $2, compression = $3 WHERE id = 'default'`, [held?.max_bytes ?? null, held?.min_free_bytes ?? null, JSON.stringify(heldComp?.compression ?? { enabled: false, codec: 'av1', replaceOriginal: false, minSavingPct: 15, minVmaf: 90, maxConcurrency: 1 })]);
   const media = new MediaMtxClient();
   const config = new VideoConfigService(ds);
   const reconciler = new VideoReconcilerService(ds, media, config);
@@ -141,7 +143,7 @@ const fname = (t) => new Date(t).toISOString().replace(/T/, '_').replace(/:/g, '
     await ds.query(`UPDATE video_storage_policies SET gcs_bucket = 'itest-bucket' WHERE id = 'default'`);
     const remote = await get(id2);
     await ds.query(`UPDATE video_storage_policies SET gcs_bucket = $1 WHERE id = 'default'`, [policy0.gcsBucket]);
-    ok(remote.status === 503 && /雲端片段暫時無法讀取/.test(remote.body.toString()), '本機已回收時改向雲端讀取（測試 bucket 不存在時明確報錯）', `${remote.status} ${remote.body}`);
+    ok(remote.status === 503 && /雲端片段暫時無法讀取/.test(remote.body.toString()), '本機已回收時改向雲端讀取（測試 bucket 不存在時明確報錯）', `${remote.status} ${remote.body.subarray(0, 120).toString('latin1').replace(/[^\x20-\x7e]/g, '.')}`);
 
     // 政策驗證
     const p = await storage.policy();

@@ -104,16 +104,16 @@ function simPublishers() {
     ok(libraryAfter.originals + libraryAfter.derived === libraryBefore, `${N} 路共用同一份相容檔，影片庫沒有增加檔案`, `${libraryBefore} → ${libraryAfter.originals + libraryAfter.derived}`);
 
     // 主系統：N 個來源、一個 N 格標籤，全部要求錄影
-    const tab = await config.createTab({ name: `模擬器負載 ${N} 路`, tileCount: N }, actor);
+    const tab = await config.createTab({ name: `模擬器負載 ${N} 路`, tiles: Array.from({ length: N }, (_, i) => ({ x: (i % 4) * 2500, y: Math.floor(i / 4) * 3333, w: 2500, h: 3333 })) }, actor);
     created.tabs.push(tab.id);
     const tiles = [];
     for (const [i, id] of created.channels.entries()) {
       const sc = await sim('GET', `/channels/${id}/source-config`);
       const sid = await config.createSource({ name: sc.name, connection: { mode: 'fields', protocol: 'rtsp', host: sc.host, port: sc.port, path: sc.path, username: sc.username, password: cred.password }, vehicleCode: sc.vehicleCode, cameraId: sc.cameraId, recordingProfile: 'original', timestampBasis: 'center' }, actor);
       created.sources.push(sid);
-      tiles.push({ position: i, sourceId: sid });
+      tiles.push(sid);
     }
-    await config.saveTiles(tab.id, { expectedVersion: tab.version, tiles });
+    for (const [i, sid] of tiles.entries()) await config.bindTileSource(tab.id, tab.tiles[i].id, { expectedVersion: tab.tiles[i].version, sourceId: sid });
     const p0 = Date.now();
     await reconciler.reconcile();
     const onlineAt = new Map();

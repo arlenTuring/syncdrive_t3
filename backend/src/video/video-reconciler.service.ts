@@ -261,15 +261,16 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
         // 持續接入（要錄影）卻沒有影像：連不上
         return { state: 'offline', recording: false, reason: want.wantRecording && !storage.ok ? `錄影暫停：${storage.reason}` : '連不上來源，連上後開始錄影', tracks, readers };
       }
-      // 沒人看也沒錄影：用背景探測結果；過期或沒探測過就是未知
+      // 沒人看也沒錄影：用背景探測結果；過期或沒探測過就是未知。要錄影卻因空間暫停時，原因一定要顯示
+      const paused = want.wantRecording && !storage.ok ? `錄影暫停：${storage.reason}` : null;
       const probe = this.probes.get(source.id);
       if (probe && probe.revisionId === rev!.id && Date.now() - probe.at < PROBE_FRESH_MS) {
         return probe.ok
-          ? { state: 'online', recording: false, reason: want.wantRecording && !storage.ok ? `錄影暫停：${storage.reason}` : null, tracks, readers }
-          : { state: 'offline', recording: false, reason: probe.message, tracks, readers };
+          ? { state: 'online', recording: false, reason: paused, tracks, readers }
+          : { state: 'offline', recording: false, reason: paused ?? probe.message, tracks, readers };
       }
       const probeable = rev!.protocol === 'rtsp' || rev!.protocol === 'rtsps';
-      return { state: 'unknown', recording: false, reason: probeable ? '等待檢查' : '此協定只在有人觀看或錄影時檢查連線', tracks, readers };
+      return { state: 'unknown', recording: false, reason: paused ?? (probeable ? '等待檢查' : '此協定只在有人觀看或錄影時檢查連線'), tracks, readers };
     }, demand);
     if (stats.patched) this.logger.log(`已更新 ${stats.patched} 個媒體路徑（${[...new Set(stats.differences)].join('、') || '來源'}）`);
     return stats;

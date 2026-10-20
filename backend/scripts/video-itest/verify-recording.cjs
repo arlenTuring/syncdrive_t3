@@ -39,7 +39,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // 測試期間暫時放寬容量（預算 50 GiB、最低剩餘 0）：同時運行的 worker 會依正式政策回收片段或暫停錄影，
   // 主機剩餘空間低於自動最低保留時，測試片段會被當成要回收的錄影刪掉。結束時還原。
   const [held] = await ds.query(`SELECT max_bytes, min_free_bytes FROM video_storage_policies WHERE id = 'default'`);
+  // 原政策下錄影暫停時，同時運行的 worker 每分鐘才重算；等它依測試政策恢復，避免兩個協調器互相改錄影設定
+  const pausedBefore = await new (require(D + '/video/video-storage.service.js').VideoStorageService)(ds, new (require(D + '/video/mediamtx.client.js').MediaMtxClient)(), new (require(D + '/video/video-config.service.js').VideoConfigService)(ds), { kick() {} }).status().then((st) => Boolean(st.paused), () => false);
   await ds.query(`UPDATE video_storage_policies SET max_bytes = 53687091200, min_free_bytes = 0 WHERE id = 'default'`);
+  if (pausedBefore) {
+    console.log('  · 原儲存政策下錄影暫停中，等候 worker 依測試政策恢復（約 1 分鐘）');
+    await new Promise((r) => setTimeout(r, 65_000));
+  }
   const releaseHold = () => ds.query(`UPDATE video_storage_policies SET max_bytes = $1, min_free_bytes = $2 WHERE id = 'default'`, [held?.max_bytes ?? null, held?.min_free_bytes ?? null]);
   const media = new MediaMtxClient();
   const config = new VideoConfigService(ds);
@@ -56,9 +62,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
     const sid = await config.createSource({ name: '錄影測試鏡頭', connection: { mode: 'url', url: `rtsp://cam:camtest@${IP}:18554/cam2` }, vehicleCode: 'PMS02' }, actor);
     created.sources.push(sid);
-    const tab = await config.createTab({ name: '錄影測試', tileCount: 1 }, actor);
+    // 錄影以來源為準：沒放進任何監控格也會錄
+    const tab = await config.createTab({ name: '錄影測試' }, actor);
     created.tabs.push(tab.id);
-    await config.saveTiles(tab.id, { expectedVersion: tab.version, tiles: [{ position: 0, sourceId: sid }] });
     const t0 = Date.now();
     await reconciler.reconcile();
     // 等兩個片段完成並由 hook 建立索引（本機分段 20 秒、正式 60 秒；等待時間依分段長度）
@@ -97,7 +103,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const tooLong = await history.createExport({ sourceId: sid, from: t0, to: t0 + 31 * 60_000 }, actor).then(() => 'ok', (e) => e.message);
     ok(/最長/.test(tooLong), '下載區間有上限');
     // 保護與到期
-    await history.protect({ sourceIds: [sid], from: Number(segs[1].start_at), to: Number(segs[1].end_at), until: Date.now() + 30 * 86_400_000 });
+    // 相鄰片段在邊界會重疊幾毫秒：保護範圍取第二段內側，才不會連第一段一起保護
+    await history.protect({ sourceIds: [sid], from: Number(segs[1].start_at) + 500, to: Number(segs[1].end_at) - 500, until: Date.now() + 30 * 86_400_000 });
     await storage.retention(Date.now() + 8 * 86_400_000);
     const leasedRow = (await ds.query(`SELECT status FROM video_recording_segments WHERE id = $1`, [s0.id]))[0];
     ok(leasedRow.status === 'READY', '播放中（lease）的片段即使到期也不刪');

@@ -33,6 +33,7 @@ export function LivePlayer({
   onExpired,
   className = '',
   preferHls = false,
+  fit = 'contain',
 }: {
   hlsUrl: string | null;
   whepUrl: string | null;
@@ -42,6 +43,8 @@ export function LivePlayer({
   onExpired?: () => void;
   className?: string;
   preferHls?: boolean;
+  /** cover：填滿固定格子、置中裁切、不變形（監控格子用）；contain：完整顯示（預覽用） */
+  fit?: 'cover' | 'contain';
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -183,5 +186,6 @@ export function LivePlayer({
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
 
-  return <video ref={videoRef} muted={muted} playsInline autoPlay className={`h-full w-full bg-black object-contain ${className}`} />;
+  // 影片 metadata 不參與版面：父層決定大小，影片只依 fit 填入
+  return <video ref={videoRef} muted={muted} playsInline autoPlay className={`block h-full w-full bg-black ${fit === 'cover' ? 'object-cover object-center' : 'object-contain'} ${className}`} />;
 }
