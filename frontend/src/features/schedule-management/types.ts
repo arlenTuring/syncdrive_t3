@@ -97,7 +97,6 @@ export const MEDIA_NAV_ITEMS: ShellNavItem[] = [
 
 export const EVENTS_NAV_ITEMS: ShellNavItem[] = [
   { id: 'event-list', label: 'nav.items.event-list', enabled: true, requiredPermission: 'events.events.view' },
-  { id: 'event-history', label: 'nav.items.event-history', enabled: true, requiredPermission: 'events.events.view' },
   { id: 'video-monitor', label: 'nav.items.video-monitor', enabled: true, requiredPermission: 'events.video.view' },
   // 來源設定、儲存錄影、歷史錄影都在這裡；只有歷史權限的人也看得到（只能進歷史）
   { id: 'video-resources', label: 'nav.items.video-resources', enabled: true, requiredPermission: 'events.video.configure|events.video.recording-manage|events.video-history.view' },
@@ -111,7 +110,7 @@ export const LOGS_NAV_ITEMS: ShellNavItem[] = [
 ];
 
 export function isEventsView(view: string): boolean {
-  return EVENTS_NAV_ITEMS.some((item) => item.id === view);
+  return view === 'event-history' || EVENTS_NAV_ITEMS.some((item) => item.id === view);
 }
 
 export function isLogsView(view: string): boolean {
@@ -184,6 +183,8 @@ export const VIEW_PERMISSIONS: Partial<Record<ShellView, string>> = Object.fromE
     .filter((item) => item.requiredPermission).map((item) => [item.id, item.requiredPermission!]),
 );
 VIEW_PERMISSIONS.dashboard = 'dashboard.dashboard.view';
+// 舊歷史事件 deep link 保留，但側欄已合併為單一「事件管理清單」。
+VIEW_PERMISSIONS['event-history'] = 'events.events.view';
 // 舊的歷史影像頁導向影像資源管理，權限沿用
 VIEW_PERMISSIONS['video-history'] = VIEW_PERMISSIONS['video-resources'];
 VIEW_PERMISSIONS['system-foundation'] = 'system.health.view';

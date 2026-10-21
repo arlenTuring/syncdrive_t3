@@ -63,12 +63,12 @@ export function RangeFilter({ value, onChange, timeZone, error }: { value: Range
   );
 }
 
-export function QueryActions({ onSearch, onReset, onExport, exporting, canExport }: { onSearch: () => void; onReset: () => void; onExport?: () => void; exporting?: boolean; canExport?: boolean }) {
+export function QueryActions({ onSearch, onReset, onExport, exporting, canExport, searchLabel = '搜尋' }: { onSearch: () => void; onReset: () => void; onExport?: () => void; exporting?: boolean; canExport?: boolean; searchLabel?: string }) {
   return (
     <div className="flex items-end gap-2">
       <button type="button" onClick={onSearch} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium hover:bg-blue-500">
         <Search className="size-4" />
-        搜尋
+        {searchLabel}
       </button>
       <button type="button" onClick={onReset} className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-700 px-4 text-sm text-zinc-300 hover:bg-white/5">
         <RefreshCw className="size-4" />

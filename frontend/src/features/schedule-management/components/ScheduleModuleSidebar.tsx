@@ -58,7 +58,6 @@ type ScheduleModuleSidebarProps = {
 
 const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   'event-list': BellRing,
-  'event-history': History,
   'video-monitor': Video,
   'video-resources': Film,
   'log-system': ScrollText,

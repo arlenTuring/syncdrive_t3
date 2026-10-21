@@ -38,7 +38,7 @@ import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
 import { MediaContentPage } from '../media-content/MediaContentPage';
 import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
 import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
-import { EventListPage } from '../event-management/EventListPage';
+import { EventManagementPage } from '../event-management/EventManagementPage';
 import { VideoMonitorPage } from '../video/VideoMonitorPage';
 import { OPEN_VIDEO_RESOURCES_EVENT } from '../video/history-link';
 import { VideoResourcesPage } from '../video/VideoResourcesPage';
@@ -447,8 +447,8 @@ export default function ScheduleManagementApp({
         {isEventsView(view) || isLogsView(view) ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ViewErrorBoundary title={`${chrome.title}載入失敗`}>
-              {view === 'event-list' ? <EventListPage key="live" mode="live" /> : null}
-              {view === 'event-history' ? <EventListPage key="history" mode="history" /> : null}
+              {view === 'event-list' ? <EventManagementPage /> : null}
+              {view === 'event-history' ? <EventManagementPage initialTab="history" /> : null}
               {view === 'video-monitor' ? <VideoMonitorPage /> : null}
               {view === 'video-resources' ? <VideoResourcesPage /> : null}
               {view === 'log-system' ? <LogPage key="system" category="system" /> : null}

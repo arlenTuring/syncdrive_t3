@@ -8,7 +8,7 @@ import { EventCode, Severity } from '../database/entities/security-event-log.ent
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
 import { toCsv, formatInZone, type CsvColumn } from './csv';
-import { DEFAULT_TIME_ZONE, EVENT_PAGE_SIZE, EXPORT_LIMIT, REPLAY_AFTER_MS, REPLAY_BEFORE_MS } from './event-log.constants';
+import { DEFAULT_TIME_ZONE, EVENT_PAGE_SIZE, EXPORT_LIMIT, LIVE_LIMIT_MAX, REPLAY_AFTER_MS, REPLAY_BEFORE_MS } from './event-log.constants';
 import { boolParam, enumParam, pageParams, rangeParams, rejectUnknown, textParam } from './query-params';
 
 export const EVENT_SORTS = ['occurred_at', 'received_at', 'event_code', 'vehicle_code', 'severity'] as const;
@@ -20,6 +20,7 @@ const SORT_SQL: Record<(typeof EVENT_SORTS)[number], string> = {
   severity: 'e.severity',
 };
 const SOURCE_TYPES = ['VEHICLE', 'FACILITY', 'SYSTEM'] as const;
+const LIVE_KEYS = ['bucket', 'limit', 'after'];
 const QUERY_KEYS = ['from', 'to', 'vehicleCode', 'eventCode', 'severity', 'sourceType', 'acknowledged', 'page', 'pageSize', 'sortBy', 'direction', 'snapshot'];
 
 export const EVENT_CODE_LABEL: Record<string, string> = {
@@ -64,14 +65,39 @@ type EventRow = {
   is_acknowledged: boolean;
   acknowledged_at: string | null;
   acknowledged_by_name: string | null;
+  acknowledgement_note: string | null;
 };
+
+type LiveBucket = 'pending' | 'confirmed';
+/** 游標：[集合, 嚴重度序／NULL時間序, 排序時間（NULL用0）, 中心端ID] */
+type LiveCursor = [LiveBucket, number, string, string];
+const SEVERITY_RANK_SQL = `CASE e.severity::text WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END`;
+
+function encodeCursor(cursor: LiveCursor) {
+  return Buffer.from(JSON.stringify(cursor)).toString('base64url');
+}
+
+function decodeCursor(raw: unknown): LiveCursor | null {
+  if (raw === undefined || raw === '') return null;
+  try {
+    const value: unknown = typeof raw === 'string' && raw.length <= 200 ? JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) : null;
+    if (
+      Array.isArray(value) && value.length === 4 && (value[0] === 'pending' || value[0] === 'confirmed') &&
+      Number.isInteger(value[1]) && value[1] >= 0 && value[1] <= 2 &&
+      typeof value[2] === 'string' && /^\d{1,19}$/.test(value[2]) && typeof value[3] === 'string' && /^\d{1,19}$/.test(value[3])
+    ) return value as LiveCursor;
+  } catch {
+    // 落到下方統一錯誤
+  }
+  throw new BadRequestException('游標不正確');
+}
 
 const LIST_COLUMNS = `e.id::text AS id, e.event_id, e.source_type, e.source_id, e.source_name_snapshot, e.origin, e.vehicle_code,
   e.event_code::text AS event_code, e.severity::text AS severity, e.created_at, e.occurred_at_valid, e.received_at,
-  e.display_message, e.detail, e.is_acknowledged, e.acknowledged_at, e.acknowledged_by_name`;
+  e.display_message, e.detail, e.is_acknowledged, e.acknowledged_at, e.acknowledged_by_name, e.acknowledgement_note`;
 
 /**
- * 事件資訊清單／歷史事件／事件報表共用的查詢。資料真相只有 security_event_logs。
+ * 事件管理清單／歷史事件查詢／事件報表共用的查詢。資料真相只有 security_event_logs。
  *
  * - 清單與 CSV 用同一個條件建構器；排序以主鍵打破平手（同時刻不重複、不漏列）。
  * - snapshot（查詢上界 ID）讓翻頁與匯出期間新進的事件不插隊。
@@ -166,6 +192,66 @@ export class EventsService {
     };
   }
 
+  /** 待確認／已確認各自查詢與分頁；兩者均涵蓋全部仍保留資料，不套 24 小時限制。 */
+  async live(query: Record<string, unknown>) {
+    rejectUnknown(query, LIVE_KEYS);
+    const bucket = enumParam(query.bucket, ['pending', 'confirmed'] as const, '事件集合');
+    if (!bucket) throw new BadRequestException('事件集合為必填');
+    const limit = query.limit === undefined || query.limit === '' ? EVENT_PAGE_SIZE : Number(query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > LIVE_LIMIT_MAX) throw new BadRequestException(`筆數須為 1–${LIVE_LIMIT_MAX}`);
+    const after = decodeCursor(query.after);
+    if (after && after[0] !== bucket) throw new BadRequestException('游標與事件集合不符');
+    const serverTime = Date.now();
+    const params: unknown[] = [limit + 1];
+    let keyset = '';
+    if (after) {
+      const [, rank, time, id] = after;
+      if (bucket === 'pending') {
+        params.push(rank, time, id);
+        keyset = `AND (${SEVERITY_RANK_SQL} > $2::int OR (${SEVERITY_RANK_SQL} = $2::int AND (e.created_at < $3::bigint OR (e.created_at = $3::bigint AND e.id < $4::bigint))))`;
+      } else if (rank === 1) {
+        params.push(id);
+        keyset = `AND e.acknowledged_at IS NULL AND e.id < $2::bigint`;
+      } else {
+        params.push(time, id);
+        keyset = `AND ((e.acknowledged_at IS NOT NULL AND (e.acknowledged_at < $2::bigint OR (e.acknowledged_at = $2::bigint AND e.id < $3::bigint))) OR e.acknowledged_at IS NULL)`;
+      }
+    }
+    const where = bucket === 'pending' ? 'e.is_acknowledged = false' : 'e.is_acknowledged = true';
+    const order = bucket === 'pending'
+      ? `${SEVERITY_RANK_SQL} ASC, e.created_at DESC, e.id DESC`
+      : `e.acknowledged_at DESC NULLS LAST, e.id DESC`;
+    const rows: Array<EventRow & { rank: number; sort_time: string }> = await this.dataSource.query(
+      `SELECT ${LIST_COLUMNS},
+              ${bucket === 'pending' ? SEVERITY_RANK_SQL : 'CASE WHEN e.acknowledged_at IS NULL THEN 1 ELSE 0 END'} AS rank,
+              COALESCE(${bucket === 'pending' ? 'e.created_at' : 'e.acknowledged_at'}, 0)::text AS sort_time
+         FROM security_event_logs e WHERE ${where} ${keyset}
+        ORDER BY ${order} LIMIT $1`,
+      params,
+    );
+    const [counts]: Array<{ pending: number; confirmed: number; max_id: string; max_ack: string }> = await this.dataSource.query(
+      `SELECT count(*) FILTER (WHERE NOT e.is_acknowledged)::int AS pending,
+              count(*) FILTER (WHERE e.is_acknowledged)::int AS confirmed,
+              COALESCE(max(e.id), 0)::text AS max_id,
+              COALESCE(max(e.acknowledged_at), 0)::text AS max_ack
+         FROM security_event_logs e`,
+    );
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      items: page.map((row) => this.present(row)),
+      total: bucket === 'pending' ? counts.pending : counts.confirmed,
+      pendingTotal: counts.pending,
+      confirmedTotal: counts.confirmed,
+      hasMore,
+      nextCursor: hasMore && last ? encodeCursor([bucket, Number(last.rank), String(last.sort_time), last.id]) : null,
+      version: `${counts.max_id}:${counts.max_ack}`,
+      serverTime,
+      timeZone: await this.timeZone(),
+    };
+  }
+
   private present(row: EventRow) {
     return {
       id: row.id,
@@ -186,6 +272,7 @@ export class EventsService {
       acknowledged: row.is_acknowledged,
       acknowledgedAt: row.acknowledged_at === null ? null : Number(row.acknowledged_at),
       acknowledgedByName: row.acknowledged_by_name,
+      acknowledgementNote: row.acknowledgement_note,
       // 設備恢復狀態只接受有契約的真實來源；目前沒有，一律未知
       recoveryStatus: 'UNKNOWN' as const,
     };
@@ -232,9 +319,10 @@ export class EventsService {
    * 兩人同時確認時只有先到者成功；後到者拿到目前狀態與 alreadyAcknowledged=true，不偽造第二次成功。
    */
   async acknowledge(id: string, noteRaw: unknown, actor: AuthUser, client: { ip?: string; userAgent?: string | null }) {
-    if (noteRaw !== undefined && noteRaw !== null && typeof noteRaw !== 'string') throw new BadRequestException('備註格式不正確');
-    const note = typeof noteRaw === 'string' ? noteRaw.trim() : '';
-    if (note.length > 500) throw new BadRequestException('備註最多 500 字');
+    if (typeof noteRaw !== 'string') throw new BadRequestException('確認緣由為必填，且必須是文字');
+    const note = noteRaw.trim();
+    if (!note) throw new BadRequestException('請填寫確認緣由');
+    if (note.length > 500) throw new BadRequestException('確認緣由最多 500 字');
     const eventId = this.parseId(id);
     const updated = await this.dataSource.transaction(async (manager) => {
       const rows: Array<{ id: string }> = await manager.query(
@@ -242,7 +330,7 @@ export class EventsService {
             SET is_acknowledged = true, acknowledged_by = $2, acknowledged_by_name = $3, acknowledged_at = $4, acknowledgement_note = $5
           WHERE id = $1::bigint AND is_acknowledged = false
           RETURNING id::text`,
-        [eventId, actor.id, actor.display_name, Date.now(), note || null],
+        [eventId, actor.id, actor.display_name, Date.now(), note],
       );
       const changed = (Array.isArray(rows[0]) ? rows[0] : rows).length > 0;
       if (!changed) {
@@ -259,7 +347,7 @@ export class EventsService {
           actionType: 'EVENT_ACKNOWLEDGE',
           targetType: 'EVENT',
           targetId: eventId,
-          actionDetail: note ? { note } : {},
+          actionDetail: { note },
           result: ActionResult.SUCCESS,
           correlationId: eventId,
         },
@@ -322,6 +410,7 @@ export class EventsService {
       { header: '人工確認', value: (r) => (r.is_acknowledged ? '已確認' : '未確認') },
       { header: '確認人', value: (r) => r.acknowledged_by_name },
       { header: `確認時間（${tz}）`, value: (r) => formatInZone(r.acknowledged_at === null ? null : Number(r.acknowledged_at), tz) },
+      { header: '確認緣由', value: (r) => r.acknowledgement_note },
       { header: '設備恢復狀態', value: () => '未知' },
       { header: '摘要', value: (r) => r.display_message || r.detail },
       { header: '位置', value: (r) => r.location },

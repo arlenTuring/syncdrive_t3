@@ -17,7 +17,7 @@ const CATEGORY_INFO: Record<CleanupCategory, { label: string; impact: string; ta
   telemetry: { label: '原始遙測歷史', impact: '清除後無法查詢該期間原始遙測；最新車輛狀態快照不受影響。', tables: ['telemetry_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；舊資料缺值時排除）' },
   bulk_logs: { label: '其他大量紀錄', impact: '只清理已完成的指令與已釋放的路口紀錄；事件紀錄、操作及安全稽核不在範圍內。', tables: ['command_logs', 'junction_interlock_logs'], vehicleFilter: true, trustedTime: 'sent_at／requested_at（後端時間）' },
   // 事件紀錄獨立設定（2026-10-20 起不再跟指令一起清）；預設不啟用自動清理
-  security_events: { label: '事件紀錄', impact: '清除後事件資訊清單、歷史事件與事件報表查不到該期間的事件（含人工確認狀態）；操作、權限與登入稽核不受影響。', tables: ['security_event_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；缺值的舊資料排除）' },
+  security_events: { label: '事件紀錄', impact: '只清除已人工確認的事件；清除後歷史事件與事件報表查不到該期間的已確認事件（含確認紀錄）。待確認事件一律保留在事件管理清單的待確認標籤；操作、權限與登入稽核不受影響。', tables: ['security_event_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；缺值的舊資料排除）' },
 };
 
 @Injectable()
@@ -171,9 +171,10 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
     }
     if (criteria.category === 'security_events') {
       const s = this.clause(criteria, 'received_at');
-      const [events] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NOT NULL AND ${s.sql}`, s.values);
+      const [events] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NOT NULL AND is_acknowledged = true AND ${s.sql}`, s.values);
+      const [pending] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NOT NULL AND is_acknowledged = false AND ${s.sql}`, s.values);
       const [legacy] = await this.db.query(`SELECT count(*)::bigint records FROM security_event_logs WHERE received_at IS NULL`);
-      return { records: Number(events.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: ['操作、權限與登入稽核', `${legacy.records} 筆缺少接收時間的舊事件排除`], estimatedBytes: null };
+      return { records: Number(events.records), relatedRecords: 0, affectedReplays: 0, affectedOrders: 0, protected: ['操作、權限與登入稽核', `${pending.records} 筆待確認事件保留（確認後才會依政策清除）`, `${legacy.records} 筆缺少接收時間的舊事件排除`], estimatedBytes: null };
     }
     const c = this.clause(criteria, 'sent_at');
     const [commands] = await this.db.query(`SELECT count(*)::bigint records FROM command_logs WHERE is_acked=true AND ${c.sql}`, c.values);
@@ -273,7 +274,8 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
       const rows = await this.db.query(`WITH targets AS (SELECT s.execution_id FROM degraded_replay_sessions s WHERE ${range} LIMIT ${BATCH_SIZE}), df AS (DELETE FROM degraded_replay_frames f USING targets t WHERE f.execution_id=t.execution_id RETURNING 1), ds AS (DELETE FROM degraded_replay_sessions s USING targets t WHERE s.execution_id=t.execution_id RETURNING 1) SELECT (SELECT count(*) FROM df)+(SELECT count(*) FROM ds) count`, values);
       return Number(rows[0]?.count ?? 0);
     }
-    if (c.category === 'security_events') return this.deleteCtid('security_event_logs', 'received_at', c, 'received_at IS NOT NULL');
+    // 待確認事件不清除：事件管理清單必須持續看得到，確認後才依政策清除
+    if (c.category === 'security_events') return this.deleteCtid('security_event_logs', 'received_at', c, 'received_at IS NOT NULL AND is_acknowledged = true');
     const a = await this.deleteCtid('command_logs', 'sent_at', c, 'is_acked=true');
     const b = await this.deleteCtid('junction_interlock_logs', 'requested_at', c, `status IN ('RELEASED','DENIED')`);
     return a + b;

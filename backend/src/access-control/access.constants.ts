@@ -127,8 +127,8 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
   permission('media', '媒體管理模組', 'schedule', 'delete', '刪除', 723),
   permission('media', '媒體管理模組', 'order-records', '訂單紀錄清單', 'view', '檢視', 730, false),
 
-  // 事件資訊清單與歷史事件檢視共用：view＝清單與詳情、manage＝人工確認（不下發車控）、export＝事件報表 CSV
-  permission('events', '事件管理模組', 'events', '事件資訊與歷史事件', 'view', '檢視', 800),
+  // 事件管理清單三標籤共用：view＝清單與詳情、manage＝人工確認（不下發車控）、export＝事件報表 CSV
+  permission('events', '事件管理模組', 'events', '事件管理清單', 'view', '檢視', 800),
   permission('events', '事件管理模組', 'events', 'manage', '人工確認', 801),
   permission('events', '事件管理模組', 'events', 'export', '匯出報表', 802),
   // 影像監控與事件影像回放；沒有影像來源時頁面只顯示「尚未設定影像來源」

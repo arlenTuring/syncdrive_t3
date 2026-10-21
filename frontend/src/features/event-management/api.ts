@@ -18,6 +18,7 @@ export type EventItem = {
   acknowledged: boolean;
   acknowledgedAt: number | null;
   acknowledgedByName: string | null;
+  acknowledgementNote: string | null;
   recoveryStatus: 'UNKNOWN';
 };
 
@@ -31,6 +32,20 @@ export type EventDetail = EventItem & {
 };
 
 export type EventList = { items: EventItem[]; total: number; page: number; pageSize: number; snapshot: string; range: { from: number; to: number }; timeZone: string };
+
+export type LiveBucket = 'pending' | 'confirmed';
+/** 事件管理工作集合：待確認／已確認由後端分開查詢與排序。 */
+export type LiveEvents = {
+  items: EventItem[];
+  total: number;
+  pendingTotal: number;
+  confirmedTotal: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+  version: string;
+  serverTime: number;
+  timeZone: string;
+};
 
 export type EventOptions = {
   vehicles: Array<{ vehicleCode: string; displayName: string; active: boolean }>;
@@ -49,7 +64,6 @@ export type EventQuery = {
   eventCode?: string;
   severity?: string;
   sourceType?: string;
-  acknowledged?: string;
   sortBy: string;
   direction: 'asc' | 'desc';
 };
@@ -65,7 +79,8 @@ export type Playback = {
 
 export const fetchEventOptions = (signal?: AbortSignal) => getJson<EventOptions>('/events/options', undefined, signal);
 export const fetchEvents = (query: EventQuery & { page: number; snapshot?: string }, signal?: AbortSignal) => getJson<EventList>('/events', query, signal);
+export const fetchLiveEvents = (params: { bucket: LiveBucket; limit: number; after?: string }, signal?: AbortSignal) => getJson<LiveEvents>('/events/live', params, signal);
 export const fetchEvent = (id: string, signal?: AbortSignal) => getJson<EventDetail>(`/events/${encodeURIComponent(id)}`, undefined, signal);
-export const acknowledgeEvent = (id: string, note: string) => postJson<EventDetail>(`/events/${encodeURIComponent(id)}/acknowledgement`, note ? { note } : {});
+export const acknowledgeEvent = (id: string, note: string) => postJson<EventDetail>(`/events/${encodeURIComponent(id)}/acknowledgement`, { note });
 export const fetchPlayback = (id: string, signal?: AbortSignal) => getJson<Playback>(`/events/${encodeURIComponent(id)}/playback`, undefined, signal);
 export const exportEvents = (query: EventQuery) => downloadCsv('/events/export', query);

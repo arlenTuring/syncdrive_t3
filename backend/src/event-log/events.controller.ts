@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { RequirePermission, type AuthenticatedRequest } from '../access-control/access.guard';
@@ -8,7 +8,7 @@ import { ActionResult } from '../database/entities/operator-action-log.entity';
 import { exportFileName } from './csv';
 import { EventsService } from './events.service';
 
-/** 事件管理模組：事件資訊清單、歷史事件、事件報表、回放與影像。固定路由放在 :id 之前。 */
+/** 事件管理模組：事件管理清單、歷史事件查詢、事件報表、回放與影像。固定路由放在 :id 之前。 */
 @ApiTags('Events')
 @Controller('syncdrive-api/events')
 @RequirePermission('events.events.view')
@@ -19,6 +19,12 @@ export class EventsController {
   @ApiOperation({ summary: '事件查詢（即時清單與歷史共用；from/to 為 epoch 毫秒，起點含、終點不含）' })
   list(@Query() query: Record<string, unknown>) {
     return this.events.list(query);
+  }
+
+  @Get('live')
+  @ApiOperation({ summary: '事件管理工作集合：bucket=pending|confirmed；有界游標與兩集合真實總數' })
+  live(@Query() query: Record<string, unknown>) {
+    return this.events.live(query);
   }
 
   @Get('options')
@@ -60,7 +66,7 @@ export class EventsController {
   acknowledge(@Param('id') id: string, @Body() body: { note?: unknown } | undefined, @Req() req: AuthenticatedRequest) {
     if (!req.authUser) throw new ForbiddenException('權限不足');
     const unknownKeys = Object.keys(body ?? {}).filter((key) => key !== 'note');
-    if (unknownKeys.length) throw new ForbiddenException(`不接受的欄位：${unknownKeys.join('、')}`);
+    if (unknownKeys.length) throw new BadRequestException(`不接受的欄位：${unknownKeys.join('、')}`);
     return this.events.acknowledge(id, body?.note, req.authUser, { ip: req.ip, userAgent: req.header('user-agent') ?? null });
   }
 

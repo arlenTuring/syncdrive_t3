@@ -45,6 +45,9 @@ export function securityEventDedupKey(vehicleCode: string, eventId: string, time
 @Index('IDX_EVENT_TIME_ID', ['createdAt', 'id'])
 @Index('IDX_EVENT_SOURCE_TIME', ['sourceType', 'sourceId', 'createdAt'])
 @Index('IDX_EVENT_CODE_TIME', ['eventCode', 'createdAt'])
+// 事件管理工作集合：待確認依發生時間、已確認依確認時間（20261025-live-event-indexes）
+@Index('IDX_EVENT_PENDING_TIME', ['createdAt', 'id'], { where: 'is_acknowledged = false' })
+@Index('IDX_EVENT_ACK_TIME', ['acknowledgedAt', 'id'], { where: 'is_acknowledged = true' })
 // 與 migration 20261020 相同的約束（開發環境 synchronize 也保留）
 @Check('CHK_EVENT_SOURCE_TYPE', `source_type IN ('VEHICLE', 'FACILITY', 'SYSTEM')`)
 @Check('CHK_EVENT_ORIGIN', `origin IN ('REPORTED', 'CENTER')`)
