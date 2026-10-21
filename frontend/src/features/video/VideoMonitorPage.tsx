@@ -1,4 +1,4 @@
-import { HardDrive, LayoutDashboard, MoreHorizontal, Plus } from 'lucide-react';
+import { HardDrive, LayoutDashboard, Maximize2, Minimize2, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
@@ -11,6 +11,8 @@ import { SourcePicker } from './SourcePicker';
 import { TileView } from './TileView';
 
 const PREF_KEY = 'vtms.video.monitor';
+/** 標籤頁整體全螢幕容器的標記（判斷目前的原生全螢幕是不是這一頁的） */
+const ROOT_ATTR = 'data-video-monitor-root';
 
 function readPref(): { tabId?: string; audio?: string } {
   try {
@@ -34,6 +36,8 @@ function writePref(pref: { tabId?: string; audio?: string }) {
  * - 平常監看時版面鎖定，要調整請按「編輯版面」；螢幕大小改變只等比例縮放整個畫布，不重排。
  * - 只有目前標籤頁的格子會播放；切換會釋放播放器。錄影是來源的設定，與這個頁面無關。
  * - 這裡不能建立攝影機連線或改錄影；來源在「影像資源管理」設定。
+ * - 標籤頁整體全螢幕：對包住標籤名稱與整個畫布的容器呼叫 requestFullscreen()；狀態以 document.fullscreenElement
+ *   與 fullscreenchange 為準。進出只改容器樣式，不重建播放器、不寫回版面。不支援原生 API 時用同一容器「網頁滿版」。
  */
 export function VideoMonitorPage() {
   const auth = useAuth();
@@ -52,6 +56,10 @@ export function VideoMonitorPage() {
   const dragging = useRef<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState({ w: 0, h: 0 });
+  /** 標籤頁整體全螢幕：native＝瀏覽器原生全螢幕；web＝不支援時的網頁滿版 */
+  const [full, setFull] = useState<'native' | 'web' | null>(null);
+  /** 整體全螢幕中暫時放大的格子（不寫回版面） */
+  const [zoomTile, setZoomTile] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +85,34 @@ export function VideoMonitorPage() {
     const timer = window.setTimeout(() => setNotice(null), 3200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+  // 原生全螢幕狀態以瀏覽器為準（Esc、瀏覽器退出、其他程式退出都會反映）；離開這頁時只退出自己的全螢幕
+  useEffect(() => {
+    const ours = () => document.fullscreenElement?.getAttribute(ROOT_ATTR) === 'true';
+    const onChange = () => {
+      const native = ours();
+      setFull((prev) => (native ? 'native' : prev === 'native' ? null : prev));
+      if (!native) setZoomTile(null);
+    };
+    const onError = () => notify('無法進入全螢幕：瀏覽器拒絕了要求', 'error');
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('fullscreenerror', onError);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('fullscreenerror', onError);
+      if (ours()) void document.exitFullscreen().catch(() => undefined);
+    };
+  }, [notify]);
+  // 網頁滿版沒有瀏覽器的 Esc 處理：自己聽 Esc（原生全螢幕不攔截 Esc）
+  useEffect(() => {
+    if (full !== 'web') return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      setFull(null);
+      setZoomTile(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [full]);
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return undefined;
@@ -132,9 +168,28 @@ export function VideoMonitorPage() {
     void mutate(() => videoApi.reorderTabs(ids));
   };
 
-  // 畫布依保存的長寬比等比例 fit 到可用區；格子座標依畫布換算，不依影片大小
+  const enterFull = (tab: Tab) => {
+    setMenu(null);
+    setTabId(tab.id);
+    setZoomTile(null);
+    // 容器一直掛著（只切換樣式），所以先切標籤頁再對同一個容器要求全螢幕，仍在使用者手勢內
+    const root = document.querySelector<HTMLElement>(`[${ROOT_ATTR}="true"]`);
+    if (!root) return;
+    if (document.fullscreenEnabled && typeof root.requestFullscreen === 'function') {
+      root.requestFullscreen().catch((reason: Error) => notify(`無法進入全螢幕：${reason?.message || '瀏覽器拒絕了要求'}`, 'error'));
+    } else {
+      setFull('web');
+    }
+  };
+  const exitFull = () => {
+    setZoomTile(null);
+    if (full === 'web') setFull(null);
+    else if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  };
+
+  // 畫布依保存的長寬比等比例 fit 到可用區；格子座標依畫布換算，不依影片大小。全螢幕時可用區來自全螢幕容器內的畫布區
   const aspect = current?.canvasAspectRatio ?? 16 / 9;
-  const minW = 640;
+  const minW = full ? 0 : 640;
   const fitW = Math.max(minW, Math.min(stage.w, stage.h > 0 ? stage.h * aspect : stage.w));
   const fitH = fitW / aspect;
   const storage = data?.storage;
@@ -181,6 +236,7 @@ export function VideoMonitorPage() {
               {menu === tab.id ? (
                 <div role="menu" className="absolute top-full left-0 z-30 mt-1 w-40 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] py-1 text-sm shadow-xl">
                   {[
+                    ['此標籤頁全螢幕', () => enterFull(tab)],
                     ['編輯版面', () => requireConfigure() && setEditor({ tab })],
                     ['改名', () => requireConfigure() && setRenaming(tab.id)],
                     ['複製', () => requireConfigure() && mutate(async () => setTabId((await videoApi.duplicateTab(tab.id)).id), '已複製標籤頁（引用相同來源，不複製來源或錄影）')],
@@ -200,6 +256,11 @@ export function VideoMonitorPage() {
             <Plus className="size-4" />新增標籤頁
           </button>
         </div>
+        {current ? (
+          <button type="button" onClick={() => enterFull(current)} aria-label="標籤頁全螢幕" title="標籤頁全螢幕" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-500/10">
+            <Maximize2 className="size-3.5" />全螢幕
+          </button>
+        ) : null}
         {current ? (
           <button type="button" onClick={() => requireConfigure() && setEditor({ tab: current })} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5">
             <LayoutDashboard className="size-3.5" />編輯版面
@@ -228,43 +289,75 @@ export function VideoMonitorPage() {
         </div>
       ) : null}
       {current ? (
-        <div ref={stageRef} className="min-h-0 flex-1 overflow-auto">
-          <div className="relative mx-auto" style={{ width: fitW, height: fitH }} aria-label={`${current.name} 監控畫面`}>
-            {current.tiles.map((tile) => (
-              <div
-                key={tile.id}
-                className="absolute p-1"
-                style={{ left: `${(tile.x / CANVAS) * 100}%`, top: `${(tile.y / CANVAS) * 100}%`, width: `${(tile.w / CANVAS) * 100}%`, height: `${(tile.h / CANVAS) * 100}%` }}
-              >
-                <TileView
-                  tile={tile}
-                  source={tile.sourceId ? optionById.get(tile.sourceId) : undefined}
-                  options={options}
-                  active
-                  audio={audioTile === tile.id}
-                  canConfigure={canConfigure}
-                  onAudio={() => setAudioTile(audioTile === tile.id ? undefined : tile.id)}
-                  onBind={(sourceId) => bind(tile, sourceId)}
-                  onSettings={() => requireConfigure() && setRebinding(tile)}
-                />
-              </div>
-            ))}
+        <div
+          {...{ [ROOT_ATTR]: 'true' }}
+          className={full ? `flex flex-col bg-[#0b0c0f] ${full === 'web' ? 'fixed inset-0 z-[200]' : 'h-full w-full'}` : 'flex min-h-0 flex-1 flex-col'}
+        >
+          {full ? (
+            <div className="flex h-10 shrink-0 items-center gap-3 px-3 text-sm text-zinc-100">
+              <span className="truncate font-medium">{current.name}</span>
+              <span className="shrink-0 text-xs text-zinc-500">
+                {full === 'web' ? '網頁滿版（瀏覽器工具列仍會顯示）' : '標籤頁全螢幕'}・{current.tileCount} 格{zoomTile ? '・單格放大中' : ''}
+              </span>
+              {zoomTile ? (
+                <button type="button" onClick={() => setZoomTile(null)} className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs hover:bg-white/5">返回整頁</button>
+              ) : null}
+              <button type="button" onClick={exitFull} className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1 text-xs hover:bg-white/20">
+                <Minimize2 className="size-3.5" />離開全螢幕
+              </button>
+            </div>
+          ) : null}
+          <div ref={stageRef} className={full ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1' : 'min-h-0 flex-1 overflow-auto'}>
+            <div className="relative mx-auto shrink-0" style={{ width: fitW, height: fitH }} aria-label={`${current.name} 監控畫面`}>
+              {current.tiles.map((tile) => {
+                const zoomed = zoomTile === tile.id;
+                return (
+                  <div
+                    key={tile.id}
+                    className={`absolute p-1 ${zoomTile && !zoomed ? 'invisible' : ''}`}
+                    style={
+                      zoomed
+                        ? { left: 0, top: 0, width: '100%', height: '100%', zIndex: 10 }
+                        : { left: `${(tile.x / CANVAS) * 100}%`, top: `${(tile.y / CANVAS) * 100}%`, width: `${(tile.w / CANVAS) * 100}%`, height: `${(tile.h / CANVAS) * 100}%` }
+                    }
+                  >
+                    <TileView
+                      tile={tile}
+                      source={tile.sourceId ? optionById.get(tile.sourceId) : undefined}
+                      options={options}
+                      active
+                      audio={audioTile === tile.id}
+                      canConfigure={canConfigure}
+                      onAudio={() => setAudioTile(audioTile === tile.id ? undefined : tile.id)}
+                      onBind={(sourceId) => bind(tile, sourceId)}
+                      onSettings={() => requireConfigure() && setRebinding(tile)}
+                      pageFullscreen={Boolean(full)}
+                      zoomed={zoomed}
+                      onZoom={() => setZoomTile(zoomed ? null : tile.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
+
+          {/* 對話框與通知放在全螢幕容器內，原生全螢幕時才看得到 */}
+          {rebinding ? (
+            <RebindDialog
+              tile={rebinding}
+              options={options}
+              onClose={() => setRebinding(null)}
+              onPick={(sourceId) => {
+                const tile = rebinding;
+                setRebinding(null);
+                bind(tile, sourceId);
+              }}
+            />
+          ) : null}
+          {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
         </div>
       ) : null}
 
-      {rebinding && current ? (
-        <RebindDialog
-          tile={rebinding}
-          options={options}
-          onClose={() => setRebinding(null)}
-          onPick={(sourceId) => {
-            const tile = rebinding;
-            setRebinding(null);
-            bind(tile, sourceId);
-          }}
-        />
-      ) : null}
       {editor ? (
         <LayoutEditorDialog
           tab={editor.tab}
@@ -283,7 +376,7 @@ export function VideoMonitorPage() {
           <p className="text-sm text-zinc-300">確定刪除「{deleting.name}」？只移除這個版面，不刪影像來源，也不影響任何來源的錄影。</p>
         </Dialog>
       ) : null}
-      {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
+      {notice && !current ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
     </div>
   );
 }

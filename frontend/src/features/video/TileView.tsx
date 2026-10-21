@@ -1,4 +1,4 @@
-import { Maximize, Settings2, Volume2, VolumeX } from 'lucide-react';
+import { Maximize, Minimize, Settings2, Volume2, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { SourcePicker } from './SourcePicker';
@@ -11,6 +11,7 @@ import { BADGE_TONE, tileBadges } from './status';
  * - 沒有來源：格內直接顯示可搜尋分組下拉，選了就綁定並開始播放。
  * - 已綁定：右上「設定」開簡短對話框（重新選來源／清除綁定）；格子不提供連線或錄影設定。
  * - 只有目前標籤頁的格子會建立播放器；換來源時釋放舊的播放資源，舊請求的回應不會蓋過新來源。
+ * - 單格全螢幕：一般模式用原生全螢幕；整個標籤頁已全螢幕時改成容器內暫時放大（onZoom），避免兩層原生全螢幕互相打架。
  */
 export function TileView({
   tile,
@@ -22,6 +23,9 @@ export function TileView({
   onAudio,
   onBind,
   onSettings,
+  pageFullscreen = false,
+  zoomed = false,
+  onZoom,
 }: {
   tile: Tile;
   source: SourceOption | undefined;
@@ -32,6 +36,10 @@ export function TileView({
   onAudio: () => void;
   onBind: (sourceId: string) => void;
   onSettings: () => void;
+  /** 整個監控標籤頁正在全螢幕（原生或網頁滿版） */
+  pageFullscreen?: boolean;
+  zoomed?: boolean;
+  onZoom?: () => void;
 }) {
   const [session, setSession] = useState<{ sourceId: string; value: LiveSession } | null>(null);
   const [sessionError, setSessionError] = useState<{ sourceId: string; text: string } | null>(null);
@@ -65,6 +73,7 @@ export function TileView({
   }, [active, sourceId, refreshKey]);
 
   const fullscreen = () => {
+    if (pageFullscreen) return onZoom?.();
     const el = boxRef.current;
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -93,8 +102,8 @@ export function TileView({
             </button>
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={fullscreen} aria-label={`${title} 全螢幕`} className="rounded p-1 text-zinc-400 hover:text-white">
-              <Maximize className="size-3.5" />
+            <button type="button" onClick={fullscreen} aria-label={zoomed ? `${title} 返回整頁` : pageFullscreen ? `${title} 放大` : `${title} 全螢幕`} className="rounded p-1 text-zinc-400 hover:text-white">
+              {zoomed ? <Minimize className="size-3.5" /> : <Maximize className="size-3.5" />}
             </button>
           ) : null}
           {tile.sourceId ? (

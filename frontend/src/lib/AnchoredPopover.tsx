@@ -6,7 +6,7 @@ import { computeAnchoredPosition, type AnchoredPosition } from './anchoredPositi
 /**
  * 跟著觸發按鈕的浮層（列操作選單、時間選擇面板…）。
  *
- * 掛到 document.body、position: fixed，所以不會被表格的 overflow-auto 或對話框裁切，也不用拿掉
+ * 掛到 document.body（有原生全螢幕時改掛全螢幕元素）、position: fixed，所以不會被表格的 overflow-auto 或對話框裁切，也不用拿掉
  * 必要的捲動。規則：
  * - 以觸發元素定位；下方放不下就往上開；左右超出視窗就往內推。
  * - 捲動（任何層）或視窗 resize 時重新定位；觸發元素捲出可視範圍就關閉。
@@ -182,6 +182,7 @@ export function AnchoredPopover({
     >
       {children}
     </div>,
-    document.body,
+    // 有元素在原生全螢幕時，body 上的浮層會被瀏覽器 top layer 蓋住：改掛到全螢幕元素內
+    document.fullscreenElement ?? document.body,
   );
 }
