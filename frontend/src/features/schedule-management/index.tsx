@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -19,30 +19,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
-import MapEditorApp from '../map-editor';
-import ShiftRecordsApp from '../shift-records';
-import TimeTemplatesApp from '../time-templates';
-import MaintenanceTasksApp from '../maintenance-tasks';
-import ShiftListApp from '../shift-list';
-import ShiftDeploymentApp from '../shift-deployment';
-import DegradedOperationApp from '../degraded-operation';
-import DispatchSchedulingApp from '../dispatch-scheduling';
-import PsdControlApp from '../psd-control';
-import VirtualFenceManagementApp from '../virtual-fence-management';
-import SystemFoundationApp from '../system-foundation';
-import { AccountManagementPage } from '../access-control/AccountManagementPage';
-import { RoleManagementPage } from '../access-control/RoleManagementPage';
-import { VehicleRealtimePage } from '../vehicle-realtime/VehicleRealtimePage';
-import { VehicleRegistryPage } from '../vehicle-registry/VehicleRegistryPage';
-import { RunHistoryPage } from '../vehicle-run-history/RunHistoryPage';
-import { MediaContentPage } from '../media-content/MediaContentPage';
-import { MediaGroupsPage } from '../media-groups/MediaGroupsPage';
-import { MediaSchedulesPage } from '../media-schedules/MediaSchedulesPage';
-import { EventManagementPage } from '../event-management/EventManagementPage';
-import { VideoMonitorPage } from '../video/VideoMonitorPage';
 import { OPEN_VIDEO_RESOURCES_EVENT } from '../video/history-link';
-import { VideoResourcesPage } from '../video/VideoResourcesPage';
-import { LogPage } from '../log-management/LogPage';
 import { isEventsView, isLogsView } from './types';
 import { useAuth } from '../access-control/AuthContext';
 import type { ShellView } from './types';
@@ -54,7 +31,6 @@ import { SIDEBAR_MODULE_GROUPS, VIEW_PERMISSIONS, permissionSatisfied } from './
 import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
 import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
 import { AttachModuleDashboardDialog } from './components/AttachModuleDashboardDialog';
-import { ModuleDashboardRuntimeView } from './components/ModuleDashboardRuntimeView';
 import {
   useAdminModePreference,
 } from './utils/adminModePreference';
@@ -68,6 +44,35 @@ import {
   writeModuleDashboardPages,
   type ModuleDashboardPage,
 } from './utils/moduleDashboardPages';
+
+const MapEditorApp = lazy(() => import('../map-editor'));
+const ShiftRecordsApp = lazy(() => import('../shift-records'));
+const TimeTemplatesApp = lazy(() => import('../time-templates'));
+const MaintenanceTasksApp = lazy(() => import('../maintenance-tasks'));
+const ShiftListApp = lazy(() => import('../shift-list'));
+const ShiftDeploymentApp = lazy(() => import('../shift-deployment'));
+const DegradedOperationApp = lazy(() => import('../degraded-operation'));
+const DispatchSchedulingApp = lazy(() => import('../dispatch-scheduling'));
+const PsdControlApp = lazy(() => import('../psd-control'));
+const VirtualFenceManagementApp = lazy(() => import('../virtual-fence-management'));
+const SystemFoundationApp = lazy(() => import('../system-foundation'));
+const AccountManagementPage = lazy(() => import('../access-control/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })));
+const RoleManagementPage = lazy(() => import('../access-control/RoleManagementPage').then((module) => ({ default: module.RoleManagementPage })));
+const VehicleRealtimePage = lazy(() => import('../vehicle-realtime/VehicleRealtimePage').then((module) => ({ default: module.VehicleRealtimePage })));
+const VehicleRegistryPage = lazy(() => import('../vehicle-registry/VehicleRegistryPage').then((module) => ({ default: module.VehicleRegistryPage })));
+const RunHistoryPage = lazy(() => import('../vehicle-run-history/RunHistoryPage').then((module) => ({ default: module.RunHistoryPage })));
+const MediaContentPage = lazy(() => import('../media-content/MediaContentPage'));
+const MediaGroupsPage = lazy(() => import('../media-groups/MediaGroupsPage'));
+const MediaSchedulesPage = lazy(() => import('../media-schedules/MediaSchedulesPage').then((module) => ({ default: module.MediaSchedulesPage })));
+const EventManagementPage = lazy(() => import('../event-management/EventManagementPage').then((module) => ({ default: module.EventManagementPage })));
+const VideoMonitorPage = lazy(() => import('../video/VideoMonitorPage').then((module) => ({ default: module.VideoMonitorPage })));
+const VideoResourcesPage = lazy(() => import('../video/VideoResourcesPage').then((module) => ({ default: module.VideoResourcesPage })));
+const LogPage = lazy(() => import('../log-management/LogPage').then((module) => ({ default: module.LogPage })));
+const ModuleDashboardRuntimeView = lazy(() => import('./components/ModuleDashboardRuntimeView').then((module) => ({ default: module.ModuleDashboardRuntimeView })));
+
+function PageLoading() {
+  return <div role="status" className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-500">正在載入頁面…</div>;
+}
 
 type ScheduleManagementAppProps = {
   /** @deprecated 首頁即 VTMS；保留參數以相容舊呼叫 */
@@ -239,6 +244,8 @@ export default function ScheduleManagementApp({
   }, []);
 
   useEffect(() => {
+    // 圖資首次開啟後保留掛載狀態，切頁不重建大型編輯器。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (view === 'map') setMapMounted(true);
   }, [view]);
 
@@ -322,7 +329,7 @@ export default function ScheduleManagementApp({
       />
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {!viewAllowed ? <div className="flex flex-1 items-center justify-center text-zinc-400">權限不足</div> : null}
-        {viewAllowed ? <>
+        {viewAllowed ? <Suspense fallback={<PageLoading />}>
         {activeModulePage ? (
           <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
             <ModuleDashboardRuntimeView
@@ -476,7 +483,7 @@ export default function ScheduleManagementApp({
               </ViewErrorBoundary>
             </ShellWorkspaceFrame>
           </div>
-        ) : null}</> : null}
+        ) : null}</Suspense> : null}
       </main>
 
       {attachModuleId ? (

@@ -7,6 +7,7 @@ import { ApiError, GROUPS_PAGE_SIZE, listGroups, removeMember, reorderMembers, t
 import { DeleteGroupDialog, GroupNameDialog, Toast } from './dialogs';
 import { clampPage, moveItem } from './selection';
 import { Pagination, TypeBadge } from './widgets';
+import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
 
 type Notice = { text: string; tone: 'success' | 'error'; id: number };
 
@@ -22,39 +23,25 @@ export function MediaGroupsPage() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
-  const [data, setData] = useState<GroupList | null>(null);
-  // 哪一次查詢已經有結果；跟目前要的不同就是載入中
-  const [settled, setSettled] = useState<{ key: string; error: string }>({ key: '', error: '' });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [nameDialog, setNameDialog] = useState<{ groupId?: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [adding, setAdding] = useState<MediaGroup | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [reloadTick, setReloadTick] = useState(0);
-  const requestKey = `${keyword}|${page}|${direction}|${reloadTick}`;
-  const loading = settled.key !== requestKey;
-  const error = settled.key === requestKey ? settled.error : '';
   const notify = useCallback((text: string, tone: Notice['tone'] = 'success') => setNotice({ text, tone, id: Date.now() }), []);
-
+  const queryKey = `${keyword}|${page}|${direction}|${auth.user?.id ?? ''}`;
+  const loadGroups = useCallback((signal: AbortSignal) => listGroups({ keyword, page, direction }, signal), [keyword, page, direction]);
+  const query = useCoalescedQuery<GroupList>({ enabled: true, queryKey, load: loadGroups });
+  const data = query.data;
+  const reload = query.refresh;
+  const setQueryData = query.setData;
   useEffect(() => {
-    const controller = new AbortController();
-    void listGroups({ keyword, page, direction }, controller.signal)
-      .then((next) => {
-        // 刪除最後一筆、別人刪了分組：頁碼超出就退回最後一頁
-        const fixed = clampPage(page, next.total, GROUPS_PAGE_SIZE);
-        if (fixed !== page) setPage(fixed);
-        else {
-          setData(next);
-          setSettled({ key: requestKey, error: '' });
-        }
-      })
-      .catch((reason: Error) => {
-        if (!controller.signal.aborted) setSettled({ key: requestKey, error: reason.message });
-      });
-    return () => controller.abort();
-  }, [keyword, page, direction, requestKey]);
-
-  const reload = useCallback(() => setReloadTick((value) => value + 1), []);
+    if (!data) return;
+    const fixed = clampPage(page, data.total, GROUPS_PAGE_SIZE);
+    // 刪除最後一頁資料後，以後端回傳的總數修正頁碼。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fixed !== page) setPage(fixed);
+  }, [data, page]);
   // 其他頁面或其他使用者改了媒體／分組：重新取得（沿用既有失效通知，不另外輪詢）
   useEffect(() => {
     const onLocal = () => reload();
@@ -74,8 +61,8 @@ export function MediaGroupsPage() {
   }, [notice]);
 
   const replaceGroup = useCallback((group: MediaGroup) => {
-    setData((current) => (current ? { ...current, items: current.items.map((item) => (item.id === group.id ? group : item)) } : current));
-  }, []);
+    setQueryData((current) => ({ ...current, items: current.items.map((item) => (item.id === group.id ? group : item)) }));
+  }, [setQueryData]);
   const toggleExpanded = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current);
@@ -160,7 +147,8 @@ export function MediaGroupsPage() {
             notify={notify}
           />
         ))}
-        {loading && !data ? <State text="載入中…" /> : error ? <State text={`載入失敗：${error}`} retry={reload} /> : data && !data.items.length ? <State text={keyword ? '沒有符合的分組' : '尚無媒體分組'} /> : null}
+        {query.backgroundError ? <State text={`背景更新失敗，已保留目前資料：${query.backgroundError}`} retry={reload} compact /> : null}
+        {query.initialLoading ? <State text="載入中…" /> : query.initialError ? <State text={`載入失敗：${query.initialError}`} retry={reload} /> : data && !data.items.length ? <State text={keyword ? '沒有符合的分組' : '尚無媒體分組'} /> : null}
       </div>
       {data && data.total > GROUPS_PAGE_SIZE ? <Pagination page={page} total={data.total} pageSize={GROUPS_PAGE_SIZE} onChange={setPage} /> : null}
 
@@ -210,9 +198,9 @@ export function MediaGroupsPage() {
   );
 }
 
-function State({ text, retry }: { text: string; retry?: () => void }) {
+function State({ text, retry, compact = false }: { text: string; retry?: () => void; compact?: boolean }) {
   return (
-    <div className="py-16 text-center text-zinc-500">
+    <div className={`${compact ? 'py-2 text-amber-300' : 'py-16 text-zinc-500'} text-center`}>
       {text}
       {retry ? (
         <button type="button" onClick={retry} className="ml-3 text-sky-300 underline">

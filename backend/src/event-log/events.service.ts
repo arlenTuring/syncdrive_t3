@@ -221,21 +221,25 @@ export class EventsService {
     const order = bucket === 'pending'
       ? `${SEVERITY_RANK_SQL} ASC, e.created_at DESC, e.id DESC`
       : `e.acknowledged_at DESC NULLS LAST, e.id DESC`;
-    const rows: Array<EventRow & { rank: number; sort_time: string }> = await this.dataSource.query(
+    const rowsPromise = this.dataSource.query(
       `SELECT ${LIST_COLUMNS},
               ${bucket === 'pending' ? SEVERITY_RANK_SQL : 'CASE WHEN e.acknowledged_at IS NULL THEN 1 ELSE 0 END'} AS rank,
               COALESCE(${bucket === 'pending' ? 'e.created_at' : 'e.acknowledged_at'}, 0)::text AS sort_time
          FROM security_event_logs e WHERE ${where} ${keyset}
         ORDER BY ${order} LIMIT $1`,
       params,
-    );
-    const [counts]: Array<{ pending: number; confirmed: number; max_id: string; max_ack: string }> = await this.dataSource.query(
-      `SELECT count(*) FILTER (WHERE NOT e.is_acknowledged)::int AS pending,
-              count(*) FILTER (WHERE e.is_acknowledged)::int AS confirmed,
-              COALESCE(max(e.id), 0)::text AS max_id,
-              COALESCE(max(e.acknowledged_at), 0)::text AS max_ack
-         FROM security_event_logs e`,
-    );
+    ) as Promise<Array<EventRow & { rank: number; sort_time: string }>>;
+    // 分開的純量子查詢可各自走待確認／已確認部分索引；單一 FILTER aggregate
+    // 會為十幾筆 live row 掃過曾大量刪除留下的整個 heap。
+    const countsPromise = this.dataSource.query(
+      `SELECT (SELECT count(*)::int FROM security_event_logs WHERE is_acknowledged = false) AS pending,
+              (SELECT count(*)::int FROM security_event_logs WHERE is_acknowledged = true) AS confirmed,
+              COALESCE((SELECT id FROM security_event_logs ORDER BY id DESC LIMIT 1), 0)::text AS max_id,
+              COALESCE((SELECT acknowledged_at FROM security_event_logs
+                         WHERE is_acknowledged = true AND acknowledged_at IS NOT NULL
+                         ORDER BY acknowledged_at DESC, id DESC LIMIT 1), 0)::text AS max_ack`,
+    ) as Promise<Array<{ pending: number; confirmed: number; max_id: string; max_ack: string }>>;
+    const [rows, [counts], timeZone] = await Promise.all([rowsPromise, countsPromise, this.timeZone()]);
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
@@ -248,7 +252,7 @@ export class EventsService {
       nextCursor: hasMore && last ? encodeCursor([bucket, Number(last.rank), String(last.sort_time), last.id]) : null,
       version: `${counts.max_id}:${counts.max_ack}`,
       serverTime,
-      timeZone: await this.timeZone(),
+      timeZone,
     };
   }
 

@@ -9,6 +9,7 @@ import { listSchedules, MEDIA_SCHEDULE_TAG, SCHEDULES_PAGE_SIZE, type MediaSched
 import { DeleteScheduleDialog, ScheduleResultsDialog } from './dialogs';
 import { formatInZone, MODE_LABEL } from './draft';
 import { ScheduleEditorDialog } from './ScheduleEditorDialog';
+import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
 
 type Notice = { text: string; tone: 'success' | 'error'; id: number };
 
@@ -22,36 +23,24 @@ export function MediaSchedulesPage() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<{ by: SortKey; direction: 'asc' | 'desc' }>({ by: 'created_at', direction: 'desc' });
-  const [data, setData] = useState<ScheduleList | null>(null);
-  const [settled, setSettled] = useState<{ key: string; error: string }>({ key: '', error: '' });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [deleting, setDeleting] = useState<MediaSchedule | null>(null);
   const [viewing, setViewing] = useState<MediaSchedule | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [reloadTick, setReloadTick] = useState(0);
-  const requestKey = `${keyword}|${page}|${sort.by}|${sort.direction}|${reloadTick}`;
-  const loading = settled.key !== requestKey;
-  const error = settled.key === requestKey ? settled.error : '';
   const notify = useCallback((text: string, tone: Notice['tone'] = 'success') => setNotice({ text, tone, id: Date.now() }), []);
-  const reload = useCallback(() => setReloadTick((value) => value + 1), []);
-
+  const queryKey = `${keyword}|${page}|${sort.by}|${sort.direction}|${auth.user?.id ?? ''}`;
+  const loadSchedules = useCallback((signal: AbortSignal) => listSchedules({ keyword, page, sortBy: sort.by, direction: sort.direction }, signal), [keyword, page, sort]);
+  const query = useCoalescedQuery<ScheduleList>({ enabled: true, queryKey, load: loadSchedules });
+  const data = query.data;
+  const reload = query.refresh;
   useEffect(() => {
-    const controller = new AbortController();
-    void listSchedules({ keyword, page, sortBy: sort.by, direction: sort.direction }, controller.signal)
-      .then((next) => {
-        const fixed = clampPage(page, next.total, SCHEDULES_PAGE_SIZE);
-        if (fixed !== page) setPage(fixed);
-        else {
-          setData(next);
-          setSettled({ key: requestKey, error: '' });
-        }
-      })
-      .catch((reason: Error) => {
-        if (!controller.signal.aborted) setSettled({ key: requestKey, error: reason.message });
-      });
-    return () => controller.abort();
-  }, [keyword, page, sort, requestKey]);
+    if (!data) return;
+    const fixed = clampPage(page, data.total, SCHEDULES_PAGE_SIZE);
+    // 刪除最後一頁資料後，以後端回傳的總數修正頁碼。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fixed !== page) setPage(fixed);
+  }, [data, page]);
 
   // 到期處理、其他使用者修改、媒體被改：沿用既有失效通知重新取得
   useEffect(() => {
@@ -187,7 +176,8 @@ export function MediaSchedulesPage() {
             })}
           </tbody>
         </table>
-        {loading && !data ? <State text="載入中…" /> : error ? <State text={`載入失敗：${error}`} retry={reload} /> : data && !data.items.length ? <State text={keyword ? '沒有符合的排程' : '尚無媒體排程'} /> : null}
+        {query.backgroundError ? <State text={`背景更新失敗，已保留目前資料：${query.backgroundError}`} retry={reload} compact /> : null}
+        {query.initialLoading ? <State text="載入中…" /> : query.initialError ? <State text={`載入失敗：${query.initialError}`} retry={reload} /> : data && !data.items.length ? <State text={keyword ? '沒有符合的排程' : '尚無媒體排程'} /> : null}
       </div>
       {data && data.total > SCHEDULES_PAGE_SIZE ? <Pagination page={page} total={data.total} pageSize={SCHEDULES_PAGE_SIZE} onChange={setPage} /> : null}
 
@@ -219,9 +209,9 @@ export function MediaSchedulesPage() {
   );
 }
 
-function State({ text, retry }: { text: string; retry?: () => void }) {
+function State({ text, retry, compact = false }: { text: string; retry?: () => void; compact?: boolean }) {
   return (
-    <div className="py-16 text-center text-zinc-500">
+    <div className={`${compact ? 'py-2 text-amber-300' : 'py-16 text-zinc-500'} text-center`}>
       {text}
       {retry ? (
         <button type="button" onClick={retry} className="ml-3 text-sky-300 underline">

@@ -22,6 +22,26 @@ describe('EventsService 事件管理集合與確認緣由', () => {
     await expect(service.live({ bucket: 'recent' })).rejects.toThrow('事件集合');
   });
 
+  it('live 以兩個部分索引條件取得精確計數，並保留歷史確認時間為空的資料', async () => {
+    const dataSource = {
+      query: jest.fn((sql: string) => {
+        if (sql.includes('AS rank')) return Promise.resolve([]);
+        if (sql.includes('SELECT count(*)::int')) return Promise.resolve([{ pending: 11, confirmed: 4, max_id: '15', max_ack: '0' }]);
+        throw new Error(`未預期 SQL: ${sql}`);
+      }),
+    };
+    const target = new EventsService(dataSource as never, {} as never);
+    jest.spyOn(target, 'timeZone').mockResolvedValue('Asia/Taipei');
+
+    await expect(target.live({ bucket: 'confirmed', limit: '20' })).resolves.toMatchObject({
+      items: [], total: 4, pendingTotal: 11, confirmedTotal: 4, timeZone: 'Asia/Taipei',
+    });
+    const countsSql = dataSource.query.mock.calls.map(([sql]) => sql).find((sql) => sql.includes('SELECT count(*)::int')) as string;
+    expect(countsSql).toContain('WHERE is_acknowledged = false');
+    expect(countsSql).toContain('WHERE is_acknowledged = true');
+    expect(countsSql).not.toContain('FILTER (WHERE');
+  });
+
   it.each([
     ['  已聯絡現場\nEngineer confirmed  ', '已聯絡現場\nEngineer confirmed'],
     [` ${'界'.repeat(500)} `, '界'.repeat(500)],
