@@ -52,14 +52,21 @@ export function TextFilter({ label, value, onChange, onEnter, placeholder, maxLe
 
 export function RangeFilter({ value, onChange, timeZone, error }: { value: RangeDraft; onChange: (v: RangeDraft) => void; timeZone: string; error?: string | null }) {
   return (
-    <FilterField label={`時間區間（${timeZoneLabel(timeZone)}；含結束那一秒）`} wide>
-      <div className="flex items-center gap-2">
-        <SiteDateTimeInput type="datetime-local" step={1} aria-label="開始時間" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} className={`${control} flex-1`} />
-        <span className="text-zinc-500">至</span>
-        <SiteDateTimeInput type="datetime-local" step={1} aria-label="結束時間" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} className={`${control} flex-1`} />
+    <fieldset className="@container min-w-0 flex-[1_1_36rem]">
+      <legend className="mb-1.5 text-xs text-zinc-400">時間區間（{timeZoneLabel(timeZone)}；含結束那一秒）</legend>
+      <div className="grid min-w-0 grid-cols-1 gap-2 @[36rem]:grid-cols-[minmax(16rem,1fr)_auto_minmax(16rem,1fr)] @[36rem]:items-end">
+        <label className="min-w-0">
+          <span className="mb-1 block text-xs text-zinc-500">開始</span>
+          <SiteDateTimeInput type="datetime-local" step={1} aria-label="開始時間" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} className={`${control} w-full`} />
+        </label>
+        <span className="hidden h-10 items-center text-zinc-500 @[36rem]:flex">至</span>
+        <label className="min-w-0">
+          <span className="mb-1 block text-xs text-zinc-500">結束</span>
+          <SiteDateTimeInput type="datetime-local" step={1} aria-label="結束時間" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} className={`${control} w-full`} />
+        </label>
       </div>
       {error ? <span role="alert" className="text-xs text-red-400">{error}</span> : null}
-    </FilterField>
+    </fieldset>
   );
 }
 

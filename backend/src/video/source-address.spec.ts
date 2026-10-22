@@ -1,4 +1,4 @@
-import { buildSourceUrl, checkHostAllowed, maskedSourceUrl, normalizePath, parseSourceUrl, renderPathTemplate } from './source-address';
+import { buildSourceUrl, checkHostAllowed, maskedSourceUrl, normalizePath, parseSourceUrl } from './source-address';
 import { decryptSecret, encryptSecret, signToken, verifyToken } from './video-secrets';
 
 describe('影像來源位址', () => {
@@ -17,20 +17,15 @@ describe('影像來源位址', () => {
     expect(() => normalizePath('/a b')).toThrow();
   });
 
-  it('樣板只接受白名單變數與安全值', () => {
-    expect(renderPathTemplate('/cameras/{cameraId}/main', { cameraId: 'front01' })).toBe('/cameras/front01/main');
-    expect(() => renderPathTemplate('/x/{constructor}', {})).toThrow(/只支援/);
-    expect(() => renderPathTemplate('/x/{cameraId}', { cameraId: '$(rm -rf /)' })).toThrow();
-    expect(() => renderPathTemplate('/x/{index}', {})).toThrow(/需要/);
-  });
-
   it('連線範圍：區網攝影機在允許網段可用；loopback、metadata、未允許網段與 DNS 指向內部位址都拒絕', async () => {
     const allow = ['10.0.0.0/8', '192.168.0.0/16', 'cam.site.local'];
     expect(await checkHostAllowed('10.20.0.10', allow)).toEqual({ ok: true, addresses: ['10.20.0.10'] });
     expect((await checkHostAllowed('127.0.0.1', allow)).ok).toBe(false);
     expect((await checkHostAllowed('169.254.169.254', ['169.254.0.0/16'])).ok).toBe(false);
     expect((await checkHostAllowed('metadata.google.internal', allow)).ok).toBe(false);
-    expect((await checkHostAllowed('172.18.0.5', allow)).ok).toBe(false);
+    const denied = await checkHostAllowed('172.18.0.5', allow);
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.reason).toContain('部署端影像連線政策');
     expect((await checkHostAllowed('evil.example.com', allow, async () => ['127.0.0.1'])).ok).toBe(false);
     expect((await checkHostAllowed('cam.site.local', allow, async () => ['172.20.0.9'])).ok).toBe(true);
     expect((await checkHostAllowed('cam.site.local', allow, async () => ['::ffff:127.0.0.1'])).ok).toBe(false);

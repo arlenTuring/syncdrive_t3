@@ -102,35 +102,6 @@ export function defaultPort(protocol: SourceProtocol) {
   return DEFAULT_PORT[protocol];
 }
 
-/** 路徑樣板：只允許 {vehicleCode}、{cameraId}、{index}，值限英數與 ._-，不支援任何運算式 */
-export const TEMPLATE_VARS = ['vehicleCode', 'cameraId', 'index'] as const;
-export type TemplateVars = Partial<Record<(typeof TEMPLATE_VARS)[number], string>>;
-
-export function renderPathTemplate(template: string, vars: TemplateVars): string {
-  const unknown = [...template.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]).filter((name) => !(TEMPLATE_VARS as readonly string[]).includes(name));
-  if (unknown.length) throw new BadRequestException(`路徑樣板只支援 {vehicleCode}、{cameraId}、{index}（不支援 ${unknown.map((u) => `{${u}}`).join('、')}）`);
-  const out = template.replace(/\{(vehicleCode|cameraId|index)\}/g, (_, name: (typeof TEMPLATE_VARS)[number]) => {
-    const value = vars[name] ?? '';
-    if (!value) throw new BadRequestException(`樣板需要 {${name}} 的值`);
-    if (!/^[A-Za-z0-9._-]{1,64}$/.test(value)) throw new BadRequestException(`{${name}} 只能是英數與 ._-`);
-    return value;
-  });
-  return normalizePath(out);
-}
-
-export function sanitizeTemplateVars(raw: unknown): TemplateVars {
-  if (raw === null || raw === undefined) return {};
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new BadRequestException('樣板變數格式不正確');
-  const out: TemplateVars = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!(TEMPLATE_VARS as readonly string[]).includes(key)) throw new BadRequestException(`不支援的樣板變數 ${key}`);
-    if (value === null || value === undefined || value === '') continue;
-    if (typeof value !== 'string' || !/^[A-Za-z0-9._-]{1,64}$/.test(value)) throw new BadRequestException(`${key} 只能是英數與 ._-（最多 64 字）`);
-    out[key as keyof TemplateVars] = value;
-  }
-  return out;
-}
-
 const FORBIDDEN = new BlockList();
 FORBIDDEN.addSubnet('0.0.0.0', 8, 'ipv4');
 FORBIDDEN.addSubnet('127.0.0.0', 8, 'ipv4');
@@ -186,7 +157,7 @@ export async function checkHostAllowed(host: string, allowlist: string[], resolv
     const address = mapped(raw);
     const family = isIP(address) === 6 ? 'ipv6' : 'ipv4';
     if (FORBIDDEN.check(address, family)) return { ok: false, reason: '不允許連線到本機、link-local 或雲端 metadata 位址' };
-    if (!names.has(name) && !allowed.check(address, family)) return { ok: false, reason: `位址 ${address} 不在允許的攝影機網段內，請管理者在「影像連線範圍」加入` };
+    if (!names.has(name) && !allowed.check(address, family)) return { ok: false, reason: `位址 ${address} 不在允許的攝影機網段內，請聯絡系統管理者調整部署端影像連線政策` };
   }
   return { ok: true, addresses: addresses.map(mapped) };
 }

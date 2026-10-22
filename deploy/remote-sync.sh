@@ -77,6 +77,23 @@ ensure_video_secrets() {
   fi
 }
 
+# 舊版把來源 allowlist 放在 video_settings；新版改成部署設定。必須在刪欄位的 Migration 前搬移。
+ensure_video_allowed_networks() {
+  local file="$1" current legacy column_exists
+  current="$(grep '^VIDEO_ALLOWED_NETWORKS=.' "$file" | cut -d= -f2- || true)"
+  [ -z "$current" ] || { log "影像連線政策：沿用 deploy/.env 的 VIDEO_ALLOWED_NETWORKS"; return 0; }
+  column_exists="$(docker exec syncdrive_postgres sh -c 'psql -X -Atq -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '\''video_settings'\'' AND column_name = '\''allowed_networks'\'')"')" || return 1
+  if [ "$column_exists" = t ]; then
+    legacy="$(docker exec syncdrive_postgres sh -c 'psql -X -Atq -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT array_to_string(allowed_networks, '\'', '\'') FROM video_settings WHERE id = 1"')" || return 1
+    [ -n "$legacy" ] || { echo "既有 video_settings.allowed_networks 為空；請先在 deploy/.env 明確設定 VIDEO_ALLOWED_NETWORKS" >&2; return 1; }
+    set_env "$file" VIDEO_ALLOWED_NETWORKS "$legacy" || return 1
+    log "影像連線政策：已從既有資料庫搬移到 deploy/.env，請由管理者核對"
+    return 0
+  fi
+  set_env "$file" VIDEO_ALLOWED_NETWORKS "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" || return 1
+  log "影像連線政策：新安裝採安全私網預設，請由管理者核對"
+}
+
 compose() {
   (cd "$LIVE_ROOT" && IMAGE_TAG="$IMAGE_TAG" DB_SYNCHRONIZE=false \
     docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env "$@")
@@ -283,6 +300,8 @@ docker cp syncdrive_postgres:/tmp/syncdrive-backup.dump "$BACKUP/database.dump" 
 mkdir -p "$BACKUP/backend-data"
 docker cp syncdrive_backend:/app/data/. "$BACKUP/backend-data/" || false
 
+ensure_video_allowed_networks "$LIVE_ROOT/deploy/.env" || { echo "影像連線政策搬移失敗，未執行 Migration" >&2; false; }
+
 log "[4/7] 維護模式與資料庫升級"
 mark_stage migration
 CURRENT_STAGE=Migration
@@ -357,6 +376,7 @@ git -C "$LIVE_ROOT" checkout -q -f --detach "$SOURCE_SHA"
 set_env "$LIVE_ROOT/deploy/.env" DB_SYNCHRONIZE false
 set_env "$LIVE_ROOT/deploy/.env" IMAGE_TAG "$IMAGE_TAG"
 ensure_video_secrets "$LIVE_ROOT/deploy/.env"
+ensure_video_allowed_networks "$LIVE_ROOT/deploy/.env"
 compose up -d --no-build $(app_services)
 wait_ready
 

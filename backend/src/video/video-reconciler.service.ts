@@ -3,7 +3,7 @@ import { DataSource, In, IsNull, QueryRunner } from 'typeorm';
 import { VideoSource, VideoSourceRevision } from '../database/entities/video.entities';
 import { MediaMtxClient, type ManagedPathConfig, type RuntimePath } from './mediamtx.client';
 import { VideoConfigService } from './video-config.service';
-import { MEDIA_PATH_PREFIX, segmentSeconds, videoConfig } from './video.config';
+import { MEDIA_PATH_PREFIX, segmentSeconds, videoAllowedNetworks, videoConfig } from './video.config';
 import { probeRtsp } from './rtsp-probe';
 import { checkHostAllowed, defaultPort, buildSourceUrl } from './source-address';
 import { addressOf } from './video-config.service';
@@ -126,7 +126,7 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
     if (this.probing || !this.leader) return;
     this.probing = true;
     try {
-      const settings = await this.config.settings();
+      const allowlist = videoAllowedNetworks();
       const sources = await this.dataSource.manager.find(VideoSource, { where: { deletedAt: IsNull(), enabled: true } });
       const revIds = sources.map((s) => s.currentRevisionId).filter(Boolean) as string[];
       const revisions = revIds.length ? await this.dataSource.manager.find(VideoSourceRevision, { where: { id: In(revIds) } }) : [];
@@ -143,7 +143,7 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
           const address = addressOf(rev);
           let result: { ok: boolean; message: string | null };
           try {
-            const check = await checkHostAllowed(address.host, settings.allowedNetworks);
+            const check = await checkHostAllowed(address.host, allowlist);
             if (!check.ok) result = { ok: false, message: check.reason };
             else {
               const probe = await probeRtsp({ host: check.addresses[0], port: address.port ?? defaultPort(address.protocol), tls: address.protocol === 'rtsps', url: buildSourceUrl({ ...address, username: null }, null), username: address.username, password: decryptSecret(rev.secretCiphertext) }, 4_000);
@@ -167,7 +167,6 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
   /** 一次協調：算出需求、對齊媒體服務設定、回寫實際狀態 */
   async reconcile() {
     const cfg = videoConfig();
-    const settings = await this.config.settings();
     const sources = await this.dataSource.manager.find(VideoSource, { where: { deletedAt: IsNull() } });
     const revIds = sources.map((s) => s.currentRevisionId).filter(Boolean) as string[];
     const revisions = revIds.length ? await this.dataSource.manager.find(VideoSourceRevision, { where: { id: In(revIds) } }) : [];
@@ -183,7 +182,7 @@ export class VideoReconcilerService implements OnModuleInit, OnModuleDestroy {
       const wantRecording = demand.get(source.id)?.recording ?? false;
       let url: string;
       try {
-        url = await this.config.mediaSourceUrl(rev, settings.allowedNetworks);
+        url = await this.config.mediaSourceUrl(rev);
       } catch (error) {
         errors.set(source.id, (error as Error).message);
         continue;

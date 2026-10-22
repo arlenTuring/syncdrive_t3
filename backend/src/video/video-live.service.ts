@@ -9,7 +9,7 @@ import { MediaMtxClient } from './mediamtx.client';
 import { probeRtsp } from './rtsp-probe';
 import { buildSourceUrl, checkHostAllowed, defaultPort, maskedSourceUrl, type SourceAddress } from './source-address';
 import { addressOf, VideoConfigService, type ConnectionInput } from './video-config.service';
-import { SOURCE_TEST_CONCURRENCY, SOURCE_TEST_TTL_MS, TEST_PATH_PREFIX, videoConfig } from './video.config';
+import { SOURCE_TEST_CONCURRENCY, SOURCE_TEST_TTL_MS, TEST_PATH_PREFIX, videoAllowedNetworks, videoConfig } from './video.config';
 import { decryptSecret, signToken, verifyToken, type VideoToken } from './video-secrets';
 
 const LIVE_TTL_MS = 10 * 60_000;
@@ -97,7 +97,7 @@ export class VideoLiveService implements OnModuleInit, OnModuleDestroy {
 
   async createTest(input: { connection?: ConnectionInput; sourceId?: unknown }, user: AuthUser, req: Request) {
     if ([...this.tests.values()].filter((t) => t.expiresAt > Date.now()).length >= SOURCE_TEST_CONCURRENCY) throw new BadRequestException('同時進行的測試太多，請稍後再試或先關閉其他預覽');
-    const settings = await this.config.settings();
+    const allowlist = videoAllowedNetworks();
     let address: SourceAddress;
     let password: string | null;
     if (input.sourceId && !input.connection) {
@@ -107,11 +107,11 @@ export class VideoLiveService implements OnModuleInit, OnModuleDestroy {
     } else {
       let previous: VideoSourceRevision | null = null;
       if (input.sourceId) previous = (await this.config.revisionFor(String(input.sourceId))).revision;
-      const resolved = await this.config.resolveConnection(input.connection, settings.allowedNetworks, previous);
+      const resolved = await this.config.resolveConnection(input.connection, previous);
       address = resolved.address;
       password = resolved.secret.kind === 'set' ? resolved.secret.value : resolved.secret.kind === 'keep' && previous ? decryptSecret(previous.secretCiphertext) : null;
     }
-    const check = await checkHostAllowed(address.host, settings.allowedNetworks);
+    const check = await checkHostAllowed(address.host, allowlist);
     if (!check.ok) throw new BadRequestException(check.reason);
     const masked = maskedSourceUrl(address, Boolean(password));
     // RTSP 先直接診斷，錯誤訊息可以分辨帳密錯誤、路徑不存在、逾時

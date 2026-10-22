@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
-import ScheduleManagementApp from './features/schedule-management';
+import { lazy, Suspense, useEffect } from 'react';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
-import { migrateLocalCacheToServer } from './lib/migrateLocalCacheToServer';
 import { useAuth } from './features/access-control/AuthContext';
 import { LoginPage } from './features/access-control/LoginPage';
 import { SIDEBAR_MODULE_GROUPS, type ShellView } from './features/schedule-management/types';
+
+const ScheduleManagementApp = lazy(() => import('./features/schedule-management'));
 
 /**
  * SyncDrive VTMS 根元件：進入即為側欄殼層，預設「班次運行紀錄」。
@@ -20,7 +20,11 @@ function App() {
    * 空的時候推，不會覆蓋已有內容。
    */
   useEffect(() => {
-    if (auth.user) migrateLocalCacheToServer();
+    if (auth.user) {
+      void import('./lib/migrateLocalCacheToServer')
+        .then(({ migrateLocalCacheToServer }) => migrateLocalCacheToServer())
+        .catch((error: unknown) => console.warn('背景快取遷移模組載入失敗；不影響頁面使用', error));
+    }
   }, [auth.user]);
 
   if (auth.loading) {
@@ -33,7 +37,9 @@ function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
       <ViewErrorBoundary title="應用程式載入失敗">
-        <ScheduleManagementApp initialView={initialView as ShellView} />
+        <Suspense fallback={<div className="flex h-full items-center justify-center bg-black text-zinc-500">正在載入工作區…</div>}>
+          <ScheduleManagementApp initialView={initialView as ShellView} />
+        </Suspense>
       </ViewErrorBoundary>
     </div>
   );

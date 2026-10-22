@@ -55,15 +55,13 @@ export type SourceOption = {
 };
 
 export type SourcePage = { page: number; pageSize: number; total: number; items: VideoSourceItem[] };
-export type SourceQuery = { page?: number; pageSize?: number; q?: string; tags?: string[]; enabled?: 'true' | 'false' | ''; online?: '' | 'online' | 'offline' | 'unknown' | 'disabled' };
+export type SourceQuery = { page?: number; pageSize?: number; tags?: string[] };
 
 /** 格子：0–10000 正規化座標（與螢幕像素無關） */
 export type Tile = { id: string; position: number; sourceId: string | null; displayName: string | null; x: number; y: number; w: number; h: number; version: number };
 export type Tab = { id: string; name: string; position: number; tileCount: number; canvasAspectRatio: number; canvas: number; version: number; tiles: Tile[] };
 export type LayoutRectInput = { tileId?: string | null; x: number; y: number; w: number; h: number };
 
-export type Defaults = { protocol: Protocol; host: string | null; port: number | null; pathPrefix: string | null; pathTemplate: string | null; username: string | null; hasPassword: boolean; recordingDefault: boolean; version: number };
-export type Settings = { allowedNetworks: string[]; maxTabs: number; maxSources: number; version: number };
 
 export type StoragePolicy = {
   storageType: 'local' | 'gcs';
@@ -130,16 +128,6 @@ export type ConnectionInput = {
 export type LiveSession = { sourceId: string; expiresAt: number; hlsUrl: string; whepUrl: string; status: ActualStatus };
 export type SourceTest = { id: string | null; status: 'connecting' | 'ready' | 'failed'; error: string | null; tracks: string[]; maskedUrl: string; expiresAt?: number; hlsUrl: string | null; whepUrl: string | null };
 
-export type ApplyItem = {
-  sourceId: string;
-  name: string;
-  version: number;
-  action: 'same' | 'update' | 'error';
-  before: string | null;
-  after: string | null;
-  reason: string | null;
-};
-
 export type TimelineItem = { kind: 'available' | 'gap' | 'expired' | 'failed' | 'recording'; from: number; to: number; protected?: boolean; reason?: string | null };
 export type RevisionInfo = { revisionId: string; revisionNo: number; vehicleCode: string | null; cameraId: string | null; location: string | null; validFrom: number; validTo: number | null; timestampBasis: string; maskedUrl: string };
 export type Availability = { from: number; to: number; sources: Array<{ sourceId: string; name: string; removed: boolean; timeline: TimelineItem[]; revisions: RevisionInfo[] }> };
@@ -175,7 +163,7 @@ export const videoApi = {
   reorderTabs: (ids: string[]) => send<Tab[]>('POST', '/tabs/reorder', { ids }),
   duplicateTab: (id: string) => send<Tab>('POST', `/tabs/${id}/duplicate`),
   sources: (query: SourceQuery, signal?: AbortSignal) =>
-    v('/sources', { page: query.page, pageSize: query.pageSize, q: query.q || undefined, tags: query.tags?.length ? query.tags.join(',') : undefined, enabled: query.enabled || undefined, online: query.online || undefined }, signal) as Promise<SourcePage>,
+    v('/sources', { page: query.page, pageSize: query.pageSize, tags: query.tags?.length ? query.tags.join(',') : undefined }, signal) as Promise<SourcePage>,
   sourceTags: (signal?: AbortSignal) => v('/source-tags', undefined, signal) as Promise<Array<{ tag: string; count: number }>>,
   sourceOptions: (includeDeleted = false, signal?: AbortSignal) => v('/source-options', { includeDeleted: includeDeleted || undefined }, signal) as Promise<{ items: SourceOption[]; total: number }>,
   source: (id: string) => v(`/sources/${id}`) as Promise<VideoSourceItem>,
@@ -185,12 +173,6 @@ export const videoApi = {
   duplicateSource: (id: string, body: { expectedVersion: number; requestId: string }) => send<VideoSourceItem>('POST', `/sources/${id}/duplicate`, body),
   deleteImpact: (id: string) => v(`/sources/${id}/delete-impact`) as Promise<{ sourceId: string; name: string; tabs: number; tiles: number; stopsRecording: boolean }>,
   deleteSource: (id: string, version: number) => send<{ deleted: boolean }>('DELETE', `/sources/${id}?expectedVersion=${version}`),
-  settings: () => v('/settings') as Promise<Settings>,
-  defaults: () => v('/defaults') as Promise<Defaults>,
-  updateDefaults: (body: Record<string, unknown>) => send<Defaults>('PUT', '/defaults', body),
-  previewApply: (body: Record<string, unknown>) => send<{ defaultsVersion: number; items: ApplyItem[] }>('POST', '/defaults/preview-apply', body),
-  apply: (body: Record<string, unknown>) => send<{ applied: Array<{ sourceId: string }>; unchanged: number }>('POST', '/defaults/apply', body),
-  updateSettings: (body: { allowedNetworks: string[]; expectedVersion: number }) => send<Settings>('PUT', '/settings', body),
   createTest: (body: { connection?: ConnectionInput; sourceId?: string }) => send<SourceTest>('POST', '/source-tests', body),
   getTest: (id: string) => v(`/source-tests/${id}`) as Promise<SourceTest>,
   deleteTest: (id: string) => send<{ deleted: boolean }>('DELETE', `/source-tests/${id}`),

@@ -1,4 +1,16 @@
 import { join, resolve } from 'node:path';
+import { validateAllowlistEntry } from './source-address';
+
+const DEFAULT_ALLOWED_NETWORKS = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'];
+
+/** 攝影機連線政策只由部署設定提供；空值拒絕啟動相關連線，不代表任意放行。 */
+export function videoAllowedNetworks(): string[] {
+  const raw = process.env.VIDEO_ALLOWED_NETWORKS;
+  const values = raw === undefined ? DEFAULT_ALLOWED_NETWORKS : raw.split(',').map((value) => value.trim()).filter(Boolean);
+  if (values.length === 0) throw new Error('VIDEO_ALLOWED_NETWORKS 不可為空；請設定允許的攝影機主機或 CIDR');
+  if (values.length > 100) throw new Error('VIDEO_ALLOWED_NETWORKS 最多 100 筆');
+  return [...new Set(values.map(validateAllowlistEntry))];
+}
 
 /**
  * 影像服務的部署設定（環境變數）。一般使用者在畫面上不會看到這些名詞。

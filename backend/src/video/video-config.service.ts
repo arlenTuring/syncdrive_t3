@@ -7,7 +7,6 @@ import {
   VideoMonitorTile,
   VideoSettings,
   VideoSource,
-  VideoSourceDefaults,
   VideoSourceRevision,
   type RecordingProfile,
 } from '../database/entities/video.entities';
@@ -21,13 +20,9 @@ import {
   normalizePort,
   normalizeProtocol,
   parseSourceUrl,
-  renderPathTemplate,
-  sanitizeTemplateVars,
-  validateAllowlistEntry,
   type SourceAddress,
-  type TemplateVars,
 } from './source-address';
-import { mediaPathOf } from './video.config';
+import { mediaPathOf, videoAllowedNetworks } from './video.config';
 import { CANVAS, duplicateName, fullCanvas, normalizeTags, parseAspect, parseLayout, tagKey, type LayoutRect } from './video-layout';
 import { decryptSecret, encryptSecret } from './video-secrets';
 
@@ -116,7 +111,7 @@ export class VideoConfigService {
     if (reason !== 'video_status') this.onChange?.();
   }
 
-  // ── 系統設定（連線範圍） ─────────────────────────────
+  // ── 系統配額 ─────────────────────────────────────────
   async settings(manager: EntityManager = this.dataSource.manager): Promise<VideoSettings> {
     let row = await manager.findOne(VideoSettings, { where: { id: 1 } });
     if (!row) {
@@ -126,19 +121,8 @@ export class VideoConfigService {
     return row;
   }
 
-  async updateSettings(input: { allowedNetworks?: unknown; expectedVersion?: unknown }) {
-    const expected = versionOf(input.expectedVersion);
-    if (!Array.isArray(input.allowedNetworks)) throw new BadRequestException('請提供允許的攝影機網段清單');
-    if (input.allowedNetworks.length > 100) throw new BadRequestException('最多 100 筆');
-    const list = [...new Set(input.allowedNetworks.map((v) => validateAllowlistEntry(String(v))))];
-    const result = await this.dataSource.manager.update(VideoSettings, { id: 1, version: expected }, { allowedNetworks: list, version: expected + 1, updatedAt: Date.now() });
-    if (!result.affected) throw new ConflictException('連線範圍已被其他人修改，請重新整理');
-    this.changed('video_settings');
-    return this.settings();
-  }
-
   // ── 連線輸入與檢查 ───────────────────────────────────
-  async resolveConnection(input: ConnectionInput | undefined, allowlist: string[], previous?: VideoSourceRevision | null): Promise<ResolvedConnection> {
+  async resolveConnection(input: ConnectionInput | undefined, previous?: VideoSourceRevision | null): Promise<ResolvedConnection> {
     if (!input || typeof input !== 'object') throw new BadRequestException('請輸入影像來源');
     let address: SourceAddress;
     let password: string | null = null;
@@ -159,7 +143,7 @@ export class VideoConfigService {
       password = typeof input.password === 'string' && input.password ? input.password : null;
     }
     if (password && password.length > 200) throw new BadRequestException('密碼最多 200 字');
-    const check = await checkHostAllowed(address.host, allowlist);
+    const check = await checkHostAllowed(address.host, videoAllowedNetworks());
     if (!check.ok) throw new BadRequestException(check.reason);
     const secret: ResolvedConnection['secret'] = password
       ? { kind: 'set', value: password }
@@ -170,9 +154,9 @@ export class VideoConfigService {
   }
 
   /** 解開密碼並組出媒體服務用的網址（RTSP／RTMP／SRT 改用檢查過的 IP，避免 DNS rebinding） */
-  async mediaSourceUrl(rev: VideoSourceRevision, allowlist: string[]): Promise<string> {
+  async mediaSourceUrl(rev: VideoSourceRevision): Promise<string> {
     const address = addressOf(rev);
-    const check = await checkHostAllowed(address.host, allowlist);
+    const check = await checkHostAllowed(address.host, videoAllowedNetworks());
     if (!check.ok) throw new ForbiddenException(check.reason);
     const pinned = ['rtsp', 'rtmp', 'srt'].includes(address.protocol) ? check.addresses[0] : undefined;
     return buildSourceUrl(address, decryptSecret(rev.secretCiphertext), pinned);
@@ -235,7 +219,7 @@ export class VideoConfigService {
   }
 
   /**
-   * 來源清單（影像資源管理）：分頁、關鍵字（名稱／載具／位置）、來源標籤（任一符合）、啟用、上線狀態。
+   * 來源清單（影像資源管理）：分頁、來源標籤（任一符合）。
    * 穩定排序（名稱、ID）。不建立任何播放 session、不回傳密碼。
    */
   async querySources(query: Record<string, unknown>) {
@@ -247,24 +231,9 @@ export class VideoConfigService {
       params.push(v);
       return `$${params.length}`;
     };
-    const q = typeof query.q === 'string' ? query.q.trim().slice(0, 100) : '';
-    if (q) {
-      const like = add(`%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-      where.push(`(s.name ILIKE ${like} OR r.vehicle_code ILIKE ${like} OR r.location ILIKE ${like} OR r.camera_id ILIKE ${like})`);
-    }
-    const tags = String(query.tags ?? '').split(',').map((t) => tagKey(t)).filter(Boolean).slice(0, 20);
+    const tags = [...new Set(String(query.tags ?? '').split(',').map((t) => tagKey(t)).filter(Boolean))];
+    if (tags.length > 100) throw new BadRequestException('來源標籤篩選最多 100 個');
     if (tags.length) where.push(`EXISTS (SELECT 1 FROM jsonb_array_elements_text(s.tags) tg WHERE lower(regexp_replace(normalize(tg, NFKC), '\\s+', ' ', 'g')) = ANY(${add(tags)}::text[]))`);
-    if (query.enabled === 'true' || query.enabled === 'false') where.push(`s.enabled = ${add(query.enabled === 'true')}`);
-    // 上線狀態分類：停用／在線（新鮮的 online）／離線（新鮮的離線或錯誤）／未知（沒檢查過或已過期）
-    const category = (fresh: string) => `CASE WHEN NOT s.enabled THEN 'disabled'
-        WHEN COALESCE((s.actual_status->>'checkedAt')::bigint, 0) < ${fresh} THEN 'unknown'
-        WHEN s.actual_status->>'state' = 'online' THEN 'online'
-        WHEN s.actual_status->>'state' IN ('offline', 'error', 'media_unavailable') THEN 'offline'
-        ELSE 'unknown' END`;
-    if (['online', 'offline', 'unknown', 'disabled'].includes(String(query.online))) {
-      const fresh = add(Date.now() - STATUS_STALE_MS);
-      where.push(`${category(fresh)} = ${add(String(query.online))}`);
-    }
     const base = `FROM video_sources s LEFT JOIN video_source_revisions r ON r.id = s.current_revision_id WHERE ${where.join(' AND ')}`;
     const [{ total }] = await this.dataSource.query(`SELECT count(*)::int AS total ${base}`, params);
     const rows: Array<{ id: string }> = await this.dataSource.query(`SELECT s.id ${base} ORDER BY lower(s.name), s.id LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params);
@@ -394,7 +363,7 @@ export class VideoConfigService {
       const count = await m.count(VideoSource, { where: { deletedAt: IsNull() } });
       if (count >= settings.maxSources) throw new BadRequestException(`影像來源已達上限 ${settings.maxSources} 個`);
       const name = text(input.name, '影像名稱', 120, true)!;
-      const conn = await this.resolveConnection(input.connection, settings.allowedNetworks);
+      const conn = await this.resolveConnection(input.connection);
       const now = Date.now();
       const sourceId = randomUUID();
       await m.insert(VideoSource, { id: sourceId, name, enabled: input.enabled === false ? false : true, recordingEnabled, tags, requestId: null, recordingProfile: this.profile(input.recordingProfile), actualStatus: {}, version: 1, createdBy: actor.id, createdAt: now, updatedAt: now, deletedAt: null });
@@ -419,7 +388,6 @@ export class VideoConfigService {
       if (input.recordingEnabled !== undefined && (input.recordingEnabled === true) !== source.recordingEnabled && !perm.canManageRecording) {
         throw new ForbiddenException('變更來源的「儲存錄影」需要錄影管理權限');
       }
-      const settings = await this.settings(m);
       const prev = source.currentRevisionId ? await m.findOne(VideoSourceRevision, { where: { id: source.currentRevisionId } }) : null;
       const patch: Partial<VideoSource> = { version: expected + 1, updatedAt: Date.now() };
       if (input.name !== undefined) patch.name = text(input.name, '影像名稱', 120, true)!;
@@ -432,7 +400,7 @@ export class VideoConfigService {
       const metaChanged = !prev || meta.vehicleCode !== prev.vehicleCode || meta.cameraId !== prev.cameraId || meta.location !== prev.location || meta.timestampBasis !== prev.timestampBasis;
       let conn: ResolvedConnection | null = null;
       if (input.connection) {
-        conn = await this.resolveConnection(input.connection, settings.allowedNetworks, prev);
+        conn = await this.resolveConnection(input.connection, prev);
       }
       const connChanged = conn !== null && (!prev
         || JSON.stringify(conn.address) !== JSON.stringify(addressOf(prev))
@@ -525,149 +493,6 @@ export class VideoConfigService {
     });
     this.changed('video_source_duplicate');
     return this.getSource(newId);
-  }
-
-  // ── 全域預設 ─────────────────────────────────────────
-  private async defaultsRow(m: EntityManager = this.dataSource.manager) {
-    let row = await m.findOne(VideoSourceDefaults, { where: { id: 1 } });
-    if (!row) {
-      await m.createQueryBuilder().insert().into(VideoSourceDefaults).values({ id: 1 }).orIgnore().execute();
-      row = await m.findOneOrFail(VideoSourceDefaults, { where: { id: 1 } });
-    }
-    return row;
-  }
-
-  async getDefaults() {
-    const d = await this.defaultsRow();
-    return {
-      protocol: d.protocol,
-      host: d.host,
-      port: d.port,
-      pathPrefix: d.pathPrefix,
-      pathTemplate: d.pathTemplate,
-      username: d.username,
-      hasPassword: Boolean(d.secretCiphertext),
-      recordingDefault: d.recordingDefault,
-      version: d.version,
-    };
-  }
-
-  /** 儲存全域預設：只影響之後新建的來源；要改既有來源需預覽後「套用到來源」 */
-  async updateDefaults(input: Record<string, unknown>, actor: AuthUser) {
-    const expected = versionOf(input.expectedVersion);
-    const settings = await this.settings();
-    const host = input.host === undefined || input.host === '' || input.host === null ? null : normalizeHost(String(input.host));
-    if (host) {
-      const check = await checkHostAllowed(host, settings.allowedNetworks);
-      if (!check.ok) throw new BadRequestException(check.reason);
-    }
-    const template = text(input.pathTemplate, '路徑樣板', 255);
-    if (template) renderPathTemplate(template, { vehicleCode: 'x', cameraId: 'x', index: '1' });
-    const patch: Partial<VideoSourceDefaults> = {
-      protocol: normalizeProtocol(input.protocol ?? 'rtsp'),
-      host,
-      port: normalizePort(input.port),
-      pathPrefix: input.pathPrefix ? normalizePath(String(input.pathPrefix)) : null,
-      pathTemplate: template,
-      username: text(input.username, '帳號', 120),
-      recordingDefault: input.recordingDefault !== false,
-      version: expected + 1,
-      updatedBy: actor.id,
-      updatedAt: Date.now(),
-    };
-    if (typeof input.password === 'string' && input.password) patch.secretCiphertext = encryptSecret(input.password.slice(0, 200));
-    else if (input.clearPassword === true) patch.secretCiphertext = null;
-    const result = await this.dataSource.manager.update(VideoSourceDefaults, { id: 1, version: expected }, patch as never);
-    if (!result.affected) throw new ConflictException('全域預設已被其他人修改，請重新整理');
-    this.changed('video_defaults');
-    return this.getDefaults();
-  }
-
-  /**
-   * 全域預設批次套用（作用對象是來源，不是格子）：先預覽每個來源的連線差異，明確套用才修改。
-   * 路徑由「前綴＋樣板」算出；樣板只允許白名單變數（vehicleCode、cameraId、index＝在這批中的順序）。
-   * 套用會為有變化的來源建立新版本（新媒體路徑），密碼使用全域預設的密碼（只在後端解開）。
-   */
-  async planApply(m: EntityManager, input: { scope?: unknown; sourceIds?: unknown; tags?: unknown }) {
-    const d = await this.defaultsRow(m);
-    if (!d.host) throw new BadRequestException('請先設定全域來源預設的主機');
-    const scope = input.scope;
-    if (scope !== 'sources' && scope !== 'tags' && scope !== 'all') throw new BadRequestException('套用範圍只能是勾選的來源、來源標籤或全部來源');
-    let sources = await m.find(VideoSource, { where: { deletedAt: IsNull() }, order: { name: 'ASC', id: 'ASC' } });
-    if (scope === 'sources') {
-      if (!Array.isArray(input.sourceIds) || !input.sourceIds.length || input.sourceIds.length > 500) throw new BadRequestException('請勾選要套用的來源');
-      const ids = new Set(input.sourceIds.map(String));
-      sources = sources.filter((s) => ids.has(s.id));
-    }
-    if (scope === 'tags') {
-      const keys = new Set(normalizeTags(input.tags).map(tagKey));
-      if (!keys.size) throw new BadRequestException('請選擇來源標籤');
-      sources = sources.filter((s) => (s.tags ?? []).some((t) => keys.has(tagKey(t))));
-    }
-    const revIds = sources.map((s) => s.currentRevisionId).filter(Boolean) as string[];
-    const revisions = revIds.length ? await m.find(VideoSourceRevision, { where: { id: In(revIds) } }) : [];
-    const revBySource = new Map(revisions.map((r) => [r.sourceId, r]));
-    const items = sources.map((source, index) => {
-      const rev = revBySource.get(source.id);
-      const base = { sourceId: source.id, name: source.name, version: source.version };
-      const before = rev ? maskedSourceUrl(addressOf(rev), Boolean(rev.secretCiphertext)) : null;
-      try {
-        const vars: TemplateVars = { ...sanitizeTemplateVars({ vehicleCode: rev?.vehicleCode ?? '', cameraId: rev?.cameraId ?? '' }), index: String(index + 1) };
-        const tail = d.pathTemplate ? renderPathTemplate(d.pathTemplate, vars) : '';
-        const path = normalizePath(`${d.pathPrefix ?? ''}${tail}`);
-        const address: SourceAddress = { protocol: d.protocol as SourceAddress['protocol'], host: d.host!, port: d.port, path, query: null, username: d.username };
-        const after = maskedSourceUrl(address, Boolean(d.secretCiphertext));
-        const same = rev !== undefined && JSON.stringify(addressOf(rev)) === JSON.stringify(address) && (rev.secretCiphertext === null) === (d.secretCiphertext === null);
-        return { ...base, action: same ? ('same' as const) : ('update' as const), before, after, address, reason: same ? '連線相同，不需更新' : null };
-      } catch (error) {
-        return { ...base, action: 'error' as const, before, after: null, reason: (error as Error).message };
-      }
-    });
-    return { defaults: d, items };
-  }
-
-  async previewApply(input: Record<string, unknown>) {
-    const { defaults, items } = await this.planApply(this.dataSource.manager, input);
-    return {
-      defaultsVersion: defaults.version,
-      items: items.map((item) => {
-        const { address: _address, ...rest } = item as typeof item & { address?: SourceAddress };
-        return rest;
-      }),
-    };
-  }
-
-  async apply(input: Record<string, unknown>, actor: AuthUser) {
-    const expected = versionOf(input.defaultsVersion);
-    const result = await this.dataSource.transaction(async (m) => {
-      const { defaults, items } = await this.planApply(m, input);
-      if (defaults.version !== expected) throw new ConflictException('全域預設在預覽後被修改，請重新預覽');
-      const errors = items.filter((i) => i.action === 'error');
-      if (errors.length) throw new BadRequestException(`有 ${errors.length} 個來源無法套用：${errors[0].reason}`);
-      const settings = await this.settings(m);
-      const check = await checkHostAllowed(defaults.host!, settings.allowedNetworks);
-      if (!check.ok) throw new BadRequestException(check.reason);
-      const applied: Array<{ sourceId: string }> = [];
-      for (const item of items) {
-        if (item.action !== 'update') continue;
-        const source = await this.findSource(m, item.sourceId, true);
-        if (source.version !== item.version) throw new ConflictException(`來源「${source.name}」在預覽後被修改，請重新預覽`);
-        const prev = source.currentRevisionId ? await m.findOne(VideoSourceRevision, { where: { id: source.currentRevisionId } }) : null;
-        const now = Date.now();
-        if (prev) await m.update(VideoSourceRevision, { id: prev.id }, { validTo: now });
-        const revId = randomUUID();
-        await m.insert(VideoSourceRevision, {
-          id: revId, sourceId: source.id, revisionNo: (prev?.revisionNo ?? 0) + 1, ...(item as { address: SourceAddress }).address, secretCiphertext: defaults.secretCiphertext,
-          vehicleCode: prev?.vehicleCode ?? null, cameraId: prev?.cameraId ?? null, location: prev?.location ?? null, mediaPath: mediaPathOf(revId),
-          timestampBasis: prev?.timestampBasis ?? 'center', validFrom: now, validTo: null, createdBy: actor.id, createdAt: now,
-        });
-        await m.update(VideoSource, { id: source.id }, { currentRevisionId: revId, version: source.version + 1, updatedAt: now });
-        applied.push({ sourceId: source.id });
-      }
-      return { applied, unchanged: items.filter((i) => i.action === 'same').length };
-    });
-    this.changed('video_defaults_apply');
-    return result;
   }
 
   // ── 監控標籤頁與版面 ─────────────────────────────────

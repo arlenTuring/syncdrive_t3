@@ -118,53 +118,18 @@ export class VideoController {
     return this.config.saveTilesDeprecated();
   }
 
-  // ── 全域預設與批次套用（影像資源管理 › 進階設定；作用對象是來源） ──
-  @Get('defaults')
-  @RequirePermission(CONFIGURE)
-  defaults() {
-    return this.config.getDefaults();
-  }
-
-  @Put('defaults')
-  @RequirePermission(CONFIGURE)
-  @AuditAction('VIDEO_DEFAULTS_UPDATE', { detail: (req) => ({ fields: Object.keys((req.body as object) ?? {}) }) })
-  updateDefaults(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
-    return this.config.updateDefaults(body ?? {}, user(req));
-  }
-
-  @Post('defaults/preview-apply')
-  @RequirePermission(CONFIGURE)
-  @ApiOperation({ summary: '預覽全域預設套用到來源的差異（scope：sources／tags／all）' })
-  previewApply(@Body() body: Record<string, unknown>) {
-    return this.config.previewApply(body ?? {});
-  }
-
-  @Post('defaults/apply')
-  @RequirePermission(CONFIGURE)
-  @AuditAction('VIDEO_DEFAULTS_APPLY', { detail: (req, result) => ({ scope: (req.body as Record<string, unknown>)?.scope, applied: (result as { applied?: unknown[] })?.applied?.length }) })
-  apply(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
-    return this.config.apply(body ?? {}, user(req));
-  }
-
-  // ── 連線範圍 ──
+  // ── 系統配額（唯讀；連線網段由部署環境設定） ──
   @Get('settings')
   @RequirePermission(CONFIGURE)
   async settings() {
     const s = await this.config.settings();
-    return { allowedNetworks: s.allowedNetworks, maxTabs: s.maxTabs, maxSources: s.maxSources, version: s.version };
-  }
-
-  @Put('settings')
-  @RequirePermission(CONFIGURE)
-  @AuditAction('VIDEO_SETTINGS_UPDATE', { detail: (req) => ({ allowedNetworks: (req.body as Record<string, unknown>)?.allowedNetworks }) })
-  updateSettings(@Body() body: Record<string, unknown>) {
-    return this.config.updateSettings(body ?? {});
+    return { maxTabs: s.maxTabs, maxSources: s.maxSources, version: s.version };
   }
 
   // ── 來源（影像資源管理） ──
   @Get('sources')
   @RequirePermission(CONFIGURE, RECORDING)
-  @ApiOperation({ summary: '來源清單：分頁（page、pageSize）、q、tags（逗號分隔）、enabled、online（online／offline／unknown／disabled）；含 checkedAt／stale，不含密碼、不建立播放' })
+  @ApiOperation({ summary: '來源清單：分頁（page、pageSize）、tags（逗號分隔且任一符合）；含實際狀態，不含密碼、不建立播放' })
   sources(@Query() query: Record<string, unknown>) {
     return this.config.querySources(query ?? {});
   }

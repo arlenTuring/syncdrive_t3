@@ -16,10 +16,6 @@ export class VideoSettings {
   @PrimaryColumn({ type: 'smallint', default: 1, primaryKeyConstraintName: 'PK_VIDEO_SETTINGS' })
   id: number;
 
-  /** 允許連線的攝影機網段（CIDR）或主機名稱 */
-  @Column({ name: 'allowed_networks', type: 'text', array: true, default: () => `ARRAY['10.0.0.0/8', '192.168.0.0/16']::text[]` })
-  allowedNetworks: string[];
-
   @Column({ name: 'max_tabs', type: 'int', default: 50 })
   maxTabs: number;
 
@@ -28,49 +24,6 @@ export class VideoSettings {
 
   @Column({ name: 'row_version', type: 'int', default: 1 })
   version: number;
-
-  @Column({ name: 'updated_at', type: 'bigint', default: () => '(EXTRACT(epoch FROM now()) * (1000)::numeric)', transformer: bigintNumber })
-  updatedAt: number;
-}
-
-@Entity('video_source_defaults')
-@Check('CHK_VIDEO_DEFAULTS_SINGLETON', `id = 1`)
-@Check('CHK_VIDEO_DEFAULTS_PORT', `port IS NULL OR port BETWEEN 1 AND 65535`)
-export class VideoSourceDefaults {
-  @PrimaryColumn({ type: 'smallint', default: 1, primaryKeyConstraintName: 'PK_VIDEO_SOURCE_DEFAULTS' })
-  id: number;
-
-  @Column({ type: 'varchar', length: 8, default: 'rtsp' })
-  protocol: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  host: string | null;
-
-  @Column({ type: 'int', nullable: true })
-  port: number | null;
-
-  @Column({ name: 'path_prefix', type: 'varchar', length: 255, nullable: true })
-  pathPrefix: string | null;
-
-  /** 路徑樣板；只支援 {vehicleCode}、{cameraId}、{index} */
-  @Column({ name: 'path_template', type: 'varchar', length: 255, nullable: true })
-  pathTemplate: string | null;
-
-  @Column({ type: 'varchar', length: 120, nullable: true })
-  username: string | null;
-
-  /** AES-256-GCM 密文；API 永遠不回傳 */
-  @Column({ name: 'secret_ciphertext', type: 'text', nullable: true })
-  secretCiphertext: string | null;
-
-  @Column({ name: 'recording_default', type: 'boolean', default: true })
-  recordingDefault: boolean;
-
-  @Column({ name: 'row_version', type: 'int', default: 1 })
-  version: number;
-
-  @Column({ name: 'updated_by', type: 'varchar', length: 64, nullable: true })
-  updatedBy: string | null;
 
   @Column({ name: 'updated_at', type: 'bigint', default: () => '(EXTRACT(epoch FROM now()) * (1000)::numeric)', transformer: bigintNumber })
   updatedAt: number;
@@ -539,7 +492,6 @@ export class VideoJob {
 
 export const VIDEO_ENTITIES = [
   VideoSettings,
-  VideoSourceDefaults,
   VideoSource,
   VideoSourceRevision,
   VideoMonitorTab,

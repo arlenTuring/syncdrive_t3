@@ -16,6 +16,16 @@ import { computeAnchoredPosition, type AnchoredPosition } from './anchoredPositi
  */
 
 const BASE_Z = 40;
+const TABBABLE = 'button:not([disabled]), a[href], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function moveFocusFromAnchor(anchor: HTMLElement | null, backwards: boolean, panel: HTMLElement | null) {
+  if (!anchor) return;
+  const candidates = [...document.querySelectorAll<HTMLElement>(TABBABLE)]
+    .filter((item) => !panel?.contains(item) && !item.hidden && item.getAttribute('aria-hidden') !== 'true');
+  const index = candidates.indexOf(anchor);
+  const next = candidates[index + (backwards ? -1 : 1)];
+  (next ?? anchor).focus();
+}
 
 /** 觸發元素所在那一層的 z-index（往上找最近有數字 z-index 的祖先） */
 function layerZIndex(el: HTMLElement | null): number {
@@ -40,6 +50,7 @@ export function AnchoredPopover({
   style,
   role,
   ariaLabel,
+  ariaMultiselectable,
   autoFocus = true,
 }: {
   open: boolean;
@@ -53,6 +64,7 @@ export function AnchoredPopover({
   /** menu/listbox：上下鍵在可操作項目之間移動 */
   role?: 'menu' | 'listbox' | 'dialog';
   ariaLabel?: string;
+  ariaMultiselectable?: boolean;
   /** 打開時把焦點移到第一個可操作項目 */
   autoFocus?: boolean;
 }) {
@@ -116,8 +128,9 @@ export function AnchoredPopover({
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
+        e.preventDefault();
         onCloseRef.current('outside');
-        anchorRef.current?.focus();
+        moveFocusFromAnchor(anchorRef.current, e.shiftKey, panelRef.current);
         return;
       }
       if (e.key === 'Escape') {
@@ -167,6 +180,7 @@ export function AnchoredPopover({
       ref={panelRef}
       role={role}
       aria-label={ariaLabel}
+      aria-multiselectable={role === 'listbox' ? ariaMultiselectable : undefined}
       data-anchored-popover={pos?.placement ?? 'measuring'}
       className={className}
       onKeyDown={onKeyDown}

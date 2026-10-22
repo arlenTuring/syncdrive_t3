@@ -33,6 +33,11 @@ function format(value: Date, kind: Kind, seconds: boolean): string {
   return kind === 'time' ? hms : `${ymd}T${hms}`;
 }
 
+function displayDateTimeValue(value: string, kind: Kind): string {
+  if (!value) return '';
+  return kind === 'datetime-local' ? value.replace('T', ' ') : value;
+}
+
 /** 日期／時間輸入的網站深色面板；值格式維持原生 input 契約。 */
 export function SiteDateTimeInput({
   type,
@@ -74,9 +79,9 @@ export function SiteDateTimeInput({
         aria-expanded={open}
         data-site-datetime-value={current}
         onClick={() => setOpen((currentOpen) => !currentOpen)}
-        className={`flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       >
-        <span className={current ? '' : 'text-zinc-500'}>{current || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
+        <span className={`min-w-0 whitespace-nowrap tabular-nums ${current ? '' : 'text-zinc-500'}`}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
         <CalendarClock className="size-4 shrink-0 text-zinc-500" aria-hidden />
       </button>
       <AnchoredPopover

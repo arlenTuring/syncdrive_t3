@@ -1,32 +1,36 @@
-# 影像監控標籤頁與歷史錄影實作指示
+# 影像資源管理與即時影像監控實作指示
 
-本次交付給 Claude Code 的工作是實作功能與測試。本文件取代前一份《事件管理與日誌管理實作指示》中所有影像監控、來源設定、錄影與歷史影像的衝突內容；事件及四類日誌的其餘要求保留。請讀取適用的 AGENTS.md、目前程式與本文件後直接完成實作。
+本文件是影像功能唯一有效的製作指示，直接在原檔更新，不另開第二版。本文件包含每個監控標籤頁的整體全螢幕；事件功能的最新規則與執行模型請以同目錄《事件管理與日誌管理實作指示》為準，不沿用舊兩頁分流。Claude Code 請以本文件完成前後端、資料遷移、既有呼叫者與測試；歷次交付紀錄只代表當時結果，不可拿其中的舊設計覆蓋本文件。事件與日誌的非影像功能保留。
 
-## 一 本次確定的產品行為
+本次重整為兩個側欄頁面：「影像資源管理」與「即時影像監控」。來源設定、分類標籤、啟停、錄影與歷史入口都屬於資源管理；即時監控只負責可保存的版面及來源綁定。「來源標籤」是分類文字，「監控標籤頁」是版面，兩者不可混用。
 
-1. 移除影像監控頁目前的大面積黃色介接說明、缺少契約清單、「本系統預設不錄影」及「11 台上限、第 12 格保留」。這些不應成為一般使用者的操作介面。
-2. 使用者可以建立、命名、排序、編輯、複製及刪除監控標籤頁。每頁自行選擇 1–12 格，每格都能使用，第 12 格沒有保留限制。頁數不限制為一頁，但後端仍須有可配置的資源上限及分頁，避免無界建立。
-3. 每格可以設定影像名稱、影像來源、可選的載具／位置關聯，測試連線並預覽；也能從既有來源選擇，不強制一車一鏡頭。
-4. 提供全站來源預設、標籤頁批次套用、個別格子覆寫。使用者可先用全域主機與路徑樣板產生來源，再逐格修改最終路徑。
-5. 新增有效影像來源時，「儲存錄影」預設勾選，可取消；儲存有效設定後由伺服器持續錄影，與瀏覽器是否開啟、是否觀看該標籤頁無關。
-6. 「測試／預覽」是暫時操作，不寫正式錄影；來源儲存成功後才依勾選狀態啟動。僅建立空格、未設定來源時不啟動錄影。
-7. 「歷史影像查詢」獨立成側欄頁面，提供時間查詢、可用片段時間軸、播放、拖曳定位、倍速、多來源同步及有權限的片段下載。即時監控頁移除目前只有文字結果的歷史查詢區。
-8. 整體深色風格、頁首、側欄、字型、按鈕、分頁、提示、下拉與日期時間控制沿用目前網站。使用者只需看到能設定、能播放、能儲存的介面；編碼器、閘道、索引等實作名詞留在工程文件與進階設定。
+模擬器仍沿用既有 RTSP／HLS／WebRTC 介接，不改 MQTT。模擬器的來源設定、錄影開關與歷史入口若與本文件不同，一律調整為本文件語意。請先讀適用 AGENTS.md、目前程式與本文件再執行，不重建既有媒體平台。
 
-## 二 現有程式修改入口
+## 一 兩個頁面與明確責任
 
-先讀取下列實作，沿用已有權限、稽核、錯誤與 UI 共用能力：
+| 頁面 | 必須提供 | 不應放在此處 |
+| --- | --- | --- |
+| 影像資源管理 | 分頁來源清單、真實上線狀態、啟停、新增／修改／刪除／直接複製、分類標籤、來源錄影設定、歷史錄影入口 | 清單內的播放器、影像縮圖預覽、多格監控版面 |
+| 即時影像監控 | 使用者定義的監控標籤頁、建立／編輯版面對話框、1–12 格拖拉及縮放、每格選用既有來源、播放與臨時全螢幕 | 新建攝影機連線、修改共用來源帳密、每格錄影開關、獨立歷史清單 |
 
-- `frontend/src/features/event-management/VideoMonitorPage.tsx`：目前只有版型與空格，重做為標籤頁管理與真實播放器。
-- `frontend/src/features/event-management/EventReplayDialog.tsx`：目前影像側尚未真正播放，必須串接本次歷史播放服務。
-- `frontend/src/features/event-management/api.ts`：替換 status/missing 與 unknown[] 型別；將影像 API 分離為清楚的型別化模組。
-- `backend/src/event-log/video.service.ts`：目前固定使用 NotConfiguredVideoProvider，替換為實際來源設定、媒體服務及歷史索引。移除 VIDEO_MISSING_CONTRACT 作為一般頁面內容的設計。
-- `backend/src/event-log/events.controller.ts`：VideoController 現有 `/video/sources`、`/video/streams/:id`、`/video/recordings`；升級契約時同步更新全部呼叫者與測試。
-- `frontend/src/features/schedule-management/types.ts`、`index.tsx`、側欄及語系：新增 `video-history` 頁面與權限，保留 `video-monitor`。
-- `backend/src/access-control/access.constants.ts`：保留 `events.video.view` 的現有角色相容性，新增設定、錄影政策、歷史播放與下載所需權限。
-- `deploy/docker-compose.prod.yml`、`deploy/nginx.conf`、`deploy/images.lock`、`deploy/migrations/order.txt`、`deploy/migrate.sh`：加入可部署的媒體服務、磁碟掛載、受保護串流代理及 migration。
+- 「影像監控管理」更名為「即時影像監控」；原「歷史影像查詢」側欄入口改為「影像資源管理」，不保留第三個平行的歷史頁入口。
+- 舊 video-monitor／video-history 深連結、事件回放與模擬器操作連結要相容導向；帶 sourceId、from、to、eventId 的歷史連結進資源管理內的歷史子畫面，不能只跳到空白來源清單。
+- 不放黃色工程缺項清單。保留現站深色風格、共用下拉、日期控制、對話框與權限通知，空狀態用精準可操作的按鈕。
+- 新來源「儲存錄影」預設勾選。從來源啟用且設定生效後即依此決定持續錄影，不依賴是否放進監控格或是否開啟網站。
+- 保留每個監控標籤頁最多 12 格，全部可用；不是限制全站只有 12 個來源，也不是限制來源數與車數相同。
 
-不可只把黃色說明藏起來，底下仍保留空 provider；也不可用前端 localStorage 當正式設定或錄影索引。現有事件、日誌與地圖功能要維持相容。
+## 二 目前程式與修改範圍
+
+目前已實作真實影像管線，不要照舊規格重建空 provider。先讀以下程式及所有呼叫者：
+
+- `frontend/src/features/video/VideoMonitorPage.tsx`、`VideoHistoryPage.tsx`、`TileView.tsx`、`TileSettingsDialog.tsx`、`StorageDialog.tsx`、`layout.ts`、`api.ts`、`status.ts`、`history-link.ts`、`video.spec.ts`。
+- `LivePlayer.tsx`、`SegmentFollower.tsx`、`sync.ts`：保留既有 WebRTC/HLS、歷史時間軸與資源釋放；這次要解除 aspect-video／object-contain 對格子版面的控制。
+- `frontend/src/features/event-management/EventReplayDialog.tsx`、schedule-management 的 types/index/側欄及 i18n；同步改名與歷史跳轉。
+- `backend/src/video/video-config.service.ts`、`video-reconciler.service.ts`、`video.controller.ts`、`video-live.service.ts`、`video-history.service.ts`、`video-storage.service.ts`、`video-archive.service.ts`、`mediamtx.client.ts`。
+- `backend/src/database/entities/video.entities.ts`、現有 video migration、`access.constants.ts`、audit catalog、`backend/scripts/video-itest/`、`deploy/migrations/order.txt` 與部署機制。
+- frontend/package.json 已有 `react-rnd`，優先沿用作版面編輯，不另外引入第二套拖拉系統。不可將整個正在播放的格子變成拖拉區導致下拉與播放控制失效。
+
+已確認舊 `recordingDemand()` 從格子的 recording_requested／enabled 聚合錄影，`layout.ts` 依格數決定固定欄數，TileView 有 aspect-video。這三點都與本次要求衝突，必須修改後端、資料庫與播放容器，不能只換頁名。
 
 ## 三 技術研究結論與選型
 
@@ -47,52 +51,94 @@ MediaMTX 官方提供分段錄影與按時間範圍取回錄影的能力，可�
 
 FFmpeg 的 stream copy 避開重編碼；切片與 seek 仍受關鍵幀限制，不能把設定 60 秒誤當每檔精準 60 秒。[FFmpeg](https://www.ffmpeg.org/ffmpeg.html)、[格式與切片](https://www.ffmpeg.org/ffmpeg-formats.html)。
 
-## 四 監控標籤頁與互動細節
+## 四 影像資源管理與即時監控互動
 
-### 標籤列與版型
+### 影像資源管理首頁
 
-- 頁面上方是監控標籤列，支援新增、改名、拖曳排序與更多選單；當前頁名稱、格數及設定儲存狀態可見。標籤過多時橫向捲動，不壓縮成不可點選。
-- 預設提供「監控總覽」標籤，初始 4 格；只有空白設定，不植入假攝影機。有既有設定時遷移保留。
-- 快捷版型 1、4、9、12 格，另可輸入 1–12 的任意整數。依格數適配欄數：1 格一欄、2–4 格兩欄、5–9 格三欄、10–12 格四欄；小視窗依現站斷點調整，格子維持合理長寬比。
-- 減少格數時預覽哪些格子會從該頁移除；不刪原始來源、不刪錄影。若會取消某來源最後一個錄影需求，提示受影響來源與將停止的新錄影，確認後才套用。
-- 標籤頁設定為場站共用資源，有管理權限者修改、其他有檢視權限者可看；當前標籤、音量、暫時放大可作個人偏好，不將帳號私有與全站配置混成同一份。
-- 切換標籤釋放非作用中播放器，但後端錄影繼續。跨標籤不預先播放全部影像。預設靜音，一次僅啟用使用者指定的音訊。
+- 預設進來源清單，頂部只保留來源標籤多選（空值＝全部、任一標籤符合）、歷史錄影、錄影儲存狀態與新增來源；來源變動後立即更新，不另設搜尋／重置。
+- 表格：名稱、來源標籤、可選載具／位置、已啟用／已停用、線上狀態、儲存錄影設定、實際錄影狀態、遮罩來源摘要、操作。分頁與穩定排序由後端完成，欄位繁多時合理橫向捲動，不能擠成不可讀。
+- 每列操作：開關來源、編輯、直接複製、歷史錄影、刪除。清單不建立 live-session、不載入影片或影像縮圖，不提供 hover 播放；歷史入口也不在列內播放。
+- enabled 是使用者指令，上線狀態是實際探測結果，錄影狀態又是另一件事。啟用不代表在線；停用表示停止本站接入／錄影，不是對實體攝影機下達電源指令。
+- 即使無人觀看且未錄影，啟用來源仍需有有界健康探測。sourceOnDemand 尚未啟動不能直接判成離線；API 提供 checkedAt／stale，過期顯示未知或狀態待更新，不沿用上次綠燈。
+- 有錄影的來源用實際接入狀態判斷，其他啟用來源背景有界探測，建議初始 30 秒、有限並發／逾時／退避；不為每次開清單全量重建播放器或長期拉所有主碼流。
+- 開關採 optimistic version，顯示套用中／失敗與實際結果。停用時撤銷新播放並中止本站既有串流；錄影收尾，舊歷史保留。來源離線則即時格保留尺寸與錯誤，不把來源自動刪掉。
+- 刪除為停用＋soft delete；確認視窗列引用標籤頁數與將停止錄影，保留歷史／稽核。原格子保留 stable tileId、位置與來源已刪除提示，可重新選取，不刪格也不重排版面。刪影片是另有權限的歷史操作。
 
-### 每個格子的設定與預覽
+### 新增與編輯來源對話框
 
-格子頂部：名稱、來源摘要、連線狀態、錄影狀態、設定、放大／全螢幕。狀態以短文字及小徽章表達，例如「未設定」「連線中」「播放中」「錄影中」「僅即時」「錄影暫停：空間不足」。空格顯示「設定影像來源」按鈕。
+1. 名稱、可建立／選取的來源標籤 chips、協定、主機、port、path／完整 URL、帳密、可選載具／cameraId／位置、啟用開關。
+2. 「儲存錄影」預設勾選，可取消；進階提供既有品質／保存設定，無實作的 codec/preset 不假裝可用。來源儲存與是否儲存錄影區分命名。
+3. 測試連線、預覽、儲存、取消。只有這個對話框才可做來源預覽，測試用短效 session、不開正式錄影；關閉、取消與切換來源釋放預覽資源。
+4. 編輯回填非敏感配置，password 未填保留舊值，明確操作才清除；不回傳解密密碼。儲存成功立即更新清單狀態，網路協調由 worker 套用。
+5. 來源標籤是可多選文字分類，trim／去空／去重、每來源最多 10 個、每個 30 字作初值；保留顯示字，規範化比較避免只有全半形／大小寫不同的重複分類。未知標籤可在有設定權限時新增，不必先建分類管理頁。
+6. 標籤與名稱變更不建立新的媒體 revision、不重啟串流；真實連線、鏡頭或時間關聯改變才按現有規則建立 revision。
 
-設定對話框包含：
+### 一鍵複製來源
 
-1. 影像名稱、選用現有來源／建立新來源。
-2. 協定、主機、連接埠、路徑、帳號／密碼；提供完整 URL 輸入模式，由後端解析並脫敏，不把含密碼 URL 放到一般頁面。
-3. 可選載具、攝影機識別、位置／視角，來源可不屬於任何車輛。
-4. 「儲存錄影」checkbox 預設勾選，與「儲存設定」按鈕區別命名；可選保存策略及錄影品質預設。
-5. 「測試連線」「預覽」「儲存設定」「取消」。測試回報可理解的錯誤，預覽顯示真正畫面與目前取得的解析度、fps／codec；沒有數據則顯示未知。
-6. 預覽使用短效 preview session、逾時與並發上限，關閉即清理；不開始正式錄影，不留下永久測試來源。測試不能讓其他格子正在播放的正式來源斷線。
+- 按複製後直接呼叫後端並在清單目前來源附近顯示新列與成功訊息；不先開對話框、不等使用者按第二次建立。篩選／排序使新列不在當頁時顯示可定位該筆的提示，不能悄悄清空使用者所有條件。
+- 新名稱為「原名稱的複製」，名稱上限須先預留後綴長度；不把後綴截掉。允許重複顯示名，sourceId 才是識別，不用名稱當唯一鍵。
+- 複製當時連線配置、帳密、來源標籤、啟用、儲存錄影與適用的品質／保存設定，只有名稱和新身份不同。已停用來源複製仍停用；勾選錄影且啟用者複製後會有獨立新錄影需求，依配額處理並明示實際狀態。
+- 新 sourceId、新 revisionId 與新 mediaPath；伺服器內安全複製／重新加密 secret，不從瀏覽器要求原密碼。不能共用可變來源 row 或原 revision。
+- 不複製舊片段、歷史索引、連線狀態、播放授權、錄影 jobs、lease、建立者與建立時間；新列 actualStatus 從待檢查開始。原始來源改路徑不會改副本，反之亦然。
+- 原子檢查來源版本／maxSources／權限與複製，前端防連按；以 requestId 冪等避免網路重試產生兩份。明確再次點複製可再建一份。
 
-換來源時區分「更換此格綁定」與「修改共用來源」。前者不影響其他格；後者顯示所有受影響標籤／格子並確認。來源更新採版本控制，後端拒絕舊版本覆蓋較新設定。
+### 即時影像監控與版面編輯對話框
 
-### 全域設定與批次套用
+- 首頁顯示場站共用的使用者監控標籤頁，支援新增、改名、排序、複製、刪除與編輯版面。來源標籤與這些頁籤互相獨立。
+- 新增標籤頁按鈕先開對話框，填名稱、按「加入影像格」。第一格占滿編輯畫布；第二格預設與第一格左右各半。上限 12 格，後端同樣驗證。
+- 第三格起先選取要分割的格子，未選取則選面積最大的一格；較寬則左右分割、較高則上下分割，依穩定順序打破平手。新格加入只分割該格，不每加一格重排全部自訂位置。另提供明確的「平均重排」操作，需使用者觸發才重新平均安排。
+- 使用者可拖曳格子標題／拖曳把手調整位置，從邊／角拉伸大小；顯示邊界與吸附，最小尺寸、不可越界、不可重疊。已選來源、播放器控制、下拉不作拖曳把手。
+- 建議存 0–10000 的正規化整數 x/y/w/h（非螢幕 px），每頁另保存 canvasAspectRatio（初始 16:9，與來源影像比例無關），監看時整體等比例 fit 畫布，避免裝置變化使版面形狀走樣；編輯畫布有固定可用區；前端以畫布尺寸換算，後端檢查所有矩形邊界、最小寬高（初值 500）與正面積相交。相接邊合法，間距用格內 padding 實現。可保留使用者移動後的背景空白，不暗中補位或重排。
+- 拖曳／縮放 stop 時才更新草稿；不合法位置回到最後合法矩形並提示。儲存前檢查整份版面，取消不寫後端；API 必須同樣拒絕越界、NaN、負尺寸、重複 tileId、重疊與第 13 格，不能只靠 UI。
+- 刪格只刪版面格子，不刪來源、不停止來源錄影；最後一格刪除後草稿可重新加入，但儲存時要求 1–12 格。
+- 儲存後版面鎖定，日常監看不能直接拖拉改版。要調整就開「編輯版面」；重整、換標籤、其他有權帳號看同一版面，不能只保存在 localStorage。
+- 螢幕變大縮小只等比例／依座標映射整個畫布，不能套舊 gridColumns 自動重排；極窄視窗可以整體縮放／捲動維持最小可操作大小。格子內影片 metadata 不參與 layout 計算。
+- 開編輯對話框使用配置示意，不預先啟動 12 路播放器；提交後才正常載入目前標籤需要的來源。
 
-- 「全域來源預設」提供協定、主機、port、共同路徑前綴、路徑樣板、憑證與新來源錄影預設。主畫面只放一個入口，不常駐工程說明。
-- 支援明確白名單變數，例如 `{vehicleCode}`、`{cameraId}`、`{index}`，不支援 JS、shell 或任意 expression。每一格可以指定變數值，再修改最終路徑。
-- 範例：全域 `rtsp://10.20.0.10:554`，樣板 `/cameras/{cameraId}/main`；第 1 格 cameraId=`front01`，得到 `/cameras/front01/main`，第 2 格可覆寫為 `/special/rear`。憑證另存，預覽 URL 不含密碼。
-- 套用範圍可選目前標籤、勾選格子、全部標籤；預設只填空白／未覆寫欄位。提供「覆蓋已自訂欄位」選項與變更前後預覽，避免一鍵破壞所有來源。
-- 「儲存全域預設」只影響將來新建；「套用到既有格子」才修改現有設定。採快照套用，不暗中即時繼承全域值，避免改一次主機讓所有串流突然換來源。
-- 批次更新先驗證全部輸入，再以交易保存 desired config；來源實際連線由 worker 套用，每格顯示待套用／已套用／失敗可重試。資料庫交易不能橫跨慢速網路連線。
-- 共享同來源時，UI 應提示這是同一來源，不重複建立錄影。修改單格路徑造成真正不同來源時，建立新來源／來源版本，不冒用另一台鏡頭的歷史。
+### 格子來源選取與影片填滿
 
-## 五 錄影需求與來源共用規則
+- 建好的格子沒有來源時，直接在格內顯示本站樣式的可搜尋分組下拉，選取來源即保存該格綁定，不跳對話框、不填帳密、不在此建立來源。
+- 下拉按來源標籤排序與分組；多標籤來源只呈現一次，以標準化後排序第一個標籤作分組，其他標籤仍顯示 chips；同組依名稱及 ID 穩定排序，無標籤為「未分類」。搜尋匹配名稱／全部標籤／載具／位置，不只分組標題。
+- 顯示來源線上／停用狀態：離線但啟用者可選，提示等待來源恢復；停用來源不接受新綁定，既有綁定仍顯示停用。已刪除來源不在新選單，但既有格保留可重新選取。
+- 綁定成功立即載入播放器。已綁定格子右上角「設定」才開一個僅重新選來源／清除綁定的簡短對話框，取消無副作用；不開來源連線編輯器、不提供錄影開關。
+- 清除綁定恢復格內下拉，layout 完全不變。來源改名／標籤更新反映選單，但不重新建立媒體來源；換來源時釋放舊 session／HLS／WebRTC／計時器，舊請求回應不能蓋新來源。
+- 影片必須填滿固定格子的可用影像區，採 `width:100%; height:100%; object-fit:cover`、預設置中裁切，維持影像比例，不拉伸變形、不留 contain 黑邊。直式／橫式／切換解析度都不能改格子尺寸。
+- 格子標題列占固定控制高度，播放器父層 `min-width:0; min-height:0; overflow:hidden`；移除 TileView 的 aspect-video 及 LivePlayer 內衝突的 aspect/contain。全螢幕也維持 cover；臨時放大不回寫保存版面。
+- 只播放作用中標籤，切換釋放非作用中播放器；預設靜音，一次只開使用者指定的音訊。同 sourceId 多格不增加後端錄影份數。
 
-資料模型分開「標籤／格子」和「攝影機來源」。同一個 sourceId 被多個格子引用，只接入一份主碼流、錄製一份歷史。必要的低解析子碼流可另外接入，但全站共用。
+### 每個監控標籤頁整體全螢幕
 
-- 格子保存 `recordingRequested`，新綁定有效來源時預設 true。來源的有效錄影需求為「至少一個啟用格子要求錄影」，並受停用來源與全域容量保護控制。
-- 某格取消勾選不刪過去錄影；若其他格仍勾選，來源仍錄影，該格顯示「此格不要求錄影；來源仍由其他格儲存」，避免承諾未儲存卻仍有共享紀錄。
-- 若全部格子取消，關閉／刪除最後一個請求，則完成當前可恢復片段後停止新錄影，保留歷史至到期。刪除標籤、來源停用也遵循此規則。
-- 不把「預設勾選」做成只勾 UI，後端其實永遠 disabled。回應必須分 desiredRecording 與 actualRecording，附容量不足、離線、轉碼失敗等原因。
-- 關閉網站／登出不停止錄影；worker 重啟後依已保存需求恢復，並以 lease／鎖確保單一來源不被兩個 worker 重複錄製。
-- 允許只即時不保存：沒有其他需求時不產生持久錄影片段；必要播放器暫存應有短 TTL，不可悄悄保留成歷史。
+這是使用者圖中監控頁籤的整體全螢幕，與每顆鏡頭既有的單格全螢幕不同，兩者都保留但不能混淆。
+
+- 每個標籤頁有可識別的「此標籤頁全螢幕」入口，可放在頁籤更多選單；當前頁籤工具列另有醒目的「標籤頁全螢幕」圖示按鈕，所有有即時檢視權限的人都能用，不需 configure 權限。
+- 按下後以使用者手勢呼叫 requestFullscreen()，目標為當前標籤的整個監控容器：包含所有格子、必要的精簡控制與標籤名稱，隱藏應用側欄／頁首／其他管理工具。不只是放大最後點選的那顆鏡頭，也不是把每格各開新頁。
+- 全螢幕頂部保留標籤名稱與明確「離開全螢幕」控制，必要狀態短提示即可。Esc／瀏覽器退出／切離頁面都應還原；不要攔截瀏覽器 Esc 造成困住使用者。
+- 版面仍使用該頁已保存 normalized rects 與 canvasAspectRatio，依全螢幕可用區重新 fit。尺寸來自 fullscreen root 的 ResizeObserver，不繼續使用進入前 stage 尺寸；清除 minW=640 造成的小螢幕超界並正確約束容器。所有格子同時可見、不可因 full screen 覆蓋或自動排成另一套版面。
+- 影片在每格內仍 object-fit:cover，長寬比、直橫片與載入 metadata 不會改格子幾何；整體畫布 fit 可能有畫布外留白，不能以拉伸單格或重排版面消除它。
+- 進出不得重建整組播放器／改 key／重取所有 session／中斷音訊；保留目前來源、連線、音量、臨時狀態及播放，不重啟錄影 worker。
+- 監控頁 fullscreen 時禁止版面拖曳，版面編輯仍走既有對話框；要修改版面先離開整體全螢幕即可。格內播放控制與來源設定若保留，Popover／Dialog portal 必須掛到 fullscreen root 內，不能 portal 到 body 後被瀏覽器 top layer 蓋掉。
+- 若整體 full screen 中按某格全螢幕，使用容器內臨時單格放大／返回整頁，避免兩套 requestFullscreen／exitFullscreen 狀態互相打架；離開單格時回原標籤整體全螢幕。一般非整體模式的單格原生全螢幕行為維持。
+- document.fullscreenElement、fullscreenchange／fullscreenerror 是權威狀態，不能只用一個 optimistic boolean 讓按鈕顯示錯誤。requestFullscreen 拒絕時顯示短錯誤，不暗中顯示已全螢幕。
+- 瀏覽器不支援原生 API 時可提供同一 DOM 容器的「網頁滿版」備援，並正確標為網頁滿版；不可冒稱已隱藏瀏覽器工具列。測目標瀏覽器與使用者手勢限制，不為此新增全螢幕套件。
+- 來源離線、重新連線、token 續期與頁面失效不應卡住退出控制。切換路由／登出時清理 listener／ResizeObserver 並退出本頁自己的全螢幕，不替其他頁任意 exitFullscreen。
+- 全螢幕只是當下觀看狀態，不保存到資料庫、不修改版面／格子／錄影設定、不在下次進頁自動觸發（瀏覽器也可能禁止）。
+
+驗收：1／3／12 格各自進出、圖中不等大三格版面、直橫片 cover、Esc、API 拒絕、瀏覽器縮放／視窗 resize、來源離線／重連、權杖續期、無 configure 但有 view、來源對話框與 popover、整體與單格模式來回、離頁／登出；比對播放器 instance／網路請求，確保沒有為全螢幕重啟全部串流。這些都必須用真實瀏覽器驗證，不能只 mock requestFullscreen。
+
+### 逐筆來源與部署連線政策
+
+全域來源預設、路徑樣板與批次套用已移除；來源連線只在逐筆來源建立／編輯時設定。允許主機／CIDR 改由部署端 `VIDEO_ALLOWED_NETWORKS` 統一控制，create／edit／test／live／reconciler 共用同一驗證，不提供一般使用者修改入口。
+
+## 五 錄影以來源為準
+
+- `source.enabled && source.recordingEnabled && 未刪除 && 容量允許` 才是錄影需求；來源未綁任何格也要錄。新來源 recordingEnabled 預設 true，可在來源對話框關閉。
+- source.enabled=false：停止本站來源接入／新錄影與新即時播放，保留歷史。recordingEnabled=false：只停止新錄影，來源仍可即時播放並有實際健康狀態。
+- 刪格、換格子來源、刪標籤頁、關閉瀏覽器／登出都不能停掉仍啟用且要求儲存的來源錄影。
+- 從 VideoConfigService.recordingDemand、VideoReconcilerService、容量狀態、TileView/status、API DTO、測試與稽核全部移除「格子 bool_or 決定錄影」的業務規則。不要前端搬開關但 worker 繼續用舊查詢。
+- 同一 sourceId 多格只接入／錄製一份。來源一鍵複製產生新 sourceId，所以副本獨立接入與錄影，不沿用原媒體路徑或歷史；不同 sourceId 即使目前 URL 相同也不能將一方的停用套到另一方。
+- desiredRecording 與 actualRecording、失敗／暫停原因分開回應；配額不足保留設定但顯示錄影暫停，不能默默將 checkbox 改 false。
+- 暫時預覽不啟正式錄影；關閉來源錄影不刪舊資料。停錄完成當前可恢復片段，依既有 hook／補漏建立索引。
+- worker 保留既有鎖／lease、重啟恢復與容量保護；多個 worker 不重複錄製，失敗不能重試無限次。
 
 ## 六 錄影儲存與壓縮設計
 
@@ -140,11 +186,13 @@ FFmpeg 的 stream copy 避開重編碼；切片與 seek 仍受關鍵幀限制，
 - `DELETE_PENDING` 後撤銷新播放授權，刪本機／雲端各副本與 proxy／縮圖，成功後標 DELETED；重試、部分失敗與索引校正要可觀測。設定資料、事件、軌跡、日誌不能跟著影片 cascade 刪除。
 - worker 用現有工作排程與 DB 鎖／佇列能力，避免兩套互不知情的刪除程序；MediaMTX 自動刪除由同一政策產生或停用，不能一邊保護片段，另一邊按固定天數偷偷刪掉。
 
-## 八 獨立歷史影像查詢頁
+## 八 影像資源管理內的歷史錄影
 
-側欄新增「歷史影像查詢」，與「影像監控管理」平行，不藏在監控頁底部。
+來源清單每列有「歷史錄影」按鈕，點入資源管理的全寬歷史子畫面，麵包屑「影像資源管理 › 來源名稱 › 歷史錄影」，有返回清單按鈕並保留原篩選／排序／頁碼。不用小彈窗塞長時間軸，也不新增第三個側欄頁。清單頁仍無預覽，這個明確進入的歷史子畫面可以播放歷史影片。
 
-- 條件：標籤頁、來源（可多選）、載具／位置、起訖時間。標籤篩選使用目前來源集合，歷史也可單獨選停用／已移除但仍有錄影的來源；不能因格子改綁就查不到舊影片。
+清單工具列另有「歷史錄影」入口，可查多來源及已刪除但仍有歷史的來源。只有歷史權限者可由資源管理進入歷史模式，不因此取得來源連線與秘密。
+
+- 條件：來源標籤、來源（可多選）、載具／位置、起訖時間；監控標籤頁可作輔助來源集合篩選，不能與來源標籤混名。歷史可單獨查停用／已刪除但仍有錄影的來源；來源現在的分類只是篩選條件，車輛／時間關聯以歷史 revision 為準。
 - 預設最近一小時、單來源播放；可切多來源同步模式，上限 12 格但不自動播放所有查詢結果。沒有選車也能查固定場域鏡頭。
 - 日曆標示有錄影日期，時間軸顯示有資料／缺段／錄影中／已到期／受保護等真實狀態；時間完整顯示日期、秒與網站時區。
 - 先讀 metadata／availability，再按需要載入媒體；拖曳查找採取消舊請求、debounce 與短範圍預取，不為每次 mousemove 產生一次轉碼工作。
@@ -153,7 +201,7 @@ FFmpeg 的 stream copy 避開重編碼；切片與 seek 仍受關鍵幀限制，
 - 片段以 UTC 絕對起點加媒體相對時間對齊；記錄 timestampBasis（來源／中心接收）、時間偏移、來源時鐘可信度。攝影機未同步時標註精度限制，不能宣稱毫秒同步。MediaMTX 預設可能使用中心系統時間，必須顯式決定是否信任來源絕對時間。[時間映射](https://mediamtx.org/docs/features/absolute-timestamps)。
 - 缺段可「跳至下一段」，由使用者決定；斷線、關閉儲存、磁碟保護、到期刪除原因應可區別。
 - 下載選定來源與區間：快速模式依關鍵幀取範圍並說明實際起訖；精準裁切才重編必要邊界，採有界非同步 job，避免 HTTP request 阻塞或整段影片重編。下載權限、到期與暫存清理要完整。
-- 事件詳情可帶 eventId、來源／載具及事件前後 30 秒導到此頁；EventReplayDialog 也用同一 timeline/playback service。歷史來源和載具關聯用當時版本／時間有效範圍，不拿現在標籤位置推定當時是哪台車。
+- 事件詳情可帶 eventId、來源／載具及事件前後 30 秒導到資源管理的歷史子畫面；EventReplayDialog 也用同一 timeline/playback service。歷史來源和載具關聯用當時版本／時間有效範圍，不拿現在標籤位置推定當時是哪台車。
 
 ## 九 歷史索引與播放路徑
 
@@ -165,60 +213,67 @@ FFmpeg 的 stream copy 避開重編碼；切片與 seek 仍受關鍵幀限制，
 6. 對不支援的原碼流按來源版本＋時間窗＋preset 建 proxy cache，single-flight 合併相同任務；有 TTL、LRU、容量配額，與錄影預算一起計算。查詢不因每位使用者而複製相同代理影片。
 7. 時間軸縮圖按需、低頻產生並共用快取，不對每格每秒存全尺寸 JPEG；保留 HLS 緩衝與錄影快取界線，取消錄影時不能將播放器快取永久留下。
 
-## 十 資料庫設計
+## 十 資料庫 遷移與相容性
 
-沿用 PostgreSQL／TypeORM 與 migration，使用 UTC timestamptz 或專案一致的 epoch 毫秒型別；API bigint 不經 JS number 損失精度。建議實體如下，若現有表已能覆蓋則擴充，不能重複儲存同義資料。
+沿用既有 PostgreSQL／TypeORM、video_* 表、分段索引、儲存與 worker，不重建已完成平台。以下欄位按實際 schema 補齊，不新增同義表：
 
-| 表／實體 | 必要內容 |
+| 實體 | 本次變更 |
 | --- | --- |
-| video_monitor_tabs | id、name、position、tile_count 1–12、version、created_by、created_at、updated_at |
-| video_monitor_tiles | id、tab_id、position、source_id 可空、display_name、recording_requested 預設 true、enabled、version；唯一 tab_id＋position |
-| video_source_defaults | 場站全域模板／非敏感連線欄位、secret reference、version；只作明確套用的模板 |
-| video_sources | 穩定攝影機身份、name、enabled、current_revision_id、recording_profile_id、desired／actual 狀態；UI 格子數不等於來源總數 |
-| video_source_revisions | 不可變來源版本、協定、host、port、path、secret reference、主／子碼流、可選載具／位置、有效時間及時間映射資訊；不把密碼明文放 JSON |
-| video_recording_profiles | 原始／平衡／節省策略、可選壓縮政策、來源 fps／碼率設定；對應型別化驗證 |
-| video_storage_policies | local／GCS、根目錄的部署別名／bucket prefix、配額、保留天數、餘量、高低水位、版本；全域預設與來源覆寫清楚 |
-| video_recording_segments | id、source_id、revision_id、start_at、end_at、狀態、bytes、codec／fps／尺寸、時間基準、checksum、protected_until、失敗原因；唯一 recorder 提供的片段鍵 |
-| video_segment_objects | segment_id、rendition、storage_type、object_key、generation／checksum、bytes、ready/deleting/deleted；同片段可能有本機與雲端副本，不能只存單一 URL |
-| video_jobs | probe／preview／upload／compress／delete／export 的持久化狀態、去重鍵、重試、lease、進度、到期、錯誤；優先沿用現有工作機制 |
+| video_sources | 增加 tags（有界 JSONB 字串陣列即可）、recording_enabled；保留 enabled、sourceId、revision、version、actualStatus、soft delete |
+| video_monitor_tabs | layout_schema_version、canvas_aspect_ratio、固定正規化畫布範圍、tile_count 與 version；新建初值 1 格，數量 1–12 |
+| video_monitor_tiles | stable tileId、tabId、position、可空 sourceId、x/y/w/h、version；唯一位置、正規化邊界與尺寸驗證；不再作錄影真相來源 |
+| video_source_revisions | 複製來源要建新的 revision/mediaPath，來源 tags/name/錄影開關則不改 revision |
+| 現有 recordings／objects／jobs／storage policy | 保留既有檔案、source/revision 索引與歷史，不改來源標籤或版面就搬影片 |
 
-播放 session 與短效 lease 可用現有 Redis；失效後不影響持久錄影索引。不要把每個解碼畫格、每秒品質樣本寫成正式操作日誌。稽核保存來源設定變更、批次套用、錄影政策異動、刪除、下載等必要操作，內容脫敏。
+遷移要求：
 
-來源或標籤刪除為移除設定／停用，不連帶刪錄影；歷史仍以穩定 sourceId 查詢。來源真的換成不同鏡頭時提供新身份選項，不能用改名稱掩蓋歷史。
+1. 新來源 recording_enabled default true；既有來源按舊有效格子的 bool_or(recording_requested AND enabled) 回填，無有效格子則 false。這是避免升級後突然為未使用來源開錄，後續使用者可在來源對話框主動勾選。enabled=false 仍保留算出的保存意圖，實際錄影受 enabled 控制。說明此遷移規則，不一刀切將舊來源全部設 true。
+2. 既有 tag 資料有則保留，沒有設 []。規範化標籤去重；需要 GIN 索引時依實際篩選 EXPLAIN 決定，不建全新分類平台。
+3. 既有每頁 n 格依舊 gridColumns 的基準寬版欄數，穩定回填 normalized x/y/w/h；新建 1 格滿版、2 格左右均分。保留 sourceId、來源 secret、tileId、頁序與頁名，不把目前 nth index 當作永久身份。
+4. 現有 saveTiles 可能依 position 重建 UUID，須改成依 stable tileId 差異更新；布局保存不能讓播放器／引用身份全部重建。未授權 tab 的 tileId、重複 ID／sourceId 錯綁要拒絕。
+5. 保存名稱、layout、增刪 tiles 在一筆交易中完成，用 tab.expectedVersion 防止另一人覆蓋；綁定獨立保存時同樣鎖定 tab／tile，版面與選來源的寫入互不吞掉。不可在鎖等待時做慢速媒體網路呼叫。
+6. 應用與 worker 改讀 source.recording_enabled 後，舊 tile recording_requested 先保留 deprecated 但不再影響行為，舊寫入端不能再更改錄影。若收到舊錄影參數回清楚的版本／契約錯誤，不靜默接受假成功。確認無呼叫者才以後續 migration 刪欄位。
+7. 舊 video-history route 帶條件時轉歷史子畫面；無條件則到資源管理首頁。保留舊 source/revision ID 與媒體檔案，刪來源不 cascade 刪片段。
+8. 新 migration 加到 deploy/migrations/order.txt，測空 DB、既有 DB、可重跑 ledger 與已保存版面。部署時先更新 schema、停止舊版 worker 再啟新版，禁止兩種錄影需求算法並行。禁止 synchronize 重建表或為了通過升級清空資料。
 
-## 十一 API 契約
+稽核增加來源複製、來源啟停／儲存切換、版面儲存、綁定來源，記 actor 與 source/tab/tileId，秘密脫敏；不記每個拖曳 mousemove，也不每次輪詢寫稽核。
 
-均在 `/syncdrive-api/video` 下，先核對現有路由並同步遷移型別與測試；以下為本次可執行設計：
+## 十一 API 契約與前端整合
+
+沿用 `/syncdrive-api/video`、session／CSRF／Guard、現有媒體播放授權；同步 DTO、Swagger、前端型別、既有模擬器／事件呼叫者與整合測試。新增必要端點即可，不複製一套服務：
 
 | API | 行為 |
 | --- | --- |
-| GET/POST `/tabs`；PATCH/DELETE `/tabs/:id` | 查詢與管理標籤，樂觀鎖版本、格數及位置驗證 |
-| POST `/tabs/reorder`；POST `/tabs/:id/duplicate` | 排序／複製；複製預設共用來源，不複製實體錄影 |
-| PUT `/tabs/:id/tiles` | 原子保存格子配置、來源引用及 recordingRequested，最多 12 格 |
-| GET/PUT `/defaults` | 讀／寫全域來源預設，回應不帶 secret |
-| POST `/defaults/preview-apply`；POST `/defaults/apply` | 預覽批次差異；以版本／scope 套用，防止畫面預覽後設定已被別人改掉 |
-| GET/POST `/sources`；GET/PATCH/DELETE `/sources/:id` | 來源配置／停用、遮蔽憑證；頁面初始資料可另用 `/bootstrap`，不再返回長篇 missing 清單 |
-| POST `/source-tests`；GET/DELETE `/source-tests/:id` | 暫存配置測試／預覽、短效授權；限時限量，不寫正式錄影 |
-| POST `/sources/:id/live-sessions` | 依能力取得 WebRTC/HLS 播放資訊、到期與狀態 |
-| GET `/recordings/availability` | sourceIds、from、to，回可用區間、缺段、時間基準；限制來源數與查詢跨度 |
-| GET `/recordings` | 分頁片段清單，來源、時間、狀態、大小與保護資訊；支援舊 vehicleCode 查詢呼叫者的過渡相容 |
-| POST `/playback-sessions` | sourceIds 最多 12、from/to、能力資訊，建立有時間窗限制的歷史播放 |
-| GET `/playback-sessions/:id/manifest` | 有授權的 HLS／播放清單與所需初始化資訊 |
-| POST `/exports`；GET `/jobs/:id` | 有界區間下載任務與結果授權，不在同一 request 重編幾小時影像 |
-| POST `/recordings/delete-preview`；POST `/recordings/deletions` | 預覽影響後刪除，保護與播放 lease 檢查 |
-| GET/PUT `/storage-policy`；GET `/storage-status` | 實際配額、餘量、預估保存、錄影狀態與政策 |
-| GET `/capabilities` | 實際 codec／硬體／協定／儲存可用性，供進階設定選項顯示 |
+| GET `/sources` | 分頁＋tags（OR），穩定排序；清單摘要含 checkedAt/stale、recordingEnabled／actualRecording／usage，無 secret、無播放器 |
+| GET `/source-tags` | 有權限且有界的來源標籤選項／計數，供清單與分組來源選單 |
+| POST `/sources`；PATCH `/sources/:id` | 建立／修改名稱、tags、connection、enabled、recordingEnabled 等；含 expectedVersion，建立預設錄影 true |
+| PATCH `/sources/:id/enabled` | 清單直接啟停，expectedVersion＋enabled，回 desired 與 actual 狀態；可共用 updateSource 實作 |
+| POST `/sources/:id/duplicate` | 原子複製，expectedVersion／requestId，回 201＋新 source 摘要；舊來源 version 不更改 |
+| DELETE `/sources/:id` | 引用影響確認、soft delete，保留歷史與格子尺寸，不能物理 cascade 刪錄影 |
+| POST/GET/DELETE `/source-tests` 相關路由 | 僅來源新增／編輯對話框用的短效真實預覽，不錄影 |
+| GET `/source-options` | 可搜尋／分頁／標籤分組的安全來源摘要，給即時監控；不含 connection 帳密，只需 monitor view 與綁定權限組合 |
+| GET/POST `/tabs`；PATCH/DELETE `/tabs/:id` | 名稱與持久化 layout 管理；建立帶 1–12 個 stable tile 草稿、沒有來源也可存 |
+| PUT `/tabs/:id/layout` | expectedVersion＋完整 normalized rects；同交易增刪更新 tiles 與校驗整體邊界／重疊 |
+| PATCH `/tabs/:id/tiles/:tileId/source` | expectedVersion＋sourceId 或 null，僅換此格來源，不改 layout 或來源錄影 |
+| 既有 tabs reorder/duplicate | 保留能力；複製版面需新 tab/tileId，引用同一 sourceId、不複製來源與錄影 |
+| 既有 live-sessions、recordings/calendar/availability、playback-sessions、manifest、exports、jobs | 後端播放及歷史能力沿用，前端入口換到兩頁新結構 |
+| 既有 defaults、storage-policy/status、capabilities | 移到資源管理進階入口，不放在每格設定對話框 |
 
-API 統一 DTO 白名單、URL 正規化、字串長度、pageSize、時間窗、sourceIds 上限；設定請求含 expectedVersion。即時狀態用既有 Socket 發 sourceId 與狀態，不廣播含帳密 URL。錯誤顯示「帳號或密碼錯誤」「連線逾時」「來源格式無法播放」「空間不足」等，不把內部堆疊當 UX。
+矩形資料至少為 `{tileId, x, y, w, h, position}`，canvas 使用固定 10000×10000 邏輯座標與另存的 canvasAspectRatio；不是把實際播放畫布強迫成正方形。與 sourceId 綁定的輸入分開，避免編版面時意外還原另一人剛選的來源。server 不接受非數值、越界／重疊、跨 tab ID、已刪／停用來源的新綁定。
+
+啟停與複製使用預期版本與冪等鍵；連線套用非同步時回 settingAccepted／actualStatus，不把 HTTP 200 當成在線。清單狀態用現有授權 Socket 失效／有界輪詢更新，不把所有來源 live-sessions 都建起來。
 
 ## 十二 權限與必要邊界
 
-- 沿用 `events.video.view` 看即時；新增 `events.video.configure`、`events.video.recording-manage`、`events.video-history.view`、`events.video-history.export`、`events.video-history.delete`。前後端、角色清單、migration 一起補；普通 view 不等於可改連線或刪錄影。
-- 無頁面 view 隱藏入口並由後端拒絕；有 view 無動作權限依現站慣例保留按鈕，點擊提示權限不足。來源 secret 只允許寫入／替換，GET 不回原值；空白保留原 secret、明確操作才清除。
-- 使用者可以設定 LAN 攝影機，不能一刀切封鎖所有私有 IP；以管理者可設定的攝影機網段／主機 allowlist 與 egress 邊界實現。阻擋 loopback、link-local、GCP metadata、未授權管理網段、DNS rebinding、跨白名單 redirect 及任意 file／shell protocol；對 HLS 子清單／segment URL 同樣驗證。
-- 測試與轉碼使用固定參數 argv，不拼接 shell；固定工作根目錄與進程權限。外部 URL、模板與檔名都不能轉成可執行指令。
-- 短效授權綁 session、source、動作、時間窗；登出／撤權後中止新資源請求並關閉可撤銷的現有連線。內部 MediaMTX API／metrics／hook 不公開匿名存取。[MediaMTX 授權](https://mediamtx.org/docs/features/authentication)。
-- 不在主介面堆疊資安／通訊教科書；限制落實在後端與精準錯誤提示，進階設定才顯示管理者需要的資訊。
+- 保留既有 permission code 相容：events.video.view 管即時監看、events.video.configure 管來源／監控版面設定、events.video.recording-manage 管來源錄影政策與全域儲存、events.video-history.view/export/delete 管歷史。UI 顯示名稱更新為兩頁新名稱，不因改頁名擅自重設角色。
+- 資源管理入口對具有 configure、recording-manage 或任何 history 權限者可見；頁內僅開放其動作與資料。只有 history 的人可由安全來源摘要進歷史，不可讀／改攝影機連線；只有 live view 的人可在即時頁讀安全選項，但不能改來源／版面。
+- 新增／複製來源或編輯來源時，若 payload 要變更儲存政策需檢查 recording-manage；新增預設 true／複製 true 也不能繞過。缺權限採明確拒絕整個所請操作並提示，不能偷偷把錄影改成 false 產生不一致副本。
+- 有頁面 view 沒動作權限保留按鈕、點擊沿用 auth.require 提示；純 view 不可操作版面或持久換來源。有 configure 則可版面／綁定，不因此取得歷史匯出或刪影片權。
+- 原角色曾有 live+history 的相容路徑須有回歸測試；controller 方法級權限與類別級權限要核對實際 Guard 合併語意，避免 history-only 被外層 live view 錯誤擋住。
+- Secret 只寫不讀，來源複製只在後端安全複製。一般清單、選單、log、Socket、CSV 不含密碼或長效 token。
+- 延用 LAN allowlist、metadata／loopback 阻擋、DNS／redirect 防護及受控 argv，不為來源複製或預覽開任意 URL 代理；HLS 子資源同樣驗證。
+- 短效媒體 token 綁 session/source/動作/時間窗；登出、撤權、來源停用／刪除後撤銷新資源並關閉可撤銷連線。MediaMTX Control API/hook 不公開匿名存取。
+- 不把工程或資安長清單放在產品頁面，限制落實後端，錯誤精準、短而可操作。
 
 ## 十三 部署與性能要求
 
@@ -233,23 +288,25 @@ API 統一 DTO 白名單、URL 正規化、字串長度、pageSize、時間窗�
 
 ## 十四 實作順序與驗收清單
 
-順序：來源／標籤 schema 與權限 → 真實接入／預覽 → 監控標籤與批次套用 → 持續錄影與容量回收 → 索引與獨立歷史頁 → 事件同步回放 → GCS／壓縮政策 → 整合與部署驗證。不要停在 UI 外殼。
+依序完成：來源 tags／recordingEnabled 與遷移 → 資源清單／來源對話框／直接複製 → worker 來源錄影切換 → normalized layout API／編輯對話框 → 格內分組選單／設定換源／cover 播放 → 歷史入口與深連結 → 權限／模擬器對應／整合驗證。這次重組以現有串流、錄影與儲存能力為基礎，不把尚未完成的 codec/proxy 功能假裝已完成，也不為版面重構重做平台。
 
 必測案例：
 
-1. 新建、改名、排序、複製、刪除標籤；1／2／4／6／9／12 格；13 格前後端都拒絕；第 12 格確實可播。重整與換帳號後場站設定仍存在。
-2. 全域模板套用、逐格路徑覆寫、只填空白、明確覆蓋、版本衝突、批次部分連線失敗可重試；不把密碼放入回應、稽核或畫面。
-3. RTSP、HLS 等宣告支援的來源實際測試／預覽／播放；壞憑證、逾時、不支援 codec、預覽取消、測試不開始正式錄影。
-4. 新有效來源預設錄影，取消不新錄、歷史不刪；同源多格只錄一份；某格取消但其他格繼續時文案正確；關網頁仍錄，重啟續錄，重複 worker 不重錄。
-5. 不同鏡頭換綁、來源 revision、車輛關聯更改、來源停用與標籤刪除，舊歷史都能正確查詢；不能把舊車畫面顯示成新車。
-6. 寫入崩潰、尾段恢復、斷線缺段、時鐘偏移、跨午夜、不同 GOP、codec 切換；歷史 seek、倍速、取消舊請求、manifest 子資源、Range／206。
-7. 磁碟高低水位、最低餘量、受保護片段、播放 lease、佇列配額、上傳失敗及恢復；回收不得動到事件、軌跡、資料庫與日誌。
-8. GCS 上傳／checksum／generation／本機回收、soft delete 提示、遠端暫時故障、冪等重試；不使用正式 bucket 做破壞性測試。
-9. AV1／HEVC／H.264 能力探測、壓縮候選品質／容量／耗時、失敗保留原檔、原子替換、無硬體 fallback；不把 VMAF 高分當唯一驗收。
-10. 多來源同步、缺段獨立顯示、事件前後 30 秒連結、原碼流不相容的共用 proxy、到期授權續期與撤權；12 格沒有固定假品質數字。
-11. 直接 API／Socket／manifest／segment／download 權限旁路、SSRF／metadata／DNS redirect、注入、路徑穿越；普通 LAN 攝影機在白名單內可成功設定。
-12. Chrome／Safari／Edge 的實際目標瀏覽器、桌面與窄視窗、本站下拉及對話框樣式、鍵盤與焦點、空狀態、短錯誤提示。畫面不可再出現目前的黃色工程缺項列表。
+1. 側欄只顯示影像資源管理與即時影像監控，歷史只由資源管理進入；舊 video-history/事件/模擬器連結保留來源與時間，返回保留清單條件。
+2. 資源清單全程沒有播放器／影像縮圖及隱藏 live-session；filter、分頁、標籤、啟停、實際上線／stale／停用狀態正確。無錄影且無觀看來源仍有有界真實探測。
+3. 新增／編輯來源可設分類 tags、儲存勾選、預覽與取消；預覽不錄影、密碼不回傳、關閉釋放 session。只改名稱／tags 不重啟媒體。
+4. 一鍵直接複製出「原名的複製」，連線／秘密／tags／enabled／recordingEnabled 一致，sourceId/revision/mediaPath 獨立，actual 狀態重置，沒有複製原歷史。重試冪等、連按與名稱長度、上限、來源版本衝突、無錄影權限案例都要測。
+5. 未綁格子的啟用且儲存來源會實際錄影；刪格、換綁定、刪監控頁、登出都不停止它。來源取消儲存仍可即時播放；停用來源停止本站接入及新錄影但歷史可查。
+6. 新增監控頁先開對話框，1 格滿版、2 格左右均分；3–12 格按規則分割，既有其他格不被重排，第 13 格前後端拒絕。刪到零時不可保存，取消不改資料。
+7. 拖拉、四邊／角縮放、邊界、吸附、最小尺寸、越界、重疊、NaN／負值／跨 tab tileId、並發版面與換來源，均驗前後端；sourceId/tileId 不因拖曳全部重建。
+8. 自訂不等大格子保存後重整／換標籤／換視窗／換帳號呈現一致；監看模式鎖版，無法誤拖；放大／全螢幕與切換影片尺寸不改持久版面。
+9. 空格直接分組下拉而非彈窗；多 tags 去重分組、未分類、搜尋、來源離線／停用／刪除均正確。已綁格右上設定才彈重新選來源視窗，清除只清綁定。
+10. 直式、橫式、超寬影片在同一格都 cover 滿格、置中裁切且不變形／不改格子尺寸；測播放器內部、HLS／WebRTC fallback、全螢幕與錯誤狀態不造成 layout shift。
+11. 來源刪除後格子保留幾何與可重選提示，舊錄影可從資源管理歷史模式查到；事件回放仍以歷史 revision 車輛關聯對齊。
+12. 舊 DB 升級回填來源錄影意圖／無格來源 false、既有版面位置、來源 tags、secret、source/revision/tileId、錄影索引保留。舊 worker 不和新 worker 混跑，新 schema/ledger 可重跑。
+13. live-only／configure／recording-manage／history-only／export/delete 角色實際 API／UI／Socket／媒體授權均驗；history-only 不讀連線秘密，來源複製不能繞過錄影權限。
+14. 錄影分段、quota 高低水位、保護／lease、GCS、壓縮、Range/206、缺段、事件前後 30 秒、多來源歷史同步與原有模擬器 RTSP 管線回歸，不能因改入口丟失既有能力。
 
-使用小型合成測試串流與隔離錄影目錄，設定測試磁碟與執行時間上限、測後清理；這可驗證管線與 UI，不等於真實攝影機 12 路效能驗收。跑前後端既有測試入口、build 及本次新增的真實媒體整合測試，記錄環境／命令／結果。
+用有限測試 fixtures／隔離 DB 與錄影目錄驗證，測後清理自有資料。不跑無限模擬器、不調低正式容量保護。執行前後端 build、相關單元／API／媒體整合測試，並以真實瀏覽器驗證拖拉縮放、分組下拉、cover 與歷史入口；命令、環境、結果須實錄，未執行不能寫通過。
 
-最終交付：完整程式、migration、compose／Nginx／媒體配置、來源與儲存設定範例、API 型別／Swagger、操作說明、測試結果、編碼策略實測比較與部署步驟。真實來源由使用者在 UI 輸入；沒有攝影機憑證不能成為只交空 provider 的理由。尚未實機驗證的項目明列在工程交付紀錄，不把缺項清單塞回使用者首頁。
+最終交付：前後端與所有呼叫者修改、migration/order、角色與稽核對照、資料升級規則、使用者操作說明、回歸測試與尚未實機驗證的限制。相關功能依同目錄《事件管理與日誌管理實作指示》第十五節的 Git 要求 commit 到 main，回報實際 SHA；不自動 push 或部署。只更新本檔作影像唯一製作指示，不產生 v2／補丁版指示；其他文件只保留指向本檔的摘要／相容性更新，歷史交付紀錄不回寫成新功能已完成。
