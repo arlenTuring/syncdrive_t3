@@ -11,6 +11,7 @@ import {
   type RecordingProfile,
 } from '../database/entities/video.entities';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
+import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
 import {
   buildSourceUrl,
   checkHostAllowed,
@@ -101,7 +102,11 @@ export function addressOf(rev: Pick<VideoSourceRevision, 'protocol' | 'host' | '
  */
 @Injectable()
 export class VideoConfigService {
-  constructor(private readonly dataSource: DataSource, @Optional() private readonly invalidation?: DatasourceInvalidationService) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
+    @Optional() private readonly foundationSettings?: SystemFoundationSettingsService,
+  ) {}
 
   /** 協調器註冊：設定變更後盡快套用到媒體服務 */
   onChange?: () => void;
@@ -293,7 +298,8 @@ export class VideoConfigService {
     const filtered = q
       ? items.filter((i) => [i.name, i.vehicleCode, i.location, ...i.tags].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)))
       : items;
-    return { items: filtered.slice(0, 500), total: filtered.length };
+    const timeZone = (await this.foundationSettings?.get())?.locale.timeZone || 'Asia/Taipei';
+    return { items: filtered.slice(0, 500), total: filtered.length, timeZone };
   }
 
   async getSource(id: string) {

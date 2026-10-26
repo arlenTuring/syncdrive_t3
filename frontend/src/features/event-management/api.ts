@@ -31,7 +31,7 @@ export type EventDetail = EventItem & {
   alreadyAcknowledged?: boolean;
 };
 
-export type EventList = { items: EventItem[]; total: number; page: number; pageSize: number; snapshot: string; range: { from: number; to: number }; timeZone: string };
+export type EventList = { items: EventItem[]; total: number; page: number; pageSize: number; snapshot: string; range: { from: number; to: number } | null; timeZone: string };
 
 export type LiveBucket = 'pending' | 'confirmed';
 /** 事件管理工作集合：待確認／已確認由後端分開查詢與排序。 */
@@ -58,8 +58,9 @@ export type EventOptions = {
 };
 
 export type EventQuery = {
-  from: number;
-  to: number;
+  from?: number;
+  to?: number;
+  eventRecordId?: string;
   vehicleCode?: string;
   eventCode?: string;
   severity?: string;

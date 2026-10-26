@@ -19,7 +19,7 @@ function backend() {
     const url = new URL(input, 'http://x'); calls.push(`${url.pathname}${url.search}`);
     const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } });
     if (url.pathname.endsWith('/events/options')) return json({ vehicles: [], eventCodes: [], severities: [], sourceTypes: [], timeZone: 'Asia/Taipei', pageSize: 8, exportLimit: 1000 });
-    if (url.pathname.endsWith('/events')) return json({ items: [row], total: 1, page: 1, pageSize: 8, snapshot: '1', range: { from: Number(url.searchParams.get('from')), to: Number(url.searchParams.get('to')) }, timeZone: 'Asia/Taipei' });
+    if (url.pathname.endsWith('/events')) return json({ items: [row], total: 1, page: 1, pageSize: 8, snapshot: '1', range: url.searchParams.has('eventRecordId') ? null : { from: Number(url.searchParams.get('from')), to: Number(url.searchParams.get('to')) }, timeZone: 'Asia/Taipei' });
     return json({});
   });
   return { fetch, calls };
@@ -43,10 +43,31 @@ describe('歷史事件查詢', () => {
     expect(b.calls.length).toBe(before);
   });
 
-  it('未查詢時背景 refreshSignal 不會觸發事件清單查詢', async () => {
+  it('重新渲染仍不會在未查詢時觸發事件清單查詢', async () => {
     const b = backend(); vi.stubGlobal('fetch', b.fetch); box = document.createElement('div'); document.body.appendChild(box); root = createRoot(box);
-    act(() => root!.render(createElement(HistoryEventsPage, { refreshSignal: 1 }))); await settle();
-    act(() => root!.render(createElement(HistoryEventsPage, { refreshSignal: 2 }))); await settle();
+    act(() => root!.render(createElement(HistoryEventsPage))); await settle();
+    act(() => root!.render(createElement(HistoryEventsPage))); await settle();
     expect(b.calls.filter((call) => /\/events\?/.test(call))).toHaveLength(0);
+  });
+
+  it('以超過 JS 安全整數的事件 ID 精確查詢，不夾帶日期、嚴重度或來源條件', async () => {
+    const b = backend(); mount(b); await settle();
+    expect(document.querySelector('[aria-label="嚴重度"]')).toBeNull();
+    expect(document.querySelector('[aria-label="來源"]')).toBeNull();
+    const id = document.querySelector<HTMLInputElement>('[aria-label="事件 ID"]')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(id, '9007199254740993');
+      id.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => button('查詢').click()); await settle();
+    const call = b.calls.find((value) => /\/events\?/.test(value))!;
+    const url = new URL(call, 'http://x');
+    expect(url.searchParams.get('eventRecordId')).toBe('9007199254740993');
+    expect(url.searchParams.has('from')).toBe(false);
+    expect(url.searchParams.has('to')).toBe(false);
+    expect(url.searchParams.has('severity')).toBe(false);
+    expect(url.searchParams.has('sourceType')).toBe(false);
+    expect(document.body.textContent).toContain('精確事件 ID');
+    expect(document.body.textContent).toContain('事件 ID');
   });
 });

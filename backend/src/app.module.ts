@@ -47,7 +47,12 @@ import { DashboardPlane } from './database/entities/dashboard-plane.entity';
 import { MapEntity } from './database/entities/map.entity';
 import { MapVersion } from './database/entities/map-version.entity';
 import { MediaSchedule } from './database/entities/media-schedule.entity';
-import { MediaPlayBatch, MediaPlayDelivery, MediaPlaySchedule, MediaPlayScheduleItem } from './database/entities/media-play-schedule.entities';
+import {
+  MediaPlayBatch,
+  MediaPlayDelivery,
+  MediaPlaySchedule,
+  MediaPlayScheduleItem,
+} from './database/entities/media-play-schedule.entities';
 // 原僅存於瀏覽器 localStorage 的系統資產與流程狀態
 import { DataSource_ } from './database/entities/data-source.entity';
 import { VehicleDefinition } from './database/entities/vehicle-definition.entity';
@@ -97,7 +102,12 @@ import {
   VehicleHistoryStreamKey,
 } from './database/entities/vehicle-history.entities';
 import { VehicleHistoryModule } from './vehicle-history/vehicle-history.module';
-import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database/entities/data-retention.entities';
+import {
+  DataCleanupJob,
+  DataCleanupPlan,
+  DataRetentionPolicy,
+} from './database/entities/data-retention.entities';
+import { ScheduledOrderEntry } from './database/entities/scheduled-order-entry.entity';
 
 @Module({
   imports: [
@@ -112,33 +122,78 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
         host: configService.get<string>('DB_HOST', '127.0.0.1'),
         port: configService.get<number>('DB_PORT', 5432),
         username: configService.get<string>('DB_USER', 'syncdrive_user'),
-        password: configService.get<string>('DB_PASSWORD', 'syncdrive_password'),
+        password: configService.get<string>(
+          'DB_PASSWORD',
+          'syncdrive_password',
+        ),
         database: configService.get<string>('DB_NAME', 'syncdrive_t3'),
         entities: [
-          Vehicle, OperationOrder, CommandLog, SecurityEventLog, TelemetryLog,
-          OperatorActionLog, SpeedLimitConfig, JunctionInterlockLog, FieldEquipmentStatus,
-          FacilitySlot, SlotStatus_, CapacityTrendDemoPoint,
-          OperationRoute, OperationRouteStation, OperationRouteStationAction,
-          OrderActionState, OrderEvent, TimeTemplate, MaintenanceTask, OperationShift,
+          Vehicle,
+          OperationOrder,
+          CommandLog,
+          SecurityEventLog,
+          TelemetryLog,
+          OperatorActionLog,
+          SpeedLimitConfig,
+          JunctionInterlockLog,
+          FieldEquipmentStatus,
+          FacilitySlot,
+          SlotStatus_,
+          CapacityTrendDemoPoint,
+          OperationRoute,
+          OperationRouteStation,
+          OperationRouteStationAction,
+          OrderActionState,
+          OrderEvent,
+          TimeTemplate,
+          MaintenanceTask,
+          OperationShift,
           MediaLibraryItem,
           // 後勤管理層：帳號、角色、功能權限與其綁定關係
-          Account, Role, Permission, RolePermission, AccountRole,
+          Account,
+          Role,
+          Permission,
+          RolePermission,
+          AccountRole,
           // 後勤管理層：登入登出與權限異動稽核
-          LoginLog, PermissionChangeLog, AccountSession,
+          LoginLog,
+          PermissionChangeLog,
+          AccountSession,
           // 後勤管理層：系統參數與全域通知
-          SystemSetting, Notification,
+          SystemSetting,
+          Notification,
           // 營運核心層：全景圖台版面
           DashboardPlane,
           // 資源配置層：場域圖資版本庫與媒體排程
-          MapEntity, MapVersion, MediaSchedule, MediaPlaySchedule, MediaPlayScheduleItem, MediaPlayBatch, MediaPlayDelivery,
+          MapEntity,
+          MapVersion,
+          MediaSchedule,
+          MediaPlaySchedule,
+          MediaPlayScheduleItem,
+          MediaPlayBatch,
+          MediaPlayDelivery,
           // 圖台資料來源、載具外觀定義、模組頁面對應、班表調整簽核
-          DataSource_, VehicleDefinition, ModuleDashboardPage, ScheduleAdjustRequest,
-          DegradedOperationPlan, DegradedOperationExecution, DegradedOperationEvent, DegradedOperationDraft,
-          DegradedReplaySession, DegradedReplayMap, DegradedReplayFrame,
+          DataSource_,
+          VehicleDefinition,
+          ModuleDashboardPage,
+          ScheduleAdjustRequest,
+          DegradedOperationPlan,
+          DegradedOperationExecution,
+          DegradedOperationEvent,
+          DegradedOperationDraft,
+          DegradedReplaySession,
+          DegradedReplayMap,
+          DegradedReplayFrame,
           // 一般運行歷史（運行管理紀錄回放）
-          VehicleHistoryFrame, VehicleHistorySegment, VehicleHistoryGap, VehicleHistoryStreamKey,
+          VehicleHistoryFrame,
+          VehicleHistorySegment,
+          VehicleHistoryGap,
+          VehicleHistoryStreamKey,
           DataAdminAudit,
-          DataRetentionPolicy, DataCleanupPlan, DataCleanupJob,
+          DataRetentionPolicy,
+          DataCleanupPlan,
+          DataCleanupJob,
+          ScheduledOrderEntry,
           // 對外存取層：發給協力廠商、帶有效期的 API 金鑰
           PartnerApiKey,
           // 影像監控與歷史錄影
@@ -146,9 +201,14 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from './database
         ],
         /** 正式結構由 deploy/migrate.sh 管理；synchronize 僅供明確開啟的本機開發。 */
         synchronize: (() => {
-          const explicit = configService.get<string>('DB_SYNCHRONIZE', '').trim();
+          const explicit = configService
+            .get<string>('DB_SYNCHRONIZE', '')
+            .trim();
           if (explicit) return explicit.toLowerCase() === 'true';
-          return configService.get<string>('NODE_ENV', 'development') !== 'production';
+          return (
+            configService.get<string>('NODE_ENV', 'development') !==
+            'production'
+          );
         })(),
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
         retryAttempts: 15,

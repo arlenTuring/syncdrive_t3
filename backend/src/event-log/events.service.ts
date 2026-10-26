@@ -21,7 +21,8 @@ const SORT_SQL: Record<(typeof EVENT_SORTS)[number], string> = {
 };
 const SOURCE_TYPES = ['VEHICLE', 'FACILITY', 'SYSTEM'] as const;
 const LIVE_KEYS = ['bucket', 'limit', 'after'];
-const QUERY_KEYS = ['from', 'to', 'vehicleCode', 'eventCode', 'severity', 'sourceType', 'acknowledged', 'page', 'pageSize', 'sortBy', 'direction', 'snapshot'];
+const QUERY_KEYS = ['from', 'to', 'eventRecordId', 'vehicleCode', 'eventCode', 'severity', 'sourceType', 'acknowledged', 'page', 'pageSize', 'sortBy', 'direction', 'snapshot'];
+const MAX_BIGINT = '9223372036854775807';
 
 export const EVENT_CODE_LABEL: Record<string, string> = {
   UNSCHEDULED_DOOR_OPEN: '非預期開門',
@@ -35,8 +36,9 @@ export const SEVERITY_LABEL: Record<string, string> = { INFO: '資訊', WARNING:
 export const SOURCE_TYPE_LABEL: Record<string, string> = { VEHICLE: '載具', FACILITY: '設施', SYSTEM: '系統' };
 
 export type EventFilters = {
-  from: number;
-  to: number;
+  from?: number;
+  to?: number;
+  eventRecordId?: string;
   vehicleCode?: string;
   eventCode?: string;
   severity?: string;
@@ -120,15 +122,25 @@ export class EventsService {
     }
   }
 
+  private bigintParam(value: unknown, label: string) {
+    const text = textParam(value, label, 19);
+    if (!text) return undefined;
+    if (!/^[1-9]\d{0,18}$/.test(text) || (text.length === 19 && text > MAX_BIGINT)) {
+      throw new BadRequestException(`${label}須為有效的正整數`);
+    }
+    return text;
+  }
+
   parseFilters(query: Record<string, unknown>): EventFilters & { page: number; pageSize: number } {
     rejectUnknown(query, QUERY_KEYS);
-    const { from, to } = rangeParams(query.from, query.to);
+    const eventRecordId = this.bigintParam(query.eventRecordId, '事件 ID');
+    const range = eventRecordId ? {} : rangeParams(query.from, query.to);
     const vehicleCode = textParam(query.vehicleCode, '載具', 64);
     const snapshot = textParam(query.snapshot, '查詢上界', 20);
     if (snapshot && !/^\d+$/.test(snapshot)) throw new BadRequestException('查詢上界不正確');
     return {
-      from,
-      to,
+      ...range,
+      eventRecordId,
       vehicleCode,
       eventCode: enumParam(query.eventCode, Object.values(EventCode), '事件類型'),
       severity: enumParam(query.severity, Object.values(Severity), '嚴重度'),
@@ -142,12 +154,18 @@ export class EventsService {
   }
 
   private where(filters: EventFilters, snapshotId: string | null) {
-    const clauses = ['e.created_at >= $1', 'e.created_at < $2'];
-    const params: unknown[] = [filters.from, filters.to];
+    const clauses: string[] = [];
+    const params: unknown[] = [];
     const add = (sql: string, value: unknown) => {
       params.push(value);
       clauses.push(sql.replace('?', `$${params.length}`));
     };
+    if (filters.eventRecordId) {
+      add('e.id = ?::bigint', filters.eventRecordId);
+      return { sql: clauses.join(' AND '), params };
+    }
+    add('e.created_at >= ?', filters.from);
+    add('e.created_at < ?', filters.to);
     if (snapshotId) add('e.id <= ?::bigint', snapshotId);
     // 精確比對（選單給的是事件裡實際出現的車號）：走 (vehicle_code, created_at) 索引
     if (filters.vehicleCode) add('e.vehicle_code = ?', filters.vehicleCode);
@@ -164,6 +182,7 @@ export class EventsService {
   }
 
   private async snapshotId(filters: EventFilters) {
+    if (filters.eventRecordId) return filters.eventRecordId;
     if (filters.snapshot) return filters.snapshot;
     const [row] = await this.dataSource.query(`SELECT COALESCE(max(id), 0)::text AS id FROM security_event_logs`);
     return row.id as string;
@@ -187,7 +206,7 @@ export class EventsService {
       page: filters.page,
       pageSize: filters.pageSize,
       snapshot,
-      range: { from: filters.from, to: filters.to },
+      range: filters.eventRecordId ? null : { from: filters.from!, to: filters.to! },
       timeZone: await this.timeZone(),
     };
   }
@@ -283,7 +302,7 @@ export class EventsService {
   }
 
   private parseId(id: string) {
-    if (!/^\d{1,19}$/.test(id)) throw new NotFoundException('找不到事件');
+    if (!/^[1-9]\d{0,18}$/.test(id) || (id.length === 19 && id > MAX_BIGINT)) throw new NotFoundException('找不到事件');
     return id;
   }
 
@@ -398,8 +417,8 @@ export class EventsService {
     ]);
     const tz = await this.timeZone();
     const columns: CsvColumn<EventRow & { location: unknown }>[] = [
-      { header: '中心端事件ID', value: (r) => r.id, raw: true },
-      { header: '來源事件ID', value: (r) => r.event_id, raw: true },
+      { header: '事件 ID（系統紀錄主鍵）', value: (r) => r.id, raw: true },
+      { header: '來源事件 ID', value: (r) => r.event_id, raw: true },
       { header: `發生時間（${tz}）`, value: (r) => formatInZone(Number(r.created_at), tz) },
       { header: '發生時間有效', value: (r) => (r.occurred_at_valid === null ? '未知' : r.occurred_at_valid ? '是' : '否（以接收時間代替）') },
       { header: `接收時間（${tz}）`, value: (r) => formatInZone(r.received_at === null ? null : Number(r.received_at), tz) },

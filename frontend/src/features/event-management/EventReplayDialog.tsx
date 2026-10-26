@@ -97,7 +97,7 @@ export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; 
               <h3 className="text-sm font-medium">事件影像</h3>
               {drift !== null ? <span className="text-xs text-zinc-500">與軌跡誤差 {drift} ms</span> : null}
               {playback?.permissions.video && playback.event.vehicleCode ? (
-                <button type="button" onClick={openHistory} className="ml-auto inline-flex items-center gap-1 text-xs text-sky-300 hover:underline"><Film className="size-3.5" />在影像資源管理的歷史錄影開啟</button>
+                <button type="button" onClick={openHistory} className="ml-auto inline-flex items-center gap-1 text-xs text-sky-300 hover:underline"><Film className="size-3.5" />前往影像管理紀錄（帶入條件）</button>
               ) : null}
             </div>
             {!playback ? null : !playback.permissions.video ? (

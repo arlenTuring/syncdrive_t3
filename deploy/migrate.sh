@@ -88,6 +88,7 @@ validate_order() {
   assert_before backend/src/database/migrations/20261015-data-retention-management.sql backend/src/database/migrations/20261021-security-event-retention.sql
   assert_before backend/src/database/migrations/20261010-create-degraded-replay.sql backend/src/database/migrations/20261015-vehicle-run-history.sql
   assert_before backend/src/database/migrations/20261015-vehicle-run-history.sql backend/src/database/migrations/20261015-data-retention-management.sql
+  assert_before deploy/migrations/20261008-required-extensions.sql backend/src/database/migrations/20261028-scheduled-order-management.sql
 }
 
 schema_preflight() {
@@ -107,6 +108,7 @@ WITH required(kind, name, present) AS (
     ('table','telemetry_logs',to_regclass('public.telemetry_logs') IS NOT NULL),
     ('table','operation_orders',to_regclass('public.operation_orders') IS NOT NULL),
     ('table','order_action_states',to_regclass('public.order_action_states') IS NOT NULL),
+    ('table','operation_routes',to_regclass('public.operation_routes') IS NOT NULL),
     ('table','media_library_items',to_regclass('public.media_library_items') IS NOT NULL),
     ('table','security_event_logs',to_regclass('public.security_event_logs') IS NOT NULL),
     ('table','operator_action_logs',to_regclass('public.operator_action_logs') IS NOT NULL),
@@ -133,7 +135,8 @@ WITH checks(migration_id, valid) AS (
     ('backend/src/database/migrations/20261023-video-monitoring.sql', to_regclass('public.video_sources') IS NOT NULL AND to_regclass('public.video_recording_segments') IS NOT NULL),
     ('backend/src/database/migrations/20261024-video-resources-and-layout.sql', EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_sources' AND column_name='recording_enabled') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_monitor_tiles' AND column_name='x')),
     ('backend/src/database/migrations/20261025-live-event-indexes.sql', to_regclass('public."IDX_EVENT_PENDING_TIME"') IS NOT NULL AND to_regclass('public."IDX_EVENT_ACK_TIME"') IS NOT NULL),
-    ('backend/src/database/migrations/20261027-video-source-settings-cleanup.sql', to_regclass('public.video_source_defaults') IS NULL AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_settings' AND column_name='allowed_networks'))
+    ('backend/src/database/migrations/20261027-video-source-settings-cleanup.sql', to_regclass('public.video_source_defaults') IS NULL AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='video_settings' AND column_name='allowed_networks')),
+    ('backend/src/database/migrations/20261028-scheduled-order-management.sql', to_regclass('public.scheduled_order_entries') IS NOT NULL)
 )
 SELECT string_agg(c.migration_id, ', ' ORDER BY c.migration_id)
 FROM checks c JOIN syncdrive_schema_migrations m USING(migration_id)
@@ -155,6 +158,7 @@ WITH required(name, present) AS (
     ('data_retention_policies', to_regclass('public.data_retention_policies') IS NOT NULL),
     ('data_cleanup_jobs', to_regclass('public.data_cleanup_jobs') IS NOT NULL),
     ('media_play_schedules', to_regclass('public.media_play_schedules') IS NOT NULL),
+    ('scheduled_order_entries', to_regclass('public.scheduled_order_entries') IS NOT NULL),
     ('uuid-ossp extension', EXISTS(SELECT 1 FROM pg_extension WHERE extname='uuid-ossp')),
     ('vehicle_history_order_change trigger', EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='vehicle_history_order_change' AND NOT tgisinternal)),
     ('vehicle_history_order_action_change trigger', EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='vehicle_history_order_action_change' AND NOT tgisinternal)),

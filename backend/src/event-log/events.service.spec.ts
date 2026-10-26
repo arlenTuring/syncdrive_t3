@@ -42,6 +42,42 @@ describe('EventsService 事件管理集合與確認緣由', () => {
     expect(countsSql).not.toContain('FILTER (WHERE');
   });
 
+  it('事件 ID 精確查詢不需要也不套用時間區間，並以 bigint 字串完整查詢', async () => {
+    const dataSource = {
+      query: jest.fn((sql: string, params?: unknown[]) => {
+        if (sql.includes('count(*)')) return Promise.resolve([{ total: 0 }]);
+        if (sql.includes('FROM security_event_logs e')) return Promise.resolve([]);
+        throw new Error(`未預期 SQL: ${sql} ${String(params)}`);
+      }),
+    };
+    const target = new EventsService(dataSource as never, {} as never);
+    jest.spyOn(target, 'timeZone').mockResolvedValue('Asia/Taipei');
+    await expect(target.list({ eventRecordId: '9007199254740993', page: '1' })).resolves.toMatchObject({ total: 0, range: null, snapshot: '9007199254740993' });
+    const calls = dataSource.query.mock.calls.filter(([sql]) => sql.includes('FROM security_event_logs e'));
+    expect(calls).toHaveLength(2);
+    for (const [sql, params] of calls) {
+      expect(sql).toContain('e.id = $1::bigint');
+      expect(sql).not.toContain('e.created_at >=');
+      expect(params).toEqual(['9007199254740993']);
+    }
+  });
+
+  it.each(['0', '-1', '1.2', 'abc', '9223372036854775808'])('事件 ID 不合法時在送進 PostgreSQL cast 前回 400：%s', async (eventRecordId) => {
+    await expect(service.list({ eventRecordId })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('事件 ID CSV 使用相同精確條件並清楚區分系統主鍵與來源事件 ID', async () => {
+    const row = { id: '42', event_id: 'DEVICE-42', source_type: 'VEHICLE', source_id: 'PMS01', source_name_snapshot: 'PMS01', origin: 'REPORTED', vehicle_code: 'PMS01', event_code: 'PATH_BLOCKED', severity: 'WARNING', created_at: '1', occurred_at_valid: true, received_at: '2', display_message: 'x', detail: null, is_acknowledged: false, acknowledged_at: null, acknowledged_by_name: null, acknowledgement_note: null, location: null };
+    const dataSource = { query: jest.fn((sql: string) => sql.includes('count(*)') ? Promise.resolve([{ total: 1 }]) : Promise.resolve([row])) };
+    const target = new EventsService(dataSource as never, {} as never);
+    jest.spyOn(target, 'timeZone').mockResolvedValue('Asia/Taipei');
+    const result = await target.exportCsv({ eventRecordId: '42' });
+    expect(result.csv).toContain('事件 ID（系統紀錄主鍵）');
+    expect(result.csv).toContain('來源事件 ID');
+    expect(result.csv).toContain('42');
+    expect(result.csv).toContain('DEVICE-42');
+  });
+
   it.each([
     ['  已聯絡現場\nEngineer confirmed  ', '已聯絡現場\nEngineer confirmed'],
     [` ${'界'.repeat(500)} `, '界'.repeat(500)],

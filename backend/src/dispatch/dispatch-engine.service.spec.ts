@@ -87,7 +87,9 @@ function build(
 ) {
   const created: CreatedOrder[] = [];
   const shiftService = {
-    getDeployedShift: jest.fn().mockResolvedValue({ shiftId: 'shift-1', shiftName: '模擬正線', body }),
+    getDeployedShift: jest
+      .fn()
+      .mockResolvedValue({ shiftId: 'shift-1', shiftName: '模擬正線', body }),
     getDeployedTrips: jest.fn().mockResolvedValue({
       shiftId: 'shift-1',
       shiftName: '模擬正線',
@@ -110,9 +112,15 @@ function build(
   let persistedEnabled: boolean | undefined;
   const lockRunner = {
     connect: jest.fn(),
-    query: jest.fn().mockImplementation((sql: string) =>
-      Promise.resolve(sql.includes('pg_try_advisory_lock') ? [{ locked: true }] : [{ pg_advisory_unlock: true }]),
-    ),
+    query: jest
+      .fn()
+      .mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('pg_try_advisory_lock')
+            ? [{ locked: true }]
+            : [{ pg_advisory_unlock: true }],
+        ),
+      ),
     release: jest.fn(),
   };
   const orderRepository = {
@@ -120,9 +128,14 @@ function build(
     manager: {
       query: jest.fn().mockImplementation((sql: string, params: unknown[]) => {
         if (sql.includes('SELECT setting_value')) {
-          return Promise.resolve(persistedEnabled === undefined ? [] : [{ setting_value: persistedEnabled }]);
+          return Promise.resolve(
+            persistedEnabled === undefined
+              ? []
+              : [{ setting_value: persistedEnabled }],
+          );
         }
-        if (sql.includes('INSERT INTO system_settings')) persistedEnabled = JSON.parse(String(params[1]));
+        if (sql.includes('INSERT INTO system_settings'))
+          persistedEnabled = JSON.parse(String(params[1]));
         return Promise.resolve([]);
       }),
       connection: { createQueryRunner: () => lockRunner },
@@ -134,11 +147,20 @@ function build(
   };
   const adoptions = new Map<string, unknown>();
   const dailyPlans = {
-    get: jest.fn().mockImplementation((day: string) => Promise.resolve(adoptions.get(day) ?? null)),
-    save: jest.fn().mockImplementation((adoption: { operating_day: string }) => {
-      adoptions.set(adoption.operating_day, adoption);
-      return Promise.resolve();
-    }),
+    get: jest
+      .fn()
+      .mockImplementation((day: string) =>
+        Promise.resolve(adoptions.get(day) ?? null),
+      ),
+    save: jest
+      .fn()
+      .mockImplementation((adoption: { operating_day: string }) => {
+        adoptions.set(adoption.operating_day, adoption);
+        return Promise.resolve();
+      }),
+  };
+  const scheduledOrders = {
+    publishDue: jest.fn().mockResolvedValue({ checked: 0, published: [] }),
   };
   const engine = new DispatchEngineService(
     shiftService as never,
@@ -147,11 +169,32 @@ function build(
     vehicleRepository as never,
     orderRepository as never,
     dailyPlans as never,
+    scheduledOrders as never,
   );
-  return { engine, created, orderService, shiftService, orderRepository, dailyPlans };
+  return {
+    engine,
+    created,
+    orderService,
+    shiftService,
+    orderRepository,
+    dailyPlans,
+    scheduledOrders,
+  };
 }
 
 describe('DispatchEngineService.tick', () => {
+  it('沒有部署班表時仍在同一個 tick 發布人工排程', async () => {
+    const { engine, shiftService, scheduledOrders } = build([]);
+    shiftService.getDeployedShift.mockResolvedValue(null);
+    scheduledOrders.publishDue.mockResolvedValue({
+      checked: 1,
+      published: ['schedule-1'],
+    });
+    const result = await engine.tick({ now: REFERENCE });
+    expect(scheduledOrders.publishDue).toHaveBeenCalled();
+    expect(result.checked).toBe(1);
+  });
+
   it('發車時刻進入提前量才下訂單', async () => {
     const { engine, created } = build([trip(12 * 3600 + 60)]);
 
@@ -175,8 +218,16 @@ describe('DispatchEngineService.tick', () => {
       plan_digest: expect.any(String),
     });
     expect(dailyPlans.save).toHaveBeenCalledTimes(1);
-    const adoption = dailyPlans.save.mock.calls[0]![0] as { plan_digest: string; adopted_via: string; operating_day: string };
-    expect(adoption).toMatchObject({ plan_digest: payload.plan_digest, adopted_via: 'auto_deployed', operating_day: payload.operating_day });
+    const adoption = dailyPlans.save.mock.calls[0]![0] as {
+      plan_digest: string;
+      adopted_via: string;
+      operating_day: string;
+    };
+    expect(adoption).toMatchObject({
+      plan_digest: payload.plan_digest,
+      adopted_via: 'auto_deployed',
+      operating_day: payload.operating_day,
+    });
     // 第二次不再重建紀錄
     await engine.tick({ now: REFERENCE + 5_000 });
     expect(dailyPlans.save).toHaveBeenCalledTimes(1);
@@ -607,9 +658,7 @@ describe('整備班次', () => {
     const order = created[0];
     expect(order.line_kind).toBe('MAINTENANCE');
     expect(order.trip_code).toBe(`MT-E3-R1-${(12 * 60 + 1) * 60}`);
-    expect(
-      order.maint_station,
-    ).toBe('E3');
+    expect(order.maint_station).toBe('E3');
   });
 
   it('整備訂單使用班表作者設定的班次卡標籤', async () => {
@@ -692,47 +741,77 @@ describe('整備班次', () => {
 
 describe('DispatchEngineService.planForShift（模擬器依班表 ID 載入）', () => {
   it('指定班表與部署中班表走同一套展開：同樣內容得到同樣的任務', async () => {
-    const trips = [trip(9 * 3600, 1, 'D0900'), trip(9 * 3600 + 600, 2, 'D0910')];
+    const trips = [
+      trip(9 * 3600, 1, 'D0900'),
+      trip(9 * 3600 + 600, 2, 'D0910'),
+    ];
     const { engine, shiftService } = build(trips);
-    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn().mockResolvedValue({
-      shiftId: 'shift-B',
-      shiftName: '草稿 B',
-      trips,
-      body: {},
-      row: { id: 'shift-B', name: '草稿 B' },
-    });
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest
+      .fn()
+      .mockResolvedValue({
+        shiftId: 'shift-B',
+        shiftName: '草稿 B',
+        trips,
+        body: {},
+        row: { id: 'shift-B', name: '草稿 B' },
+      });
 
     const deployed = await engine.planToday(REFERENCE);
     const chosen = await engine.planForShift('shift-B', REFERENCE);
 
     expect(chosen.shiftId).toBe('shift-B');
-    expect(chosen.planned.map((item) => [item.tripCode, item.vehicleCode, item.departAt]))
-      .toEqual(deployed!.planned.map((item) => [item.tripCode, item.vehicleCode, item.departAt]));
+    expect(
+      chosen.planned.map((item) => [
+        item.tripCode,
+        item.vehicleCode,
+        item.departAt,
+      ]),
+    ).toEqual(
+      deployed!.planned.map((item) => [
+        item.tripCode,
+        item.vehicleCode,
+        item.departAt,
+      ]),
+    );
     // 讀的是指定那一份，不是部署中的
-    expect((shiftService as Record<string, jest.Mock>).getShiftTrips).toHaveBeenCalledWith('shift-B');
+    expect(
+      (shiftService as Record<string, jest.Mock>).getShiftTrips,
+    ).toHaveBeenCalledWith('shift-B');
   });
 
   it('找不到指定班表就報錯，不退回部署中的班表', async () => {
     const { engine, shiftService } = build([trip(9 * 3600)]);
-    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn()
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest
+      .fn()
       .mockRejectedValue(new Error("Operation shift 'missing' not found"));
 
-    await expect(engine.planForShift('missing', REFERENCE)).rejects.toThrow('not found');
+    await expect(engine.planForShift('missing', REFERENCE)).rejects.toThrow(
+      'not found',
+    );
     expect(shiftService.getDeployedTrips).not.toHaveBeenCalled();
   });
 
   it('時間線多於車隊：列為略過並寫明原因，不自己編車號', async () => {
     const trips = [trip(9 * 3600, 1, 'D0900'), trip(9 * 3600, 3, 'D0901')];
     const { engine, shiftService } = build(trips);
-    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest.fn().mockResolvedValue({
-      shiftId: 's', shiftName: 's', trips, body: {}, row: { id: 's', name: 's' },
-    });
+    (shiftService as Record<string, jest.Mock>).getShiftTrips = jest
+      .fn()
+      .mockResolvedValue({
+        shiftId: 's',
+        shiftName: 's',
+        trips,
+        body: {},
+        row: { id: 's', name: 's' },
+      });
 
     const plan = await engine.planForShift('s', REFERENCE);
 
     expect(plan.planned.map((item) => item.vehicleCode)).toEqual(['PMS01']);
     expect(plan.skipped).toEqual([
-      { tripCode: 'D0901', reason: '時間線第 3 列沒有對應車輛（車隊只有 2 台）' },
+      {
+        tripCode: 'D0901',
+        reason: '時間線第 3 列沒有對應車輛（車隊只有 2 台）',
+      },
     ]);
   });
 });

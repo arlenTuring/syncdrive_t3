@@ -24,3 +24,4 @@ backend/src/database/migrations/20261024-video-resources-and-layout.sql
 backend/src/database/migrations/20261025-live-event-indexes.sql
 backend/src/database/migrations/20261026-event-confirmed-index.sql
 backend/src/database/migrations/20261027-video-source-settings-cleanup.sql
+backend/src/database/migrations/20261028-scheduled-order-management.sql

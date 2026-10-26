@@ -50,16 +50,16 @@ export function TextFilter({ label, value, onChange, onEnter, placeholder, maxLe
   );
 }
 
-export function RangeFilter({ value, onChange, timeZone, error }: { value: RangeDraft; onChange: (v: RangeDraft) => void; timeZone: string; error?: string | null }) {
+export function RangeFilter({ value, onChange, timeZone, error, compact = false }: { value: RangeDraft; onChange: (v: RangeDraft) => void; timeZone: string; error?: string | null; compact?: boolean }) {
   return (
-    <fieldset className="@container min-w-0 flex-[1_1_36rem]">
+    <fieldset className={`@container min-w-0 ${compact ? 'flex-[0_1_32rem] max-w-full' : 'flex-[1_1_36rem]'}`}>
       <legend className="mb-1.5 text-xs text-zinc-400">時間區間（{timeZoneLabel(timeZone)}；含結束那一秒）</legend>
-      <div className="grid min-w-0 grid-cols-1 gap-2 @[36rem]:grid-cols-[minmax(16rem,1fr)_auto_minmax(16rem,1fr)] @[36rem]:items-end">
+      <div className={`grid min-w-0 grid-cols-1 gap-2 ${compact ? '@[30rem]:grid-cols-[minmax(14rem,1fr)_auto_minmax(14rem,1fr)] @[30rem]:items-end' : '@[36rem]:grid-cols-[minmax(16rem,1fr)_auto_minmax(16rem,1fr)] @[36rem]:items-end'}`}>
         <label className="min-w-0">
           <span className="mb-1 block text-xs text-zinc-500">開始</span>
           <SiteDateTimeInput type="datetime-local" step={1} aria-label="開始時間" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} className={`${control} w-full`} />
         </label>
-        <span className="hidden h-10 items-center text-zinc-500 @[36rem]:flex">至</span>
+        <span className={`hidden h-10 items-center text-zinc-500 ${compact ? '@[30rem]:flex' : '@[36rem]:flex'}`}>至</span>
         <label className="min-w-0">
           <span className="mb-1 block text-xs text-zinc-500">結束</span>
           <SiteDateTimeInput type="datetime-local" step={1} aria-label="結束時間" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} className={`${control} w-full`} />

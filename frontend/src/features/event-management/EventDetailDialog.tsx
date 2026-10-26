@@ -1,6 +1,6 @@
-import { PlayCircle } from 'lucide-react';
+import { Copy, PlayCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Dialog, ErrorLine, GhostButton } from '../media-groups/dialogs';
+import { Dialog, ErrorLine, GhostButton, Toast } from '../media-groups/dialogs';
 import { Badge, DetailRow, JsonBlock } from '../event-log-shared/ui';
 import { formatDateTime } from '../event-log-shared/time';
 import { fetchEvent, type EventDetail } from './api';
@@ -8,13 +8,34 @@ import { fetchEvent, type EventDetail } from './api';
 const SOURCE_LABEL = { VEHICLE: '載具', FACILITY: '設施', SYSTEM: '系統' } as const;
 const SEVERITY_LABEL: Record<string, string> = { INFO: '資訊', WARNING: '警告', CRITICAL: '嚴重' };
 
+async function copyText(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* 使用退路 */ }
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.readOnly = true;
+    area.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  } catch { return false; }
+}
+
 /**
- * 事件詳情（三標籤共用，唯讀）。人工確認只在待確認標籤的事件列進行；
+ * 事件詳情（即時頁與紀錄頁共用，唯讀）。人工確認只在即時事件管理的待確認列進行；
  * 這裡開啟、查看或開回放都不會寫入確認或標記已讀。最上方先顯示處理紀錄摘要，再顯示事件原始資料。
  */
 export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, onReplay }: { id: string; timeZone: string; refreshSignal?: number; onClose: () => void; onReplay: (id: string) => void }) {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [copyNotice, setCopyNotice] = useState<{ text: string; tone: 'success' | 'error'; id: number } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -23,9 +44,14 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
       .catch((reason: Error) => !controller.signal.aborted && setLoadError(reason.message));
     return () => controller.abort();
   }, [id, refreshSignal]);
+  useEffect(() => {
+    if (!copyNotice) return undefined;
+    const timer = window.setTimeout(() => setCopyNotice(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [copyNotice]);
 
   const t = (ms: number | null | undefined) => formatDateTime(ms, timeZone);
-  return (
+  return <>
     <Dialog
       title="事件詳情"
       width="max-w-3xl"
@@ -63,13 +89,18 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
             ) : (
               <div className="mt-2 text-sm">
                 <Badge tone="amber">待確認</Badge>
-                <span className="ml-2 text-xs text-zinc-400">請回「待確認」標籤填寫確認緣由</span>
+                <span className="ml-2 text-xs text-zinc-400">請至「即時事件管理」的待確認標籤填寫確認緣由</span>
               </div>
             )}
             <p className="mt-2 text-xs text-zinc-500">確認只代表中心端已確認，不下發車控，也不代表設備已恢復。</p>
           </section>
           <dl>
-            <DetailRow label="中心端 ID">{event.id}</DetailRow>
+            <DetailRow label="事件 ID">
+              <span className="inline-flex items-center gap-2">
+                <span className="select-all font-mono">{event.id}</span>
+                <button type="button" aria-label="複製事件 ID" onClick={async () => { const ok = await copyText(event.id); setCopyNotice({ text: ok ? '已複製事件 ID' : '複製失敗，請手動選取事件 ID', tone: ok ? 'success' : 'error', id: Date.now() }); }} className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-white/5"><Copy className="size-3.5" />複製</button>
+              </span>
+            </DetailRow>
             <DetailRow label="來源事件 ID">{event.eventId}</DetailRow>
             <DetailRow label="發生時間">
               {t(event.occurredAt)}
@@ -109,5 +140,6 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
         </div>
       )}
     </Dialog>
-  );
+    {copyNotice ? <Toast key={copyNotice.id} text={copyNotice.text} tone={copyNotice.tone} /> : null}
+  </>;
 }

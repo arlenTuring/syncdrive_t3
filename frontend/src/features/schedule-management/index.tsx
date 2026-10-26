@@ -1,5 +1,13 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   ClipboardList,
@@ -17,23 +25,31 @@ import {
   ShieldCheck,
   UserRoundCog,
   Volume2,
-} from 'lucide-react';
-import { ViewErrorBoundary } from '../../components/ViewErrorBoundary';
-import { OPEN_VIDEO_RESOURCES_EVENT } from '../video/history-link';
-import { isEventsView, isLogsView } from './types';
-import { useAuth } from '../access-control/AuthContext';
-import type { ShellView } from './types';
+  ListChecks,
+} from "lucide-react";
+import { ViewErrorBoundary } from "../../components/ViewErrorBoundary";
+import {
+  OPEN_VIDEO_HISTORY_EVENT,
+  OPEN_VIDEO_RESOURCES_EVENT,
+  takeHistoryRequest,
+  type HistoryRequest,
+} from "../video/history-link";
+import { isEventsView, isLogsView } from "./types";
+import { useAuth } from "../access-control/AuthContext";
+import type { ShellView } from "./types";
 import {
   OPEN_VEHICLE_MODELS_EVENT,
   type OpenVehicleModelsDetail,
-} from '../../lib/vehicleModelNavigation';
-import { SIDEBAR_MODULE_GROUPS, VIEW_PERMISSIONS, permissionSatisfied } from './types';
-import { ScheduleModuleSidebar } from './components/ScheduleModuleSidebar';
-import { ShellWorkspaceFrame } from './components/ShellWorkspaceFrame';
-import { AttachModuleDashboardDialog } from './components/AttachModuleDashboardDialog';
+} from "../../lib/vehicleModelNavigation";
 import {
-  useAdminModePreference,
-} from './utils/adminModePreference';
+  SIDEBAR_MODULE_GROUPS,
+  VIEW_PERMISSIONS,
+  permissionSatisfied,
+} from "./types";
+import { ScheduleModuleSidebar } from "./components/ScheduleModuleSidebar";
+import { ShellWorkspaceFrame } from "./components/ShellWorkspaceFrame";
+import { AttachModuleDashboardDialog } from "./components/AttachModuleDashboardDialog";
+import { useAdminModePreference } from "./utils/adminModePreference";
 import {
   createModuleDashboardPageId,
   moduleDashboardViewId,
@@ -43,35 +59,102 @@ import {
   refreshModuleDashboardPages,
   writeModuleDashboardPages,
   type ModuleDashboardPage,
-} from './utils/moduleDashboardPages';
+} from "./utils/moduleDashboardPages";
 
-const MapEditorApp = lazy(() => import('../map-editor'));
-const ShiftRecordsApp = lazy(() => import('../shift-records'));
-const TimeTemplatesApp = lazy(() => import('../time-templates'));
-const MaintenanceTasksApp = lazy(() => import('../maintenance-tasks'));
-const ShiftListApp = lazy(() => import('../shift-list'));
-const ShiftDeploymentApp = lazy(() => import('../shift-deployment'));
-const DegradedOperationApp = lazy(() => import('../degraded-operation'));
-const DispatchSchedulingApp = lazy(() => import('../dispatch-scheduling'));
-const PsdControlApp = lazy(() => import('../psd-control'));
-const VirtualFenceManagementApp = lazy(() => import('../virtual-fence-management'));
-const SystemFoundationApp = lazy(() => import('../system-foundation'));
-const AccountManagementPage = lazy(() => import('../access-control/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })));
-const RoleManagementPage = lazy(() => import('../access-control/RoleManagementPage').then((module) => ({ default: module.RoleManagementPage })));
-const VehicleRealtimePage = lazy(() => import('../vehicle-realtime/VehicleRealtimePage').then((module) => ({ default: module.VehicleRealtimePage })));
-const VehicleRegistryPage = lazy(() => import('../vehicle-registry/VehicleRegistryPage').then((module) => ({ default: module.VehicleRegistryPage })));
-const RunHistoryPage = lazy(() => import('../vehicle-run-history/RunHistoryPage').then((module) => ({ default: module.RunHistoryPage })));
-const MediaContentPage = lazy(() => import('../media-content/MediaContentPage'));
-const MediaGroupsPage = lazy(() => import('../media-groups/MediaGroupsPage'));
-const MediaSchedulesPage = lazy(() => import('../media-schedules/MediaSchedulesPage').then((module) => ({ default: module.MediaSchedulesPage })));
-const EventManagementPage = lazy(() => import('../event-management/EventManagementPage').then((module) => ({ default: module.EventManagementPage })));
-const VideoMonitorPage = lazy(() => import('../video/VideoMonitorPage').then((module) => ({ default: module.VideoMonitorPage })));
-const VideoResourcesPage = lazy(() => import('../video/VideoResourcesPage').then((module) => ({ default: module.VideoResourcesPage })));
-const LogPage = lazy(() => import('../log-management/LogPage').then((module) => ({ default: module.LogPage })));
-const ModuleDashboardRuntimeView = lazy(() => import('./components/ModuleDashboardRuntimeView').then((module) => ({ default: module.ModuleDashboardRuntimeView })));
+const MapEditorApp = lazy(() => import("../map-editor"));
+const ShiftRecordsApp = lazy(() => import("../shift-records"));
+const TimeTemplatesApp = lazy(() => import("../time-templates"));
+const MaintenanceTasksApp = lazy(() => import("../maintenance-tasks"));
+const ShiftListApp = lazy(() => import("../shift-list"));
+const ShiftDeploymentApp = lazy(() => import("../shift-deployment"));
+const DegradedOperationApp = lazy(() => import("../degraded-operation"));
+const DispatchSchedulingApp = lazy(() => import("../dispatch-scheduling"));
+const ScheduledOrdersApp = lazy(() => import("../scheduled-orders"));
+const OrderRecordsPage = lazy(() => import("../order-records"));
+const PsdControlApp = lazy(() => import("../psd-control"));
+const VirtualFenceManagementApp = lazy(
+  () => import("../virtual-fence-management"),
+);
+const SystemFoundationApp = lazy(() => import("../system-foundation"));
+const AccountManagementPage = lazy(() =>
+  import("../access-control/AccountManagementPage").then((module) => ({
+    default: module.AccountManagementPage,
+  })),
+);
+const RoleManagementPage = lazy(() =>
+  import("../access-control/RoleManagementPage").then((module) => ({
+    default: module.RoleManagementPage,
+  })),
+);
+const VehicleRealtimePage = lazy(() =>
+  import("../vehicle-realtime/VehicleRealtimePage").then((module) => ({
+    default: module.VehicleRealtimePage,
+  })),
+);
+const VehicleRegistryPage = lazy(() =>
+  import("../vehicle-registry/VehicleRegistryPage").then((module) => ({
+    default: module.VehicleRegistryPage,
+  })),
+);
+const RunHistoryPage = lazy(() =>
+  import("../vehicle-run-history/RunHistoryPage").then((module) => ({
+    default: module.RunHistoryPage,
+  })),
+);
+const MediaContentPage = lazy(
+  () => import("../media-content/MediaContentPage"),
+);
+const MediaGroupsPage = lazy(() => import("../media-groups/MediaGroupsPage"));
+const MediaSchedulesPage = lazy(() =>
+  import("../media-schedules/MediaSchedulesPage").then((module) => ({
+    default: module.MediaSchedulesPage,
+  })),
+);
+const EventManagementPage = lazy(() =>
+  import("../event-management/EventManagementPage").then((module) => ({
+    default: module.EventManagementPage,
+  })),
+);
+const HistoryEventsPage = lazy(() =>
+  import("../event-management/HistoryEventsPage").then((module) => ({
+    default: module.HistoryEventsPage,
+  })),
+);
+const VideoMonitorPage = lazy(() =>
+  import("../video/VideoMonitorPage").then((module) => ({
+    default: module.VideoMonitorPage,
+  })),
+);
+const VideoResourcesPage = lazy(() =>
+  import("../video/VideoResourcesPage").then((module) => ({
+    default: module.VideoResourcesPage,
+  })),
+);
+const VideoHistoryPage = lazy(() =>
+  import("../video/VideoHistoryPage").then((module) => ({
+    default: module.VideoHistoryPage,
+  })),
+);
+const LogPage = lazy(() =>
+  import("../log-management/LogPage").then((module) => ({
+    default: module.LogPage,
+  })),
+);
+const ModuleDashboardRuntimeView = lazy(() =>
+  import("./components/ModuleDashboardRuntimeView").then((module) => ({
+    default: module.ModuleDashboardRuntimeView,
+  })),
+);
 
 function PageLoading() {
-  return <div role="status" className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-500">正在載入頁面…</div>;
+  return (
+    <div
+      role="status"
+      className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-500"
+    >
+      正在載入頁面…
+    </div>
+  );
 }
 
 type ScheduleManagementAppProps = {
@@ -96,127 +179,172 @@ function useWorkspaceChrome(
       const moduleKey =
         SIDEBAR_MODULE_GROUPS.find((group) => group.id === page?.moduleId)
           ?.label ?? null;
-      const moduleLabel = moduleKey ? t(moduleKey) : t('common.module');
+      const moduleLabel = moduleKey ? t(moduleKey) : t("common.module");
       return {
         // 使用者自訂別名 page.label 不翻譯
         title: page?.label ? `${moduleLabel} · ${page.label}` : moduleLabel,
         icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'shift-deployment') {
+    if (view === "shift-deployment") {
       return {
-        title: t('nav.items.shift-deployment'),
+        title: t("nav.items.shift-deployment"),
         icon: <Activity className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'degraded-operation') {
+    if (view === "degraded-operation") {
       return {
-        title: t('nav.items.degraded-operation'),
+        title: t("nav.items.degraded-operation"),
         icon: <AlertTriangle className="size-4 text-amber-400" aria-hidden />,
       };
     }
-    if (view === 'dispatch-scheduling') {
+    if (view === "dispatch-scheduling") {
       return {
-        title: t('nav.items.dispatch-scheduling'),
+        title: t("nav.items.dispatch-scheduling"),
         icon: <Send className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'psd-control') {
+    if (view === "scheduled-orders") {
       return {
-        title: t('nav.items.psd-control'),
+        title: t("nav.items.scheduled-orders"),
+        icon: <ListChecks className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "order-records") {
+      return {
+        title: t("nav.items.order-records"),
+        icon: <ListChecks className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "psd-control") {
+      return {
+        title: t("nav.items.psd-control"),
         icon: <DoorOpen className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'virtual-fence') {
+    if (view === "virtual-fence") {
       return {
-        title: t('nav.items.virtual-fence'),
+        title: t("nav.items.virtual-fence"),
         icon: <Pentagon className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'dashboard') {
+    if (view === "dashboard") {
       return {
-        title: t('nav.items.dashboard'),
+        title: t("nav.items.dashboard"),
         icon: <LayoutDashboard className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'map') {
+    if (view === "map") {
       return {
-        title: t('nav.items.map'),
+        title: t("nav.items.map"),
         icon: <Map className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'vehicle-realtime') {
+    if (view === "vehicle-realtime") {
       return {
-        title: '載具即時清單',
+        title: "載具即時清單",
         icon: <Route className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'vehicle-run-history') {
-      return { title: '運行管理紀錄', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
+    if (view === "vehicle-run-history") {
+      return {
+        title: "運行管理紀錄",
+        icon: <Route className="size-4 text-sky-400" aria-hidden />,
+      };
     }
-    if (view === 'vehicle-registry') {
-      return { title: '載具註冊管理', icon: <Route className="size-4 text-sky-400" aria-hidden /> };
+    if (view === "vehicle-registry") {
+      return {
+        title: "載具註冊管理",
+        icon: <Route className="size-4 text-sky-400" aria-hidden />,
+      };
     }
-    if (view === 'media-content') {
-      return { title: t('nav.items.media-content'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    if (view === "media-content") {
+      return {
+        title: t("nav.items.media-content"),
+        icon: <Volume2 className="size-4 text-sky-400" aria-hidden />,
+      };
     }
-    if (view === 'media-groups') {
-      return { title: t('nav.items.media-groups'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    if (view === "media-groups") {
+      return {
+        title: t("nav.items.media-groups"),
+        icon: <Volume2 className="size-4 text-sky-400" aria-hidden />,
+      };
     }
-    if (view === 'media-schedule') {
-      return { title: t('nav.items.media-schedule'), icon: <Volume2 className="size-4 text-sky-400" aria-hidden /> };
+    if (view === "media-schedule") {
+      return {
+        title: t("nav.items.media-schedule"),
+        icon: <Volume2 className="size-4 text-sky-400" aria-hidden />,
+      };
     }
     if (isEventsView(view) || isLogsView(view)) {
-      return { title: t(`nav.items.${view}`), icon: <ClipboardList className="size-4 text-sky-400" aria-hidden /> };
-    }
-    if (view === 'system-foundation') {
       return {
-        title: t('nav.modules.system'),
+        title: t(`nav.items.${view}`),
+        icon: <ClipboardList className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "system-foundation") {
+      return {
+        title: t("nav.modules.system"),
         icon: <Settings2 className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'account-management') {
-      return { title: '帳號管理中心', icon: <UserRoundCog className="size-4 text-sky-400" aria-hidden /> };
-    }
-    if (view === 'role-management') {
-      return { title: '角色管理設定', icon: <ShieldCheck className="size-4 text-sky-400" aria-hidden /> };
-    }
-    if (view === 'time-templates') {
+    if (view === "account-management") {
       return {
-        title: t('nav.modules.schedule'),
+        title: "帳號管理中心",
+        icon: <UserRoundCog className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "role-management") {
+      return {
+        title: "角色管理設定",
+        icon: <ShieldCheck className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "time-templates") {
+      return {
+        title: t("nav.modules.schedule"),
         icon: <FileText className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'shift-list') {
+    if (view === "shift-list") {
       return {
-        title: t('nav.modules.schedule'),
+        title: t("nav.modules.schedule"),
         icon: <List className="size-4 text-sky-400" aria-hidden />,
       };
     }
-    if (view === 'maintenance-tasks') {
+    if (view === "maintenance-tasks") {
       return {
-        title: t('nav.modules.schedule'),
+        title: t("nav.modules.schedule"),
         icon: <Wrench className="size-4 text-sky-400" aria-hidden />,
       };
     }
     return {
-      title: t('nav.modules.schedule'),
+      title: t("nav.modules.schedule"),
       icon: <ClipboardList className="size-4 text-sky-400" aria-hidden />,
     };
   }, [view, modulePages, t]);
 }
 
 export default function ScheduleManagementApp({
-  initialView = 'shift-records',
+  initialView = "shift-records",
 }: ScheduleManagementAppProps) {
-  // 舊的歷史影像頁 ID（書籤、偏好）導向影像資源管理
-  const [view, setView] = useState<string>(initialView === 'video-history' ? 'video-resources' : initialView);
-  const auth = useAuth(); const { user } = auth;
-  const [mapMounted, setMapMounted] = useState(initialView === 'map');
+  const [view, setView] = useState<string>(initialView);
+  const [videoHistoryRequest, setVideoHistoryRequest] = useState<{
+    request: HistoryRequest | null;
+    nonce: number;
+  }>(() => ({
+    request: initialView === "video-history" ? takeHistoryRequest() : null,
+    nonce: 0,
+  }));
+  const auth = useAuth();
+  const { user } = auth;
+  const [mapMounted, setMapMounted] = useState(initialView === "map");
   const [adminMode] = useAdminModePreference();
   const [modulePages, setModulePages] = useState(readModuleDashboardPages);
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
-  const [accountRoleFilter,setAccountRoleFilter]=useState<string|null>(null);
+  const [accountRoleFilter, setAccountRoleFilter] = useState<string | null>(
+    null,
+  );
   // 後端的對應拉回來之前不能回寫：初始值是這台瀏覽器的舊快取，一掛載就送出去會把
   // 其他人改好的對應（例如重新指定版面）蓋回舊值。
   const modulePagesSyncedRef = useRef(false);
@@ -246,7 +374,7 @@ export default function ScheduleManagementApp({
   useEffect(() => {
     // 圖資首次開啟後保留掛載狀態，切頁不重建大型編輯器。
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (view === 'map') setMapMounted(true);
+    if (view === "map") setMapMounted(true);
   }, [view]);
 
   // 儀表板「前往圖資管理編輯」：切到圖資資料管理並打開車輛模型（圖資頁可能還沒掛載，所以經 prop 傳過去）
@@ -255,21 +383,29 @@ export default function ScheduleManagementApp({
   >(null);
   useEffect(() => {
     const onOpen = (event: Event) => {
-      const detail = (event as CustomEvent<OpenVehicleModelsDetail>).detail ?? {};
+      const detail =
+        (event as CustomEvent<OpenVehicleModelsDetail>).detail ?? {};
       setVehicleModelsRequest({ ...detail, nonce: Date.now() });
-      setView('map');
+      setView("map");
     };
     window.addEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_VEHICLE_MODELS_EVENT, onOpen);
   }, []);
 
-  // 事件回放、舊的歷史影像連結、即時監控的容量提示：切到影像資源管理（帶條件時由該頁開歷史錄影子畫面）
+  // 跨頁導覽由 shell 單點接收。歷史條件只交給獨立頁預填，不在這裡查詢。
   useEffect(() => {
-    const onOpen = () => setView('video-resources');
-    window.addEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
+    const openResources = () => setView("video-resources");
+    const openHistory = () => {
+      setVideoHistoryRequest({ request: takeHistoryRequest(), nonce: Date.now() });
+      setView("video-history");
+    };
+    window.addEventListener(OPEN_VIDEO_RESOURCES_EVENT, openResources);
+    window.addEventListener(OPEN_VIDEO_HISTORY_EVENT, openHistory);
+    return () => {
+      window.removeEventListener(OPEN_VIDEO_RESOURCES_EVENT, openResources);
+      window.removeEventListener(OPEN_VIDEO_HISTORY_EVENT, openHistory);
+    };
   }, []);
-
 
   useEffect(() => {
     if (!modulePagesSyncedRef.current) return;
@@ -288,21 +424,26 @@ export default function ScheduleManagementApp({
     const key = SIDEBAR_MODULE_GROUPS.find(
       (group) => group.id === attachModuleId,
     )?.label;
-    return key ? t(key) : t('common.module');
+    return key ? t(key) : t("common.module");
   })();
 
   const frameProps = {
-    onOpenSystemFoundation: () => { if (auth.require('system.health.view')) setView('system-foundation'); },
+    onOpenSystemFoundation: () => {
+      if (auth.require("system.health.view")) setView("system-foundation");
+    },
   };
-  const requiredPermission = parseModuleDashboardViewId(view) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[view as ShellView];
-  const viewAllowed = !requiredPermission || permissionSatisfied(requiredPermission, auth.can);
+  const requiredPermission = parseModuleDashboardViewId(view)
+    ? "dashboard.dashboard.view"
+    : VIEW_PERMISSIONS[view as ShellView];
+  const viewAllowed =
+    !requiredPermission || permissionSatisfied(requiredPermission, auth.can);
 
   const scheduleContent = (
     <>
-      {view === 'shift-records' && <ShiftRecordsApp embedded />}
-      {view === 'time-templates' && <TimeTemplatesApp embedded />}
-      {view === 'shift-list' && <ShiftListApp embedded />}
-      {view === 'maintenance-tasks' && <MaintenanceTasksApp embedded />}
+      {view === "shift-records" && <ShiftRecordsApp embedded />}
+      {view === "time-templates" && <TimeTemplatesApp embedded />}
+      {view === "shift-list" && <ShiftListApp embedded />}
+      {view === "maintenance-tasks" && <MaintenanceTasksApp embedded />}
     </>
   );
 
@@ -310,180 +451,363 @@ export default function ScheduleManagementApp({
     <div className="flex h-full min-h-0 w-full bg-black">
       <ScheduleModuleSidebar
         activeView={view}
-        onViewChange={(next) => { const required = parseModuleDashboardViewId(next) ? 'dashboard.dashboard.view' : VIEW_PERMISSIONS[next as ShellView]; if (!required || permissionSatisfied(required, auth.can) || auth.require(required.split('|')[0])) setView(next); }}
+        onViewChange={(next) => {
+          const required = parseModuleDashboardViewId(next)
+            ? "dashboard.dashboard.view"
+            : VIEW_PERMISSIONS[next as ShellView];
+          if (
+            !required ||
+            permissionSatisfied(required, auth.can) ||
+            auth.require(required.split("|")[0])
+          )
+            setView(next);
+        }}
         adminMode={adminMode}
         moduleDashboardPages={modulePages}
         onAddModuleDashboard={setAttachModuleId}
         onRenameModuleDashboard={(pageId, label) => {
           setModulePages((prev) =>
-            prev.map((page) => (page.id === pageId ? { ...page, label } : page)),
+            prev.map((page) =>
+              page.id === pageId ? { ...page, label } : page,
+            ),
           );
         }}
         onRemoveModuleDashboard={(pageId) => {
           setModulePages((prev) => prev.filter((page) => page.id !== pageId));
           if (view === moduleDashboardViewId(pageId)) {
-            setView('shift-records');
+            setView("shift-records");
           }
         }}
         permissions={user?.permissions ?? []}
       />
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {!viewAllowed ? <div className="flex flex-1 items-center justify-center text-zinc-400">權限不足</div> : null}
-        {viewAllowed ? <Suspense fallback={<PageLoading />}>
-        {activeModulePage ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ModuleDashboardRuntimeView
-              planeId={activeModulePage.planeId}
-              pageLabel={activeModulePage.label}
-            />
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'shift-deployment' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.shift-deployment') })}>
-              <ShiftDeploymentApp />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'degraded-operation' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.degraded-operation') })}>
-              <DegradedOperationApp />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'dispatch-scheduling' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.dispatch-scheduling') })}>
-              <DispatchSchedulingApp />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'psd-control' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.psd-control') })}>
-              <PsdControlApp />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'virtual-fence' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.virtual-fence') })}>
-              <VirtualFenceManagementApp />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'system-foundation' || view === 'dashboard' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} flush {...frameProps}>
-            <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.modules.system') })}>
-              <SystemFoundationApp
-                initialTab={view === 'dashboard' ? 'advanced' : 'health'}
-                initialAdvancedSection="dashboard"
-              />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'shift-records'
-        || view === 'time-templates'
-        || view === 'shift-list'
-        || view === 'maintenance-tasks' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            {scheduleContent}
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'account-management' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="帳號管理中心載入失敗">
-              <AccountManagementPage onOpenRoles={() => setView('role-management')} roleId={accountRoleFilter} onClearRoleFilter={()=>setAccountRoleFilter(null)} />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'role-management' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="角色管理設定載入失敗"><RoleManagementPage onOpenAccounts={(roleId)=>{setAccountRoleFilter(roleId);setView('account-management');}} /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'vehicle-realtime' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="載具即時清單載入失敗">
-              <VehicleRealtimePage />
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'vehicle-run-history' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="運行管理紀錄載入失敗"><RunHistoryPage /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'vehicle-registry' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="載具註冊管理載入失敗"><VehicleRegistryPage /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'media-content' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="媒體內容清單載入失敗"><MediaContentPage /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'media-groups' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="媒體分組清單載入失敗"><MediaGroupsPage /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {view === 'media-schedule' ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title="媒體排程設定載入失敗"><MediaSchedulesPage /></ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {isEventsView(view) || isLogsView(view) ? (
-          <ShellWorkspaceFrame title={chrome.title} titleIcon={chrome.icon} {...frameProps}>
-            <ViewErrorBoundary title={`${chrome.title}載入失敗`}>
-              {view === 'event-list' ? <EventManagementPage /> : null}
-              {view === 'event-history' ? <EventManagementPage initialTab="history" /> : null}
-              {view === 'video-monitor' ? <VideoMonitorPage /> : null}
-              {view === 'video-resources' ? <VideoResourcesPage /> : null}
-              {view === 'log-system' ? <LogPage key="system" category="system" /> : null}
-              {view === 'log-permissions' ? <LogPage key="permissions" category="permissions" /> : null}
-              {view === 'log-operations' ? <LogPage key="operations" category="operations" /> : null}
-              {view === 'log-authentication' ? <LogPage key="authentication" category="authentication" /> : null}
-            </ViewErrorBoundary>
-          </ShellWorkspaceFrame>
-        ) : null}
-
-        {mapMounted ? (
-          <div
-            className={`absolute inset-0 z-20 flex min-h-0 flex-col ${
-              view === 'map' ? '' : 'pointer-events-none hidden'
-            }`}
-          >
-            <ShellWorkspaceFrame
-              title="圖資資料管理"
-              titleIcon={<Map className="size-4 text-sky-400" aria-hidden />}
-              flush
-              {...frameProps}
-            >
-              <ViewErrorBoundary title={t('shell.loadFailed', { title: t('nav.items.map') })}>
-                <MapEditorApp workspace="map" vehicleModelsRequest={vehicleModelsRequest} />
-              </ViewErrorBoundary>
-            </ShellWorkspaceFrame>
+        {!viewAllowed ? (
+          <div className="flex flex-1 items-center justify-center text-zinc-400">
+            權限不足
           </div>
-        ) : null}</Suspense> : null}
+        ) : null}
+        {viewAllowed ? (
+          <Suspense fallback={<PageLoading />}>
+            {activeModulePage ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ModuleDashboardRuntimeView
+                  planeId={activeModulePage.planeId}
+                  pageLabel={activeModulePage.label}
+                />
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "shift-deployment" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.shift-deployment"),
+                  })}
+                >
+                  <ShiftDeploymentApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "degraded-operation" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                flush
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.degraded-operation"),
+                  })}
+                >
+                  <DegradedOperationApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "dispatch-scheduling" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.dispatch-scheduling"),
+                  })}
+                >
+                  <DispatchSchedulingApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "scheduled-orders" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.scheduled-orders"),
+                  })}
+                >
+                  <ScheduledOrdersApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "order-records" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="訂單管理記錄載入失敗">
+                  <OrderRecordsPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "psd-control" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.psd-control"),
+                  })}
+                >
+                  <PsdControlApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "virtual-fence" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.virtual-fence"),
+                  })}
+                >
+                  <VirtualFenceManagementApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "system-foundation" || view === "dashboard" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                flush
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.modules.system"),
+                  })}
+                >
+                  <SystemFoundationApp
+                    initialTab={view === "dashboard" ? "advanced" : "health"}
+                    initialAdvancedSection="dashboard"
+                  />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "shift-records" ||
+            view === "time-templates" ||
+            view === "shift-list" ||
+            view === "maintenance-tasks" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                {scheduleContent}
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "account-management" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="帳號管理中心載入失敗">
+                  <AccountManagementPage
+                    onOpenRoles={() => setView("role-management")}
+                    roleId={accountRoleFilter}
+                    onClearRoleFilter={() => setAccountRoleFilter(null)}
+                  />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "role-management" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="角色管理設定載入失敗">
+                  <RoleManagementPage
+                    onOpenAccounts={(roleId) => {
+                      setAccountRoleFilter(roleId);
+                      setView("account-management");
+                    }}
+                  />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "vehicle-realtime" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="載具即時清單載入失敗">
+                  <VehicleRealtimePage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "vehicle-run-history" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="運行管理紀錄載入失敗">
+                  <RunHistoryPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "vehicle-registry" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="載具註冊管理載入失敗">
+                  <VehicleRegistryPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "media-content" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="媒體內容清單載入失敗">
+                  <MediaContentPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "media-groups" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="媒體分組清單載入失敗">
+                  <MediaGroupsPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "media-schedule" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title="媒體排程設定載入失敗">
+                  <MediaSchedulesPage />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {isEventsView(view) || isLogsView(view) ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary title={`${chrome.title}載入失敗`}>
+                  {view === "event-list" ? <EventManagementPage /> : null}
+                  {view === "event-history" ? <HistoryEventsPage /> : null}
+                  {view === "video-monitor" ? <VideoMonitorPage /> : null}
+                  {view === "video-resources" ? <VideoResourcesPage /> : null}
+                  {view === "video-history" ? (
+                    <VideoHistoryPage
+                      key={videoHistoryRequest.nonce}
+                      request={videoHistoryRequest.request}
+                    />
+                  ) : null}
+                  {view === "log-system" ? (
+                    <LogPage key="system" category="system" />
+                  ) : null}
+                  {view === "log-permissions" ? (
+                    <LogPage key="permissions" category="permissions" />
+                  ) : null}
+                  {view === "log-operations" ? (
+                    <LogPage key="operations" category="operations" />
+                  ) : null}
+                  {view === "log-authentication" ? (
+                    <LogPage key="authentication" category="authentication" />
+                  ) : null}
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {mapMounted ? (
+              <div
+                className={`absolute inset-0 z-20 flex min-h-0 flex-col ${
+                  view === "map" ? "" : "pointer-events-none hidden"
+                }`}
+              >
+                <ShellWorkspaceFrame
+                  title="圖資資料管理"
+                  titleIcon={
+                    <Map className="size-4 text-sky-400" aria-hidden />
+                  }
+                  flush
+                  {...frameProps}
+                >
+                  <ViewErrorBoundary
+                    title={t("shell.loadFailed", { title: t("nav.items.map") })}
+                  >
+                    <MapEditorApp
+                      workspace="map"
+                      vehicleModelsRequest={vehicleModelsRequest}
+                    />
+                  </ViewErrorBoundary>
+                </ShellWorkspaceFrame>
+              </div>
+            ) : null}
+          </Suspense>
+        ) : null}
       </main>
 
       {attachModuleId ? (

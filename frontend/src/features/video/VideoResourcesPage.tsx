@@ -1,29 +1,43 @@
-import { Copy, Film, HardDrive, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Copy, Film, HardDrive, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
 import { SiteMultiSelect } from '../../components/SiteMultiSelect';
 import { ListFooter, ListState } from '../event-log-shared/ui';
 import { Dialog, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
 import { videoApi, type StorageStatus, type VideoSourceItem } from './api';
-import { OPEN_VIDEO_RESOURCES_EVENT, takeHistoryRequest, type HistoryRequest } from './history-link';
+import { openVideoHistory } from './history-link';
 import { tagKey } from './layout';
 import { SourceDialog } from './SourceDialog';
 import { BADGE_TONE, onlineBadge, recordingBadge } from './status';
 import { StorageDialog } from './StorageDialog';
-import { VideoHistoryPage } from './VideoHistoryPage';
 import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
+import { AnchoredPopover } from '../../lib/AnchoredPopover';
 
 const PAGE_SIZE = 20;
 const HOUR = 3_600_000;
-type HistoryView = { request: HistoryRequest; title?: string };
 
 const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().replace(/-/g, '') : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`);
 
+function RowActions({ source, open, busy, onToggle, onEdit, onDuplicate, onHistory, onDelete }: { source: VideoSourceItem; open: boolean; busy: boolean; onToggle: () => void; onEdit: () => void; onDuplicate: () => void; onHistory: () => void; onDelete: () => void }) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const choose = (action: () => void) => { onToggle(); action(); };
+  const item = 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none disabled:opacity-50';
+  return <>
+    <button ref={anchorRef} type="button" aria-haspopup="menu" aria-expanded={open} aria-label={`${source.name} 操作`} onClick={onToggle} className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-300 hover:bg-white/5"><MoreHorizontal className="size-5" /></button>
+    <AnchoredPopover open={open} anchorRef={anchorRef} onClose={onToggle} role="menu" ariaLabel={`${source.name} 操作`} className="min-w-44 overflow-hidden rounded-xl border border-zinc-700 bg-[#1b1d23] py-1 shadow-xl">
+      <button type="button" role="menuitem" onClick={() => choose(onEdit)} className={item}><Pencil className="size-4" />編輯</button>
+      <button type="button" role="menuitem" disabled={busy} onClick={() => choose(onDuplicate)} className={item}><Copy className="size-4" />複製</button>
+      <button type="button" role="menuitem" onClick={() => choose(onHistory)} className={item}><Film className="size-4" />查看影像紀錄</button>
+      <button type="button" role="menuitem" onClick={() => choose(onDelete)} className={`${item} text-red-300`}><Trash2 className="size-4" />刪除</button>
+    </AnchoredPopover>
+  </>;
+}
+
 /**
- * 影像資源管理：來源清單（分頁、篩選、真實狀態）、啟停、新增／編輯、一鍵複製、刪除、分類標籤、儲存錄影、歷史錄影入口。
+ * 影像資源管理：來源清單（分頁、篩選、真實狀態）、啟停、新增／編輯、一鍵複製、刪除、分類標籤與儲存錄影。
  *
- * - 清單不播放影片、不建立任何播放 session、不載入縮圖；歷史錄影在明確點入的子畫面才播放。
+ * - 清單不播放影片、不建立任何播放 session、不載入縮圖；歷史錄影由獨立「影像管理紀錄」頁查詢。
  * - 「啟用」是使用者指令、「上線」是實際探測結果、「錄影」又是另一件事，三者分開顯示；過期狀態顯示「狀態待更新」。
  * - 來源連線逐筆設定；攝影機允許網段是部署設定，不在此頁修改。
  */
@@ -31,7 +45,6 @@ export function VideoResourcesPage() {
   const auth = useAuth();
   const canConfigure = auth.can('events.video.configure');
   const canManageRecording = auth.can('events.video.recording-manage');
-  const canHistory = auth.can('events.video-history.view');
   const canList = canConfigure || canManageRecording;
 
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -43,11 +56,8 @@ export function VideoResourcesPage() {
   const [deleting, setDeleting] = useState<{ source: VideoSourceItem; impact: { tabs: number; tiles: number; stopsRecording: boolean } } | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
-  const [history, setHistory] = useState<HistoryView | null>(() => {
-    const req = takeHistoryRequest();
-    return req ? { request: req } : null;
-  });
   const [notice, setNotice] = useState<{ text: string; tone: 'success' | 'error'; id: number } | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const notify = useCallback((text: string, tone: 'success' | 'error') => setNotice((n) => ({ text, tone, id: (n?.id ?? 0) + 1 })), [setNotice]);
 
   // reload 不是資料身分；帳號切換時也不能沿用前一位使用者的列。
@@ -88,8 +98,8 @@ export function VideoResourcesPage() {
   const refreshTags = useCallback(async () => applyTagOptions(await videoApi.sourceTags()), [applyTagOptions]);
   useEffect(() => {
     if (canList) void videoApi.sourceTags().then(applyTagOptions, () => undefined);
-    if (canList || canHistory) void videoApi.storageStatus().then(setStorage, () => undefined);
-  }, [applyTagOptions, canList, canHistory]);
+    if (canList) void videoApi.storageStatus().then(setStorage, () => undefined);
+  }, [applyTagOptions, canList]);
   // 狀態變化（worker 探測、其他人修改）：有界地重新取得目前這一頁，不建立任何播放
   useEffect(() => {
     if (!canList) return undefined;
@@ -105,16 +115,6 @@ export function VideoResourcesPage() {
     const timer = window.setInterval(refresh, 30_000);
     return () => window.clearInterval(timer);
   }, [canList, refresh]);
-  // 其他頁面帶條件進來（事件前後、舊歷史連結）
-  useEffect(() => {
-    const onOpen = (event: Event) => {
-      const wantsHistory = (event as CustomEvent<{ history?: boolean }>).detail?.history;
-      const req = takeHistoryRequest();
-      setHistory(wantsHistory && req ? { request: req } : null);
-    };
-    window.addEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_VIDEO_RESOURCES_EVENT, onOpen);
-  }, []);
   useEffect(() => {
     if (!notice) return undefined;
     const timer = window.setTimeout(() => setNotice(null), 3600);
@@ -190,14 +190,10 @@ export function VideoResourcesPage() {
   const openHistory = (s?: VideoSourceItem) => {
     if (!auth.require('events.video-history.view')) return;
     const now = Date.now();
-    setHistory({ request: { from: now - HOUR, to: now, sourceIds: s ? [s.id] : [] }, title: s?.name });
+    openVideoHistory({ from: now - HOUR, to: now, sourceIds: s ? [s.id] : [] });
   };
 
   const tagSuggestions = useMemo(() => tagOptions.map((t) => t.tag), [tagOptions]);
-
-  if (history) {
-    return <VideoHistoryPage key={JSON.stringify(history.request)} request={history.request.sourceIds?.length || history.request.vehicleCode ? history.request : null} title={history.title} onBack={() => setHistory(null)} />;
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-zinc-100">
@@ -209,14 +205,11 @@ export function VideoResourcesPage() {
             allLabel="全部標籤"
             values={normalizedTags}
             options={tagOptions.map(({ tag, count }) => ({ value: tagKey(tag), label: tag, badge: count }))}
-            onChange={(tags) => { setSelectedTags(tags); setPage(1); }}
+            onChange={(tags) => { setOpenMenuId(null); setSelectedTags(tags); setPage(1); }}
             className="w-[min(22rem,calc(100vw-2rem))]"
           />
         </label>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => openHistory()} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-zinc-700 px-3 text-sm text-zinc-200 hover:bg-white/5">
-            <Film className="size-4" />歷史錄影
-          </button>
           <button type="button" onClick={() => void openStorage()} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm hover:bg-white/5 ${storage?.paused ? 'border-amber-500/40 text-amber-200' : 'border-zinc-700 text-zinc-200'}`}>
             <HardDrive className="size-4" />{storage?.paused ? `錄影暫停：${storage.paused.reason}` : '錄影儲存狀態'}
           </button>
@@ -226,10 +219,7 @@ export function VideoResourcesPage() {
         </div>
       </div>
       {!canList ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-zinc-400">
-          <p>你的帳號可以查詢歷史錄影，但沒有管理影像來源的權限。</p>
-          <PrimaryButton onClick={() => openHistory()}>查詢歷史錄影</PrimaryButton>
-        </div>
+        <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">權限不足</div>
       ) : (
         <>
           {sourceQuery.refreshing ? <div role="status" className="text-xs text-sky-300">背景更新中，仍顯示目前資料…</div> : null}
@@ -280,14 +270,7 @@ export function VideoResourcesPage() {
                       <td className="px-3 py-3 text-xs">{s.recordingEnabled ? '儲存' : '不儲存'}</td>
                       <td className="px-3 py-3"><span className={`rounded px-1.5 py-0.5 text-xs ${BADGE_TONE[rec.tone]}`}>{rec.text}</span></td>
                       <td className="max-w-[16rem] px-3 py-3"><span className="block truncate font-mono text-xs text-zinc-400" title={s.connection?.maskedUrl}>{s.connection?.maskedUrl ?? '—'}</span></td>
-                      <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          <button type="button" onClick={() => auth.require('events.video.configure') && setDialog({ source: s })} aria-label={`編輯 ${s.name}`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2 py-1 text-xs hover:bg-white/5"><Pencil className="size-3.5" />編輯</button>
-                          <button type="button" onClick={() => void duplicate(s)} disabled={Boolean(busy)} aria-label={`複製 ${s.name}`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2 py-1 text-xs hover:bg-white/5 disabled:opacity-50"><Copy className="size-3.5" />複製</button>
-                          <button type="button" onClick={() => openHistory(s)} aria-label={`${s.name} 歷史錄影`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2 py-1 text-xs hover:bg-white/5"><Film className="size-3.5" />歷史錄影</button>
-                          <button type="button" onClick={() => void askDelete(s)} aria-label={`刪除 ${s.name}`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2 py-1 text-xs text-red-300 hover:bg-white/5"><Trash2 className="size-3.5" />刪除</button>
-                        </div>
-                      </td>
+                      <td className="px-3 py-3"><RowActions source={s} open={openMenuId === s.id} busy={Boolean(busy)} onToggle={() => setOpenMenuId((current) => current === s.id ? null : s.id)} onEdit={() => auth.require('events.video.configure') && setDialog({ source: s })} onDuplicate={() => void duplicate(s)} onHistory={() => openHistory(s)} onDelete={() => void askDelete(s)} /></td>
                     </tr>
                   );
                 })}
@@ -300,7 +283,7 @@ export function VideoResourcesPage() {
               </div>
             ) : null}
           </div>
-          <ListFooter page={page} total={total} pageSize={PAGE_SIZE} onPage={setPage} summary={<>共 {total} 個來源</>} />
+          <ListFooter page={page} total={total} pageSize={PAGE_SIZE} onPage={(next) => { setOpenMenuId(null); setPage(next); }} summary={<>共 {total} 個來源</>} />
         </>
       )}
 

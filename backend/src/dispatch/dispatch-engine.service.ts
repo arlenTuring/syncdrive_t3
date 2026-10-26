@@ -35,7 +35,12 @@ import {
   type DailyPlanAdoption,
   type DailyPlanAdoptionVia,
 } from './daily-plan';
-import { operatingDayOf, operatingDayReference, operatingDayStart } from '../operating-day/operating-day';
+import {
+  operatingDayOf,
+  operatingDayReference,
+  operatingDayStart,
+} from '../operating-day/operating-day';
+import { ScheduledOrderService } from '../order/scheduled-order.service';
 
 type ShiftSource = Awaited<ReturnType<OperationShiftService['getShiftTrips']>>;
 
@@ -107,6 +112,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(OperationOrder)
     private readonly orderRepository: Repository<OperationOrder>,
     private readonly dailyPlans: DailyPlanStore,
+    private readonly scheduledOrders: ScheduledOrderService,
   ) {}
 
   /**
@@ -127,7 +133,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     this.timer.unref?.();
     this.logger.log(
       `即時調度計時器啟動：每 ${dispatchConfig.tickSeconds} 秒檢查一次；` +
-      '是否下單以資料庫中的持久開關為準',
+        '是否下單以資料庫中的持久開關為準',
     );
   }
 
@@ -140,7 +146,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
 
   /** 線上開關。停用時保留既有訂單，只是不再發新的。 */
   async setEnabled(enabled: boolean): Promise<void> {
-    await this.orderRepository.manager.query(`
+    await this.orderRepository.manager.query(
+      `
       INSERT INTO system_settings
         (setting_key, setting_value, value_type, description, updated_by, created_at, updated_at)
       VALUES ($1, $2::jsonb, 'boolean', '調度下單持久開關；完整重置後保持停用', 'dispatch', $3, $3)
@@ -148,7 +155,13 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         setting_value = EXCLUDED.setting_value,
         updated_by = EXCLUDED.updated_by,
         updated_at = EXCLUDED.updated_at
-    `, [DispatchEngineService.ENABLED_SETTING, JSON.stringify(enabled), Date.now()]);
+    `,
+      [
+        DispatchEngineService.ENABLED_SETTING,
+        JSON.stringify(enabled),
+        Date.now(),
+      ],
+    );
     this.logger.log(`即時調度引擎${enabled ? '啟用' : '停用'}（已保存）`);
   }
 
@@ -172,11 +185,23 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    * 某營運日採用的班表內容與車隊：時間線第 N 列由車隊第 N 台擔任（跟下單同一套，見 vehicleForRow）。
    * 營運分佈用它看「此刻在計畫上做什麼」（例如月台上等下一班，那種等待不會產生訂單）。
    */
-  async dailyPlanTimeline(day: string): Promise<{ shiftId: string; body: Record<string, unknown>; fleet: string[] } | null> {
+  async dailyPlanTimeline(
+    day: string,
+  ): Promise<{
+    shiftId: string;
+    body: Record<string, unknown>;
+    fleet: string[];
+  } | null> {
     const adoption = await this.ensureDailyPlan(day);
     if (!adoption) return null;
-    const source = await this.operationShiftService.getShiftTrips(adoption.shift_id);
-    return { shiftId: source.shiftId, body: source.body, fleet: await this.loadFleet() };
+    const source = await this.operationShiftService.getShiftTrips(
+      adoption.shift_id,
+    );
+    return {
+      shiftId: source.shiftId,
+      body: source.body,
+      fleet: await this.loadFleet(),
+    };
   }
 
   private async loadFleet(): Promise<string[]> {
@@ -215,7 +240,14 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const planDigest = planDigestOf(plan.planned);
     let adoption = resolved.adoption;
     if (resolved.adoptVia) {
-      adoption = await this.saveAdoption(day, source, plan, planDigest, resolved.adoption, resolved.adoptVia);
+      adoption = await this.saveAdoption(
+        day,
+        source,
+        plan,
+        planDigest,
+        resolved.adoption,
+        resolved.adoptVia,
+      );
     }
     return {
       ...plan,
@@ -238,7 +270,14 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const reference = operatingDayReference(day) ?? Date.now();
     const source = await resolved.load();
     const plan = await this.buildPlan(source, reference);
-    return this.saveAdoption(day, source, plan, planDigestOf(plan.planned), resolved.adoption, resolved.adoptVia);
+    return this.saveAdoption(
+      day,
+      source,
+      plan,
+      planDigestOf(plan.planned),
+      resolved.adoption,
+      resolved.adoptVia,
+    );
   }
 
   /**
@@ -252,7 +291,10 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     by?: string | null;
     expectedPlanDigest?: string | null;
     loadDigest?: string | null;
-  }): Promise<{ previous: DailyPlanAdoption | null; adoption: DailyPlanAdoption }> {
+  }): Promise<{
+    previous: DailyPlanAdoption | null;
+    adoption: DailyPlanAdoption;
+  }> {
     const reference = operatingDayReference(args.day);
     if (reference == null) throw new Error(`營運日格式不對：${args.day}`);
     const source = await this.operationShiftService.getShiftTrips(args.shiftId);
@@ -263,26 +305,46 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     }
     const previous = await this.dailyPlans.get(args.day);
     const adoption = await this.saveAdoption(
-      args.day, source, plan, planDigest, previous, args.via, args.by ?? null, args.loadDigest ?? null,
+      args.day,
+      source,
+      plan,
+      planDigest,
+      previous,
+      args.via,
+      args.by ?? null,
+      args.loadDigest ?? null,
     );
     return { previous, adoption };
   }
 
   private async saveAdoption(
     day: string,
-    source: Pick<ShiftSource, 'shiftId' | 'shiftName' | 'trips' | 'body'> & { row?: ShiftSource['row'] },
-    plan: { planned: PlannedDispatch[]; skipped: Array<{ tripCode: string; reason: string }> },
+    source: Pick<ShiftSource, 'shiftId' | 'shiftName' | 'trips' | 'body'> & {
+      row?: ShiftSource['row'];
+    },
+    plan: {
+      planned: PlannedDispatch[];
+      skipped: Array<{ tripCode: string; reason: string }>;
+    },
     planDigest: string,
     previous: DailyPlanAdoption | null,
     via: DailyPlanAdoptionVia,
     by: string | null = null,
     loadDigest: string | null = null,
   ): Promise<DailyPlanAdoption> {
-    const version = typeof source.body.version === 'string' && source.body.version.trim() ? source.body.version.trim() : null;
+    const version =
+      typeof source.body.version === 'string' && source.body.version.trim()
+        ? source.body.version.trim()
+        : null;
     const updatedAt = source.row ? Number(source.row.updatedAt) : NaN;
     const adoption = buildAdoption({
       operatingDay: day,
-      shift: { id: source.shiftId, name: source.shiftName, version, updatedAt: Number.isFinite(updatedAt) ? updatedAt : null },
+      shift: {
+        id: source.shiftId,
+        name: source.shiftName,
+        version,
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : null,
+      },
       planDigest,
       loadDigest,
       planned: plan.planned,
@@ -291,7 +353,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         return {
           trip_code: trip.trip_code,
           task_type: trip.task_type,
-          start: dayStart == null ? null : dayStart + trip.card_start_second * 1000,
+          start:
+            dayStart == null ? null : dayStart + trip.card_start_second * 1000,
           end: dayStart == null ? null : dayStart + trip.card_end_second * 1000,
         };
       }),
@@ -302,8 +365,14 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       previous,
     });
     await this.dailyPlans.save(adoption);
-    if (!previous || previous.plan_digest !== adoption.plan_digest || previous.shift_id !== adoption.shift_id) {
-      this.logger.log(`${day} 每日計畫採用「${adoption.shift_name}」（${adoption.passenger_trips.length} 班載客，${via}）`);
+    if (
+      !previous ||
+      previous.plan_digest !== adoption.plan_digest ||
+      previous.shift_id !== adoption.shift_id
+    ) {
+      this.logger.log(
+        `${day} 每日計畫採用「${adoption.shift_name}」（${adoption.passenger_trips.length} 班載客，${via}）`,
+      );
     }
     return adoption;
   }
@@ -314,30 +383,52 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    * 正式部署（usage_status＝in_use）晚於採用紀錄，或還沒有紀錄時，改採部署中的那份——部署本身就是
    * 明確的動作。其餘照採用紀錄（例如模擬器部署的班表），不因為部署中是另一份就被換掉。
    */
-  private async resolveDailySource(day: string, options: { allowAuto: boolean }): Promise<{
+  private async resolveDailySource(
+    day: string,
+    options: { allowAuto: boolean },
+  ): Promise<{
     adoption: DailyPlanAdoption | null;
     adoptVia: DailyPlanAdoptionVia | null;
-    load: () => Promise<ShiftSource | (Omit<ShiftSource, 'row'> & { row?: undefined })>;
+    load: () => Promise<
+      ShiftSource | (Omit<ShiftSource, 'row'> & { row?: undefined })
+    >;
   } | null> {
     const adoption = await this.dailyPlans.get(day);
-    const deployed = options.allowAuto ? await this.operationShiftService.getDeployedShift() : null;
-    const deployedAt = Number((deployed?.body.deployment as { deployedAt?: unknown } | undefined)?.deployedAt) || 0;
+    const deployed = options.allowAuto
+      ? await this.operationShiftService.getDeployedShift()
+      : null;
+    const deployedAt =
+      Number(
+        (deployed?.body.deployment as { deployedAt?: unknown } | undefined)
+          ?.deployedAt,
+      ) || 0;
     const loadDeployed = async () => {
       const trips = await this.operationShiftService.getDeployedTrips();
       if (!trips) throw new Error('部署中的班表已不存在');
       return trips;
     };
-    if (deployed && (!adoption || (adoption.shift_id !== deployed.shiftId && deployedAt > adoption.adopted_at))) {
-      return { adoption, adoptVia: adoption ? 'deploy' : 'auto_deployed', load: loadDeployed };
+    if (
+      deployed &&
+      (!adoption ||
+        (adoption.shift_id !== deployed.shiftId &&
+          deployedAt > adoption.adopted_at))
+    ) {
+      return {
+        adoption,
+        adoptVia: adoption ? 'deploy' : 'auto_deployed',
+        load: loadDeployed,
+      };
     }
     if (!adoption) return null;
-    const load = deployed && adoption.shift_id === deployed.shiftId
-      ? loadDeployed
-      : () => this.operationShiftService.getShiftTrips(adoption.shift_id);
+    const load =
+      deployed && adoption.shift_id === deployed.shiftId
+        ? loadDeployed
+        : () => this.operationShiftService.getShiftTrips(adoption.shift_id);
     return {
       adoption,
       // 舊快照只有載客明細；第一次讀取時用同一份班表原地補齊，不改版本或採用歷史。
-      adoptVia: adoption.task_snapshot_version === 2 ? null : adoption.adopted_via,
+      adoptVia:
+        adoption.task_snapshot_version === 2 ? null : adoption.adopted_via,
       load,
     };
   }
@@ -476,7 +567,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     if (!dryRun && !(await this.isEnabled())) return empty;
 
     // 同一資料庫即使啟動多個後端，也只有取得 advisory lock 的程序可下單。
-    const lockRunner = this.orderRepository.manager.connection.createQueryRunner();
+    const lockRunner =
+      this.orderRepository.manager.connection.createQueryRunner();
     if (!dryRun) {
       await lockRunner.connect();
       const locked = await lockRunner.query(
@@ -490,89 +582,102 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-    // 換日就把記憶體的已發清單重置——昨天的 order_id 今天不會再出現
-    const today = localMidnight(now);
-    if (today !== this.issuedDay) {
-      this.issued = new Set();
-      this.issuedDay = today;
-    }
+      // 換日就把記憶體的已發清單重置——昨天的 order_id 今天不會再出現
+      const today = localMidnight(now);
+      if (today !== this.issuedDay) {
+        this.issued = new Set();
+        this.issuedDay = today;
+      }
 
-    let plan: Awaited<ReturnType<typeof this.planToday>>;
-    try {
-      plan = await this.planToday(now);
-      this.lastError = null;
-    } catch (error) {
-      this.lastError = error instanceof Error ? error.message : String(error);
-      this.logger.error(`即時調度引擎讀班表失敗：${this.lastError}`);
-      return empty;
-    }
-    if (!plan) {
-      this.lastError = '目前沒有部署中的班表';
-      return empty;
-    }
+      // 人工排程與班表共用同一把資料庫鎖、同一個 tick 及同一個 OrderService；
+      // 即使當天沒有部署班表，合法保存的人工排程仍會到期發布。
+      const manual = dryRun
+        ? { checked: 0, published: [] as string[] }
+        : await this.scheduledOrders.publishDue(
+            now,
+            dispatchConfig.leadSeconds,
+            dispatchConfig.catchUpSeconds,
+          );
 
-    const due: PlannedDispatch[] = [];
-    const expired: PlannedDispatch[] = [];
-    for (const item of plan.planned) {
-      if (this.issued.has(item.orderId)) continue;
-      const decision = dispatchDecision({
-        departAt: item.departAt,
-        now,
-        leadSeconds: dispatchConfig.leadSeconds,
-        catchUpSeconds: dispatchConfig.catchUpSeconds,
+      let plan: Awaited<ReturnType<typeof this.planToday>>;
+      try {
+        plan = await this.planToday(now);
+        this.lastError = null;
+      } catch (error) {
+        this.lastError = error instanceof Error ? error.message : String(error);
+        this.logger.error(`即時調度引擎讀班表失敗：${this.lastError}`);
+        return empty;
+      }
+      if (!plan) {
+        this.lastError = '目前沒有部署中的班表';
+        return { ...empty, checked: manual.checked };
+      }
+
+      const due: PlannedDispatch[] = [];
+      const expired: PlannedDispatch[] = [];
+      for (const item of plan.planned) {
+        if (this.issued.has(item.orderId)) continue;
+        const decision = dispatchDecision({
+          departAt: item.departAt,
+          now,
+          leadSeconds: dispatchConfig.leadSeconds,
+          catchUpSeconds: dispatchConfig.catchUpSeconds,
+        });
+        if (decision === 'dispatch') due.push(item);
+        else if (decision === 'expired') expired.push(item);
+      }
+
+      if (due.length === 0) {
+        return {
+          checked: plan.planned.length,
+          issued: [],
+          expired,
+          skipped: plan.skipped,
+        };
+      }
+
+      // 第二層防重：重啟後記憶體是空的，庫裡卻可能已經有這些訂單
+      const existing = await this.orderRepository.find({
+        where: { id: In(due.map((item) => item.orderId)) },
+        select: { id: true },
       });
-      if (decision === 'dispatch') due.push(item);
-      else if (decision === 'expired') expired.push(item);
-    }
+      const existingIds = new Set(existing.map((row) => row.id));
 
-    if (due.length === 0) {
+      const issued: PlannedDispatch[] = [];
+      for (const item of due) {
+        if (existingIds.has(item.orderId)) {
+          // 已經在庫裡＝上一次程序發過了。記進記憶體避免每個 tick 都再查一次。
+          this.issued.add(item.orderId);
+          continue;
+        }
+        if (dryRun) {
+          issued.push(item);
+          continue;
+        }
+        try {
+          await this.issueOrder(item, plan);
+          this.issued.add(item.orderId);
+          issued.push(item);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.lastError = `下訂單 ${item.orderId} 失敗：${message}`;
+          this.logger.error(this.lastError);
+          // 不記進 issued——下個 tick 還在補發窗口內的話會再試一次
+        }
+      }
+
       return {
         checked: plan.planned.length,
-        issued: [],
+        issued,
         expired,
         skipped: plan.skipped,
       };
-    }
-
-    // 第二層防重：重啟後記憶體是空的，庫裡卻可能已經有這些訂單
-    const existing = await this.orderRepository.find({
-      where: { id: In(due.map((item) => item.orderId)) },
-      select: { id: true },
-    });
-    const existingIds = new Set(existing.map((row) => row.id));
-
-    const issued: PlannedDispatch[] = [];
-    for (const item of due) {
-      if (existingIds.has(item.orderId)) {
-        // 已經在庫裡＝上一次程序發過了。記進記憶體避免每個 tick 都再查一次。
-        this.issued.add(item.orderId);
-        continue;
-      }
-      if (dryRun) {
-        issued.push(item);
-        continue;
-      }
-      try {
-        await this.issueOrder(item, plan);
-        this.issued.add(item.orderId);
-        issued.push(item);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = `下訂單 ${item.orderId} 失敗：${message}`;
-        this.logger.error(this.lastError);
-        // 不記進 issued——下個 tick 還在補發窗口內的話會再試一次
-      }
-    }
-
-    return {
-      checked: plan.planned.length,
-      issued,
-      expired,
-      skipped: plan.skipped,
-    };
     } finally {
       if (!dryRun) {
-        await lockRunner.query('SELECT pg_advisory_unlock($1)', [DispatchEngineService.EXECUTOR_LOCK]);
+        await lockRunner.query('SELECT pg_advisory_unlock($1)', [
+          DispatchEngineService.EXECUTOR_LOCK,
+        ]);
         await lockRunner.release();
       }
     }
@@ -580,7 +685,10 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
 
   /** 班表綁定的整備任務 → 充電參數查詢表。取不到就讓每張充電單都帶著原因。 */
   private async chargingLookupFor(body: Record<string, unknown>) {
-    const taskId = typeof body.maintenanceTaskId === 'string' ? body.maintenanceTaskId.trim() : '';
+    const taskId =
+      typeof body.maintenanceTaskId === 'string'
+        ? body.maintenanceTaskId.trim()
+        : '';
     if (!taskId) return buildChargingLookup(null);
     try {
       const task = await this.maintenanceTaskService.getTaskDetail(taskId);
@@ -601,7 +709,13 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
    */
   private async issueOrder(
     item: PlannedDispatch,
-    plan: { shiftId: string; shiftName: string; operatingDay: string; planDigest: string; mapId?: string | null },
+    plan: {
+      shiftId: string;
+      shiftName: string;
+      operatingDay: string;
+      planDigest: string;
+      mapId?: string | null;
+    },
   ): Promise<void> {
     const { shiftId, shiftName } = plan;
     const fields = dispatchOrderFields(item);
@@ -627,7 +741,9 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         [DAILY_PLAN_PAYLOAD_KEYS.shiftId]: shiftId,
         [DAILY_PLAN_PAYLOAD_KEYS.planDigest]: plan.planDigest,
         [DAILY_PLAN_PAYLOAD_KEYS.tripCode]: item.tripCode,
-        ...(item.planBlockId ? { [DAILY_PLAN_PAYLOAD_KEYS.blockId]: item.planBlockId } : {}),
+        ...(item.planBlockId
+          ? { [DAILY_PLAN_PAYLOAD_KEYS.blockId]: item.planBlockId }
+          : {}),
         // 站點 ID 屬於哪張圖：現行站名依「同一張圖、同一個站點 ID」解析最新保存的名稱
         ...(plan.mapId ? { plan_map_id: plan.mapId } : {}),
         planned_depart_at: item.departAt,
@@ -711,7 +827,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
 
 /** 呼叫端載入的計畫版本跟班表目前展開的不同 */
 export class DailyPlanVersionMismatch extends Error {
-  constructor(readonly expected: string, readonly actual: string) {
-    super(`班表內容已在載入後變更（載入時 ${expected}，目前 ${actual}），請重新載入後再部署`);
+  constructor(
+    readonly expected: string,
+    readonly actual: string,
+  ) {
+    super(
+      `班表內容已在載入後變更（載入時 ${expected}，目前 ${actual}），請重新載入後再部署`,
+    );
   }
 }

@@ -160,7 +160,7 @@ export function LiveEventsPage({ bucket, active, refreshSignal, onTotals, onChan
             {items.map((row) => {
               const severity = getSeverityStyle(row.severity);
               return <tr key={row.id} data-event-id={row.id} className="border-b border-zinc-800/80 align-top">
-                <td className="px-4 py-3 tabular-nums">{formatDateTime(row.occurredAt, tz)}</td>
+                <td className="px-4 py-3 tabular-nums"><div>{formatDateTime(row.occurredAt, tz)}</div><div className="mt-1 font-mono text-xs text-zinc-500">事件 ID：{row.id}</div></td>
                 <td className="px-4 py-3"><div>{row.vehicleCode ?? row.sourceName ?? row.sourceId ?? '—'}</div>{row.vehicleCode && row.sourceName && row.sourceName !== row.vehicleCode ? <div className="text-xs text-zinc-500">{row.sourceName}</div> : null}</td>
                 <td className="px-4 py-3">{row.eventLabel}</td>
                 <td className="px-4 py-3"><span className="rounded-md px-2 py-0.5 text-xs" style={{ background: severity.stripBg, color: severity.stripText }}>{SEVERITY_LABEL[row.severity] ?? row.severity}</span></td>

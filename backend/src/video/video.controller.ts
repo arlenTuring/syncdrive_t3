@@ -282,6 +282,12 @@ export class VideoController {
     return this.history.recordings(query);
   }
 
+  @Get('recordings/source-candidates')
+  @RequirePermission('events.video-history.view')
+  sourceCandidates(@Query() query: Record<string, unknown>) {
+    return this.history.sourceCandidates(query);
+  }
+
   @Post('playback-sessions')
   @RequirePermission('events.video-history.view')
   @ApiOperation({ summary: '建立歷史播放（最多 12 來源、24 小時）' })

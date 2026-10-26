@@ -10,6 +10,7 @@ import {
   Headphones,
   LayoutDashboard,
   List,
+  ListChecks,
   Map,
   PanelLeftClose,
   PanelLeftOpen,
@@ -31,19 +32,26 @@ import {
   KeyRound,
   LogIn,
   Film,
-} from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import type { ShellView } from '../types';
-import { isEventsView, isLogsView, isOperationsView, isSiteView, SIDEBAR_MODULE_GROUPS, permissionSatisfied } from '../types';
-import type { ModuleDashboardPage } from '../utils/moduleDashboardPages';
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { ShellView } from "../types";
+import {
+  isEventsView,
+  isLogsView,
+  isOperationsView,
+  isSiteView,
+  SIDEBAR_MODULE_GROUPS,
+  permissionSatisfied,
+} from "../types";
+import type { ModuleDashboardPage } from "../utils/moduleDashboardPages";
 import {
   moduleDashboardViewId,
   parseModuleDashboardViewId,
-} from '../utils/moduleDashboardPages';
+} from "../utils/moduleDashboardPages";
 
-const SIDEBAR_COLLAPSED_KEY = 'syncdrive_vtms_sidebar_collapsed';
-const VTMS_MARK_SRC = '/logo.svg';
+const SIDEBAR_COLLAPSED_KEY = "syncdrive_vtms_sidebar_collapsed";
+const VTMS_MARK_SRC = "/logo.svg";
 
 type ScheduleModuleSidebarProps = {
   activeView: string;
@@ -57,63 +65,78 @@ type ScheduleModuleSidebarProps = {
 };
 
 const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
-  'event-list': BellRing,
-  'video-monitor': Video,
-  'video-resources': Film,
-  'log-system': ScrollText,
-  'log-permissions': KeyRound,
-  'log-operations': ClipboardList,
-  'log-authentication': LogIn,
-  'shift-deployment': Activity,
-  'degraded-operation': AlertTriangle,
-  'dispatch-scheduling': Send,
-  'psd-control': DoorOpen,
-  'virtual-fence': Pentagon,
+  "event-list": BellRing,
+  "video-monitor": Video,
+  "video-resources": Film,
+  "log-system": ScrollText,
+  "log-permissions": KeyRound,
+  "log-operations": ClipboardList,
+  "log-authentication": LogIn,
+  "shift-deployment": Activity,
+  "degraded-operation": AlertTriangle,
+  "dispatch-scheduling": Send,
+  "scheduled-orders": ListChecks,
+  "psd-control": DoorOpen,
+  "virtual-fence": Pentagon,
   map: Map,
-  'shift-records': ClipboardList,
-  'time-templates': FileText,
-  'shift-list': List,
-  'maintenance-tasks': Wrench,
-  'vehicle-realtime': Route,
-  'vehicle-registry': Route,
-  'vehicle-run-history': History,
-  'media-content': Volume2,
-  'media-groups': Volume2,
-  'media-schedule': Volume2,
-  'account-management': UserRoundCog,
-  'role-management': ShieldCheck,
+  "shift-records": ClipboardList,
+  "time-templates": FileText,
+  "shift-list": List,
+  "maintenance-tasks": Wrench,
+  "vehicle-realtime": Route,
+  "vehicle-registry": Route,
+  "vehicle-run-history": History,
+  "media-content": Volume2,
+  "media-groups": Volume2,
+  "media-schedule": Volume2,
+  "account-management": UserRoundCog,
+  "role-management": ShieldCheck,
 };
 
 function groupIcon(groupId: string) {
-  if (groupId === 'schedule') return CalendarDays;
-  if (groupId === 'monitor') return Activity;
-  if (groupId === 'vehicle') return Route;
-  if (groupId === 'site') return Map;
-  if (groupId === 'operations') return Activity;
-  if (groupId === 'permission') return Settings;
-  if (groupId === 'media') return Volume2;
-  if (groupId === 'events') return BellRing;
-  if (groupId === 'logs') return ScrollText;
-  if (groupId === 'service') {
+  if (groupId === "schedule") return CalendarDays;
+  if (groupId === "monitor") return Activity;
+  if (groupId === "vehicle") return Route;
+  if (groupId === "site") return Map;
+  if (groupId === "operations") return Activity;
+  if (groupId === "permission") return Settings;
+  if (groupId === "media") return Volume2;
+  if (groupId === "events") return BellRing;
+  if (groupId === "logs") return ScrollText;
+  if (groupId === "service") {
     return LayoutDashboard;
   }
   return LayoutDashboard;
 }
 
 function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
-  if (groupId === 'site') return isSiteView(activeView);
-  if (groupId === 'events') return isEventsView(activeView);
-  if (groupId === 'logs') return isLogsView(activeView);
-  if (groupId === 'vehicle') return activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history';
-  if (groupId === 'operations') return isOperationsView(activeView);
-  if (groupId === 'permission') return activeView === 'account-management' || activeView === 'role-management';
-  if (groupId === 'media') return activeView === 'media-content' || activeView === 'media-groups' || activeView === 'media-schedule';
-  if (groupId === 'schedule') {
+  if (groupId === "site") return isSiteView(activeView);
+  if (groupId === "events") return isEventsView(activeView);
+  if (groupId === "logs") return isLogsView(activeView);
+  if (groupId === "vehicle")
     return (
-      activeView === 'shift-records'
-      || activeView === 'time-templates'
-      || activeView === 'shift-list'
-      || activeView === 'maintenance-tasks'
+      activeView === "vehicle-realtime" ||
+      activeView === "vehicle-registry" ||
+      activeView === "vehicle-run-history"
+    );
+  if (groupId === "operations") return isOperationsView(activeView);
+  if (groupId === "service") return activeView === "scheduled-orders";
+  if (groupId === "permission")
+    return (
+      activeView === "account-management" || activeView === "role-management"
+    );
+  if (groupId === "media")
+    return (
+      activeView === "media-content" ||
+      activeView === "media-groups" ||
+      activeView === "media-schedule"
+    );
+  if (groupId === "schedule") {
+    return (
+      activeView === "shift-records" ||
+      activeView === "time-templates" ||
+      activeView === "shift-list" ||
+      activeView === "maintenance-tasks"
     );
   }
   return false;
@@ -121,7 +144,7 @@ function isBuiltinGroupActive(groupId: string, activeView: string): boolean {
 
 function readCollapsedPreference(): boolean {
   try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -129,7 +152,7 @@ function readCollapsedPreference(): boolean {
 
 function writeCollapsedPreference(collapsed: boolean) {
   try {
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
   } catch {
     // ignore
   }
@@ -162,12 +185,13 @@ export function ScheduleModuleSidebar({
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     operations: true,
+    service: true,
     schedule: true,
     vehicle: true,
     site: true,
   });
   const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
+  const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -198,23 +222,36 @@ export function ScheduleModuleSidebar({
     if (isOperationsView(activeView)) {
       setExpanded((prev) => ({ ...prev, operations: true }));
     }
+    if (activeView === "scheduled-orders")
+      setExpanded((prev) => ({ ...prev, service: true }));
     if (isSiteView(activeView)) {
       setExpanded((prev) => ({ ...prev, site: true }));
     }
     if (
-      activeView === 'shift-records'
-      || activeView === 'time-templates'
-      || activeView === 'shift-list'
-      || activeView === 'maintenance-tasks'
+      activeView === "shift-records" ||
+      activeView === "time-templates" ||
+      activeView === "shift-list" ||
+      activeView === "maintenance-tasks"
     ) {
       setExpanded((prev) => ({ ...prev, schedule: true }));
     }
-    if (activeView === 'vehicle-realtime' || activeView === 'vehicle-registry' || activeView === 'vehicle-run-history') {
+    if (
+      activeView === "vehicle-realtime" ||
+      activeView === "vehicle-registry" ||
+      activeView === "vehicle-run-history"
+    ) {
       setExpanded((prev) => ({ ...prev, vehicle: true }));
     }
-    if (activeView === 'media-content' || activeView === 'media-groups' || activeView === 'media-schedule') setExpanded((prev) => ({ ...prev, media: true }));
-    if (isEventsView(activeView)) setExpanded((prev) => ({ ...prev, events: true }));
-    if (isLogsView(activeView)) setExpanded((prev) => ({ ...prev, logs: true }));
+    if (
+      activeView === "media-content" ||
+      activeView === "media-groups" ||
+      activeView === "media-schedule"
+    )
+      setExpanded((prev) => ({ ...prev, media: true }));
+    if (isEventsView(activeView))
+      setExpanded((prev) => ({ ...prev, events: true }));
+    if (isLogsView(activeView))
+      setExpanded((prev) => ({ ...prev, logs: true }));
     const mdpId = parseModuleDashboardViewId(activeView);
     if (mdpId) {
       const page = moduleDashboardPages.find((item) => item.id === mdpId);
@@ -229,14 +266,14 @@ export function ScheduleModuleSidebar({
   return (
     <aside
       className={`flex shrink-0 flex-col bg-black transition-[width] duration-200 ease-out ${
-        collapsed ? 'w-[64px]' : 'w-[240px]'
+        collapsed ? "w-[64px]" : "w-[240px]"
       }`}
     >
       <div
         className={`flex shrink-0 ${
           collapsed
-            ? 'flex-col items-center gap-3 px-2 pt-3 pb-2'
-            : 'h-14 items-center gap-2 px-3'
+            ? "flex-col items-center gap-3 px-2 pt-3 pb-2"
+            : "h-14 items-center gap-2 px-3"
         }`}
       >
         {collapsed ? (
@@ -245,15 +282,15 @@ export function ScheduleModuleSidebar({
               type="button"
               onClick={toggleCollapsed}
               className="inline-flex size-9 items-center justify-center rounded-md text-zinc-300 transition hover:bg-white/5 hover:text-white"
-              title={t('shell.expandSidebar')}
-              aria-label={t('shell.expandSidebar')}
+              title={t("shell.expandSidebar")}
+              aria-label={t("shell.expandSidebar")}
               aria-expanded={false}
             >
               <PanelLeftOpen className="size-5" />
             </button>
             <button
               type="button"
-              onClick={() => onViewChange('shift-records')}
+              onClick={() => onViewChange("shift-records")}
               className="inline-flex size-9 items-center justify-center rounded-md transition hover:bg-white/5"
               title="SyncDrive VTMS"
             >
@@ -264,7 +301,7 @@ export function ScheduleModuleSidebar({
           <>
             <button
               type="button"
-              onClick={() => onViewChange('shift-records')}
+              onClick={() => onViewChange("shift-records")}
               className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1 text-left transition hover:bg-white/5"
               title="SyncDrive VTMS"
             >
@@ -277,8 +314,8 @@ export function ScheduleModuleSidebar({
               type="button"
               onClick={toggleCollapsed}
               className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/5 hover:text-white"
-              title={t('shell.collapseSidebar')}
-              aria-label={t('shell.collapseSidebar')}
+              title={t("shell.collapseSidebar")}
+              aria-label={t("shell.collapseSidebar")}
               aria-expanded
             >
               <PanelLeftClose className="size-5" />
@@ -289,24 +326,38 @@ export function ScheduleModuleSidebar({
 
       <nav
         className={`min-h-0 flex-1 overflow-y-auto py-2 ${
-          collapsed ? 'px-1.5' : 'px-2'
+          collapsed ? "px-1.5" : "px-2"
         }`}
       >
         {SIDEBAR_MODULE_GROUPS.map((group) => {
           const groupLabel = t(group.label);
           const isOpen = expanded[group.id] ?? false;
           const GroupIcon = groupIcon(group.id);
-          const dashPages = permissions.includes('dashboard.dashboard.view') ? moduleDashboardPages.filter((page) => page.moduleId === group.id) : [];
-          const visibleItems = group.items?.filter(
-            (item) => !item.requiredPermission || permissionSatisfied(item.requiredPermission, (p) => permissions.includes(p)),
-          ) ?? [];
-          if (group.items && visibleItems.length === 0 && dashPages.length === 0) return null;
+          const dashPages = permissions.includes("dashboard.dashboard.view")
+            ? moduleDashboardPages.filter((page) => page.moduleId === group.id)
+            : [];
+          const visibleItems =
+            group.items?.filter(
+              (item) =>
+                !item.requiredPermission ||
+                permissionSatisfied(item.requiredPermission, (p) =>
+                  permissions.includes(p),
+                ),
+            ) ?? [];
+          if (
+            group.items &&
+            visibleItems.length === 0 &&
+            dashPages.length === 0
+          )
+            return null;
           const hasBuiltinItems = visibleItems.length > 0;
           const hasDashPages = dashPages.length > 0;
           const hasChildren = hasBuiltinItems || hasDashPages;
           const groupActive =
-            isBuiltinGroupActive(group.id, activeView)
-            || dashPages.some((page) => activeView === moduleDashboardViewId(page.id));
+            isBuiltinGroupActive(group.id, activeView) ||
+            dashPages.some(
+              (page) => activeView === moduleDashboardViewId(page.id),
+            );
           const canExpand = hasChildren;
           const rowInteractive = group.enabled || hasDashPages || adminMode;
 
@@ -314,15 +365,15 @@ export function ScheduleModuleSidebar({
             <div key={group.id} className="mb-0.5">
               <div
                 className={`flex w-full items-center rounded-lg text-[14px] transition ${
-                  collapsed ? 'justify-center' : 'gap-1'
+                  collapsed ? "justify-center" : "gap-1"
                 } ${
                   !rowInteractive
-                    ? 'text-zinc-600'
+                    ? "text-zinc-600"
                     : groupActive && (!hasChildren || collapsed)
-                      ? 'bg-[#1a3a5c] font-medium text-[#5B9BD5]'
+                      ? "bg-[#1a3a5c] font-medium text-[#5B9BD5]"
                       : groupActive
-                        ? 'text-[#5B9BD5]'
-                        : 'text-zinc-200'
+                        ? "text-[#5B9BD5]"
+                        : "text-zinc-200"
                 }`}
               >
                 <button
@@ -360,22 +411,26 @@ export function ScheduleModuleSidebar({
                     }
                   }}
                   className={`flex min-w-0 flex-1 items-center rounded-lg text-left transition ${
-                    collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2.5'
+                    collapsed
+                      ? "justify-center px-0 py-2.5"
+                      : "gap-2.5 px-3 py-2.5"
                   } ${
-                    !rowInteractive
-                      ? 'cursor-not-allowed'
-                      : 'hover:bg-white/5'
+                    !rowInteractive ? "cursor-not-allowed" : "hover:bg-white/5"
                   }`}
                   title={groupLabel}
                 >
                   <GroupIcon
                     className={`size-[18px] shrink-0 ${
-                      groupActive && rowInteractive ? 'opacity-100' : 'opacity-80'
+                      groupActive && rowInteractive
+                        ? "opacity-100"
+                        : "opacity-80"
                     }`}
                   />
                   {!collapsed ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate">{groupLabel}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {groupLabel}
+                      </span>
                       {canExpand ? (
                         isOpen ? (
                           <ChevronDown className="size-3.5 shrink-0 text-zinc-500" />
@@ -396,8 +451,10 @@ export function ScheduleModuleSidebar({
                       setExpanded((prev) => ({ ...prev, [group.id]: true }));
                     }}
                     className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-sky-600/20 hover:text-sky-300"
-                    title={t('shell.addModulePage', { module: groupLabel })}
-                    aria-label={t('shell.addModulePageAria', { module: groupLabel })}
+                    title={t("shell.addModulePage", { module: groupLabel })}
+                    aria-label={t("shell.addModulePageAria", {
+                      module: groupLabel,
+                    })}
                   >
                     <Plus className="size-4" />
                   </button>
@@ -416,15 +473,19 @@ export function ScheduleModuleSidebar({
                             key={item.id}
                             type="button"
                             disabled={!item.enabled}
-                            onClick={() => item.enabled && onViewChange(item.id)}
+                            onClick={() =>
+                              item.enabled && onViewChange(item.id)
+                            }
                             className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
                               !item.enabled
-                                ? 'cursor-not-allowed text-zinc-600'
+                                ? "cursor-not-allowed text-zinc-600"
                                 : active
-                                  ? 'bg-[#1a3a5c] font-medium text-white'
-                                  : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                                  ? "bg-[#1a3a5c] font-medium text-white"
+                                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
                             }`}
-                            title={!item.enabled ? t('shell.comingSoon') : itemLabel}
+                            title={
+                              !item.enabled ? t("shell.comingSoon") : itemLabel
+                            }
                           >
                             <Icon className="size-3.5 shrink-0 opacity-80" />
                             <span className="truncate">{itemLabel}</span>
@@ -438,31 +499,36 @@ export function ScheduleModuleSidebar({
                     const active = activeView === viewId;
                     const isRenaming = renamingPageId === page.id;
                     return (
-                      <div key={page.id} className="group/item flex items-center gap-0.5">
+                      <div
+                        key={page.id}
+                        className="group/item flex items-center gap-0.5"
+                      >
                         {isRenaming ? (
                           <div
                             className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1.5 ${
-                              active ? 'bg-[#1a3a5c]' : 'bg-white/5'
+                              active ? "bg-[#1a3a5c]" : "bg-white/5"
                             }`}
                           >
                             <LayoutDashboard className="size-3.5 shrink-0 text-zinc-300 opacity-80" />
                             <input
                               ref={renameInputRef}
                               value={renameDraft}
-                              onChange={(event) => setRenameDraft(event.target.value)}
+                              onChange={(event) =>
+                                setRenameDraft(event.target.value)
+                              }
                               onBlur={commitRename}
                               onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
+                                if (event.key === "Enter") {
                                   event.preventDefault();
                                   commitRename();
                                 }
-                                if (event.key === 'Escape') {
+                                if (event.key === "Escape") {
                                   event.preventDefault();
                                   setRenamingPageId(null);
                                 }
                               }}
                               className="min-w-0 flex-1 rounded border border-sky-500/60 bg-zinc-950 px-1.5 py-0.5 text-[13px] text-white outline-none"
-                              aria-label={t('shell.renamePageInput')}
+                              aria-label={t("shell.renamePageInput")}
                             />
                           </div>
                         ) : (
@@ -476,12 +542,14 @@ export function ScheduleModuleSidebar({
                             }}
                             className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
                               active
-                                ? 'bg-[#1a3a5c] font-medium text-white'
-                                : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                                ? "bg-[#1a3a5c] font-medium text-white"
+                                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
                             }`}
                             title={
                               adminMode
-                                ? t('shell.renamePageHint', { name: page.label })
+                                ? t("shell.renamePageHint", {
+                                    name: page.label,
+                                  })
                                 : page.label
                             }
                           >
@@ -495,8 +563,8 @@ export function ScheduleModuleSidebar({
                               type="button"
                               onClick={() => startRename(page)}
                               className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-sky-600/15 hover:text-sky-300 group-hover/item:opacity-100"
-                              title={t('shell.renamePage')}
-                              aria-label={t('shell.renamePageAria', {
+                              title={t("shell.renamePage")}
+                              aria-label={t("shell.renamePageAria", {
                                 name: page.label,
                               })}
                             >
@@ -506,8 +574,8 @@ export function ScheduleModuleSidebar({
                               type="button"
                               onClick={() => onRemoveModuleDashboard?.(page.id)}
                               className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover/item:opacity-100"
-                              title={t('shell.removePage')}
-                              aria-label={t('shell.removePageAria', {
+                              title={t("shell.removePage")}
+                              aria-label={t("shell.removePageAria", {
                                 name: page.label,
                               })}
                             >
@@ -527,19 +595,19 @@ export function ScheduleModuleSidebar({
 
       <div
         className={`shrink-0 space-y-0.5 border-t border-white/10 py-3 ${
-          collapsed ? 'px-1.5' : 'px-2'
+          collapsed ? "px-1.5" : "px-2"
         }`}
       >
         <button
           type="button"
           disabled
           className={`flex w-full cursor-not-allowed items-center text-[14px] text-zinc-600 ${
-            collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2.5'
+            collapsed ? "justify-center p-2.5" : "gap-2.5 px-3 py-2.5"
           }`}
-          title={t('shell.comingSoon')}
+          title={t("shell.comingSoon")}
         >
           <Headphones className="size-[18px] shrink-0" />
-          {!collapsed ? <span>{t('shell.comingSoon')}</span> : null}
+          {!collapsed ? <span>{t("shell.comingSoon")}</span> : null}
         </button>
       </div>
     </aside>

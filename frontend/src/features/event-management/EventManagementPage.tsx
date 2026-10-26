@@ -2,21 +2,19 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { acquireSocket, releaseSocket } from '../dashboard/elements/socketManager';
 import { DEFAULT_DATASOURCE } from '../dashboard/store/useDataSourceStore';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
-import { HistoryEventsPage } from './HistoryEventsPage';
 import { LiveEventsPage } from './LiveEventsPage';
 
-export type EventTab = 'pending' | 'confirmed' | 'history';
+export type EventTab = 'pending' | 'confirmed';
 
-/** 單一事件入口：共用一份 Socket／invalidation，三個標籤保留各自的畫面狀態。 */
-export function EventManagementPage({ initialTab = 'pending' }: { initialTab?: EventTab }) {
-  const [tab, setTab] = useState<EventTab>(initialTab);
+/** 即時事件入口：待確認／已確認共用一份 Socket 與 invalidation。 */
+export function EventManagementPage() {
+  const [tab, setTab] = useState<EventTab>('pending');
   const [totals, setTotals] = useState({ pending: null as number | null, confirmed: null as number | null });
   const [refreshSignal, setRefreshSignal] = useState(0);
   const coalesce = useRef<number | null>(null);
   const tabs: Array<{ id: EventTab; label: string }> = [
     { id: 'pending', label: '待確認' },
     { id: 'confirmed', label: '已確認' },
-    { id: 'history', label: '歷史事件查詢' },
   ];
   const updateTotals = useCallback((pending: number, confirmed: number) => setTotals({ pending, confirmed }), []);
   const refresh = useCallback(() => {
@@ -66,7 +64,6 @@ export function EventManagementPage({ initialTab = 'pending' }: { initialTab?: E
       </div>
       <div id="event-panel-pending" role="tabpanel" aria-labelledby="event-tab-pending" className={tab === 'pending' ? 'flex min-h-0 flex-1' : 'hidden'}><LiveEventsPage bucket="pending" active={tab === 'pending'} refreshSignal={refreshSignal} onTotals={updateTotals} onChanged={refresh} /></div>
       <div id="event-panel-confirmed" role="tabpanel" aria-labelledby="event-tab-confirmed" className={tab === 'confirmed' ? 'flex min-h-0 flex-1' : 'hidden'}><LiveEventsPage bucket="confirmed" active={tab === 'confirmed'} refreshSignal={refreshSignal} onTotals={updateTotals} onChanged={refresh} /></div>
-      <div id="event-panel-history" role="tabpanel" aria-labelledby="event-tab-history" className={tab === 'history' ? 'flex min-h-0 flex-1' : 'hidden'}><HistoryEventsPage refreshSignal={refreshSignal} /></div>
     </div>
   );
 }

@@ -197,6 +197,26 @@ export class VideoHistoryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** 依歷史版本與實際錄影片段解析載具來源；先完整比對，再套用播放上限。 */
+  async sourceCandidates(query: Record<string, unknown>) {
+    const { from, to } = this.window(query.from, query.to, AVAILABILITY_SPAN_MAX_MS);
+    const vehicleCode = String(query.vehicleCode ?? '').trim().slice(0, 64);
+    if (!vehicleCode) throw new BadRequestException('vehicleCode 必填');
+    const rows = await this.dataSource.query(
+      `SELECT s.source_id, src.name, MIN(s.start_at) AS first_at
+         FROM video_recording_segments s
+         JOIN video_source_revisions r ON r.id = s.revision_id
+         JOIN video_sources src ON src.id = s.source_id
+        WHERE s.start_at < $2 AND s.end_at > $1 AND r.vehicle_code = $3
+          AND s.status IN ('READY', 'REMOTE_READY', 'UPLOADING')
+        GROUP BY s.source_id, src.name
+        ORDER BY MIN(s.start_at), src.name, s.source_id
+        LIMIT 12`,
+      [from, to, vehicleCode],
+    );
+    return { items: rows.map((row: { source_id: string; name: string }) => ({ id: row.source_id, name: row.name })) };
+  }
+
   // ── 播放 ─────────────────────────────────────────────
   async createPlayback(input: { sourceIds?: unknown; from?: unknown; to?: unknown }, user: AuthUser, req: Request) {
     const ids = this.sourceIds(input.sourceIds);

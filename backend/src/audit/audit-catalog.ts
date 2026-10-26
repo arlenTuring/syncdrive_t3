@@ -9,10 +9,22 @@ import type { AuditCategory } from '../database/entities/operator-action-log.ent
  *
  * 內容句型：「{操作者} 對 {目標} 進行了 {label}」。
  */
-export type AuditActionInfo = { category: AuditCategory; label: string; targetType: string };
+export type AuditActionInfo = {
+  category: AuditCategory;
+  label: string;
+  targetType: string;
+};
 
-const op = (label: string, targetType: string): AuditActionInfo => ({ category: 'OPERATIONS', label, targetType });
-const sys = (label: string, targetType: string): AuditActionInfo => ({ category: 'SYSTEM', label, targetType });
+const op = (label: string, targetType: string): AuditActionInfo => ({
+  category: 'OPERATIONS',
+  label,
+  targetType,
+});
+const sys = (label: string, targetType: string): AuditActionInfo => ({
+  category: 'SYSTEM',
+  label,
+  targetType,
+});
 
 export const AUDIT_ACTIONS = {
   // ── 既有代碼（保留原值）──
@@ -49,6 +61,7 @@ export const AUDIT_ACTIONS = {
   DISPATCH_CLOCK_SET: op('調整營運時鐘', 'DISPATCH'),
   DISPATCH_ENABLE: op('切換即時派遣', 'DISPATCH'),
   ORDER_ACTION_UPDATE: op('回報站點動作結果', 'ORDER_ACTION'),
+  SCHEDULED_ORDER_CREATE: op('建立排程訂單', 'SCHEDULED_ORDER'),
   DEGRADED_PLAN_CREATE: op('建立降級計畫', 'DEGRADED_PLAN'),
   DEGRADED_PLAN_UPDATE: op('修改降級計畫', 'DEGRADED_PLAN'),
   DEGRADED_PLAN_DELETE: op('刪除降級計畫', 'DEGRADED_PLAN'),
@@ -151,7 +164,23 @@ export const TARGET_TYPE_LABEL: Record<string, string> = {
 };
 
 /** 稽核內容不得保存的欄位（比對小寫、去掉 _ 與 -） */
-const SENSITIVE_KEYS = ['password', 'passwordhash', 'hash', 'token', 'secret', 'apikey', 'xapikey', 'cookie', 'session', 'csrf', 'authorization', 'privatekey', 'keypem', 'credential', 'credentials'];
+const SENSITIVE_KEYS = [
+  'password',
+  'passwordhash',
+  'hash',
+  'token',
+  'secret',
+  'apikey',
+  'xapikey',
+  'cookie',
+  'session',
+  'csrf',
+  'authorization',
+  'privatekey',
+  'keypem',
+  'credential',
+  'credentials',
+];
 
 export function isSensitiveKey(key: string) {
   const k = key.toLowerCase().replace(/[_-]/g, '');
@@ -161,7 +190,10 @@ export function isSensitiveKey(key: string) {
 /** 遞迴遮蔽敏感欄位；長字串截斷；深度與陣列長度有上限，避免整包大內容進稽核 */
 export function redact(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value;
-  if (typeof value === 'string') return value.length > 300 ? `${value.slice(0, 300)}…（共 ${value.length} 字）` : value;
+  if (typeof value === 'string')
+    return value.length > 300
+      ? `${value.slice(0, 300)}…（共 ${value.length} 字）`
+      : value;
   if (typeof value !== 'object') return value;
   if (depth >= 4) return '[略]';
   if (Array.isArray(value)) {
@@ -169,6 +201,7 @@ export function redact(value: unknown, depth = 0): unknown {
     return value.length > 30 ? [...head, `…（共 ${value.length} 項）`] : head;
   }
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = isSensitiveKey(k) ? '[已遮蔽]' : redact(v, depth + 1);
+  for (const [k, v] of Object.entries(value as Record<string, unknown>))
+    out[k] = isSensitiveKey(k) ? '[已遮蔽]' : redact(v, depth + 1);
   return out;
 }

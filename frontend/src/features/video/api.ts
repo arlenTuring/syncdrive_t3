@@ -134,11 +134,12 @@ export type Availability = { from: number; to: number; sources: Array<{ sourceId
 export type Manifest = { sourceId: string; name: string; from: number; to: number; expiresAt: number; segments: Array<{ id: string; revisionId: string; start: number; end: number; codec: string | null; timestampBasis: string; url: string }>; timeline: TimelineItem[]; revisions: RevisionInfo[] };
 export type Job = { id: string; kind: string; status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'expired'; progress: number; error: string | null; result: Record<string, unknown> | null; expiresAt: number | null; downloadUrl: string | null; note: string | null };
 
-async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function send<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${apiBase()}/video${path}`, {
     method,
     headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -165,7 +166,7 @@ export const videoApi = {
   sources: (query: SourceQuery, signal?: AbortSignal) =>
     v('/sources', { page: query.page, pageSize: query.pageSize, tags: query.tags?.length ? query.tags.join(',') : undefined }, signal) as Promise<SourcePage>,
   sourceTags: (signal?: AbortSignal) => v('/source-tags', undefined, signal) as Promise<Array<{ tag: string; count: number }>>,
-  sourceOptions: (includeDeleted = false, signal?: AbortSignal) => v('/source-options', { includeDeleted: includeDeleted || undefined }, signal) as Promise<{ items: SourceOption[]; total: number }>,
+  sourceOptions: (includeDeleted = false, signal?: AbortSignal) => v('/source-options', { includeDeleted: includeDeleted || undefined }, signal) as Promise<{ items: SourceOption[]; total: number; timeZone: string }>,
   source: (id: string) => v(`/sources/${id}`) as Promise<VideoSourceItem>,
   createSource: (body: Record<string, unknown>) => send<VideoSourceItem>('POST', '/sources', body),
   updateSource: (id: string, body: Record<string, unknown>) => send<VideoSourceItem>('PATCH', `/sources/${id}`, body),
@@ -181,8 +182,9 @@ export const videoApi = {
   capabilities: () => v('/capabilities') as Promise<Capabilities>,
   updateStoragePolicy: (body: Record<string, unknown>) => send<StorageStatus>('PUT', '/storage-policy', body),
   availability: (sourceIds: string[], from: number, to: number, signal?: AbortSignal) => v('/recordings/availability', { sourceIds: sourceIds.join(','), from, to }, signal) as Promise<Availability>,
+  sourceCandidates: (vehicleCode: string, from: number, to: number, signal?: AbortSignal) => v('/recordings/source-candidates', { vehicleCode, from, to }, signal) as Promise<{ items: Array<{ id: string; name: string }> }>,
   calendar: (sourceIds: string[], from: number, to: number, timeZone: string, signal?: AbortSignal) => v('/recordings/calendar', { sourceIds: sourceIds.join(','), from, to, timeZone }, signal) as Promise<{ days: string[] }>,
-  playback: (body: { sourceIds: string[]; from: number; to: number }) => send<{ from: number; to: number; expiresAt: number; sessions: Array<{ sourceId: string; name: string; manifestUrl: string }> }>('POST', '/playback-sessions', body),
+  playback: (body: { sourceIds: string[]; from: number; to: number }, signal?: AbortSignal) => send<{ from: number; to: number; expiresAt: number; sessions: Array<{ sourceId: string; name: string; manifestUrl: string }> }>('POST', '/playback-sessions', body, signal),
   manifest: async (url: string, signal?: AbortSignal): Promise<Manifest> => {
     const response = await fetch(url.startsWith('http') ? url : `${apiBase().replace(/\/syncdrive-api$/, '')}${url}`, { signal });
     const data = await response.json().catch(() => ({}));

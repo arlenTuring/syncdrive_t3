@@ -1,14 +1,14 @@
-import { ChevronLeft, Download, Maximize2, Pause, Play, Shield, Trash2 } from 'lucide-react';
+import { Check, Download, Maximize2, Pause, Play, Shield, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { SiteSelect } from '../../components/SiteSelect';
 import { useAuth } from '../access-control/AuthContext';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
 import { QueryActions, RangeFilter } from '../event-log-shared/ui';
 import { formatDateTime, rangeToQuery, toLocalInput, type RangeDraft } from '../event-log-shared/time';
-import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Manifest, type SourceOption, type Tab, type TimelineItem } from './api';
+import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Manifest, type SourceOption, type TimelineItem } from './api';
 import { SegmentFollower } from './SegmentFollower';
-import { tagKey } from './layout';
 import type { HistoryRequest } from './history-link';
+import { OPTION_STATE_LABEL } from './status';
 
 /** 歷史多畫面：依路數決定欄數（歷史回放的格子大小不需保存） */
 function historyGrid(count: number) {
@@ -18,7 +18,7 @@ function historyGrid(count: number) {
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
 }
 
-const TZ = 'Asia/Taipei';
+const DEFAULT_TZ = 'Asia/Taipei';
 const HOUR = 3_600_000;
 const SPEEDS = [0.5, 1, 2, 4, 8];
 const KIND_STYLE: Record<TimelineItem['kind'], string> = {
@@ -59,7 +59,7 @@ function useMasterClock(from: number, to: number) {
   };
 }
 
-function Timeline({ items, from, to, cursor, onSeek }: { items: TimelineItem[]; from: number; to: number; cursor: number; onSeek: (t: number) => void }) {
+function Timeline({ items, from, to, cursor, timeZone, onSeek }: { items: TimelineItem[]; from: number; to: number; cursor: number; timeZone: string; onSeek: (t: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,7 +84,7 @@ function Timeline({ items, from, to, cursor, onSeek }: { items: TimelineItem[]; 
       aria-valuemin={from}
       aria-valuemax={to}
       aria-valuenow={cursor}
-      aria-valuetext={formatDateTime(cursor, TZ)}
+      aria-valuetext={formatDateTime(cursor, timeZone)}
       tabIndex={0}
       onPointerDown={(e) => onSeek(at(e))}
       onPointerMove={drag}
@@ -96,32 +96,33 @@ function Timeline({ items, from, to, cursor, onSeek }: { items: TimelineItem[]; 
       className="relative h-5 w-full cursor-pointer overflow-hidden rounded bg-zinc-800 focus:ring-1 focus:ring-sky-500"
     >
       {items.map((item, i) => (
-        <div key={i} title={`${KIND_LABEL[item.kind]}${item.protected ? '（受保護）' : ''}：${formatDateTime(item.from, TZ)}–${formatDateTime(item.to, TZ)}${item.reason ? `・${item.reason}` : ''}`}
+        <div key={i} title={`${KIND_LABEL[item.kind]}${item.protected ? '（受保護）' : ''}：${formatDateTime(item.from, timeZone)}–${formatDateTime(item.to, timeZone)}${item.reason ? `・${item.reason}` : ''}`}
           className={`absolute inset-y-0 ${KIND_STYLE[item.kind]} ${item.protected ? 'border-y-2 border-amber-300' : ''}`}
           style={{ left: `${((item.from - from) / span) * 100}%`, width: `${Math.max(0.2, ((item.to - item.from) / span) * 100)}%` }} />
       ))}
       <div className="absolute inset-y-0 w-0.5 bg-white" style={{ left: `${((cursor - from) / span) * 100}%` }} />
-      {hover !== null ? <div className="pointer-events-none absolute -top-0.5 rounded bg-black/80 px-1 text-[10px] text-white" style={{ left: `calc(${((hover - from) / span) * 100}% + 4px)` }}>{formatDateTime(hover, TZ).slice(11)}</div> : null}
+      {hover !== null ? <div className="pointer-events-none absolute -top-0.5 rounded bg-black/80 px-1 text-[10px] text-white" style={{ left: `calc(${((hover - from) / span) * 100}% + 4px)` }}>{formatDateTime(hover, timeZone).slice(11)}</div> : null}
     </div>
   );
 }
 
 /**
- * 影像資源管理 › 歷史錄影（子畫面）。
+ * 獨立「影像管理紀錄」頁。
  * 先查可用區間（只讀索引），需要時才載入片段；多畫面共用絕對時間游標，缺段的畫面顯示空白狀態，不暫停其他畫面。
  * 可查停用或已刪除但仍有錄影的來源；來源清單只用安全摘要，不需要也拿不到連線資訊。
  */
-export function VideoHistoryPage({ request, title, onBack }: { request?: HistoryRequest | null; title?: string; onBack?: () => void }) {
+export function VideoHistoryPage({ request }: { request?: HistoryRequest | null }) {
   const auth = useAuth();
+  const [timeZone, setTimeZone] = useState(DEFAULT_TZ);
   const [sources, setSources] = useState<SourceOption[]>([]);
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [tabs, setTabs] = useState<Tab[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [vehicleFilter, setVehicleFilter] = useState('');
-  const [range, setRange] = useState<RangeDraft>(() => ({ from: toLocalInput(Date.now() - HOUR, TZ), to: toLocalInput(Date.now(), TZ) }));
+  const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
+  const [tempSelected, setTempSelected] = useState<string[]>([]);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const [prefillVehicleCode, setPrefillVehicleCode] = useState('');
+  const [range, setRange] = useState<RangeDraft>(() => ({ from: toLocalInput(Date.now() - HOUR, DEFAULT_TZ), to: toLocalInput(Date.now(), DEFAULT_TZ) }));
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [window_, setWindow] = useState<{ from: number; to: number }>(() => ({ from: Date.now() - HOUR, to: Date.now() }));
-  const [multi, setMulti] = useState(false);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [manifests, setManifests] = useState<Record<string, Manifest>>({});
   const [days, setDays] = useState<string[]>([]);
@@ -135,11 +136,19 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
   const [audio, setAudio] = useState<string | null>(null);
   const clock = useMasterClock(window_.from, window_.to);
   const stageRef = useRef<HTMLDivElement>(null);
+  const requestVersion = useRef(0);
+  const queryAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    requestVersion.current += 1;
+    queryAbort.current?.abort();
+  }, []);
 
   useEffect(() => {
-    void videoApi.sourceOptions(true).then((r) => setSources(r.items), (e: Error) => setError(e.message));
-    // 監控標籤頁只是輔助的來源集合；沒有即時監看權限時就不顯示
-    void videoApi.tabs().then(setTabs, () => undefined);
+    void videoApi.sourceOptions(true).then((r) => {
+      setSources(r.items);
+      setTimeZone(r.timeZone || DEFAULT_TZ);
+    }, (e: Error) => setError(e.message));
   }, []);
   useEffect(() => {
     if (!notice) return undefined;
@@ -149,50 +158,108 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
 
   const query = useCallback(async (ids: string[], win: { from: number; to: number }, at?: number) => {
     if (!ids.length) return setError('請選擇影像來源');
+    queryAbort.current?.abort();
+    const controller = new AbortController();
+    queryAbort.current = controller;
+    const version = ++requestVersion.current;
     setError('');
+    setAvailability(null);
+    setManifests({});
+    setDays([]);
+    setAppliedIds(ids);
     try {
-      const [avail, playback] = await Promise.all([videoApi.availability(ids, win.from, win.to), videoApi.playback({ sourceIds: ids, from: win.from, to: win.to })]);
+      const avail = await videoApi.availability(ids, win.from, win.to, controller.signal);
+      if (version !== requestVersion.current) return;
       setAvailability(avail);
-      const loaded = await Promise.all(playback.sessions.map((s) => videoApi.manifest(s.manifestUrl)));
-      setManifests(Object.fromEntries(loaded.map((m) => [m.sourceId, m])));
       setWindow(win);
+      const playableIds = avail.sources
+        .filter((source) => source.timeline.some((item) => item.kind === 'available' || item.kind === 'recording'))
+        .map((source) => source.sourceId);
+      if (!playableIds.length) {
+        clock.reset(win.from);
+        return;
+      }
+      const playback = await videoApi.playback({ sourceIds: playableIds, from: win.from, to: win.to }, controller.signal);
+      if (version !== requestVersion.current) return;
+      const loaded = await Promise.all(playback.sessions.map((s) => videoApi.manifest(s.manifestUrl, controller.signal)));
+      if (version !== requestVersion.current) return;
+      setManifests(Object.fromEntries(loaded.map((m) => [m.sourceId, m])));
       clock.reset(at ?? (loaded.flatMap((m) => m.segments).sort((a, b) => a.start - b.start)[0]?.start ?? win.from));
       const monthStart = new Date(win.from);
-      void videoApi.calendar(ids, Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1) - 8 * HOUR, Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1), TZ).then((r) => setDays(r.days), () => undefined);
+      void videoApi.calendar(ids, Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1) - 8 * HOUR, Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1), timeZone, controller.signal).then((r) => version === requestVersion.current && setDays(r.days), () => undefined);
     } catch (reason) {
-      setError((reason as Error).message);
+      if (version === requestVersion.current && !controller.signal.aborted) setError((reason as Error).message);
     }
     // clock.reset 是穩定的動作
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [timeZone]);
 
-  // 帶條件進來（事件前後、舊的歷史連結、清單的「歷史錄影」）：依當時的載具關聯找來源
-  const consumed = useRef(false);
+  // 外部條件只預填。即使事件／來源帶入完整條件，也必須由使用者按搜尋。
   useEffect(() => {
-    if (!request || consumed.current || !sources.length) return;
-    consumed.current = true;
-    const req = request;
-    void (async () => {
-      setRange({ from: toLocalInput(req.from, TZ), to: toLocalInput(req.to, TZ) });
-      let ids = req.sourceIds ?? [];
-      if (!ids.length && req.vehicleCode) {
-        const rows = await videoApi.availability(sources.map((s) => s.id).slice(0, 12), req.from, req.to).catch(() => null);
-        ids = rows ? rows.sources.filter((s) => s.revisions.some((r) => r.vehicleCode === req.vehicleCode)).map((s) => s.sourceId) : [];
-        setVehicleFilter(req.vehicleCode);
-      }
-      setSelected(ids);
-      setMulti(ids.length > 1);
-      if (ids.length) await query(ids, { from: req.from, to: req.to }, req.at);
-      else setError(req.vehicleCode ? `找不到 ${req.vehicleCode} 在這段期間的影像來源` : '請選擇影像來源');
-    })();
-  }, [request, sources, query]);
+    queryAbort.current?.abort();
+    requestVersion.current += 1;
+    // 外部導覽條件是頁面輸入事件；收到時必須同步清掉上一個已套用結果。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAvailability(null);
+    setManifests({});
+    setDays([]);
+    setAppliedIds([]);
+    setError('');
+    if (!request) {
+      setSelected([]);
+      setPrefillVehicleCode('');
+      setRange({ from: toLocalInput(Date.now() - HOUR, timeZone), to: toLocalInput(Date.now(), timeZone) });
+      return;
+    }
+    setRange({ from: toLocalInput(request.from, timeZone), to: toLocalInput(request.to, timeZone) });
+    const ids = (request.sourceIds ?? []).slice(0, 12);
+    setSelected([...new Set(ids)]);
+    setPrefillVehicleCode(request.vehicleCode ?? '');
+  }, [request, timeZone]);
 
   const search = () => {
-    const r = rangeToQuery(range, TZ);
+    const r = rangeToQuery(range, timeZone);
     if ('error' in r) return setRangeError(r.error);
     setRangeError(null);
-    const ids = multi ? selected : selected.slice(0, 1);
-    void query(ids, r);
+    void (async () => {
+      const candidateVersion = ++requestVersion.current;
+      queryAbort.current?.abort();
+      const candidateAbort = new AbortController();
+      queryAbort.current = candidateAbort;
+      let ids = [...new Set(selected)].slice(0, 12);
+      if (!ids.length && prefillVehicleCode.trim()) {
+        const candidates = await videoApi.sourceCandidates(prefillVehicleCode.trim(), r.from, r.to, candidateAbort.signal).catch((reason: Error) => {
+          if (!candidateAbort.signal.aborted && candidateVersion === requestVersion.current) setError(reason.message);
+          return null;
+        });
+        if (!candidates || candidateAbort.signal.aborted || candidateVersion !== requestVersion.current) return;
+        ids = [...new Set(candidates.items.map((item) => item.id))].slice(0, 12);
+        setSelected(ids);
+      }
+      if (candidateAbort.signal.aborted || candidateVersion !== requestVersion.current) return;
+      if (!ids.length) return setError(prefillVehicleCode.trim() ? `找不到 ${prefillVehicleCode.trim()} 在這段期間的影像來源` : '請選擇影像來源');
+      await query(ids, r, request?.at);
+    })();
+  };
+
+  const reset = () => {
+    queryAbort.current?.abort();
+    requestVersion.current += 1;
+    setSelected([]);
+    setPrefillVehicleCode('');
+    setSourceDialogOpen(false);
+    setTempSelected([]);
+    setAvailability(null);
+    setManifests({});
+    setDays([]);
+    setAppliedIds([]);
+    setError('');
+    setRangeError(null);
+    setAudio(null);
+    setDrifts({});
+    setJob(null);
+    setRange({ from: toLocalInput(Date.now() - HOUR, timeZone), to: toLocalInput(Date.now(), timeZone) });
+    clock.reset(Date.now() - HOUR);
   };
 
   // 下載任務輪詢
@@ -202,19 +269,16 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
     return () => clearTimeout(timer);
   }, [job]);
 
-  const tagOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of sources) for (const t of s.tags) if (!map.has(tagKey(t))) map.set(tagKey(t), t);
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, 'zh-Hant'));
+  const sourceGroups = useMemo(() => {
+    const groups = new Map<string, SourceOption[]>();
+    for (const source of sources) {
+      const labels = source.tags.length ? [...new Set(source.tags)] : ['未分類'];
+      for (const label of labels) groups.set(label, [...(groups.get(label) ?? []), source]);
+    }
+    return [...groups.entries()].sort(([a], [b]) => (a === '未分類' ? 1 : b === '未分類' ? -1 : a.localeCompare(b, 'zh-Hant')));
   }, [sources]);
-  const filteredSources = sources.filter((s) => {
-    const v = vehicleFilter.toLowerCase();
-    if (v && !`${s.vehicleCode ?? ''} ${s.location ?? ''}`.toLowerCase().includes(v)) return false;
-    if (tagFilter.length && !s.tags.some((t) => tagFilter.includes(tagKey(t)))) return false;
-    return true;
-  });
-  const playing = useMemo(() => (multi ? selected : selected.slice(0, 1)).filter((id) => manifests[id]), [multi, selected, manifests]);
-  const toggleSource = (id: string) => setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : multi ? (cur.length >= 12 ? cur : [...cur, id]) : [id]));
+  const playing = useMemo(() => appliedIds.filter((id) => manifests[id]), [appliedIds, manifests]);
+  const selectedNames = selected.map((id) => sources.find((source) => source.id === id)?.name ?? id);
 
   const startExport = async () => {
     if (!auth.require('events.video-history.export') || !playing[0]) return;
@@ -246,70 +310,23 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4 text-zinc-100">
-      {onBack ? (
-        <div className="flex items-center gap-2 text-sm">
-          <button type="button" onClick={onBack} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-zinc-200 hover:bg-white/5">
-            <ChevronLeft className="size-4" />返回來源清單
-          </button>
-          <nav aria-label="麵包屑" className="text-zinc-400">
-            影像資源管理 <span className="px-1">›</span> {title ? <>{title} <span className="px-1">›</span> </> : null}<span className="text-zinc-100">歷史錄影</span>
-          </nav>
-        </div>
-      ) : null}
       <div className="flex flex-wrap items-end gap-3">
-        <RangeFilter value={range} onChange={setRange} timeZone={TZ} error={rangeError} />
-        <label className="flex min-w-[11rem] flex-col gap-1.5">
-          <span className="text-xs text-zinc-400">監控標籤頁（帶入該頁來源）</span>
-          <SiteSelect aria-label="監控標籤頁" value="" options={[{ value: '', label: '選擇監控標籤頁' }, ...tabs.map((t) => ({ value: t.id, label: t.name }))]}
-            onChange={(e) => {
-              const tab = tabs.find((t) => t.id === e.target.value);
-              if (!tab) return;
-              const ids = [...new Set(tab.tiles.map((t) => t.sourceId).filter(Boolean) as string[])].slice(0, 12);
-              setSelected(ids);
-              setMulti(ids.length > 1);
-            }}
-            className="h-10 rounded-xl bg-[#222831] px-3 text-sm" />
+        <RangeFilter compact value={range} onChange={setRange} timeZone={timeZone} error={rangeError} />
+        <label className="flex min-w-[15rem] flex-col gap-1.5">
+          <span className="text-xs text-zinc-400">影像來源</span>
+          <button type="button" onClick={() => { setTempSelected(selected); setSourceDialogOpen(true); }} className="flex h-10 max-w-80 items-center justify-between gap-2 rounded-xl bg-[#222831] px-3 text-left text-sm hover:bg-[#2b313b]" aria-label="選擇影像來源"><span className="truncate">{selectedNames.length ? selectedNames.join('、') : '選擇影像來源'}</span><span className="shrink-0 text-xs text-zinc-400">{selected.length}/12</span></button>
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs text-zinc-400">載具／位置</span>
-          <input value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)} placeholder="篩選來源" className="h-10 w-36 rounded-xl bg-[#222831] px-3 text-sm outline-none focus:ring-1 focus:ring-sky-500" />
-        </label>
-        {tagOptions.length ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-zinc-400">來源標籤</span>
-            <div className="flex max-w-md flex-wrap gap-1">
-              {tagOptions.map(([key, label]) => (
-                <button key={key} type="button" aria-pressed={tagFilter.includes(key)} onClick={() => setTagFilter((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))}
-                  className={`rounded-md border px-2 py-1 text-xs ${tagFilter.includes(key) ? 'border-sky-500 bg-sky-500/15 text-sky-100' : 'border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        <div className="flex items-center gap-2 pb-2 text-sm">
-          <label className="flex items-center gap-1.5"><input type="radio" checked={!multi} onChange={() => { setMulti(false); setSelected((s) => s.slice(0, 1)); }} className="accent-blue-600" />單一來源</label>
-          <label className="flex items-center gap-1.5"><input type="radio" checked={multi} onChange={() => setMulti(true)} className="accent-blue-600" />多來源同步（最多 12）</label>
-        </div>
-        <QueryActions onSearch={search} onReset={() => { setSelected([]); setAvailability(null); setManifests({}); setRange({ from: toLocalInput(Date.now() - HOUR, TZ), to: toLocalInput(Date.now(), TZ) }); }} />
-      </div>
-
-      <div className="flex max-h-28 flex-wrap gap-1.5 overflow-auto" aria-label="影像來源">
-        {filteredSources.map((s) => (
-          <button key={s.id} type="button" onClick={() => toggleSource(s.id)} aria-pressed={selected.includes(s.id)}
-            className={`rounded-lg border px-2.5 py-1 text-xs ${selected.includes(s.id) ? 'border-blue-500 bg-blue-500/15 text-white' : 'border-zinc-700 text-zinc-300 hover:bg-white/5'}`}>
-            {s.name}{s.vehicleCode ? `（${s.vehicleCode}）` : ''}{s.deleted ? '［已刪除］' : !s.enabled ? '［已停用］' : ''}
-          </button>
-        ))}
-        {!filteredSources.length ? <span className="text-sm text-zinc-500">沒有影像來源</span> : null}
+        <QueryActions onSearch={search} onReset={reset} />
       </div>
       {error ? <ErrorLine text={error} /> : null}
 
-      {availability ? (
+      {availability && playing.length ? (
         <>
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[#16181d] px-3 py-2 text-sm">
             <button type="button" onClick={() => clock.setPlaying(!clock.playing)} aria-label={clock.playing ? '暫停' : '播放'} className="rounded-lg bg-blue-600 p-1.5 hover:bg-blue-500">
               {clock.playing ? <Pause className="size-4" /> : <Play className="size-4" />}
             </button>
-            <span className="tabular-nums">{formatDateTime(clock.t, TZ)}</span>
+            <span className="tabular-nums">{formatDateTime(clock.t, timeZone)}</span>
             <SiteSelect aria-label="倍速" value={String(clock.speed)} options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))} onChange={(e) => clock.setSpeed(Number(e.target.value))} className="h-8 w-20 rounded-lg bg-[#222831] px-2 text-sm" />
             <button type="button" disabled title="來源沒有提供逐幀所需的影格時間資訊，暫不提供逐幀" className="rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-500">逐幀（不支援）</button>
             <button type="button" onClick={() => void stageRef.current?.requestFullscreen?.()} aria-label="全螢幕" className="rounded-lg p-1.5 text-zinc-300 hover:bg-white/5"><Maximize2 className="size-4" /></button>
@@ -332,7 +349,7 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
             {availability.sources.filter((s) => playing.includes(s.sourceId)).map((s) => (
               <div key={s.sourceId} className="grid grid-cols-[10rem_minmax(0,1fr)] items-center gap-2 text-xs">
                 <span className="truncate text-zinc-300" title={s.revisions.map((r) => `版本 ${r.revisionNo}${r.vehicleCode ? `・${r.vehicleCode}` : ''}`).join('；')}>{s.name}{s.removed ? '［已移除］' : ''}</span>
-                <Timeline items={s.timeline} from={window_.from} to={window_.to} cursor={clock.t} onSeek={clock.seek} />
+                <Timeline items={s.timeline} from={window_.from} to={window_.to} cursor={clock.t} timeZone={timeZone} onSeek={clock.seek} />
               </div>
             ))}
             <div className="flex flex-wrap gap-3 pl-[10.5rem] text-[11px] text-zinc-500">
@@ -356,24 +373,35 @@ export function VideoHistoryPage({ request, title, onBack }: { request?: History
             ))}
           </div>
         </>
+      ) : availability ? (
+        <div className="rounded-xl border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-400">
+          這段時間沒有可播放片段。沒有建立播放工作階段，也沒有自動播放。
+        </div>
       ) : (
         <div className="rounded-xl border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-500">
-          選擇影像來源與時間後按「搜尋」。預設查最近一小時。
+          選擇影像來源與時間後按「搜尋」。進入本頁不會自動查詢或播放。
           {days.length ? <div className="mt-2">本月有錄影的日期：{days.join('、')}</div> : null}
         </div>
       )}
       {availability && days.length ? (
         <div className="text-xs text-zinc-500">本月有錄影的日期：{days.map((d) => (
-          <button key={d} type="button" onClick={() => { const from = new Date(`${d}T00:00:00+08:00`).getTime(); setRange({ from: toLocalInput(from, TZ), to: toLocalInput(from + 24 * HOUR - 1000, TZ) }); }} className="mr-1 text-sky-300 underline">{d.slice(5)}</button>
+          <button key={d} type="button" onClick={() => { const parsed = rangeToQuery({ from: `${d}T00:00:00`, to: `${d}T23:59:59` }, timeZone); if (!('error' in parsed)) setRange({ from: toLocalInput(parsed.from, timeZone), to: toLocalInput(parsed.to - 1000, timeZone) }); }} className="mr-1 text-sky-300 underline">{d.slice(5)}</button>
         ))}</div>
       ) : null}
 
       {deletePreview ? (
         <Dialog title="刪除錄影" onClose={() => setDeletePreview(null)} footer={<><GhostButton onClick={() => setDeletePreview(null)}>取消</GhostButton><PrimaryButton danger disabled={!deletePreview.segments} onClick={() => { setDeletePreview(null); void videoApi.deleteRecordings({ sourceIds: playing, from: window_.from, to: window_.to, confirm: true }).then((j) => { setJob(null); notify(`已建立刪除工作（${j.status}）`, 'success'); setTimeout(() => void query(playing, window_, clock.t), 3000); }, (e: Error) => notify(e.message, 'error')); }}>刪除 {deletePreview.segments} 個片段</PrimaryButton></>}>
-          <p className="text-sm text-zinc-300">{formatDateTime(window_.from, TZ)} 至 {formatDateTime(window_.to, TZ)}：將刪除 {deletePreview.segments} 個片段（{formatBytes(deletePreview.bytes)}）。{deletePreview.protectedSegments ? `受保護的 ${deletePreview.protectedSegments} 個片段不會刪除。` : ''}</p>
+          <p className="text-sm text-zinc-300">{formatDateTime(window_.from, timeZone)} 至 {formatDateTime(window_.to, timeZone)}：將刪除 {deletePreview.segments} 個片段（{formatBytes(deletePreview.bytes)}）。{deletePreview.protectedSegments ? `受保護的 ${deletePreview.protectedSegments} 個片段不會刪除。` : ''}</p>
           <p className="mt-2 text-xs text-zinc-500">{deletePreview.note}</p>
         </Dialog>
       ) : null}
+      {sourceDialogOpen ? <Dialog title="選擇影像來源" width="max-w-2xl" onClose={() => setSourceDialogOpen(false)} footer={<><GhostButton onClick={() => setSourceDialogOpen(false)}>取消</GhostButton><PrimaryButton disabled={tempSelected.length === 0} onClick={() => { setSelected([...new Set(tempSelected)].slice(0, 12)); setPrefillVehicleCode(''); setSourceDialogOpen(false); }}>確定（{tempSelected.length}/12）</PrimaryButton></>}>
+        <p className="mb-3 text-sm text-zinc-400">可選 1–12 個來源；確認只套用選擇，不會自動查詢或播放。</p>
+        <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+          {sourceGroups.map(([label, group]) => <section key={label} className="overflow-hidden rounded-xl border border-zinc-700"><h3 className="bg-[#232730] px-4 py-2 text-sm font-medium">{label}</h3>{group.map((source) => { const active = tempSelected.includes(source.id); const limit = !active && tempSelected.length >= 12; return <button key={`${label}:${source.id}`} type="button" disabled={limit} aria-pressed={active} onClick={() => setTempSelected((current) => active ? current.filter((id) => id !== source.id) : [...current, source.id])} className="flex w-full items-center gap-3 border-t border-zinc-800 px-4 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-40"><span className={`flex size-5 shrink-0 items-center justify-center rounded border ${active ? 'border-blue-500 bg-blue-600' : 'border-zinc-600'}`}>{active ? <Check className="size-3.5" /> : null}</span><span className="min-w-0 flex-1"><span className="block truncate">{source.name}</span><span className="text-xs text-zinc-500">{[source.vehicleCode, source.location].filter(Boolean).join('・') || '未綁定載具／位置'}</span></span><span className="text-xs text-zinc-400">{source.deleted ? '已刪除' : !source.enabled ? '已停用' : OPTION_STATE_LABEL[source.state]}</span></button>; })}</section>)}
+          {!sourceGroups.length ? <p className="py-8 text-center text-sm text-zinc-500">沒有可查詢的影像來源</p> : null}
+        </div>
+      </Dialog> : null}
       {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
     </div>
   );
