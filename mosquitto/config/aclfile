@@ -23,6 +23,13 @@ user vtms-backend
 topic readwrite v1/vtms/#
 topic readwrite syncdrive/#
 
+# ── 模擬號誌控制器（syncdrive_t3_simulator 的閉鎖區間，僅測試用）──
+# 獨立的設施身分：只能發布號誌燈號 syncdrive/Light/#，不能讀寫任何車輛 topic，
+# 也不能發布月台門等其他設施。TLS 憑證 CN 必須是 sim-signal-controller，由維運
+# 以 client-ca 手動簽發；沒有簽發就沒有任何人能用這個身分。
+user sim-signal-controller
+topic write syncdrive/Light/#
+
 # 這裡曾經有一個 vtms-simulator 帳號，可以代所有車輛發布，已移除。
 # 車端（含模擬器）現在以各車自己的 TLS 用戶端憑證連線 8883，身分由憑證 CN
 # 決定——沒有任何一個身分該有「代替全部車輛發話」的權限，也沒有帳密可用。
