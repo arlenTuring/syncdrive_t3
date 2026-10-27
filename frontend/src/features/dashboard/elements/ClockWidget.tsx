@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ClockWidget } from '../types';
-import { useOperatingClock } from '../utils/operatingClock';
+import { clockStatusLabel, useOperatingClock } from '../utils/operatingClock';
 
 function formatDate(date: Date, fmt: string): string {
   const y = date.getFullYear();
@@ -13,7 +13,8 @@ function formatDate(date: Date, fmt: string): string {
 
 /**
  * 時鐘顯示營運時間：正式營運就是實際時間；執行端加速重播時顯示重播到的營運時刻，
- * 日期與時間仍使用同一個營運時鐘；重播資訊留在模擬器控制介面。
+ * 日期與時間仍使用同一個營運時鐘。日期旁一個短狀態（即時／重播暫停／重播失聯…），
+ * 停在過去的時刻時看得出原因。
  */
 export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
   const clock = useOperatingClock();
@@ -44,6 +45,8 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
   }
 
   const dateStr = formatDate(now, widget.dateFormat);
+  const status = clockStatusLabel(clock);
+  const statusColor = status.tone === 'warn' ? '#fb923c' : status.tone === 'replay' ? '#38bdf8' : widget.dateColor;
 
   return (
     <div style={{
@@ -72,6 +75,7 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
           letterSpacing: '0.05em',
         }}>
           {dateStr}
+          <span style={{ marginLeft: '0.6em', color: statusColor }} data-clock-status={status.tone}>{status.text}</span>
         </div>
       )}
     </div>

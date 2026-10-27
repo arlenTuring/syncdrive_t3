@@ -96,6 +96,20 @@ export function clockAdvancing(snapshot: OperatingClockSnapshot | null): boolean
   return !!snapshot && snapshot.mode === 'replay' && !snapshot.paused && !snapshot.ended && !snapshot.stale;
 }
 
+/**
+ * 時鐘旁的短狀態：即時／重播／重播暫停／重播結束／重播失聯／時鐘失聯。
+ * 畫面停在過去的日期時，要看得出那是暫停的重播，不是自稱即時的監控。
+ */
+export function clockStatusLabel(state: OperatingClockState): { text: string; tone: 'live' | 'replay' | 'warn' } {
+  const snapshot = state.snapshot;
+  if (state.error && !snapshot) return { text: '時鐘失聯', tone: 'warn' };
+  if (!snapshot || snapshot.mode !== 'replay') return state.error ? { text: '即時（時鐘查詢失敗）', tone: 'warn' } : { text: '即時', tone: 'live' };
+  if (snapshot.ended) return { text: '重播已結束', tone: 'warn' };
+  if (snapshot.stale) return { text: '重播失聯', tone: 'warn' };
+  if (snapshot.paused) return { text: '重播暫停', tone: 'warn' };
+  return { text: `重播 ×${snapshot.rate}`, tone: 'replay' };
+}
+
 /** 此刻的營運時刻：沒有時鐘資料時退回實際時間 */
 export function operatingNowFrom(state: OperatingClockState, realNow = Date.now()): number {
   const snapshot = state.snapshot;

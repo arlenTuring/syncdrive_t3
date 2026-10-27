@@ -87,6 +87,8 @@ export class DispatchController {
   }
 
   @Get('operating-clock')
+  // 執行端（模擬器）要能讀回來對帳：寫得進時鐘的同一把金鑰也能讀，不必另外登入
+  @AllowApiKey()
   @ApiOperation({
     summary: '營運時鐘',
     description:
@@ -105,7 +107,8 @@ export class DispatchController {
     summary: '推進營運時鐘（執行端用）',
     description:
       'mode=replay 時帶 run_id、operating_day、operating_now（此刻的營運時刻，毫秒）、rate（1～180）、paused、ended、lag_ms；' +
-      '執行中要定期回報（心跳），超過 15 秒沒消息畫面會標示中斷。mode=realtime 回到實際時間。',
+      '執行中要定期回報（心跳），超過 15 秒沒消息畫面會標示中斷。mode=realtime 回到實際時間。' +
+      '可帶 expected_run_id（目前時鐘的執行 ID，realtime 為 null）：與目前不符時回 409，不覆蓋別人正在推進的時鐘。',
   })
   async updateOperatingClock(@Body() body: {
     mode?: string;
@@ -116,8 +119,17 @@ export class DispatchController {
     paused?: boolean;
     ended?: boolean;
     lag_ms?: number;
+    expected_run_id?: string | null;
   }): Promise<Record<string, unknown>> {
     if (body?.mode !== 'replay' && body?.mode !== 'realtime') throw new BadRequestException('mode 需為 replay 或 realtime');
+    // 狀態轉換檢核：呼叫端說「我以為現在是 X」，實際不是就拒絕（另一個執行端剛接手時不會被蓋掉）
+    if (body && Object.prototype.hasOwnProperty.call(body, 'expected_run_id')) {
+      const current = this.operatingClock.snapshot();
+      const actual = current.mode === 'replay' ? current.run_id : null;
+      if ((body.expected_run_id ?? null) !== actual) {
+        throw new ConflictException(`營運時鐘目前是 ${actual ? `重播 ${actual}` : '即時'}，與預期的 ${body.expected_run_id ?? '即時'} 不同`);
+      }
+    }
     if (body.mode === 'replay' && body.operating_day != null && !isOperatingDay(body.operating_day)) {
       throw new BadRequestException('operating_day 格式為 YYYY-MM-DD');
     }

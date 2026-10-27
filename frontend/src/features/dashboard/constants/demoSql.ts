@@ -43,6 +43,58 @@ function notCancelledSql(o: string): string {
   return `NOT (${o}.status = 'FAULTED' AND ${o}.payload ? 'cancel_requested_at')`;
 }
 
+/** 待發單往後看多遠（營運毫秒）：只列「下一筆」合理的待發，不把當天稍晚或更遠的單塞進即時名冊 */
+const PENDING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
+/** 車端多久內回報過算「還在跑」（實際毫秒）；更久沒回報的執行中單是殭屍單 */
+const LIVE_REPORT_MS = 600000;
+
+/** 車端最近還在回報的執行中單 */
+function liveProcessingSql(o: string): string {
+  return `(${o}.status = 'PROCESSING'
+      AND COALESCE((${o}.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - ${LIVE_REPORT_MS})`;
+}
+
+/**
+ * 即時名冊的有效任務範圍（正線、整備、車輛卡共用同一套，避免各卡選到不同時期的單）：
+ * <ul>
+ *   <li>屬於目前營運日（訂單上的 operating_day；舊單沒有就看計畫發車時刻），或計畫時窗涵蓋現在
+ *       （跨午夜的長整備），或車端還在回報的執行中單；</li>
+ *   <li>還沒結束：計畫結束時間在一分鐘內，或車端還在回報（晚了照樣在跑）；</li>
+ *   <li>待發單只看接下來兩小時內的下一筆。</li>
+ * </ul>
+ * 舊營運日的故障／待發不會因為排序被撈回來；目前真的故障（同營運日、時窗內）仍會顯示。
+ */
+function liveTaskScopeSql(o: string, fallbackMs = 600000): string {
+  return `(
+      (
+        ${o}.payload->>'operating_day' = operating_day()
+        OR (
+          ${o}.payload->>'operating_day' IS NULL
+          AND ${o}.planned_start >= operating_day_start_ms()
+          AND ${o}.planned_start < operating_day_start_ms() + 86400000
+        )
+        OR (
+          ${o}.planned_start <= operating_now_ms()
+          AND COALESCE(${o}.planned_end, ${o}.planned_start + ${fallbackMs}) >= operating_now_ms() - 60000
+        )
+        OR ${liveProcessingSql(o)}
+      )
+      AND (
+        COALESCE(${o}.planned_end, ${o}.planned_start + ${fallbackMs}) >= operating_now_ms() - 60000
+        OR ${liveProcessingSql(o)}
+      )
+      AND (${o}.status <> 'PENDING' OR ${o}.planned_start <= operating_now_ms() + ${PENDING_LOOKAHEAD_MS})
+    )`;
+}
+
+/**
+ * 一台車多張單時誰排第一：車實際在做的（執行中）→ 故障 → 待發。
+ * 以前故障永遠排第一，前一班故障結案後車已經接了新單在跑，卡片仍停在舊故障。
+ */
+function liveTaskRankSql(o: string): string {
+  return `CASE ${o}.status WHEN 'PROCESSING' THEN 0 WHEN 'FAULTED' THEN 1 ELSE 2 END`;
+}
+
 /**
  * 過渡單（出廠、入廠、待命、暫停、空車移動）的短名稱：下單時存的 transition_label；舊單沒有就照
  * 結構化的任務子類型推待命／暫停，其他一律中性的「過渡」，不從代號或位置猜。班次卡標題與車輛卡標籤共用。
@@ -505,11 +557,8 @@ LEFT JOIN LATERAL (
   WHERE o.vehicle_code = v.vehicle_code
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     AND ${notCancelledSql('o')}
-    AND (
-      COALESCE(o.planned_end, o.planned_start + 600000) >= operating_now_ms() - 60000
-      OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
-    )
-  ORDER BY CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END, o.priority_level DESC, o.planned_start
+    AND ${liveTaskScopeSql('o')}
+  ORDER BY ${liveTaskRankSql('o')}, o.priority_level DESC, o.planned_start
   LIMIT 1
 ) active_order ON true
 WHERE v.is_active = true
@@ -560,13 +609,13 @@ active_orders AS (
      *
      * 以前先比「計畫時間窗有沒有涵蓋現在」：前班晚了幾十秒、下一班的時間窗已經開始，
      * 卡片就先換成下一班——畫面上顯示下一班待發，車卻還在跑上一班。現在依實際狀態排：
-     * 故障、執行中的單永遠排前面，不管計畫結束時間過了沒；接下來要發的 PENDING 只有在這台
+     * 執行中的單永遠排前面（不管計畫結束時間過了沒），其次是故障；接下來要發的 PENDING 只有在這台
      * 車沒有進行中的單時才會出現。
      */
     ROW_NUMBER() OVER (
       PARTITION BY o.vehicle_code
       ORDER BY
-        CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END,
+        ${liveTaskRankSql('o')},
         o.priority_level DESC,
         CASE ${orderBusinessKindSql('o')} WHEN 'MAINLINE' THEN 0 WHEN 'TRANSITION' THEN 1 ELSE 2 END,
         (
@@ -616,45 +665,13 @@ active_orders AS (
     AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
     AND ${notCancelledSql('o')}
     /*
-     * 只看目前的營運日。
+     * 只看目前有效的任務（liveTaskScopeSql）：目前營運日、時窗涵蓋現在或車端還在回報的單。
      *
-     * 少了這一條，同一個班次代號會把每一天的那一筆都撈出來——實測 TS1217 一次回
-     * 十九列（8/29 到 9/16 各一），畫面上看起來像重複的卡片。而且排序從最早的
-     * 00:00 開始，正在跑的 13:20 那幾班反而看不到。
-     *
-     * 歸屬看訂單上的 operating_day（次日凌晨的班次仍屬原營運日）；舊訂單沒有這個欄位才看計畫發車時刻。
+     * 少了營運日條件，同一個班次代號會把每一天的那一筆都撈出來（實測 TS1217 一次回十九列）；
+     * 少了「還沒結束」，排班引擎沒收乾淨的幾百筆殭屍 PROCESSING 會塞滿卡片。執行中的單不看計畫結束
+     * 時間，看車端十分鐘內有沒有回報；半分鐘到十分鐘之間標「資料過期」，不自動換成別的班次。
      */
-    AND (
-      o.payload->>'operating_day' = operating_day()
-      OR (
-        o.payload->>'operating_day' IS NULL
-        AND o.planned_start >= operating_day_start_ms()
-        AND o.planned_start < operating_day_start_ms() + 86400000
-      )
-    )
-    /*
-     * 只留還沒跑完的。
-     *
-     * 排班引擎跑完一班不一定會把狀態收成 END：今天 218 筆裡有 208 筆掛在 PROCESSING，
-     * 其中 204 筆的 planned_end 早就過了。真正在跑的只有 4 筆（四台車各一筆，payload
-     * 的 updated_at 是幾秒前）。不擋掉的話卡片會被半夜那幾百筆殭屍班次塞滿。
-     *
-     * 留 60 秒寬限，剛到站的那一班不會瞬間消失。
-     *
-     * 執行中的單<strong>不看計畫結束時間</strong>：晚到的班次就算過了計畫結束仍在跑，卡片不能
-     * 消失、也不能被下一班取代。改看車端有沒有回報——十分鐘內回報過的才是真的在跑，更久
-     * 沒有回報的是前幾班留下的殭屍單，不列。半分鐘到十分鐘之間標成「資料過期」，不自動換成
-     * 別的班次。
-     */
-    AND (
-      COALESCE(o.planned_end, o.planned_start + 600000)
-        >= operating_now_ms() - 60000
-      OR (
-        o.status = 'PROCESSING'
-        AND COALESCE((o.payload->>'updated_at')::bigint, 0)
-          >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000
-      )
-    )
+    AND ${liveTaskScopeSql('o')}
 ),
 route_json AS (
   SELECT
@@ -972,7 +989,7 @@ FROM active_orders o
 LEFT JOIN route_json rj ON rj.order_id = o.order_id
 WHERE o.vehicle_rank = 1
 ORDER BY
-  CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 WHEN 'PENDING' THEN 2 ELSE 3 END,
+  ${liveTaskRankSql('o')},
   CASE o.business_kind WHEN 'MAINLINE' THEN 0 WHEN 'TRANSITION' THEN 1 ELSE 2 END,
   o.planned_start,
   o.trip_code
@@ -1045,15 +1062,21 @@ SELECT
   COALESCE(NULLIF(o.payload->>'operation_action', ''), o.payload->>'task_type', '') AS operation_action,
   COALESCE(o.icon_bg_color, '#51A2FF') AS icon_bg_color,
   'maintenance' AS line_kind
-FROM operation_orders o
+FROM (
+  -- 一台車只列一張整備單，規則跟正線、車輛卡相同（執行中 → 故障 → 待發）
+  SELECT o.*, ROW_NUMBER() OVER (
+    PARTITION BY o.vehicle_code
+    ORDER BY ${liveTaskRankSql('o')}, o.priority_level DESC, o.planned_start
+  ) AS vehicle_rank
+  FROM operation_orders o
+  WHERE ${orderBusinessKindSql('o')} = 'MAINTENANCE'
+    AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
+    AND ${notCancelledSql('o')}
+    -- 跟正線同一套有效範圍（含營運日）；整備沒有結束時刻時預設占用半小時，跨午夜的長整備靠時窗或車端回報保留
+    AND ${liveTaskScopeSql('o', 1800000)}
+) o
 LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = o.vehicle_code
-WHERE ${orderBusinessKindSql('o')} = 'MAINTENANCE'
-  AND o.status IN ('PENDING', 'PROCESSING', 'FAULTED')
-  AND ${notCancelledSql('o')}
-  AND (
-    COALESCE(o.planned_end, o.planned_start + 1800000) >= operating_now_ms() - 60000
-    OR (o.status = 'PROCESSING' AND COALESCE((o.payload->>'updated_at')::bigint, 0) >= (EXTRACT(EPOCH FROM now()) * 1000)::bigint - 600000)
-  )
-ORDER BY CASE o.status WHEN 'FAULTED' THEN 0 WHEN 'PROCESSING' THEN 1 ELSE 2 END, o.planned_start
+WHERE o.vehicle_rank = 1
+ORDER BY ${liveTaskRankSql('o')}, o.planned_start
 LIMIT 12
 `.trim();
