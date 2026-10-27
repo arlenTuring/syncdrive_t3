@@ -146,7 +146,11 @@ export function FacilityDraggableLabel({
 
       const onUp = (ev: PointerEvent) => {
         const drag = moveDragRef.current
-        if (drag) {
+        // 只是點一下（選取）沒有拖：不寫回位置，也不留一筆修改
+        const moved =
+          !!drag &&
+          Math.hypot(ev.clientX - drag.startClientX, ev.clientY - drag.startClientY) >= 2
+        if (drag && moved) {
           const local = clientDeltaToLocal(
             ev.clientX - drag.startClientX,
             ev.clientY - drag.startClientY,
@@ -162,6 +166,8 @@ export function FacilityDraggableLabel({
           )
           onOffsetChange(next)
           setLiveOffset(next)
+        } else if (drag) {
+          setLiveOffset(drag.startOffset)
         }
         try {
           target.releasePointerCapture(ev.pointerId)

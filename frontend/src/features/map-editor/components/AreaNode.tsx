@@ -232,6 +232,7 @@ type AreaNodeProps = {
     update: {
       areaPosition: { x: number; y: number }
       position: { x: number; y: number }
+      resizeSizePx?: { w: number; h: number }
     },
   ) => void
   onDragSessionStart?: () => void

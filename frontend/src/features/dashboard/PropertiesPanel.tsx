@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { usePlaneSourceResolver } from './context/PlaneDataSourceContext';
 import { getDataSourceById } from './store/useDataSourceStore';
 import { resolvePlaneRestUrl } from './elements/useWidgetData';
-import { stationEtaUrl, stationEvents } from './elements/StationEtaWidget';
+import { stationEtaUrl, stationEvents } from './elements/stationEtaModel';
 import { useTranslation } from 'react-i18next';
 import { useBindingHealth } from './context/BindingHealthContext';
 import type { 
@@ -2464,9 +2464,9 @@ function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; on
   };
   return (
     <div className="space-y-4">
-      <SH icon={<Clock size={13} />} label="到站／出發" color="#34d399" />
-      <Field label="標題"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
-      <Field label="停靠點（每行：站點ID=方向／停靠點名稱=到站、出發或到站出發）">
+      <SH icon={<Clock size={13} />} label="到站動態卡片" color="#34d399" />
+      <Field label="標題（站名 進站動態；站名放大顯示）"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
+      <Field label="停靠點（每行：站點ID=方向／停靠點名稱=到站、出發或到站出發；名稱與 ID 相同時顯示圖資站名）">
         <textarea
           value={stationsText}
           rows={4}
@@ -2476,8 +2476,8 @@ function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; on
         />
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="最多幾筆"><NumberInput value={w.limit} onChange={n => onUpdate({ limit: Math.max(1, Math.min(10, n)) })} className={inputCls} /></Field>
-        <Field label="字級"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
+        <Field label="最多幾列（上限 3；兩班即將到站只排 2）"><NumberInput value={w.limit} onChange={n => onUpdate({ limit: Math.max(1, Math.min(3, n)) })} className={inputCls} /></Field>
+        <Field label="字級倍率（12＝設計稿；隨卡片寬度÷320 等比）"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
       </div>
       <Field label="資料端點（登入端內部 API）"><input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={`${inputCls} font-mono`} /></Field>
       <div className="rounded border border-zinc-700 bg-zinc-900/60 p-2 text-[10px] leading-relaxed text-zinc-400">

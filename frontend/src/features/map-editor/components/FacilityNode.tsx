@@ -330,6 +330,8 @@ type FacilityNodeProps = {
       | {
           areaPosition: { x: number; y: number }
           position: { x: number; y: number }
+          /** 拖外框邊角時一起帶上的新尺寸 */
+          resizeSizePx?: { w: number; h: number }
         },
   ) => void
   onDragSessionStart?: () => void
@@ -1899,6 +1901,7 @@ export const FacilityNode = memo(function FacilityNode({
         )
         onDrag(facilityRef.current.id, {
           areaPosition,
+          resizeSizePx: areaSizePx,
           position: clampFacilityMeterPosition(
             raw.x,
             raw.y,

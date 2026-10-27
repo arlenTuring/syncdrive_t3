@@ -801,6 +801,137 @@ export function rematerializeZoneChildrenOntoZoneCanvas(
   })
 }
 
+type ZoneFrameRect = { x: number; y: number; w: number; h: number }
+
+/** 分區目前的圖台外框（areaPosition 座標） */
+export function zoneFrameRect(zone: FacilityObject, area: MapAreaObject): ZoneFrameRect {
+  const pos = resolveFacilityAreaPosition(zone, area.domain, area.layout)
+  const size = resolveFacilityAreaSize(zone, area.domain, area.layout)
+  return { x: pos.x, y: pos.y, w: size.w, h: size.h }
+}
+
+/** 子設施合起來的圖台範圍；沒有子設施回 null */
+export function zoneChildrenFrameBounds(
+  facilities: readonly FacilityObject[],
+  zoneId: string,
+  area: MapAreaObject,
+): { left: number; top: number; right: number; bottom: number } | null {
+  let out: { left: number; top: number; right: number; bottom: number } | null = null
+  for (const f of facilities) {
+    if (!canBelongToParentZone(f) || readParentZoneId(f.parameters) !== zoneId) continue
+    const p = resolveFacilityAreaPosition(f, area.domain, area.layout)
+    const sz = resolveFacilityAreaSize(f, area.domain, area.layout)
+    out = out
+      ? {
+          left: Math.min(out.left, p.x),
+          top: Math.min(out.top, p.y),
+          right: Math.max(out.right, p.x + sz.w),
+          bottom: Math.max(out.bottom, p.y + sz.h),
+        }
+      : { left: p.x, top: p.y, right: p.x + sz.w, bottom: p.y + sz.h }
+  }
+  return out
+}
+
+/** 外框至少要包住子設施：只往外擴，不推動子設施 */
+export function expandZoneFrameToContainChildren(
+  rect: ZoneFrameRect,
+  children: { left: number; top: number; right: number; bottom: number } | null,
+): ZoneFrameRect {
+  if (!children) return rect
+  const left = Math.min(rect.x, children.left)
+  const top = Math.min(rect.y, children.top)
+  const right = Math.max(rect.x + rect.w, children.right)
+  const bottom = Math.max(rect.y + rect.h, children.bottom)
+  return { x: left, y: top, w: right - left, h: bottom - top }
+}
+
+/** 把分區外框設成 rect（位置與尺寸），場域位置照圖台換算 */
+export function applyZoneFrameRect(
+  zone: FacilityObject,
+  rect: ZoneFrameRect,
+  area: Pick<MapAreaObject, 'domain' | 'layout'>,
+): FacilityObject {
+  return facilityWithAreaPosition(
+    facilityWithAreaSize(zone, { w: rect.w, h: rect.h }),
+    { x: rect.x, y: rect.y },
+    area.domain,
+    area.layout,
+  )
+}
+
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4
+
+/**
+ * 只調整分區外框（拖外框邊角、屬性面板改尺寸）之後：子設施<strong>完全不動</strong>。
+ *
+ * <ul>
+ *   <li>子設施的圖台位置與尺寸不變（外框只是裝飾容器，不連動縮放、不重排）；</li>
+ *   <li>子設施的真實場域座標不變；</li>
+ *   <li>分區的場域範圍跟著外框同比例延伸／收回（圖台每 px 對應的公尺數不變），
+ *       所以子設施相對外框的 zoneLocalField 重算後，換算回場域仍是原本的座標；
+ *       之後整個分區搬家（rematerialize）也只會平移，不會把子設施擠壓回比例位置。</li>
+ * </ul>
+ * prev 是這次調整前的外框；呼叫前 facilities 裡的分區已是新外框。
+ */
+export function refitZoneFrameKeepingChildren(
+  facilities: FacilityObject[],
+  zoneId: string,
+  prev: ZoneFrameRect,
+  area: MapAreaObject,
+): FacilityObject[] {
+  const zone = facilities.find((f) => f.id === zoneId)
+  if (!zone || !isZonePartition(zone)) return facilities
+  if (!(prev.w > 0) || !(prev.h > 0)) return facilities
+  const areaCtx: MapAreaObject = { ...area, facilities }
+  const next = zoneFrameRect(zone, areaCtx)
+  if (!(next.w > 0) || !(next.h > 0)) return facilities
+  const same =
+    Math.abs(next.x - prev.x) < 1e-9 &&
+    Math.abs(next.y - prev.y) < 1e-9 &&
+    Math.abs(next.w - prev.w) < 1e-9 &&
+    Math.abs(next.h - prev.h) < 1e-9
+  if (same) return facilities
+
+  let zoneOut = zone
+  if (hasValidRefFieldBounds(zone.parameters)) {
+    const b = getRefFieldBounds(zone.parameters)
+    const xMin = b.xMinM ?? 0
+    const yMin = b.yMinM ?? 0
+    const spanX = (b.xMaxM ?? 0) - xMin
+    const spanY = (b.yMaxM ?? 0) - yMin
+    const mapX = (px: number) => xMin + ((px - prev.x) / prev.w) * spanX
+    const mapY = (py: number) => yMin + ((py - prev.y) / prev.h) * spanY
+    zoneOut = {
+      ...zone,
+      parameters: patchRefFieldBounds(zone.parameters, {
+        xMinM: round4(mapX(next.x)),
+        xMaxM: round4(mapX(next.x + next.w)),
+        yMinM: round4(mapY(next.y)),
+        yMaxM: round4(mapY(next.y + next.h)),
+      }),
+    }
+  }
+
+  return facilities.map((f) => {
+    if (f.id === zoneId) return zoneOut
+    if (!canBelongToParentZone(f) || readParentZoneId(f.parameters) !== zoneId) return f
+    const p = resolveFacilityAreaPosition(f, areaCtx.domain, areaCtx.layout)
+    const sz = resolveFacilityAreaSize(f, areaCtx.domain, areaCtx.layout)
+    // 不夾 0–1：外框已確保包住子設施，這裡照實記相對位置
+    const local: ZoneLocalField = {
+      u: (p.x + sz.w / 2 - next.x) / next.w,
+      v: (p.y + sz.h / 2 - next.y) / next.h,
+      du: sz.w / next.w,
+      dv: sz.h / next.h,
+    }
+    return {
+      ...f,
+      parameters: { ...(f.parameters ?? {}), [ZONE_LOCAL_FIELD_KEY]: local },
+    }
+  })
+}
+
 /** 入口連結變更後：同步分區參數，並重算各分區內子設施場域 */
 export function applyEntranceLinksToAreaFacilities(
   facilities: FacilityObject[],

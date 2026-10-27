@@ -108,6 +108,8 @@ type MapAreaCanvasProps = {
   orderStationsById?: Record<string, readonly string[]>
   /** 圖台車輛座標／heading 等除錯標籤 */
   showVehicleTelemetry?: boolean
+  /** 地圖與外圍底色（圖台用自己的色票；未給維持編輯器原本的深色） */
+  mapBackground?: string
   slotPreview?: {
     facilityId: string
     occupancy: SlotOccupancy
@@ -138,6 +140,7 @@ type MapAreaCanvasProps = {
     update: {
       areaPosition: { x: number; y: number }
       position: { x: number; y: number }
+      resizeSizePx?: { w: number; h: number }
     },
   ) => void
   onDragSessionStart?: () => void
@@ -249,6 +252,7 @@ export function MapAreaCanvas({
   vehicleRoofIndicator,
   orderStationsById,
   showVehicleTelemetry = true,
+  mapBackground,
   slotPreview = null,
   onSelectArea,
   onSelectBasemap,
@@ -609,7 +613,10 @@ export function MapAreaCanvas({
           ? 'relative flex h-full w-full items-center justify-center overflow-hidden bg-zinc-950'
           : 'relative h-full w-full overflow-auto bg-zinc-950'
       }
-      style={isEmbedded ? undefined : { scrollbarGutter: 'stable both-edges' }}
+      style={{
+        ...(isEmbedded ? {} : { scrollbarGutter: 'stable both-edges' }),
+        ...(mapBackground ? { backgroundColor: mapBackground } : {}),
+      }}
       onMouseDown={(e) => {
         if (inCropMode) return
         const t = e.target as HTMLElement
@@ -664,7 +671,7 @@ export function MapAreaCanvas({
             width: layoutSize.width,
             height: layoutSize.height,
             transform: `scale(${mapScale})`,
-            background: inCropMode ? '#0a0e16' : '#060a12',
+            background: inCropMode ? '#0a0e16' : (mapBackground ?? '#060a12'),
           }}
           onDragOver={(e) => {
             if (

@@ -276,7 +276,8 @@ export function mergeFacilityLabelStyle(
   if (patch.fontSizePx === undefined && 'fontSizePx' in patch) {
     delete next.fontSizePx
   }
-  if (patch.color === '' || patch.color === undefined) delete next.color
+  // 只有明確清除顏色（'' 或帶了 color: undefined）才刪；拖曳名稱、改字級等不帶 color 的修改不能把顏色洗掉
+  if ('color' in patch && !patch.color) delete next.color
   if (patch.fontWeight === 'normal') delete next.fontWeight
   if (patch.fontStyle === 'normal') delete next.fontStyle
   if (patch.labelPlacement === undefined && 'labelPlacement' in patch) {

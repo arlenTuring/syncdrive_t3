@@ -7,7 +7,7 @@ import {
 import { upgradeSystemQueries } from './systemQueries';
 import { ensureTransitionShiftTemplate, alignShiftCardLayouts } from './shiftCardTemplates';
 import { EVENT_CENTER_LIST_SQL } from '../constants/demoSql';
-import { STATION_ETA_INVALIDATE_TAGS, STATION_ETA_URL, type StationEtaWidget, type TabListWidget, type TextWidget } from '../types';
+import { STATION_ETA_INVALIDATE_TAGS, STATION_ETA_URL, type StationEtaWidget, type TabListWidget } from '../types';
 
 const REMOVED_WIDGET_TYPES = new Set([
   'schematic-track',
@@ -32,80 +32,92 @@ function stripWidgetDemoBehavior(child: ChildWidget): ChildWidget {
   return migrateChildWidgetGenerics(next as unknown as ChildWidget);
 }
 
-function stationUrl(widget: StationEtaWidget): string {
-  const values = (event: 'arrive' | 'depart') => widget.stations
-    .filter(station => (station.events?.length ? station.events : ['arrive']).includes(event))
-    .map(station => encodeURIComponent(station.stationId));
-  const arrive = values('arrive');
-  const depart = values('depart');
-  const query = [arrive.length ? `arrive=${arrive.join(',')}` : '', depart.length ? `depart=${depart.join(',')}` : '', `limit=${widget.limit || 3}`].filter(Boolean).join('&');
-  return `${widget.dataUrl || STATION_ETA_URL}?${query}`;
+/** 2026-10 曾把站點 ETA 拆成「直排站名文字＋表格」的那三張（以元件 ID 與資料契約確認） */
+const LEGACY_ETA_TABLE_IDS = new Set(['eta-n2w', 'eta-s2w', 'eta-t3']);
+
+/**
+ * 三站到站動態卡片在即時圖台（地圖元件 vq53epo 的畫布單位）的位置與尺寸：標題、主卡、後續列由上而下，
+ * 高度剛好排完正常三筆（比例見 stationEtaModel cardScale）。寬度比設計稿 320:254 略寬，是為了讓
+ * 「出發」標記與「SW上發2」這類站名在後續列完整顯示，字級不因此放大。
+ * 位置是對這張圖台的道路、站點、號誌量出來的空白區（四周至少留 6），不壓道路與設備；
+ * 原本橫長條的表格位置放不下直式卡片，所以 N2W／S2W 移到上下道路之間的空隙。
+ */
+export const STATION_ETA_LAYOUT: Readonly<Record<string, { x: number; y: number; width: number; height: number }>> = {
+  'eta-t3': { x: 401, y: 186, width: 310, height: 226 },
+  'eta-s2w': { x: 1920, y: 235, width: 236, height: 159 },
+  'eta-n2w': { x: 2280, y: 235, width: 236, height: 159 },
+};
+
+/** 表格的 station-eta 網址 → 停靠點設定（站點 ID 與到站／出發，順序照網址） */
+function stationsFromUrl(url: string): { base: string; stations: StationEtaWidget['stations']; limit: number } {
+  const [base, query = ''] = url.split('?');
+  const params = new URLSearchParams(query);
+  const list = (key: string) => (params.get(key) ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  const arrive = list('arrive');
+  const depart = list('depart');
+  const stations: StationEtaWidget['stations'] = [];
+  for (const id of [...arrive, ...depart]) {
+    if (stations.some(station => station.stationId === id)) continue;
+    const events: Array<'arrive' | 'depart'> = [];
+    if (arrive.includes(id)) events.push('arrive');
+    if (depart.includes(id)) events.push('depart');
+    stations.push({ stationId: id, label: id, events });
+  }
+  const limit = Number(params.get('limit'));
+  return { base, stations, limit: Number.isFinite(limit) && limit >= 1 ? Math.min(10, Math.floor(limit)) : 3 };
 }
 
-/** 專用 ETA 元件只做一次資料形狀遷移；ID 與整體外框不變，左側站名使用可編輯文字元件。 */
+/**
+ * 站點到站資訊改回專用的到站動態卡片（type: 'station-eta'）。
+ *
+ * 只轉已確認的三張舊表格（eta-n2w／eta-s2w／eta-t3，且資料來源是 station-eta），連同旁邊的
+ * 直排站名文字（{id}-station-label）合成一張卡：站名放進卡片標題。元素 ID、站點集合、
+ * 到站／出發、筆數、重查設定保留。卡片是直式（標題、主卡、後續列由上而下），放不進舊表格的橫長條，
+ * 位置與尺寸用 STATION_ETA_LAYOUT；不搬動、不縮放其他東西。標題一律「站名 進站動態」，
+ * 底層的出發設定照留，列內另外標「出發」。
+ * 舊表格的欄位設定（欄寬、欄名）在卡片用不到，不保留。轉過就不再是表格，第二次執行不會再變。
+ */
 export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[] {
+  const legacy = new Map<string, TabListWidget>();
+  for (const child of children) {
+    if (child.type !== 'tab-list' || !LEGACY_ETA_TABLE_IDS.has(child.id)) continue;
+    if (child.tabs.some(tab => tab.dataUrl?.startsWith(STATION_ETA_URL))) legacy.set(child.id, child);
+  }
+  if (legacy.size === 0) return children;
+  const labels = new Map<string, ChildWidget>();
+  for (const child of children) {
+    const owner = child.id.endsWith('-station-label') ? child.id.slice(0, -'-station-label'.length) : '';
+    if (child.type === 'text' && legacy.has(owner)) labels.set(owner, child);
+  }
   const out: ChildWidget[] = [];
   for (const child of children) {
-    if (child.type !== 'station-eta') { out.push(child); continue; }
-    const labelWidth = Math.min(38, Math.max(28, Math.round(child.width * 0.16)));
-    const station = child.title.split(/\s+/)[0] || child.stations[0]?.label || '站點';
-    const stacked = /^(N2W|S2W)$/i.test(station) ? station.split('').join('\n') : station;
-    const label: TextWidget = {
-      id: `${child.id}-station-label`, type: 'text', x: child.x, y: child.y, width: labelWidth, height: child.height,
-      content: stacked, fontSize: Math.max(12, child.fontSize), lineHeight: 1.05, fontFamily: 'system-ui', fontWeight: 'bold',
-      color: child.color, textAlign: 'center', verticalAlign: 'center', borderRadius: child.borderRadius,
-      borderWidth: 1, borderColor: child.borderColor, backgroundColor: child.backgroundColor, colorRulesEnabled: false,
+    if (child.type === 'text' && [...labels.values()].includes(child)) continue;
+    const list = legacy.get(child.id);
+    if (!list) { out.push(child); continue; }
+    const tab = list.tabs.find(t => t.dataUrl?.startsWith(STATION_ETA_URL))!;
+    const label = labels.get(list.id);
+    const left = Math.min(list.x, label?.x ?? list.x);
+    const top = Math.min(list.y, label?.y ?? list.y);
+    const right = Math.max(list.x + list.width, label ? label.x + label.width : -Infinity);
+    const bottom = Math.max(list.y + list.height, label ? label.y + label.height : -Infinity);
+    const { base, stations, limit } = stationsFromUrl(tab.dataUrl ?? STATION_ETA_URL);
+    const station = (list.label || tab.label || '').trim() || stations[0]?.stationId || '站點';
+    const layout = STATION_ETA_LAYOUT[list.id] ?? { x: left, y: top, width: right - left, height: bottom - top };
+    const card: StationEtaWidget = {
+      id: list.id, type: 'station-eta', ...layout,
+      title: `${station} 進站動態`,
+      stations, limit,
+      fontSize: 12, color: '#F3F4F6', mutedColor: '#9CA3AF',
+      backgroundColor: '#212734', borderColor: '#4E525C', borderRadius: 20,
+      dataUrl: base || STATION_ETA_URL,
+      refreshMode: tab.refreshMode ?? 'event',
+      ...(tab.freshnessPolicy ? { freshnessPolicy: tab.freshnessPolicy } : {}),
+      ...(tab.refreshInterval != null ? { refreshInterval: tab.refreshInterval } : {}),
+      invalidateTags: tab.invalidateTags ?? [...STATION_ETA_INVALIDATE_TAGS],
     };
-    const columns = [
-      ['vehicle_name', '車輛名稱', 48, 'text'],
-      ['task_label', '目前任務標籤', 42, 'text'],
-      ['at', '剩餘時間', 48, 'countdown'],
-      ['event_label', '事件類型', 38, 'text'],
-      ['station_name', '事件所屬站點名稱', 54, 'text'],
-    ] as const;
-    const list: TabListWidget = {
-      id: child.id, type: 'tab-list', x: child.x + labelWidth, y: child.y, width: Math.max(10, child.width - labelWidth), height: child.height,
-      label: station, showTabBar: false, showHeader: false, activeTabId: 'events', rowHeight: 20, fontSize: Math.max(9, child.fontSize - 2),
-      textColor: child.color, headerHeight: 22, headerFontSize: 8, headerTextColor: child.mutedColor,
-      backgroundColor: child.backgroundColor, borderColor: child.borderColor, borderWidth: 1, borderRadius: child.borderRadius,
-      tabs: [{
-        id: 'events', label: station, dataUrl: stationUrl(child), dataRowPath: 'events', rowKeyField: 'row_key',
-        rowCoupling: {
-          enabled: true, relationKeyField: 'coupling_key', stableKeyField: 'row_key',
-          statusField: 'event', statusOrder: ['arrive', 'depart'],
-        },
-        refreshMode: child.refreshMode ?? 'event', freshnessPolicy: child.freshnessPolicy,
-        refreshInterval: child.refreshInterval, invalidateTags: child.invalidateTags ?? [...STATION_ETA_INVALIDATE_TAGS],
-        columns: columns.map(([fieldKey, name, width, format]) => ({ id: `${child.id}-${fieldKey}`, name, fieldKey, width, format, children: [] })),
-      }],
-    };
-    out.push(label, list);
+    out.push(card);
   }
-  return out.map(child => {
-    if (child.type !== 'tab-list' || !['eta-n2w', 'eta-s2w', 'eta-t3'].includes(child.id)) return child;
-    if (!child.tabs.some(tab => tab.dataUrl?.startsWith(STATION_ETA_URL))) return child;
-    return {
-      ...child,
-      showHeader: false,
-      tabs: child.tabs.map(tab => tab.dataUrl?.startsWith(STATION_ETA_URL) ? {
-        ...tab,
-        columns: tab.columns.some(column => column.fieldKey === 'trip_code')
-          ? tab.columns
-          : tab.columns.flatMap((column, index) => index === 0 ? [
-            column,
-            {
-              id: `${child.id}-trip_code`, name: '班次代號', fieldKey: 'trip_code', width: 64,
-              format: 'text' as const, align: column.align, fontSize: column.fontSize, children: [],
-            },
-          ] : [column]),
-        rowKeyField: 'row_key',
-        rowCoupling: {
-          enabled: true, relationKeyField: 'coupling_key', stableKeyField: 'row_key',
-          statusField: 'event', statusOrder: ['arrive', 'depart'],
-        },
-      } : tab),
-    };
-  });
+  return out;
 }
 
 function migrateCanvasElement(el: CanvasElementProps): CanvasElementProps {

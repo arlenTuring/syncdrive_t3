@@ -22,6 +22,7 @@ import { useMapMqttLive } from './useMapMqttLive';
 import { useDemoSimulationPlayback } from '../context/DemoSimulationPlaybackContext';
 import { MapSimVehicleMotionBridge } from './MapSimVehicleMotionBridge';
 import { useOrderRouteStations } from './useOrderRouteStations';
+import { MAP_PLATFORM_THEME } from '../constants/mapPlatformTheme';
 
 export function MapPlatformLayer({
   mapId,
@@ -178,7 +179,10 @@ export function MapPlatformLayer({
   }
 
   return (
-    <div className="relative h-full min-h-[120px] w-full overflow-hidden bg-zinc-950">
+    <div
+      className="relative h-full min-h-[120px] w-full overflow-hidden"
+      style={{ backgroundColor: MAP_PLATFORM_THEME.mapBackground }}
+    >
       <MapSimVehicleMotionBridge
         pixelSize={pixelSize}
         pixelOrigin={pixelOrigin}
@@ -197,6 +201,7 @@ export function MapPlatformLayer({
         vehicleRoofIndicator={vehicleRoofIndicator}
         orderStationsById={orderStationsById}
         viewportRef={viewportRef}
+        mapBackground={MAP_PLATFORM_THEME.mapBackground}
       />
     </div>
   );
@@ -243,7 +248,10 @@ export function MapPlatformCanvas({
     [vehicleTemplate],
   );
   return (
-    <div className="relative h-full min-h-[120px] w-full overflow-hidden bg-zinc-950">
+    <div
+      className="relative h-full min-h-[120px] w-full overflow-hidden"
+      style={{ backgroundColor: MAP_PLATFORM_THEME.mapBackground }}
+    >
       <MapSimVehicleMotionBridge
         pixelSize={map.pixelSize}
         pixelOrigin={map.pixelOrigin}
@@ -262,6 +270,7 @@ export function MapPlatformCanvas({
         vehicleRoofIndicator={null}
         orderStationsById={orderStationsById}
         viewportRef={viewportRef}
+        mapBackground={MAP_PLATFORM_THEME.mapBackground}
       />
     </div>
   );

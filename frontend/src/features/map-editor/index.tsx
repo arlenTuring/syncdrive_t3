@@ -235,6 +235,11 @@ import {
   readParentZoneId,
   readZoneEntranceLinks,
   rematerializeZoneChildrenOntoZoneCanvas,
+  refitZoneFrameKeepingChildren,
+  applyZoneFrameRect,
+  zoneFrameRect,
+  zoneChildrenFrameBounds,
+  expandZoneFrameToContainChildren,
   sanitizeZoneParameters,
   syncZoneChildFieldFromPlacement,
   ZONE_ENTRANCE_LINKS_KEY,
@@ -3216,6 +3221,8 @@ export default function MapEditorApp({
       update: {
         areaPosition: { x: number; y: number }
         position: { x: number; y: number }
+        /** 拖外框邊角時一起帶上的新尺寸（只有分區用得到） */
+        resizeSizePx?: { w: number; h: number }
       },
     ) => {
       const area = areasRef.current.find((a) => a.id === areaId)
@@ -3267,6 +3274,23 @@ export default function MapEditorApp({
       mapAreaFacilities(areaId, (facilities) => {
         const areaNow = areasRef.current.find((a) => a.id === areaId)
         if (!areaNow) return facilities
+        const target = facilities.find((x) => x.id === facilityId)
+        if (update.resizeSizePx && target && isZonePartition(target)) {
+          // 拖分區外框邊角（位置＋尺寸一起變）：子設施不動，外框至少包住子設施
+          const ctx = { ...areaNow, facilities }
+          const prev = zoneFrameRect(target, ctx)
+          const rect = expandZoneFrameToContainChildren(
+            { ...update.areaPosition, ...update.resizeSizePx },
+            zoneChildrenFrameBounds(facilities, facilityId, ctx),
+          )
+          const resized = facilities.map((f) =>
+            f.id === facilityId ? applyZoneFrameRect(f, rect, areaNow) : f,
+          )
+          return refitZoneFrameKeepingChildren(resized, facilityId, prev, {
+            ...areaNow,
+            facilities: resized,
+          })
+        }
         let next = facilities.map((fac) => {
           if (fac.id !== facilityId) return fac
           if (fac.type === 'Geofence') return fac
@@ -3766,13 +3790,23 @@ export default function MapEditorApp({
       )
       mapAreaFacilities(areaId, (facilities) => {
         const target = facilities.find((f) => f.id === facilityId)
-        const resizingZone = target != null && isZonePartition(target)
-        let next = resizingZone
-          ? ensureZoneChildrenLocalFields(facilities, facilityId, {
-              ...area,
-              facilities,
-            })
-          : facilities
+        if (target != null && isZonePartition(target)) {
+          // 分區只調外框：子設施不跟著縮放、不重排（外框至少包住子設施）
+          const ctx = { ...area, facilities }
+          const prev = zoneFrameRect(target, ctx)
+          const rect = expandZoneFrameToContainChildren(
+            { x: prev.x, y: prev.y, w, h },
+            zoneChildrenFrameBounds(facilities, facilityId, ctx),
+          )
+          const next = facilities.map((f) =>
+            f.id === facilityId ? applyZoneFrameRect(f, rect, area) : f,
+          )
+          return refitZoneFrameKeepingChildren(next, facilityId, prev, {
+            ...area,
+            facilities: next,
+          })
+        }
+        let next = facilities
         next = next.map((f) => {
           if (f.id !== facilityId) return f
           const sized = {
@@ -3790,12 +3824,6 @@ export default function MapEditorApp({
             ),
           })
         })
-        if (resizingZone) {
-          next = rematerializeZoneChildrenOntoZoneCanvas(next, facilityId, {
-            ...area,
-            facilities: next,
-          })
-        }
         return next
       })
     },

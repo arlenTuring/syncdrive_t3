@@ -32,6 +32,8 @@ export type MapSimVehicleMotionBridgeProps = {
   vehicleRoofIndicator?: VehicleRoofIndicatorConfig | null;
   orderStationsById?: Record<string, readonly string[]>;
   viewportRef: React.RefObject<HTMLDivElement | null>;
+  /** 地圖底色 */
+  mapBackground?: string;
 };
 
 /*
@@ -60,6 +62,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
   vehicleRoofIndicator,
   orderStationsById,
   viewportRef,
+  mapBackground,
 }: MapSimVehicleMotionBridgeProps) {
   const areaVehicles = useSimExtrapolatedVehicles(vehiclesRaw, {
     active: simPlaybackActive && vehiclesRaw.length > 0,
@@ -91,6 +94,7 @@ export const MapSimVehicleMotionBridge = memo(function MapSimVehicleMotionBridge
         vehicleBehavior={vehicleBehavior}
         vehicleRoofIndicator={vehicleRoofIndicator}
         orderStationsById={orderStationsById}
+        mapBackground={mapBackground}
         slotPreview={null}
         onSelectArea={noop}
         onSelectFacility={noop}

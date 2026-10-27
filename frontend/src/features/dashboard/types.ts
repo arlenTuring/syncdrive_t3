@@ -761,8 +761,8 @@ export const STATION_ETA_INVALIDATE_TAGS = [
 ] as const;
 
 /**
- * 站點到站／出發清單（N2W、S2W、T3…）：後端 /operation-metrics/station-eta，營運時間。
- * 每列：幾分幾秒到站／出發（倒數）、車號、方向／停靠點、即時或計畫。
+ * 站點到站動態卡片（N2W、S2W、T3…）：後端 /operation-metrics/station-eta，營運時間。
+ * 一筆重點（大號「分:秒」剩餘倒數）＋後續緊湊列：車號、倒數、方向／停靠點、即時或計畫。
  */
 /** 八方向障礙指示的方向（以卡片上車頭朝上為準，不跟地圖 heading 旋轉） */
 export const OBSTACLE_DIRECTIONS = [
@@ -812,8 +812,12 @@ export interface StationEtaWidget extends WidgetBase, WidgetDataBinding {
    * events 省略時只列到站（舊設定）。
    */
   stations: Array<{ stationId: string; label: string; events?: Array<'arrive' | 'depart'> }>;
-  /** 最多幾筆（預設 3） */
+  /** 最多幾筆（預設 3，含重點那一筆） */
   limit: number;
+  /**
+   * 字級倍率：12＝設計稿字級（站名 24、倒數 48、列 18…，見 stationEtaModel cardScale）。
+   * 實際大小再乘卡片寬度 ÷ 320，整張卡等比；最小 10。
+   */
   fontSize: number;
   color: string;
   mutedColor: string;
@@ -1641,17 +1645,18 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         ) as Record<ObstacleDirection, ObstacleDirectionBinding>,
       };
     case 'station-eta':
+      // 圖台色票（constants/mapPlatformTheme.ts）；320×280 是到站動態卡片的設計尺寸
       return {
-        id, type, x, y, width: 220, height: 96,
-        title: '到站／出發',
+        id, type, x, y, width: 320, height: 280,
+        title: '進站動態',
         stations: [],
         limit: 3,
-        fontSize: 13,
+        fontSize: 12,
         color: '#F3F4F6',
         mutedColor: '#9CA3AF',
-        backgroundColor: 'rgba(17,24,39,0.82)',
-        borderColor: 'rgba(148,163,184,0.35)',
-        borderRadius: 6,
+        backgroundColor: '#212734',
+        borderColor: '#4E525C',
+        borderRadius: 20,
         dataUrl: STATION_ETA_URL,
         refreshMode: 'event',
         invalidateTags: [...STATION_ETA_INVALIDATE_TAGS],
