@@ -228,13 +228,21 @@ export async function seedDashboardPanels(datasourceId = 'default-internal'): Pr
 const QUERY_CACHE_TTL_MS = 2_000;
 const QUERY_CACHE_MAX_ENTRIES = 128;
 const queryCache = new Map<string, { rows: Record<string, unknown>[]; at: number }>();
-const inflightQueries = new Map<string, Promise<Record<string, unknown>[]>>();
 /**
- * 每支查詢的版本號：失效通知（訂單寫入、清空、重置）一來就加一。
- * 失效前就送出去的查詢晚回來時，版本已經不同，結果不能再寫回快取，也不會被
- * 新的呼叫共用——否則清空前的舊名冊會在清空後被「補」回來。
+ * 每支 SQL 同時只有一個真的在網路上的請求。
+ *
+ * 失效通知（訂單寫入、清空、重置）一來，進行中的那支標成 stale：它晚回來的結果不寫快取，
+ * 失效後才來的呼叫也不共用它（否則清空前的舊名冊會在清空後被「補」回來）。失效後的呼叫
+ * 改排在它後面，共用同一支補查——不管期間來幾則通知、幾個元件，都只補一支，
+ * 不會像以前那樣每則通知就丟掉進行中的請求、另外再打一支，把後端越壓越慢。
  */
-const queryGeneration = new Map<string, number>();
+type QueryFlight = {
+  promise: Promise<Record<string, unknown>[]>;
+  stale: boolean;
+  /** stale 之後的呼叫共用的補查：等這支結束才開始 */
+  next: Promise<Record<string, unknown>[]> | null;
+};
+const inflightQueries = new Map<string, QueryFlight>();
 
 /** 清除過期與超量 SQL 快取（避免長時間運行後 Map 無限膨脹） */
 export function pruneDatasourceQueryCache(now = Date.now()): void {
@@ -278,9 +286,14 @@ export function clearDatasourceQueryCacheForTags(incomingTags: string[]): void {
       || tagsOverlap(inferInvalidateTagsFromSql(cacheKey.slice(sep + 2)), incomingTags);
     if (!hit) continue;
     queryCache.delete(cacheKey);
-    inflightQueries.delete(cacheKey);
-    queryGeneration.set(cacheKey, (queryGeneration.get(cacheKey) ?? 0) + 1);
+    const flight = inflightQueries.get(cacheKey);
+    if (flight) flight.stale = true;
   }
+}
+
+/** 診斷／測試用：目前快取與進行中的 SQL 數量（長時間運作後不能單向增加） */
+export function datasourceQueryCacheStats(): { cached: number; inflight: number } {
+  return { cached: queryCache.size, inflight: inflightQueries.size };
 }
 
 export async function executeDatasourceQuery(
@@ -303,10 +316,17 @@ export async function executeDatasourceQuery(
   }
 
   const existing = inflightQueries.get(cacheKey);
-  if (existing) return existing;
+  if (existing && !existing.stale) return existing.promise;
+  if (existing) {
+    // 失效前送出的還在跑：排一支補查在它後面，期間所有呼叫共用這一支
+    existing.next ??= existing.promise
+      .then(() => undefined, () => undefined)
+      .then(() => executeDatasourceQuery(datasourceId, sqlQuery, timeoutMs));
+    return existing.next;
+  }
 
-  const generation = queryGeneration.get(cacheKey) ?? 0;
-  const promise = (async () => {
+  const flight: QueryFlight = { promise: Promise.resolve([]), stale: false, next: null };
+  flight.promise = (async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -331,20 +351,19 @@ export async function executeDatasourceQuery(
         throw new Error(msg ?? `HTTP ${res.status}`);
       }
       const { rows } = await res.json() as { rows: Record<string, unknown>[] };
-      if ((queryGeneration.get(cacheKey) ?? 0) === generation) {
+      if (!flight.stale) {
         queryCache.set(cacheKey, { rows, at: Date.now() });
         pruneDatasourceQueryCache();
       }
       return rows;
     } finally {
       clearTimeout(timeoutId);
-      // 版本變了代表失效時已移除；此時表裡可能是新一輪的查詢，不能誤刪
-      if ((queryGeneration.get(cacheKey) ?? 0) === generation) inflightQueries.delete(cacheKey);
+      if (inflightQueries.get(cacheKey) === flight) inflightQueries.delete(cacheKey);
     }
   })();
 
-  inflightQueries.set(cacheKey, promise);
-  return promise;
+  inflightQueries.set(cacheKey, flight);
+  return flight.promise;
 }
 
 /** 取得資料來源的資料表清單 */

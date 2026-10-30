@@ -8,7 +8,7 @@ import { getDataSourceById } from './store/useDataSourceStore';
 import { resolvePlaneRestUrl } from './elements/useWidgetData';
 import { stationEtaUrl, stationEvents } from './elements/stationEtaModel';
 import { useTranslation } from 'react-i18next';
-import { useBindingHealth } from './context/BindingHealthContext';
+import { useBindingIssueMap } from './context/BindingHealthContext';
 import type { 
   DashboardPlane, CanvasElementProps, ChildWidget, TextWidget, ImageWidget, 
   LineChartWidget, LineChartSeriesConfig, LineChartEventLabelStyle, ChartAxisBandConfig, ChartAxisBandColorRule, ChartAxisConfig, ChartAxisUnit, ChartViewportMode, DatabaseWidget, GaugeWidget, SlotGridWidget, MaintenanceDistributionWidget, ColorRule, WidgetDataBinding,
@@ -3418,7 +3418,7 @@ export function PropertiesPanel({
   dataContextStatus = { loading: false, error: null, stale: false },
 }: Props) {
   const { t } = useTranslation();
-  const { issueMap } = useBindingHealth();
+  const issueMap = useBindingIssueMap();
   const selectedIssue = selectedChild
     ? issueMap.get(selectedChild.id)
     : selectedElement

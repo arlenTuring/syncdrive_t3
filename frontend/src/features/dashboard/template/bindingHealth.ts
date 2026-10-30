@@ -186,22 +186,30 @@ export function countBindingIssues(plane: DashboardPlane): BindingIssue[] {
   return collectBindingIssues(plane);
 }
 
+/** 同一後端的連線測試在途時共用：內部與 MQTT 資料來源常指向同一個後端，同時檢查只打一支 */
+const pingInFlight = new Map<string, Promise<boolean>>();
+
 export async function pingDataSourceById(id: string, timeoutMs = 5_000): Promise<boolean> {
   const ds = getDataSourceById(id);
   if (!ds) return false;
   if (ds.type === 'internal' || ds.type === 'mqtt') {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await fetch(`${ds.backendUrl}/syncdrive-api/datasource/ping`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      const body = await res.json();
-      return !!body.ok;
-    } catch {
-      return false;
-    }
+    const url = `${ds.backendUrl}/syncdrive-api/datasource/ping`;
+    const shared = pingInFlight.get(url);
+    if (shared) return shared;
+    const attempt = (async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        const body = await res.json();
+        return !!body.ok;
+      } catch {
+        return false;
+      }
+    })().finally(() => pingInFlight.delete(url));
+    pingInFlight.set(url, attempt);
+    return attempt;
   }
   return true;
 }

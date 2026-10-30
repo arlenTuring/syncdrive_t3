@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement, useCallback, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCoalescedQuery } from './useCoalescedQuery';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -12,19 +12,20 @@ let latest: ReturnType<typeof useCoalescedQuery<string[]>> | null = null;
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
-function Probe({ queryKey, enabled = true }: { queryKey: string; enabled?: boolean }) {
+function Probe({ queryKey, enabled = true, minIntervalMs = 0 }: { queryKey: string; enabled?: boolean; minIntervalMs?: number }) {
   const load = useCallback((signal: AbortSignal) => new Promise<string[]>((resolve, reject) => {
     requests.push({ signal, resolve, reject });
   }), []);
-  const value = useCoalescedQuery({ enabled, queryKey, load });
+  // 這組測試看合併與錯序語意，不看節流：間隔設 0，節流另外用假時鐘測
+  const value = useCoalescedQuery({ enabled, queryKey, load, minIntervalMs });
   useEffect(() => {
     latest = value;
   }, [value]);
   return createElement('div', null, value.data?.join(',') ?? 'none');
 }
 
-async function render(queryKey: string, enabled = true) {
-  await act(async () => root!.render(createElement(Probe, { queryKey, enabled })));
+async function render(queryKey: string, enabled = true, minIntervalMs = 0) {
+  await act(async () => root!.render(createElement(Probe, { queryKey, enabled, minIntervalMs })));
 }
 
 beforeEach(() => {
@@ -103,5 +104,57 @@ describe('useCoalescedQuery', () => {
     await render('A', true);
     expect(latest?.data).toBeNull();
     expect(latest?.initialLoading).toBe(true);
+  });
+
+  it('背景重查預設 500ms 節流：進行中密集失效只補一支，且不等通知停下才查', async () => {
+    vi.useFakeTimers();
+    try {
+      await render('A', true, 500);
+      for (let i = 0; i < 20; i += 1) {
+        act(() => latest!.backgroundRefresh());
+        await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+        if (i === 2) await act(async () => requests[0].resolve(['A1']));
+      }
+      // 2 秒內 20 則通知：第一支 300ms 回來，之後每 ≥500ms 一支，不是 20 支，也不是 0 支
+      expect(requests.length).toBeGreaterThanOrEqual(2);
+      expect(requests.length).toBeLessThanOrEqual(5);
+      expect(latest?.data).toEqual(['A1']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('換條件立即查，不受節流；背景重查連續失敗退避', async () => {
+    vi.useFakeTimers();
+    try {
+      await render('A', true, 500);
+      await render('B', true, 500);
+      expect(requests).toHaveLength(2);
+      await act(async () => requests[1].reject(new Error('失敗1')));
+      act(() => latest!.backgroundRefresh());
+      await act(async () => { await vi.advanceTimersByTimeAsync(999); });
+      expect(requests).toHaveLength(2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(requests).toHaveLength(3);
+      await act(async () => requests[2].resolve(['B']));
+      expect(latest?.data).toEqual(['B']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('使用者操作的 refresh 立即查；進行中就等回來立即補，不走節流', async () => {
+    vi.useFakeTimers();
+    try {
+      await render('A', true, 500);
+      await act(async () => requests[0].resolve(['A1']));
+      act(() => latest!.refresh());
+      expect(requests).toHaveLength(2);
+      act(() => latest!.refresh());
+      await act(async () => requests[1].resolve(['A2']));
+      expect(requests).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

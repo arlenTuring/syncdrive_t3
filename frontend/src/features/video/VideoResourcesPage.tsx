@@ -71,6 +71,7 @@ export function VideoResourcesPage() {
   const items = sourceQuery.data?.items ?? [];
   const total = sourceQuery.data?.total ?? 0;
   const refresh = sourceQuery.refresh;
+  const backgroundRefresh = sourceQuery.backgroundRefresh;
   const setSourceData = sourceQuery.setData;
   const setItems = useCallback((update: VideoSourceItem[] | ((current: VideoSourceItem[]) => VideoSourceItem[])) => {
     setSourceData((current) => ({
@@ -105,16 +106,16 @@ export function VideoResourcesPage() {
     if (!canList) return undefined;
     return subscribeDatasourceInvalidation((payload) => {
       if (payload.tags.includes('table:video_sources')) {
-        refresh();
+        backgroundRefresh();
         void refreshTags().catch(() => undefined);
       }
     });
-  }, [canList, refresh, refreshTags]);
+  }, [canList, backgroundRefresh, refreshTags]);
   useEffect(() => {
     if (!canList) return undefined;
-    const timer = window.setInterval(refresh, 30_000);
+    const timer = window.setInterval(backgroundRefresh, 30_000);
     return () => window.clearInterval(timer);
-  }, [canList, refresh]);
+  }, [canList, backgroundRefresh]);
   useEffect(() => {
     if (!notice) return undefined;
     const timer = window.setTimeout(() => setNotice(null), 3600);

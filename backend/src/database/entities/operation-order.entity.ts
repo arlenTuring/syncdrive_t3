@@ -9,6 +9,10 @@ export enum OrderStatus {
 
 @Entity('operation_orders')
 @Index('IDX_ORDER_VEHICLE_STATUS', ['vehicleCode', 'status']) // 快速查詢某台車的當前活躍任務
+// 班次清單排序與精確總數（含 DESC NULLS LAST，TypeORM 宣告不出來）：由 migration
+// 20261029-order-list-indexes.sql 建立；synchronize: false 讓本機自動同步不建也不刪
+@Index('IDX_ORDER_LIST_SORT', { synchronize: false })
+@Index('IDX_ORDER_LIST_KIND', { synchronize: false })
 export class OperationOrder {
   @PrimaryColumn({ type: 'varchar', name: 'order_id' })
   id: string; // e.g., 260422-U1030

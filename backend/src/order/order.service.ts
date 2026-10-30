@@ -20,13 +20,15 @@ import { OrderEvent } from '../database/entities/order-event.entity';
 import { OrderMqttPublisher } from './order-mqtt.publisher';
 import { OrderRouteService } from './order-route.service';
 import { deriveOperationActionFromTaskGroup } from './task-group.util';
-import { orderBusinessKindSql } from './order-business-kind';
+import { orderBusinessKindFilterSql } from './order-business-kind';
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
 import { MapService } from '../map/map.service';
 import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
 import {
   ExecutionStatusKey,
+  LIST_COLUMNS,
+  LIST_PAYLOAD_SQL,
   PENDING_VEHICLE_FAULT_SQL,
   ShiftRecordListItem,
   ShiftTab,
@@ -417,14 +419,6 @@ export class OrderService {
 
     const qb = this.orderRepository.createQueryBuilder('o');
 
-    // 分頁跟 matchesTab 同一套業務分類（order-business-kind.ts），不看班次代號
-    const businessKind = orderBusinessKindSql('o');
-    if (tab === 'maintenance') {
-      qb.andWhere(`${businessKind} = 'MAINTENANCE'`);
-    } else {
-      qb.andWhere(`${businessKind} IN ('MAINLINE', 'TRANSITION', 'TEST')`);
-    }
-
     const vehicle = String(query.vehicle_code ?? '').trim().toUpperCase();
     if (vehicle) {
       qb.andWhere('o.vehicle_code = :vehicle', { vehicle });
@@ -502,13 +496,40 @@ export class OrderService {
       }
     }
 
-    qb.orderBy('o.planned_start', 'DESC', 'NULLS LAST').addOrderBy('o.created_at', 'DESC');
+    /*
+     * 分頁跟 matchesTab 同一套業務分類（order-business-kind.ts），不看班次代號。
+     * 分類拆成「line_kind 直接是分類」與「舊資料照完整 CASE 判斷」兩段互斥條件：清單用 OR，
+     * 精確總數兩段分開數再相加——原本整段 CASE 每查一次都要逐列讀完整張表（含 payload）。
+     */
+    const kinds: Array<'MAINLINE' | 'TRANSITION' | 'MAINTENANCE' | 'TEST'> =
+      tab === 'maintenance' ? ['MAINTENANCE'] : ['MAINLINE', 'TRANSITION', 'TEST'];
+    const kind = orderBusinessKindFilterSql('o', kinds);
+    const countWhere = async (condition: string) => {
+      const raw = await qb.clone().andWhere(condition).select('COUNT(*)', 'cnt').getRawOne<{ cnt: string }>();
+      return Number(raw?.cnt ?? 0);
+    };
+    const total = (kind.direct ? await countWhere(kind.direct) : 0) + (await countWhere(kind.legacy));
 
-    const total = await qb.getCount();
-    const rows = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getMany();
+    /*
+     * 清單只取列表要顯示的欄位；payload 只帶列表用得到的幾個子欄（路線名、沒有路線名時的站名、
+     * 中心端取消、車輛故障），完整 payload／站序／動作在 order/detail 按需載入。
+     * 同一計畫時刻、同一建立時刻時以 order_id 定序，翻頁不漏不重複。
+     */
+    const { entities, raw } = await qb
+      .clone()
+      .andWhere(kind.direct ? `(${kind.direct} OR ${kind.legacy})` : kind.legacy)
+      .select(LIST_COLUMNS.map((column) => `o.${column}`))
+      .addSelect(LIST_PAYLOAD_SQL, 'list_payload')
+      .orderBy('o.planned_start', 'DESC', 'NULLS LAST')
+      .addOrderBy('o.created_at', 'DESC')
+      .addOrderBy('o.order_id', 'DESC')
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
+      .getRawAndEntities<{ list_payload: Record<string, unknown> | null }>();
+    const rows = entities.map((entity, index) => {
+      entity.payload = raw[index]?.list_payload ?? null;
+      return entity;
+    });
 
     const timeZone = await this.displayTimeZone();
     return {

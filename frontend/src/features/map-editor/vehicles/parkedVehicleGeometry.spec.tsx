@@ -9,6 +9,7 @@ import { parseMapFileJson } from '../utils/mapFileJson'
 import { applyRefFieldZeroPolicyToParsed } from '../utils/mergeBuiltinRefFields'
 import modelRow from './__fixtures__/vehicle-model-sampleywe93qb-v23.json'
 import yardMap from './__fixtures__/yard-slots-20261015.json'
+import landscapeYardMap from './__fixtures__/yard-slots-20261028-landscape.json'
 import { MapAreaVehicleOverlay } from './MapAreaVehicleOverlay'
 import type { AreaVehicleLive } from './types'
 
@@ -252,3 +253,155 @@ describe('parked vehicle geometry (real model, real yard slots, final DOM)', () 
     expect(bodyRect(car.code).data.yard).toBe('false')
   })
 })
+
+/*
+ * 2026-10-28 版面改版：H／M 格位在圖上改成橫的（91×47.09），場域仍是直的（H 7.40×14.35 公尺、
+ * M 10.40×19.51 公尺）；E／W 場域與圖面都是橫的。車頭照「現場長軸 → 圖面長軸」轉過去畫，
+ * 真實座標與 heading 不動。資料：發布地圖 map-1789194688160-bu1e5q6 只留分區與格位。
+ */
+describe('parked vehicle heading follows the drawn slot axis (2026-10-28 landscape slots)', () => {
+  const areas = areasOf(landscapeYardMap)
+  const center = (name: string) => {
+    const f = areas[0].facilities.find((item) => item.customName === name)!
+    const p = f.parameters as Record<string, number>
+    return { x: (p.refFieldXMinM + p.refFieldXMaxM) / 2, y: (p.refFieldYMinM + p.refFieldYMaxM) / 2 }
+  }
+  const parked = (code: string, slot: string, heading: number | undefined, extra: Record<string, unknown> = {}) => {
+    const c = center(slot)
+    const v = vehicle({ code, slot, x: c.x, y: c.y, heading: heading ?? 0 }, extra)
+    if (heading === undefined) delete (v.payload.local_pose as Record<string, unknown>).heading
+    return v
+  }
+  const rotateOf = (code: string) => Number(bodyRect(code).data.rotateDeg)
+  const sameAxisMod180 = (a: number, b: number) => {
+    const d = (((a - b) % 180) + 180) % 180
+    return Math.min(d, 180 - d)
+  }
+
+  it('draws cars in the vertical-field / horizontal-drawn H and M slots horizontally, centred, both directions kept apart', () => {
+    for (const slot of ['H1', 'H2', 'H5', 'M3', 'M4']) {
+      for (const heading of [Math.PI / 2, -Math.PI / 2]) {
+        render(areas, [parked('PMS05', slot, heading)])
+        const body = bodyRect('PMS05')
+        const rect = slotRect(areas, slot)
+        expect(body.data.yardSlot).toBe(slot)
+        expect(body.data.yardHeading).toMatch(/^mapped:/)
+        expect(body.w).toBeCloseTo(88, 1)
+        expect(body.h).toBeCloseTo(26.4, 1)
+        expect(body.cx).toBeCloseTo(rect.cx, 1)
+        expect(body.cy).toBeCloseTo(rect.cy, 1)
+        expect(body.minY).toBeGreaterThan(rect.y)
+        expect(body.maxY).toBeLessThan(rect.y + rect.h)
+        act(() => root?.unmount())
+        box?.remove()
+      }
+      render(areas, [parked('PMS05', slot, Math.PI / 2), parked('PMS06', slot === 'H1' ? 'H2' : 'H1', -Math.PI / 2)])
+      // 現場相反的兩個車頭，畫出來也相反（差 180°），不會一律朝同一邊
+      expect(sameAxisMod180(rotateOf('PMS05'), rotateOf('PMS06'))).toBeCloseTo(0, 6)
+      expect(Math.abs(((rotateOf('PMS05') - rotateOf('PMS06') + 540) % 360) - 180)).toBeCloseTo(180, 6)
+      act(() => root?.unmount())
+      box?.remove()
+    }
+  })
+
+  it('leaves E1 (horizontal in the field and on the map) as it was: no extra 90° turn', () => {
+    for (const heading of [0, Math.PI]) {
+      render(areas, [parked('PMS07', 'E1', heading)])
+      const body = bodyRect('PMS07')
+      const rect = slotRect(areas, 'E1')
+      expect(body.data.yardHeading).toMatch(/>0\.0$/)
+      expect(body.w).toBeCloseTo(88, 1)
+      expect(body.h).toBeCloseTo(26.4, 1)
+      expect(body.cx).toBeCloseTo(rect.cx, 1)
+      expect(body.cy).toBeCloseTo(rect.cy, 1)
+      act(() => root?.unmount())
+      box?.remove()
+    }
+  })
+
+  it('re-maps a car that has not moved every time the same map is edited (horizontal → vertical → moved/resized → horizontal), and maps a new slot', () => {
+    const car = parked('PMS09', 'M3', Math.PI / 2)
+    const rerender = render(areas, [car])
+    expect(bodyRect('PMS09').w).toBeCloseTo(88, 1)
+
+    const edit = (fn: (doc: typeof landscapeYardMap) => void) => {
+      const doc = structuredClone(landscapeYardMap) as typeof landscapeYardMap
+      fn(doc)
+      return areasOf(doc)
+    }
+    const m3Of = (doc: typeof landscapeYardMap) =>
+      doc.areas[0].facilities.find((f: { customName?: string }) => f.customName === 'M3') as unknown as {
+        areaSizePx: { w: number; h: number }
+        areaPosition: { x: number; y: number }
+        rotationDeg?: number
+      }
+
+    // 縱：圖面改回直格，車跟著直
+    const vertical = edit((doc) => { m3Of(doc).areaSizePx = { w: 47.09, h: 91 } })
+    rerender({ areas: vertical })
+    let body = bodyRect('PMS09')
+    expect(body.h).toBeCloseTo(88, 1)
+    expect(body.cx).toBeCloseTo(slotRect(vertical, 'M3').cx, 1)
+    expect(body.cy).toBeCloseTo(slotRect(vertical, 'M3').cy, 1)
+
+    // 移位＋縮放（仍是直格）：車身中心跟著新格子中心，大小不變
+    const moved = edit((doc) => {
+      const m3 = m3Of(doc)
+      m3.areaSizePx = { w: 40, h: 100 }
+      m3.areaPosition = { x: m3.areaPosition.x + 12, y: m3.areaPosition.y - 8 }
+    })
+    rerender({ areas: moved })
+    body = bodyRect('PMS09')
+    expect(body.h).toBeCloseTo(88, 1)
+    expect(body.cx).toBeCloseTo(slotRect(moved, 'M3').cx, 1)
+    expect(body.cy).toBeCloseTo(slotRect(moved, 'M3').cy, 1)
+
+    // 橫格轉 90°：畫出來是直的，車跟著直
+    const rotated = edit((doc) => { m3Of(doc).rotationDeg = 90 })
+    rerender({ areas: rotated })
+    body = bodyRect('PMS09')
+    expect(body.h).toBeCloseTo(88, 1)
+
+    // 再改回橫格
+    rerender({ areas })
+    body = bodyRect('PMS09')
+    expect(body.w).toBeCloseTo(88, 1)
+    expect(body.cx).toBeCloseTo(slotRect(areas, 'M3').cx, 1)
+
+    // 新增有效格位（不在任何清單裡）：同一套規則
+    const added = edit((doc) => {
+      const h3 = doc.areas[0].facilities.find((f: { customName?: string }) => f.customName === 'H3')!
+      const copy = structuredClone(h3) as typeof h3 & { id: string; customName: string; areaPosition: { x: number; y: number } }
+      copy.id = 'test-h9'
+      copy.customName = 'H9'
+      copy.areaPosition = { x: copy.areaPosition.x, y: copy.areaPosition.y - 60 }
+      const p = copy.parameters as Record<string, number>
+      p.refFieldYMinM -= 40
+      p.refFieldYMaxM -= 40
+      doc.areas[0].facilities.push(copy)
+    })
+    const h9 = (() => {
+      const f = added[0].facilities.find((item) => item.customName === 'H9')!
+      const p = f.parameters as Record<string, number>
+      return { x: (p.refFieldXMinM + p.refFieldXMaxM) / 2, y: (p.refFieldYMinM + p.refFieldYMaxM) / 2 }
+    })()
+    rerender({ areas: added, vehicles: [vehicle({ code: 'PMS11', slot: 'H9', x: h9.x, y: h9.y, heading: -Math.PI / 2 })] })
+    body = bodyRect('PMS11')
+    expect(body.data.yardSlot).toBe('H9')
+    expect(body.w).toBeCloseTo(88, 1)
+    expect(body.cx).toBeCloseTo(slotRect(added, 'H9').cx, 1)
+    expect(body.cy).toBeCloseTo(slotRect(added, 'H9').cy, 1)
+  })
+
+  it('keeps a car without heading centred and unmapped, and does not touch cars that are not located in a slot', () => {
+    render(areas, [parked('PMS05', 'H1', undefined), parked('PMS06', 'H2', Math.PI / 2, { location_kind: undefined })])
+    const noHeading = bodyRect('PMS05')
+    expect(noHeading.data.yardHeading).toMatch(/^no-heading:/)
+    expect(noHeading.cx).toBeCloseTo(slotRect(areas, 'H1').cx, 1)
+    expect(noHeading.cy).toBeCloseTo(slotRect(areas, 'H1').cy, 1)
+    const notInSlot = bodyRect('PMS06')
+    expect(notInSlot.data.yard).toBe('false')
+    expect(notInSlot.data.yardHeading).toBe('')
+  })
+})
+

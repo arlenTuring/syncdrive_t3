@@ -34,6 +34,7 @@ export function MediaGroupsPage() {
   const query = useCoalescedQuery<GroupList>({ enabled: true, queryKey, load: loadGroups });
   const data = query.data;
   const reload = query.refresh;
+  const backgroundReload = query.backgroundRefresh;
   const setQueryData = query.setData;
   useEffect(() => {
     if (!data) return;
@@ -47,13 +48,13 @@ export function MediaGroupsPage() {
     const onLocal = () => reload();
     window.addEventListener('media-library:changed', onLocal);
     const unsubscribe = subscribeDatasourceInvalidation((payload) => {
-      if (payload.tags.includes('table:media_library_items')) reload();
+      if (payload.tags.includes('table:media_library_items')) backgroundReload();
     });
     return () => {
       window.removeEventListener('media-library:changed', onLocal);
       unsubscribe();
     };
-  }, [reload]);
+  }, [reload, backgroundReload]);
   useEffect(() => {
     if (!notice) return undefined;
     const timer = window.setTimeout(() => setNotice(null), 2600);

@@ -5,7 +5,7 @@ import { WidgetRenderer } from './elements/WidgetRenderer';
 import { GroupCanvasRenderer } from './elements/GroupCanvasRenderer';
 import { MapPlatformLayer } from './elements/MapPlatformLayer';
 import { BindingWarningIcon } from './components/BindingWarningIcon';
-import { useBindingHealth } from './context/BindingHealthContext';
+import { useBindingIssueMap } from './context/BindingHealthContext';
 import { EditModeProvider } from './context/EditModeContext';
 import { CANVAS_CHILD_LIST_CLOSE_EVENT } from './utils/canvasChildList';
 import { CanvasChildListPortal } from './components/CanvasChildListPortal';
@@ -102,7 +102,7 @@ export function CanvasElement({
 }: Props) {
   const hasChildSelection = selectedChildIds.length > 0;
   const { modifier: modifierHeld } = useModifierHeld();
-  const { issueMap } = useBindingHealth();
+  const issueMap = useBindingIssueMap();
   const canvasIssue = issueMap.get(element.id);
   const [isDragOver, setIsDragOver] = useState(false);
   const [labelHover, setLabelHover] = useState(false);

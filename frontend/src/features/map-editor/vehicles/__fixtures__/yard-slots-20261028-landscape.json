@@ -1,0 +1,1725 @@
+{
+ "schemaVersion": 2,
+ "mapId": "map-1789194688160-bu1e5q6",
+ "displayName": "地圖_20261005",
+ "version": "v0.4",
+ "createdAt": "2026-09-12T06:31:28.160Z",
+ "updatedAt": "2026-10-27T16:09:08.756Z",
+ "pixelSize": {
+  "width": 3152,
+  "height": 642
+ },
+ "creationMode": "trackGen",
+ "areas": [
+  {
+   "id": "077",
+   "customName": "高精地圖 軌道",
+   "layout": {
+    "xPx": 0,
+    "yPx": 0,
+    "wPx": 3151.15614012314,
+    "hPx": 641.4626039268418,
+    "borderPx": 0,
+    "borderColor": "transparent"
+   },
+   "domain": {
+    "xMinM": 0,
+    "xMaxM": 3117.5284709011307,
+    "yMinM": 0,
+    "yMaxM": 642.681193763267
+   },
+   "showRuler": false,
+   "mqtt": {
+    "topic": "v1/vtms/+/telemetry/update",
+    "vehicleIdField": "vehicle_code",
+    "xField": "x",
+    "yField": "y"
+   },
+   "view": {
+    "panXM": 0,
+    "panYM": 0,
+    "zoom": 1
+   },
+   "facilities": [
+    {
+     "id": "125",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "整備區",
+     "positionMeters": {
+      "x": 1056.167497388801,
+      "y": 228.2436423416918
+     },
+     "areaPosition": {
+      "x": 1067.56,
+      "y": 227.81086885230803
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 236.34365912567512,
+      "h": 164.13173507453376
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "#28303E",
+      "strokeWidthPx": 1,
+      "strokeColor": "#293444",
+      "strokeStyle": "dashed",
+      "refFieldXMinM": -900,
+      "refFieldXMaxM": -873,
+      "refFieldYMinM": -330,
+      "refFieldYMaxM": -262,
+      "labelStyle": {
+       "fontSizePx": 22,
+       "color": "#0ea5e9",
+       "fontWeight": "bold",
+       "labelOffsetPx": {
+        "x": -65.7890625,
+        "y": -60.00390625
+       },
+       "labelOffsetCustom": true
+      },
+      "zonePartitionEntranceId": "124",
+      "zonePartitionLinkId": "zl-mtz7uvj9-3x4l"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "129",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "調度區",
+     "positionMeters": {
+      "x": 705.875967357278,
+      "y": 228.23095844278112
+     },
+     "areaPosition": {
+      "x": 713.49,
+      "y": 227.79820900337805
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 331.7439279450663,
+      "h": 164.13439492346376
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "#28303E",
+      "strokeWidthPx": 1,
+      "strokeColor": "#293444",
+      "strokeStyle": "dashed",
+      "labelStyle": {
+       "fontSizePx": 22,
+       "color": "#0ea5e9",
+       "fontWeight": "bold",
+       "labelOffsetPx": {
+        "x": -107.40625,
+        "y": -59.9140625
+       },
+       "labelOffsetCustom": true
+      },
+      "mqttInstanceId": "129",
+      "refFieldXMinM": -900,
+      "refFieldXMaxM": -873,
+      "refFieldYMinM": -380,
+      "refFieldYMaxM": -330,
+      "zonePartitionEntranceId": "124",
+      "zonePartitionLinkId": "zl-mtz7v9r8-17et"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "130",
+     "type": "Facility",
+     "name": "ZonePartition",
+     "customName": "充電區",
+     "positionMeters": {
+      "x": 1313.689697143667,
+      "y": 228.24538071235565
+     },
+     "areaPosition": {
+      "x": 1327.86,
+      "y": 227.8126039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 325.4010786392836,
+      "h": 166.75
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "defaultFillColor": "#28303E",
+      "strokeWidthPx": 1,
+      "strokeColor": "#293444",
+      "strokeStyle": "dashed",
+      "refFieldXMinM": -290,
+      "refFieldXMaxM": -225,
+      "refFieldYMinM": -10,
+      "refFieldYMaxM": -1,
+      "labelStyle": {
+       "fontSizePx": 22,
+       "color": "#0ea5e9",
+       "fontWeight": "bold",
+       "labelOffsetPx": {
+        "x": -115.8359375,
+        "y": -57.80078125
+       },
+       "labelOffsetCustom": true
+      },
+      "zonePartitionEntranceId": "131",
+      "zonePartitionLinkId": "zl-mtzda6vr-w8e3",
+      "mqttInstanceId": "130"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "132",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "H1",
+     "positionMeters": {
+      "x": 728.9372139046691,
+      "y": 300.3621214917697
+     },
+     "areaPosition": {
+      "x": 736.8,
+      "y": 299.7926039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -898.1,
+      "refFieldXMaxM": -890.7,
+      "refFieldYMinM": -358.07,
+      "refFieldYMaxM": -343.72,
+      "zoneLocalField": {
+       "u": 0.20741901871793791,
+       "v": 0.5820802822468382,
+       "du": 0.274307959647324,
+       "dv": 0.2868990379618981
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "138",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "H2",
+     "positionMeters": {
+      "x": 831.1744176029706,
+      "y": 300.3621214917697
+     },
+     "areaPosition": {
+      "x": 840.14,
+      "y": 299.7926039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -889.69,
+      "refFieldXMaxM": -882.29,
+      "refFieldYMinM": -358.07,
+      "refFieldYMaxM": -343.72,
+      "zoneLocalField": {
+       "u": 0.5189243434427123,
+       "v": 0.5820802822468382,
+       "du": 0.274307959647324,
+       "dv": 0.2868990379618981
+      },
+      "mqttInstanceId": "138",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "139",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "H3",
+     "positionMeters": {
+      "x": 928.6430580941324,
+      "y": 300.3621214917697
+     },
+     "areaPosition": {
+      "x": 938.66,
+      "y": 299.7926039268418
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -881.67,
+      "refFieldXMaxM": -874.27,
+      "refFieldYMinM": -358.07,
+      "refFieldYMaxM": -343.72,
+      "zoneLocalField": {
+       "u": 0.8159003894257272,
+       "v": 0.5820802822468382,
+       "du": 0.274307959647324,
+       "dv": 0.2868990379618981
+      },
+      "mqttInstanceId": "139",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "140",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "H4",
+     "positionMeters": {
+      "x": 728.9372139046691,
+      "y": 242.031520655739
+     },
+     "areaPosition": {
+      "x": 736.8,
+      "y": 241.57260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -898.1,
+      "refFieldXMaxM": -890.7,
+      "refFieldYMinM": -375.8,
+      "refFieldYMaxM": -361.46,
+      "zoneLocalField": {
+       "u": 0.20741901871793791,
+       "v": 0.22737095988239286,
+       "du": 0.274307959647324,
+       "dv": 0.2868990379618981
+      },
+      "mqttInstanceId": "140",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "141",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "H5",
+     "positionMeters": {
+      "x": 831.1744176029706,
+      "y": 242.031520655739
+     },
+     "areaPosition": {
+      "x": 840.14,
+      "y": 241.57260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "129",
+      "refFieldXMinM": -889.69,
+      "refFieldXMaxM": -882.29,
+      "refFieldYMinM": -375.8,
+      "refFieldYMaxM": -361.46,
+      "zoneLocalField": {
+       "u": 0.5189243434427123,
+       "v": 0.22737095988239286,
+       "du": 0.274307959647324,
+       "dv": 0.2868990379618981
+      },
+      "mqttInstanceId": "141",
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "142",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M3",
+     "positionMeters": {
+      "x": 1071.6217687239846,
+      "y": 300.35280126902296
+     },
+     "areaPosition": {
+      "x": 1083.180971055612,
+      "y": 299.78330137619884
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -898.22,
+      "refFieldXMaxM": -887.82,
+      "refFieldYMinM": -300.18,
+      "refFieldYMaxM": -280.67,
+      "zoneLocalField": {
+       "u": 0.2586105812261758,
+       "v": 0.58195590560543,
+       "du": 0.3850325425976882,
+       "dv": 0.28690368732540356
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "144",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M4",
+     "positionMeters": {
+      "x": 1071.6193188565262,
+      "y": 242.0222004329923
+     },
+     "areaPosition": {
+      "x": 1083.178494762306,
+      "y": 241.56330137619875
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -898.22,
+      "refFieldXMaxM": -887.82,
+      "refFieldYMinM": -324.3,
+      "refFieldYMaxM": -304.79,
+      "zoneLocalField": {
+       "u": 0.2586001037151007,
+       "v": 0.22724083497291744,
+       "du": 0.3850325425976882,
+       "dv": 0.28690368732540356
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "144"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "145",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M1",
+     "positionMeters": {
+      "x": 1169.6123034347802,
+      "y": 300.35280126902296
+     },
+     "areaPosition": {
+      "x": 1182.228494762306,
+      "y": 299.78330137619884
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -886.9,
+      "refFieldXMaxM": -876.5,
+      "refFieldYMinM": -300.18,
+      "refFieldYMaxM": -280.67,
+      "zoneLocalField": {
+       "u": 0.6776932173887381,
+       "v": 0.58195590560543,
+       "du": 0.3850325425976882,
+       "dv": 0.28690368732540356
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "145"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "146",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "M2",
+     "positionMeters": {
+      "x": 1169.6123034347802,
+      "y": 242.03221943004417
+     },
+     "areaPosition": {
+      "x": 1182.228494762306,
+      "y": 241.57330137619874
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "125",
+      "refFieldXMinM": -886.9,
+      "refFieldXMaxM": -876.5,
+      "refFieldYMinM": -324.3,
+      "refFieldYMaxM": -304.79,
+      "zoneLocalField": {
+       "u": 0.6776932173887381,
+       "v": 0.22730176164255542,
+       "du": 0.3850325425976882,
+       "dv": 0.28690368732540356
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "146"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "147",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E1",
+     "positionMeters": {
+      "x": 1518.9159941745909,
+      "y": 298.45851205191286
+     },
+     "areaPosition": {
+      "x": 1535.3,
+      "y": 297.89260392684173
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -248.56,
+      "refFieldXMaxM": -230.39,
+      "refFieldYMinM": -6.22,
+      "refFieldYMaxM": -3.68,
+      "zoneLocalField": {
+       "u": 0.7773176446055708,
+       "v": 0.561469265367316,
+       "du": 0.27965488123312615,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      }
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "148",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E2",
+     "positionMeters": {
+      "x": 1422.0508440478181,
+      "y": 297.306327390947
+     },
+     "areaPosition": {
+      "x": 1437.39,
+      "y": 296.74260392684175
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -268.12,
+      "refFieldXMaxM": -249.94,
+      "refFieldYMinM": -6.28,
+      "refFieldYMaxM": -3.74,
+      "zoneLocalField": {
+       "u": 0.47642743118210557,
+       "v": 0.5545727136431782,
+       "du": 0.27965488123312615,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "148"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "149",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E3",
+     "positionMeters": {
+      "x": 1518.579622496079,
+      "y": 242.02150165868716
+     },
+     "areaPosition": {
+      "x": 1534.96,
+      "y": 241.56260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -248.63,
+      "refFieldXMaxM": -230.45,
+      "refFieldYMinM": -9.26,
+      "refFieldYMaxM": -6.72,
+      "zoneLocalField": {
+       "u": 0.7762727802141507,
+       "v": 0.2236581709145425,
+       "du": 0.27965488123312615,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "149"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "150",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "E4",
+     "positionMeters": {
+      "x": 1422.0508440478181,
+      "y": 242.02150165868716
+     },
+     "areaPosition": {
+      "x": 1437.39,
+      "y": 241.56260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -268.12,
+      "refFieldXMaxM": -249.94,
+      "refFieldYMinM": -9.26,
+      "refFieldYMaxM": -6.72,
+      "zoneLocalField": {
+       "u": 0.47642743118210557,
+       "v": 0.2236581709145425,
+       "du": 0.27965488123312615,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "150"
+     },
+     "currentState": "Normal"
+    },
+    {
+     "id": "151",
+     "type": "Facility",
+     "name": "FacilityArea",
+     "customName": "W1",
+     "positionMeters": {
+      "x": 1325.0429559597465,
+      "y": 295.7834398390616
+     },
+     "areaPosition": {
+      "x": 1339.3357223751525,
+      "y": 295.22260392684177
+     },
+     "areaLayoutAnchor": {
+      "wPx": 3151.15614012314,
+      "hPx": 641.4626039268418
+     },
+     "areaSizePx": {
+      "w": 91,
+      "h": 47.09
+     },
+     "rotationDeg": 0,
+     "parameters": {
+      "purpose": "",
+      "remarks": "",
+      "defaultFillColor": "#354357",
+      "colorRules": [],
+      "parentZoneId": "130",
+      "refFieldXMinM": -287.71,
+      "refFieldXMaxM": -269.53,
+      "refFieldYMinM": -6.36,
+      "refFieldYMaxM": -3.82,
+      "zoneLocalField": {
+       "u": 0.1750938337801634,
+       "v": 0.5454572713643178,
+       "du": 0.27965488123312615,
+       "dv": 0.2823988005997002
+      },
+      "labelStyle": {
+       "labelOffsetPx": {
+        "x": 0,
+        "y": 0
+       },
+       "labelOffsetCustom": true,
+       "color": "#D1D5DC"
+      },
+      "mqttInstanceId": "151"
+     },
+     "currentState": "Normal"
+    }
+   ],
+   "trackJoints": []
+  }
+ ],
+ "routeGroups": [],
+ "routes": [],
+ "visibleRouteIds": [],
+ "pointTopology": {
+  "version": 1,
+  "nodes": [
+   {
+    "id": "092",
+    "kind": "docking",
+    "label": "NW上停2",
+    "stationId": "n2w_u_end",
+    "x": 879.22265625,
+    "y": 672.45703125,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "093",
+    "kind": "docking",
+    "label": "NW下發2",
+    "stationId": "n2w_u_start",
+    "x": 879.22265625,
+    "y": 165.734375,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "096",
+    "kind": "docking",
+    "label": "SW上發2",
+    "stationId": "s2w_u_start",
+    "x": -34.93359375,
+    "y": 672.45703125,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "097",
+    "kind": "docking",
+    "label": "SW下停2",
+    "stationId": "s2w_u_end",
+    "x": -34.93359375,
+    "y": 165.734375,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "090",
+    "kind": "docking",
+    "label": "NW上停1",
+    "stationId": "n2w_d_end",
+    "x": 1034.98828125,
+    "y": 547.26953125,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "091",
+    "kind": "docking",
+    "label": "NW下發1",
+    "stationId": "n2w_d_start",
+    "x": 1034.98828125,
+    "y": 72,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "095",
+    "kind": "docking",
+    "label": "SW上發1",
+    "stationId": "s2w_d_start",
+    "x": -190.8203125,
+    "y": 547.26953125,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "094",
+    "kind": "docking",
+    "label": "SW下停1",
+    "stationId": "s2w_d_end",
+    "x": -190.8203125,
+    "y": 72,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "156",
+    "kind": "docking",
+    "label": "T3上行",
+    "stationId": "t3_u",
+    "x": 448.359375,
+    "y": 672.45703125,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "157",
+    "kind": "docking",
+    "label": "T3下行",
+    "stationId": "t3_d",
+    "x": 448.359375,
+    "y": 72,
+    "color": "#5b5fc7"
+   },
+   {
+    "id": "xcwp:072:lb",
+    "kind": "cross-waypoint",
+    "label": "上行轉N2W正線起點",
+    "stationId": "n2w_u2d_back_start",
+    "x": 644.00390625,
+    "y": 547.26953125,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:072:rt",
+    "kind": "cross-waypoint",
+    "label": "上行轉N2W正線終點",
+    "stationId": "n2w_u2d_back_end",
+    "x": 785.88671875,
+    "y": 547.26953125,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:099:rb",
+    "kind": "cross-waypoint",
+    "label": "上行轉S2W正線起點",
+    "stationId": "s2w_d2u_go_start",
+    "x": 92.96484375,
+    "y": 547.26953125,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:099:lt",
+    "kind": "cross-waypoint",
+    "label": "上行轉S2W正線終點",
+    "stationId": "s2w_d2u_go_end",
+    "x": 245.6640625,
+    "y": 547.26953125,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:072:rb",
+    "kind": "cross-waypoint",
+    "label": "下行轉N2W正線起點",
+    "stationId": "n2w_u2d_go_start",
+    "x": 743.296875,
+    "y": 165.734375,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:072:lt",
+    "kind": "cross-waypoint",
+    "label": "下行轉N2W正線終點",
+    "stationId": "n2w_u2d_go_end",
+    "x": 590.41796875,
+    "y": 165.734375,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:099:lb",
+    "kind": "cross-waypoint",
+    "label": "下行轉S2W正線起點",
+    "stationId": "s2w_d2u_back_start",
+    "x": 296,
+    "y": 165.734375,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "xcwp:099:rt",
+    "kind": "cross-waypoint",
+    "label": "下行轉S2W正線終點",
+    "stationId": "s2w_d2u_back_end",
+    "x": 142.640625,
+    "y": 165.734375,
+    "color": "#6d9e9b"
+   },
+   {
+    "id": "132",
+    "kind": "facility",
+    "label": "H1",
+    "x": 666.71484375,
+    "y": 355.09375,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "138",
+    "kind": "facility",
+    "label": "H2",
+    "x": 743.296875,
+    "y": 420.71875,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "139",
+    "kind": "facility",
+    "label": "H3",
+    "x": 743.296875,
+    "y": 295.625,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "140",
+    "kind": "facility",
+    "label": "H4",
+    "x": 611.97265625,
+    "y": 268.72265625,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "141",
+    "kind": "facility",
+    "label": "H5",
+    "x": 611.97265625,
+    "y": 433.98046875,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "147",
+    "kind": "facility",
+    "label": "E1",
+    "x": 1210.6875,
+    "y": -147.2578125,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "148",
+    "kind": "facility",
+    "label": "E2",
+    "x": 1127.16796875,
+    "y": -208.02734375,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "149",
+    "kind": "facility",
+    "label": "E3",
+    "x": 1034.98828125,
+    "y": -253.51171875,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "150",
+    "kind": "facility",
+    "label": "E4",
+    "x": 941.8046875,
+    "y": -208.02734375,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "145",
+    "kind": "facility",
+    "label": "M1",
+    "x": 197.81640625,
+    "y": 393.28515625,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "146",
+    "kind": "facility",
+    "label": "M2",
+    "x": 197.81640625,
+    "y": 310.80078125,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "142",
+    "kind": "facility",
+    "label": "M3",
+    "x": 312.421875,
+    "y": 420.71875,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "144",
+    "kind": "facility",
+    "label": "M4",
+    "x": 312.421875,
+    "y": 281.58984375,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "151",
+    "kind": "facility",
+    "label": "W1",
+    "x": 854.28515625,
+    "y": -147.2578125,
+    "color": "#4a9e6e"
+   },
+   {
+    "id": "160",
+    "kind": "waypoint",
+    "label": "充電洗車入口點",
+    "x": 1034.98828125,
+    "y": -59.6484375,
+    "color": "#3b8fb8"
+   },
+   {
+    "id": "161",
+    "kind": "waypoint",
+    "label": "整備調度入口點",
+    "x": 448.359375,
+    "y": 355.09375,
+    "color": "#3b8fb8"
+   }
+  ],
+  "edges": [
+   {
+    "id": "e:091->157",
+    "fromNodeId": "091",
+    "toNodeId": "157",
+    "minTravelTimeSeconds": 140,
+    "avgTravelTimeSeconds": 170,
+    "distanceMeters": 307.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:093->xcwp:072:rb",
+    "fromNodeId": "093",
+    "toNodeId": "xcwp:072:rb",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 35,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:147->160",
+    "fromNodeId": "147",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:148->160",
+    "fromNodeId": "148",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:149->160",
+    "fromNodeId": "149",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:150->160",
+    "fromNodeId": "150",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:151->160",
+    "fromNodeId": "151",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:072:rb->xcwp:072:lt",
+    "fromNodeId": "xcwp:072:rb",
+    "toNodeId": "xcwp:072:lt",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 16.2,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:157->xcwp:099:lb",
+    "fromNodeId": "157",
+    "toNodeId": "xcwp:099:lb",
+    "minTravelTimeSeconds": 115,
+    "avgTravelTimeSeconds": 140,
+    "distanceMeters": 262.3,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:099:lb->xcwp:099:rt",
+    "fromNodeId": "xcwp:099:lb",
+    "toNodeId": "xcwp:099:rt",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 16.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:099:rt->097",
+    "fromNodeId": "xcwp:099:rt",
+    "toNodeId": "097",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 25.9,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:157->094",
+    "fromNodeId": "157",
+    "toNodeId": "094",
+    "minTravelTimeSeconds": 125,
+    "avgTravelTimeSeconds": 150,
+    "distanceMeters": 303,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:072:lt->157",
+    "fromNodeId": "xcwp:072:lt",
+    "toNodeId": "157",
+    "minTravelTimeSeconds": 130,
+    "avgTravelTimeSeconds": 160,
+    "distanceMeters": 257.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:092->093",
+    "fromNodeId": "092",
+    "toNodeId": "093",
+    "minTravelTimeSeconds": 0,
+    "avgTravelTimeSeconds": 0,
+    "distanceMeters": 9.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:072:lb->xcwp:072:rt",
+    "fromNodeId": "xcwp:072:lb",
+    "toNodeId": "xcwp:072:rt",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 16.2,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:072:rt->090",
+    "fromNodeId": "xcwp:072:rt",
+    "toNodeId": "090",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 25.9,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:156->092",
+    "fromNodeId": "156",
+    "toNodeId": "092",
+    "minTravelTimeSeconds": 135,
+    "avgTravelTimeSeconds": 165,
+    "distanceMeters": 291.7,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:156->xcwp:072:lb",
+    "fromNodeId": "156",
+    "toNodeId": "xcwp:072:lb",
+    "minTravelTimeSeconds": 135,
+    "avgTravelTimeSeconds": 165,
+    "distanceMeters": 250.6,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:099:lt->156",
+    "fromNodeId": "xcwp:099:lt",
+    "toNodeId": "156",
+    "minTravelTimeSeconds": 110,
+    "avgTravelTimeSeconds": 135,
+    "distanceMeters": 247.3,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:xcwp:099:rb->xcwp:099:lt",
+    "fromNodeId": "xcwp:099:rb",
+    "toNodeId": "xcwp:099:lt",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 16.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:095->xcwp:099:rb",
+    "fromNodeId": "095",
+    "toNodeId": "xcwp:099:rb",
+    "minTravelTimeSeconds": 5,
+    "avgTravelTimeSeconds": 5,
+    "distanceMeters": 35.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:094->095",
+    "fromNodeId": "094",
+    "toNodeId": "095",
+    "minTravelTimeSeconds": 0,
+    "avgTravelTimeSeconds": 0,
+    "distanceMeters": 9.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:097->096",
+    "fromNodeId": "097",
+    "toNodeId": "096",
+    "minTravelTimeSeconds": 0,
+    "avgTravelTimeSeconds": 0,
+    "distanceMeters": 9.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:096->156",
+    "fromNodeId": "096",
+    "toNodeId": "156",
+    "minTravelTimeSeconds": 120,
+    "avgTravelTimeSeconds": 145,
+    "distanceMeters": 297.6,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:090->091",
+    "fromNodeId": "090",
+    "toNodeId": "091",
+    "minTravelTimeSeconds": 0,
+    "avgTravelTimeSeconds": 0,
+    "distanceMeters": 9.1,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:157->161",
+    "fromNodeId": "157",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:091->160",
+    "fromNodeId": "091",
+    "toNodeId": "160",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->148",
+    "fromNodeId": "160",
+    "toNodeId": "148",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->147",
+    "fromNodeId": "160",
+    "toNodeId": "147",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->149",
+    "fromNodeId": "160",
+    "toNodeId": "149",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->150",
+    "fromNodeId": "160",
+    "toNodeId": "150",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->151",
+    "fromNodeId": "160",
+    "toNodeId": "151",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 50,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:156->161",
+    "fromNodeId": "156",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:144->161",
+    "fromNodeId": "144",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:142->161",
+    "fromNodeId": "142",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:145->161",
+    "fromNodeId": "145",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:146->161",
+    "fromNodeId": "146",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:132->161",
+    "fromNodeId": "132",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:140->161",
+    "fromNodeId": "140",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:141->161",
+    "fromNodeId": "141",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:139->161",
+    "fromNodeId": "139",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:138->161",
+    "fromNodeId": "138",
+    "toNodeId": "161",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->140",
+    "fromNodeId": "161",
+    "toNodeId": "140",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->139",
+    "fromNodeId": "161",
+    "toNodeId": "139",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->132",
+    "fromNodeId": "161",
+    "toNodeId": "132",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->138",
+    "fromNodeId": "161",
+    "toNodeId": "138",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->141",
+    "fromNodeId": "161",
+    "toNodeId": "141",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->144",
+    "fromNodeId": "161",
+    "toNodeId": "144",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->142",
+    "fromNodeId": "161",
+    "toNodeId": "142",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->145",
+    "fromNodeId": "161",
+    "toNodeId": "145",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->146",
+    "fromNodeId": "161",
+    "toNodeId": "146",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:160->091",
+    "fromNodeId": "160",
+    "toNodeId": "091",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->157",
+    "fromNodeId": "161",
+    "toNodeId": "157",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   },
+   {
+    "id": "e:161->156",
+    "fromNodeId": "161",
+    "toNodeId": "156",
+    "minTravelTimeSeconds": 30,
+    "avgTravelTimeSeconds": 30,
+    "distanceMeters": 100,
+    "curveOffsetX": null,
+    "curveOffsetY": null
+   }
+  ]
+ }
+}

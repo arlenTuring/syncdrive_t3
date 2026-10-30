@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, type CSSProperties } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DashboardPlane, CanvasElementProps, ChildWidget, WidgetType, CanvasKind } from './types';
 import { CanvasElement } from './CanvasElement';
@@ -90,7 +90,6 @@ export function PlaneWorkspace({
   const [userZoom, setUserZoom] = useState(1.0);
   const [scaleLocked, setScaleLocked] = useState(false);
   const [zoomToolsCollapsed, setZoomToolsCollapsed] = useState(readZoomToolbarCollapsed);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
   const [planeMarquee, setPlaneMarquee] = useState<MarqueeRect | null>(null);
@@ -108,6 +107,56 @@ export function PlaneWorkspace({
   horizontalPanOnlyRef.current = !isEditMode;
 
   const totalScale = fitScale * userZoom;
+
+  /**
+   * 平移位移不進 React state，只存在 ref、直接寫外層的 transform。
+   *
+   * 以前滾輪／滑鼠每個事件都 setPanOffset，整張平面（圖台、所有數值卡、群組）跟著重畫一次；
+   * 2026-10-29 本機實測即時圖台拖拉 10 秒主執行緒 55% 忙碌、p95 一幀 50ms，熱點全是元件重畫。
+   * 位移只影響這一層的 transform，沒有任何子元件用到，所以不需要經過 render：平移中每幀最多寫
+   * 一次；平移期間加 will-change 讓瀏覽器只做合成，停下 150ms 後拿掉（縮放後文字才會重新清晰）。
+   * 縮放（userZoom／fitScale）仍是 state，render 後由 layout effect 套上同一個位移。
+   */
+  const transformRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef({ x: 0, y: 0 });
+  const panFrameRef = useRef(0);
+  const panIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const totalScaleRef = useRef(totalScale);
+  /** 滾輪縮放同一幀內的多格合併成一次 setUserZoom */
+  const zoomStepsRef = useRef(0);
+  const zoomFrameRef = useRef(0);
+
+  const writeTransform = useCallback(() => {
+    panFrameRef.current = 0;
+    const el = transformRef.current;
+    const pan = panRef.current;
+    if (el) el.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${totalScaleRef.current})`;
+  }, []);
+  const movePan = useCallback((update: (prev: { x: number; y: number }) => { x: number; y: number }) => {
+    panRef.current = update(panRef.current);
+    const el = transformRef.current;
+    if (el) el.style.willChange = 'transform';
+    if (panIdleTimerRef.current) clearTimeout(panIdleTimerRef.current);
+    panIdleTimerRef.current = setTimeout(() => {
+      panIdleTimerRef.current = null;
+      if (transformRef.current) transformRef.current.style.willChange = '';
+    }, 150);
+    if (!panFrameRef.current) panFrameRef.current = requestAnimationFrame(writeTransform);
+  }, [writeTransform]);
+  const resetPan = useCallback(() => {
+    panRef.current = { x: 0, y: 0 };
+    writeTransform();
+  }, [writeTransform]);
+  // 縮放或其他原因重畫後，套上目前的位移與倍率
+  useLayoutEffect(() => {
+    totalScaleRef.current = totalScale;
+    writeTransform();
+  });
+  useEffect(() => () => {
+    cancelAnimationFrame(panFrameRef.current);
+    cancelAnimationFrame(zoomFrameRef.current);
+    if (panIdleTimerRef.current) clearTimeout(panIdleTimerRef.current);
+  }, []);
 
   // 計算 fitScale：讓整個平面等比縮放以適應容器（容器從 display:none 顯示時需重算）
   useEffect(() => {
@@ -171,7 +220,7 @@ export function PlaneWorkspace({
   /** 切換平面：還原鎖定縮放，否則重置；平移每次歸零（鎖定仍可再拖） */
   useEffect(() => {
     const pref = readPlaneScaleLock(plane.id);
-    setPanOffset({ x: 0, y: 0 });
+    resetPan();
     if (pref?.locked) {
       setUserZoom(pref.userZoom);
       setScaleLocked(true);
@@ -179,7 +228,7 @@ export function PlaneWorkspace({
       setUserZoom(1);
       setScaleLocked(false);
     }
-  }, [plane.id, plane.width, plane.height]);
+  }, [plane.id, plane.width, plane.height, resetPan]);
 
   // 滾輪與觸控板事件 (縮放與平移)
   useEffect(() => {
@@ -190,8 +239,20 @@ export function PlaneWorkspace({
         // 縮放 (Ctrl + Scroll / Pinch)；鎖定時略過，仍可平移
         e.preventDefault();
         if (scaleLockedRef.current) return;
-        const delta = e.deltaY < 0 ? 0.05 : -0.05;
-        setUserZoom(prev => stepPlaneZoom(prev, delta > 0 ? 1 : -1));
+        zoomStepsRef.current += e.deltaY < 0 ? 1 : -1;
+        if (!zoomFrameRef.current) {
+          zoomFrameRef.current = requestAnimationFrame(() => {
+            zoomFrameRef.current = 0;
+            const steps = zoomStepsRef.current;
+            zoomStepsRef.current = 0;
+            if (!steps) return;
+            setUserZoom((prev) => {
+              let next = prev;
+              for (let i = 0; i < Math.abs(steps); i += 1) next = stepPlaneZoom(next, steps > 0 ? 1 : -1);
+              return next;
+            });
+          });
+        }
       } else {
         // 檢視模式：僅橫向平移（縱向滾輪改為左右移動）
         const horizontalOnly = horizontalPanOnlyRef.current;
@@ -199,7 +260,7 @@ export function PlaneWorkspace({
           ? -(Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY)
           : -e.deltaX;
         const dy = horizontalOnly ? 0 : -e.deltaY;
-        setPanOffset(prev => ({
+        movePan(prev => ({
           x: prev.x + dx,
           y: horizontalOnly ? 0 : prev.y + dy,
         }));
@@ -207,7 +268,7 @@ export function PlaneWorkspace({
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  }, []);
+  }, [movePan]);
 
   // 平移處理 (Panning)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -228,7 +289,7 @@ export function PlaneWorkspace({
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
       const horizontalOnly = horizontalPanOnlyRef.current;
-      setPanOffset(prev => ({
+      movePan(prev => ({
         x: prev.x + dx,
         y: horizontalOnly ? 0 : prev.y + dy,
       }));
@@ -245,14 +306,15 @@ export function PlaneWorkspace({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isPanning]);
+  }, [isPanning, movePan]);
 
   // 進入檢視模式時清掉縱向偏移
   useEffect(() => {
-    if (!isEditMode) {
-      setPanOffset((prev) => (prev.y === 0 ? prev : { ...prev, y: 0 }));
+    if (!isEditMode && panRef.current.y !== 0) {
+      panRef.current = { ...panRef.current, y: 0 };
+      writeTransform();
     }
-  }, [isEditMode]);
+  }, [isEditMode, writeTransform]);
 
   const zoomIn = () => {
     if (scaleLocked) return;
@@ -263,7 +325,7 @@ export function PlaneWorkspace({
     setUserZoom((p) => stepPlaneZoom(p, -1));
   };
   const zoomReset = () => {
-    setPanOffset({ x: 0, y: 0 });
+    resetPan();
     if (scaleLocked) return;
     setUserZoom(1.0);
   };
@@ -537,10 +599,11 @@ export function PlaneWorkspace({
         }}
       >
         <div
+          ref={transformRef}
           style={{
             width: plane.width,
             height: plane.height,
-            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${totalScale})`,
+            // transform 由 writeTransform 管（位移在 panRef），這裡不寫，免得 render 蓋回舊位移
             transformOrigin: isRuntimeFitWidth ? 'top left' : 'center center',
             position: isRuntimeFitWidth ? 'absolute' : 'relative',
             left: isRuntimeFitWidth ? 0 : undefined,

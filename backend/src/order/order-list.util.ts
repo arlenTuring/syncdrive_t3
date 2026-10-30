@@ -24,6 +24,44 @@ export function hasPendingVehicleFault(order: Pick<OperationOrder, 'status' | 'p
 /** 同一個判斷的 SQL 版本（班次運行紀錄篩選用） */
 export const PENDING_VEHICLE_FAULT_SQL = `(o.status IN ('PENDING', 'PROCESSING') AND (COALESCE(o.payload->'vehicle_fault', 'null'::jsonb) <> 'null'::jsonb OR UPPER(COALESCE(o.payload->>'vehicle_phase', '')) = 'FAULTED'))`;
 
+/**
+ * 班次清單只取這些欄位（OperationOrder 的屬性名）；toShiftRecordListItem 用到的就是這些，
+ * 外加下面的 payload 摘要。
+ */
+export const LIST_COLUMNS = [
+  'id',
+  'tripCode',
+  'routeId',
+  'vehicleCode',
+  'status',
+  'createdAt',
+  'completedAt',
+  'lineKind',
+  'delayMinutes',
+  'nextStation',
+  'plannedStart',
+  'plannedEnd',
+  'maintStation',
+] as const;
+
+/**
+ * 清單需要的 payload 子欄（別名 o）：路線名、沒有路線名時的站名、中心端取消、車輛故障。
+ * 一張單的完整 payload 有好幾 KB（站序、動作、進度紀錄），清單 20 筆原本就要回傳 30 多 KB；
+ * 完整內容走 order/detail。JSON null 拿掉，跟沒有這個欄位一樣（判斷都是 truthy／?? 取值）。
+ */
+export const LIST_PAYLOAD_SQL = `jsonb_strip_nulls(jsonb_build_object(
+  'route_name', o.payload->'route_name',
+  'cancel_requested_at', o.payload->'cancel_requested_at',
+  'vehicle_fault', o.payload->'vehicle_fault',
+  'vehicle_phase', o.payload->'vehicle_phase',
+  'stations', CASE
+    WHEN COALESCE(btrim(o.payload->>'route_name'), '') = '' AND jsonb_typeof(o.payload->'stations') = 'array' THEN (
+      SELECT jsonb_agg(jsonb_build_object('station_name', s.value->'station_name', 'station_id', s.value->'station_id') ORDER BY s.ordinality)
+      FROM jsonb_array_elements(o.payload->'stations') WITH ORDINALITY AS s(value, ordinality)
+    )
+  END
+))`;
+
 export type ShiftRecordListItem = {
   order_id: string;
   trip_code: string;

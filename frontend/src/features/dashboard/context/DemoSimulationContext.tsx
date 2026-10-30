@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useOperatingClock } from '../utils/operatingClock';
+import { useOperatingClockPace } from '../utils/operatingClock';
 import {
   fetchDemoSimulationStatus,
   pauseDemoSimulation,
@@ -388,8 +388,8 @@ export function DemoSimulationProvider({ children }: { children: ReactNode }) {
    * 執行端（模擬器或任何車端程式）推進營運時鐘時，動畫與倒數照營運時鐘的倍速推：
    * 跟示範模擬同一套外插，只是時鐘來源不同。示範模擬在跑時以它為準。
    */
-  const operatingClock = useOperatingClock();
-  const clockReplay = operatingClock.snapshot?.mode === 'replay';
+  const operatingClock = useOperatingClockPace();
+  const clockReplay = operatingClock.replay;
   const playback = useMemo<DemoSimulationPlayback>(
     () => (status.running || !clockReplay
       ? { running: status.running, paused, transportPaused, speedMultiplier }

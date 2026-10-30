@@ -10,6 +10,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCoalescedQuery } from '../../../lib/useCoalescedQuery';
 import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
@@ -18,6 +19,8 @@ import { fetchRegistry, type VehicleRegistration } from '../../vehicle-registry/
 import {
   exportShiftRecordsCsv,
   fetchShiftRecordList,
+  resolveShiftRecordsBackendUrl,
+  type ShiftRecordListQuery,
 } from '../api/shiftRecordsApi';
 import {
   DateTimeRangePicker,
@@ -30,7 +33,6 @@ import {
   EXECUTION_TAG_STYLE,
   executionDisplayKey,
   type ExecutionStatusKey,
-  type ShiftRecordListItem,
   type ShiftTab,
 } from '../types';
 
@@ -42,6 +44,12 @@ type ShiftRecordsListPageProps = {
 };
 
 const PAGE_SIZE = 20;
+
+/**
+ * 會改變班次清單內容的失效標籤。只認這幾個，不再用「名稱含 operation」一網打盡——
+ * 那會讓不相干的操作紀錄通知也觸發重查。
+ */
+const SHIFT_LIST_TAGS = new Set(['table:operation_orders', 'domain:mainline_shifts', 'domain:maintenance_shifts']);
 
 function DateTimeCell({ value }: { value: string | null }) {
   if (!value) return <>—</>;
@@ -63,62 +71,56 @@ export function ShiftRecordsListPage({
   const [dateRange, setDateRange] = useState<DateTimeRange>({ start: null, end: null });
   const [appliedDateRange, setAppliedDateRange] = useState<DateTimeRange>({ start: null, end: null });
   const [page, setPage] = useState(1);
-  const [items, setItems] = useState<ShiftRecordListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [vehicles, setVehicles] = useState<VehicleRegistration[]>([]);
-  const [timeZone, setTimeZone] = useState('Asia/Taipei');
+
+  /**
+   * 清單查詢走 useCoalescedQuery：分頁、篩選、失效通知共用同一套生命週期。
+   *
+   * 車隊在跑時，中心端每有訂單進度就發 table:operation_orders 失效通知，好幾台車交錯一秒
+   * 可能好幾則。以前每則都直接重打一支、回應誰先到誰寫，快速切篩選時舊條件的回應還會
+   * 蓋掉新條件。現在同條件同時最多一支、期間的通知合併成一次補查（至少隔 500ms、失敗退避），
+   * 換條件中止舊請求、舊回應不寫回；背景更新保留目前的列，不閃 Loading。
+   */
+  const backendUrl = resolveShiftRecordsBackendUrl();
+  const query = useMemo<ShiftRecordListQuery>(() => ({
+    tab,
+    keyword,
+    execution_status: executionStatus,
+    vehicle_code: vehicleCode || undefined,
+    planned_start_from: dateToPlannedStartMs(appliedDateRange.start),
+    planned_start_to: dateToPlannedStartMs(appliedDateRange.end),
+    page,
+    page_size: PAGE_SIZE,
+  }), [tab, keyword, executionStatus, vehicleCode, appliedDateRange, page]);
+  const queryKey = JSON.stringify([backendUrl, query]);
+  const loadList = useCallback(
+    (signal: AbortSignal) => fetchShiftRecordList(query, backendUrl, signal),
+    [query, backendUrl],
+  );
+  const list = useCoalescedQuery({ enabled: true, queryKey, load: loadList });
+  const items = useMemo(() => list.data?.items ?? [], [list.data]);
+  const total = list.data?.total ?? 0;
+  const timeZone = list.data?.time_zone || 'Asia/Taipei';
+  const loading = list.initialLoading;
+  const error = actionError ?? (list.initialError || list.backgroundError || null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   /**
-   * silent＝true 時不動 loading 旗標。
-   *
-   * 車隊在跑，MQTT operation/update 一有實質變化（ETA 跨 5 秒進位、任務進度…）
-   * 中心端就會發 table:operation_orders 失效通知——好幾台車交錯，一秒可能來好幾次。
-   * 原本每次都 setLoading(true) 把整個表格清空再填回去，畫面就一直閃
-   * （2026-09-23 使用者回報「班次運行紀錄」頁面一直閃）。
-   *
-   * 背景重整（這裡訂閱失效通知觸發的）改成靜默：資料到了才整批換掉舊列，
-   * 換之前畫面维持原樣。使用者自己切分頁／改篩選時仍走正常 loading，
-   * 給操作有回應的感覺，不受影響。
+   * 勾選跟著查詢條件走：換條件就清空；同條件背景更新只保留還在這頁的列
+   * （以前每次背景重整都清空勾選，車隊在跑時勾不住）。
    */
-  const load = useCallback(async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchShiftRecordList({
-        tab,
-        keyword,
-        execution_status: executionStatus,
-        vehicle_code: vehicleCode || undefined,
-        planned_start_from: dateToPlannedStartMs(appliedDateRange.start),
-        planned_start_to: dateToPlannedStartMs(appliedDateRange.end),
-        page,
-        page_size: PAGE_SIZE,
-      });
-      setItems(res.items);
-      setTotal(res.total);
-      setTimeZone(res.time_zone || 'Asia/Taipei');
-      setSelected(new Set());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      if (!silent) {
-        setItems([]);
-        setTotal(0);
-      }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [tab, keyword, executionStatus, vehicleCode, appliedDateRange, page]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const [selection, setSelection] = useState<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
+  const selected = useMemo(() => {
+    if (selection.key !== queryKey) return new Set<string>();
+    const onPage = new Set(items.map((row) => row.order_id));
+    return new Set([...selection.ids].filter((id) => onPage.has(id)));
+  }, [selection, queryKey, items]);
+  const setSelected = (update: (prev: Set<string>) => Set<string>) => {
+    setSelection({ key: queryKey, ids: update(selected) });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -128,13 +130,12 @@ export function ShiftRecordsListPage({
     return () => { cancelled = true; };
   }, []);
 
+  const refreshList = list.backgroundRefresh;
   useEffect(() => {
     return subscribeDatasourceInvalidation((payload) => {
-      if (payload.tags.some((t) => t === 'table:operation_orders' || t.includes('operation'))) {
-        void load({ silent: true });
-      }
+      if (payload.tags.some((tag) => SHIFT_LIST_TAGS.has(tag))) refreshList();
     });
-  }, [load]);
+  }, [refreshList]);
 
   const pageNumbers = useMemo(() => {
     const max = Math.min(5, totalPages);
@@ -153,9 +154,9 @@ export function ShiftRecordsListPage({
 
   const toggleAll = () => {
     if (selected.size === items.length) {
-      setSelected(new Set());
+      setSelected(() => new Set());
     } else {
-      setSelected(new Set(items.map((r) => r.order_id)));
+      setSelected(() => new Set(items.map((r) => r.order_id)));
     }
   };
 
@@ -179,6 +180,7 @@ export function ShiftRecordsListPage({
 
   const handleDownload = async () => {
     setExporting(true);
+    setActionError(null);
     try {
       const res = await fetchShiftRecordList({
         tab,
@@ -193,7 +195,7 @@ export function ShiftRecordsListPage({
       const tabLabel = tab === 'mainline' ? 'mainline' : 'maintenance';
       exportShiftRecordsCsv(res.items, `shift-records-${tabLabel}.csv`, res.time_zone || timeZone);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setActionError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }

@@ -132,3 +132,40 @@ export function useOperatingClock(): OperatingClockState & { operatingNow: () =>
     advancing: clockAdvancing(state.snapshot),
   }), [state]);
 }
+
+export type OperatingClockPace = {
+  /** 正在加速重播 */
+  replay: boolean;
+  /** 營運時鐘正在推進（見 clockAdvancing） */
+  advancing: boolean;
+  /** 倍速：即時為 1 */
+  rate: number;
+};
+
+function paceOf(state: OperatingClockState): OperatingClockPace {
+  const snapshot = state.snapshot;
+  return {
+    replay: snapshot?.mode === 'replay',
+    advancing: clockAdvancing(snapshot),
+    rate: snapshot?.mode === 'replay' ? snapshot.rate : 1,
+  };
+}
+
+/**
+ * 只要「是否重播、是否推進、倍速」的元件用這個：時鐘每 5 秒查一次，snapshot 每次都是新物件，
+ * useOperatingClock 的訂閱者每次都會重畫。2026-10-29 即時圖台實測：每個 useWidgetData（幾乎每個
+ * 元件）都訂閱時鐘，一次查詢就帶動整張儀表板約 900 個元件重畫、每分鐘 12 次。這三個值沒變就不重畫。
+ */
+export function useOperatingClockPace(): OperatingClockPace {
+  const resolve = usePlaneSourceResolver();
+  const base = getDataSourceById(resolve('default-internal'))?.backendUrl ?? '';
+  const [pace, setPace] = useState<OperatingClockPace>(() => {
+    const state = entries.get(base)?.state;
+    return state ? paceOf(state) : { replay: false, advancing: false, rate: 1 };
+  });
+  useEffect(() => acquire(base, (state) => {
+    const next = paceOf(state);
+    setPace((prev) => (prev.replay === next.replay && prev.advancing === next.advancing && prev.rate === next.rate ? prev : next));
+  }), [base]);
+  return pace;
+}

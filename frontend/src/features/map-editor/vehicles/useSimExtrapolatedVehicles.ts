@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AreaVehicleLive } from './types';
 import { readVehicleHeadingRad } from './readVehicleHeading';
 import { lerp, lerpAngleRad, readLegSnapKey, readSimElapsedMs } from '../../dashboard/utils/simClock';
@@ -28,6 +28,15 @@ type VehiclePlayout = {
   playoutReady: boolean;
   displaySimMs: number;
   lastAdvanceWallMs: number;
+};
+
+/** 上一幀每台車的輸出：來源物件與位置都沒變就沿用同一個物件，停著的車不跟著重畫 */
+type PublishedFrame = {
+  source: AreaVehicleLive;
+  xM: number;
+  yM: number;
+  headingRad: number | null;
+  out: AreaVehicleLive;
 };
 
 type MotionFrame = {
@@ -218,6 +227,8 @@ export function useSimExtrapolatedVehicles(
 ): AreaVehicleLive[] {
   const playoutRef = useRef<Map<string, VehiclePlayout>>(new Map());
   const lastFrameRef = useRef(0);
+  // 只在本 hook 內讀寫的幀快取（不觸發重畫）；放 state 容器而不是 ref，比照 useMemo 的記憶用途
+  const [published] = useState(() => ({ frames: new Map<string, PublishedFrame>(), lastOut: new Map<'out', AreaVehicleLive[]>() }));
 
   useEffect(() => {
     const activeIds = new Set(vehicles.map((v) => v.vehicleId));
@@ -283,19 +294,41 @@ export function useSimExtrapolatedVehicles(
       continue;
     }
 
+    const prev = published.frames.get(vehicle.vehicleId);
+    if (
+      prev
+      && prev.source === vehicle
+      && prev.xM === frameAt.xM
+      && prev.yM === frameAt.yM
+      && prev.headingRad === frameAt.headingRad
+    ) {
+      out.push(prev.out);
+      continue;
+    }
+
     const payload =
       frameAt.headingRad != null
         ? patchPayloadHeading(vehicle.payload ?? {}, frameAt.headingRad)
         : vehicle.payload;
 
-    out.push({
+    const next = {
       ...vehicle,
       xM: frameAt.xM,
       yM: frameAt.yM,
       payload,
       simExtrapolated: true,
-    });
+    };
+    published.frames.set(vehicle.vehicleId, { source: vehicle, ...frameAt, out: next });
+    out.push(next);
   }
 
+  // 這一幀沒有任何車的位置改變：回傳同一個陣列，車輛圖層不重畫
+  const last = published.lastOut.get('out') ?? [];
+  if (last.length === out.length && out.every((v, i) => v === last[i])) return last;
+  if (published.frames.size > out.length * 2) {
+    const live = new Set(vehicles.map((v) => v.vehicleId));
+    for (const id of published.frames.keys()) if (!live.has(id)) published.frames.delete(id);
+  }
+  published.lastOut.set('out', out);
   return out;
 }

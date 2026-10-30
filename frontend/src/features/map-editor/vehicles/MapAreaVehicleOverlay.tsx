@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import { MapAreaVehiclesContext } from './MapAreaVehiclesContext';
 import type { VehicleDefinition } from '../../vehicle-editor/types';
@@ -76,6 +76,13 @@ import {
   MapVehicleBehaviorOverlay,
   type MapVehicleBehaviorConfig,
 } from '../../dashboard/elements/MapVehicleBehaviorOverlay';
+
+/*
+ * 車輛圖層每一幀（模擬播放約 20fps）都會重跑；props 沒變的車（停著、等候）跳過整台車的繪製。
+ * 只有位置或狀態真的變了的車才重畫（2026-10-30 車隊上線量測：每次 commit 重畫約 209 個元件）。
+ */
+const MemoVehicleDefinitionMapView = memo(VehicleDefinitionMapView);
+const MemoMapVehicleBehaviorOverlay = memo(MapVehicleBehaviorOverlay);
 import { readLegSnapKey } from '../../dashboard/utils/simClock';
 import { vehicleLastSeenAt } from '../../dashboard/elements/vehicleLastSeen';
 import { collectYardSlotFieldBoxes } from '../utils/yardFacilitySlots';
@@ -83,6 +90,7 @@ import { withCrossBranchTracks } from '../utils/crossBranches';
 import { HEADING_RELIABLE_MPS } from '../utils/trackGenLocate';
 import { classifyYardVehicle, type YardDecision } from './yardClassification';
 import { decideYardExitStage, type YardExitLatch, type YardExitStage } from './yardExitStaging';
+import { mapYardSlotHeading } from './yardSlotDisplayHeading';
 import { useOrderTaskMeta } from '../../dashboard/elements/useOrderRouteStations';
 import { resolveFacilityAreaPosition, resolveFacilityAreaSize } from '../utils/facilityAreaCoords';
 import type { MapPlannedRoute } from '../types/mapFile';
@@ -818,12 +826,28 @@ export function MapAreaVehicleOverlay({
               headingReference,
             )
           : null;
+        /*
+         * 停妥在格位裡的車：現場格子與圖面格子的長軸可以不同（現場直格、圖上畫成橫格），
+         * 車頭照「現場長軸 → 圖面長軸」轉過去再畫（見 yardSlotDisplayHeading）。只改畫面角度；
+         * 每次都從當前圖資算，格子改橫改直後不用等車再動。
+         */
+        const yardSlotFacility =
+          preferYard && yardDecision.slotId
+            ? area.facilities.find((f) => f.type !== 'Track' && f.customName?.trim() === yardDecision.slotId)
+            : undefined;
+        const yardHeading = yardSlotFacility
+          ? mapYardSlotHeading(
+              { ...yardSlotFacility, areaSizePx: resolveFacilityAreaSize(yardSlotFacility, area.domain, area.layout) },
+              headingRad,
+            )
+          : null;
+        const displayHeadingRad = yardHeading?.reason === 'mapped' ? yardHeading.headingRad : headingRad;
         const containerRotateDeg =
           swungRotateDeg ??
           (drawnDir
             ? rotateDegForDrawnDirection(drawnDir)
-            : headingRad != null
-              ? mapVehiclePivotRotateDeg(headingRad, landscape, steeringRad) ?? 0
+            : displayHeadingRad != null
+              ? mapVehiclePivotRotateDeg(displayHeadingRad, landscape, steeringRad) ?? 0
               : 0);
         const rearAxleAnchor = vehicleDefinition
           ? computeVehicleRearAxleAnchorPx(
@@ -892,6 +916,9 @@ export function MapAreaVehicleOverlay({
           'data-anchor': `${coordLeft.toFixed(1)},${coordTop.toFixed(1)}`,
           'data-placement': `${(area.layout.xPx + placementCss.left).toFixed(1)},${(area.layout.yPx + placementCss.top).toFixed(1)}`,
           'data-rotate-deg': containerRotateDeg.toFixed(1),
+          'data-yard-heading': yardHeading
+            ? `${yardHeading.reason}:${headingRad == null ? '-' : ((headingRad * 180) / Math.PI).toFixed(1)}>${((yardHeading.deltaRad * 180) / Math.PI).toFixed(1)}`
+            : '',
           'data-marker': `${markerW.toFixed(1)}x${markerH.toFixed(1)}`,
         };
         const bgColor = resolveMapVehicleBgColor(vehicle);
@@ -1089,7 +1116,7 @@ export function MapAreaVehicleOverlay({
                     和 containerRotateDeg 反算後軸錨點的，這裡若還是用樣板固定尺寸＋現場
                     heading，車就會被畫在錨點以外的地方、還轉錯方向。
                   */}
-                  <VehicleDefinitionMapView
+                  <MemoVehicleDefinitionMapView
                     definition={vehicleDefinition}
                     liveData={liveData}
                     displayWidth={markerW}
@@ -1102,7 +1129,7 @@ export function MapAreaVehicleOverlay({
                   />
                 </div>
                 {vehicleBehavior ? (
-                  <MapVehicleBehaviorOverlay
+                  <MemoMapVehicleBehaviorOverlay
                     config={vehicleBehavior}
                     vehicleCenterX={markerW / 2}
                     vehicleCenterY={markerH / 2}

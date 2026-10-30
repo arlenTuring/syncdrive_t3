@@ -130,7 +130,7 @@ describe.skipIf(maps.length === 0)('發布出去的圖：車畫得準不準', ()
         expect(of('zone')).toEqual([])
       })
 
-      it('格位要在自己的分區裡、長邊對得上、不重疊', () => {
+      it('格位要在自己的分區裡、不重疊（長邊方向可以跟場域不同，車頭由圖台換算）', () => {
         expect(of('slot')).toEqual([])
       })
     })

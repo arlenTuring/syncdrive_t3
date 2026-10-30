@@ -62,9 +62,16 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return qs.toString();
 }
 
+/** 清單請求逾時：後端卡住時要能結束這一支，讓下一次重查接手，而不是一直掛著 */
+const LIST_TIMEOUT_MS = 15_000;
+
+/**
+ * signal：條件換了、頁面卸載時由呼叫端中止；另外自帶逾時。
+ */
 export async function fetchShiftRecordList(
   query: ShiftRecordListQuery,
   backendUrl = resolveShiftRecordsBackendUrl(),
+  signal?: AbortSignal,
 ): Promise<ShiftRecordListResponse> {
   const qs = buildQuery({
     tab: query.tab,
@@ -76,11 +83,28 @@ export async function fetchShiftRecordList(
     page: query.page ?? 1,
     page_size: query.page_size ?? 20,
   });
-  const res = await fetch(`${backendUrl}/syncdrive-api/order/list?${qs}`);
-  if (!res.ok) {
-    throw new Error(`載入班次列表失敗（${res.status}）`);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, LIST_TIMEOUT_MS);
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener('abort', forwardAbort, { once: true });
+  try {
+    const res = await fetch(`${backendUrl}/syncdrive-api/order/list?${qs}`, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`載入班次列表失敗（${res.status}）`);
+    }
+    return await (res.json() as Promise<ShiftRecordListResponse>);
+  } catch (error) {
+    if (timedOut) throw new Error(`載入班次列表逾時（${LIST_TIMEOUT_MS / 1000} 秒）`);
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', forwardAbort);
   }
-  return res.json() as Promise<ShiftRecordListResponse>;
 }
 
 export async function fetchShiftRecordDetail(

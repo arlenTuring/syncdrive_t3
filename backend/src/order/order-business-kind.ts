@@ -91,3 +91,26 @@ export function orderBusinessKindSql(o: string): string {
       WHEN ${o}.line_kind = 'TEST' THEN 'TEST'
     END`;
 }
+
+/**
+ * 「業務分類屬於 kinds 其中之一」拆成兩段互斥條件，跟 {@link orderBusinessKindSql} 的結果逐列相同：
+ *
+ * - direct：line_kind 本身就是三種之一（現行資料幾乎全部），只看 line_kind，可以走索引、
+ *   計數時甚至只讀索引；
+ * - legacy：line_kind 空白或 TEST（舊版重播單、人工測試單，極少數），照原本完整的 CASE 判斷。
+ *
+ * 兩段互斥（line_kind 不可能同時是三種之一又是空白／TEST）；其他未知的 line_kind 原本 CASE
+ * 回 NULL，兩段也都不收。清單 SQL 用 `(direct OR legacy)`；精確總數兩段分開數再相加，
+ * 避免 OR 讓計數退回逐列掃表。
+ */
+export function orderBusinessKindFilterSql(
+  o: string,
+  kinds: ReadonlyArray<BusinessLineKind | 'TEST'>,
+): { direct: string | null; legacy: string } {
+  const direct = kinds.filter((k) => k !== 'TEST');
+  const quoted = (list: ReadonlyArray<string>) => list.map((k) => `'${k}'`).join(', ');
+  return {
+    direct: direct.length ? `${o}.line_kind IN (${quoted(direct)})` : null,
+    legacy: `((${o}.line_kind IS NULL OR ${o}.line_kind IN ('', 'TEST')) AND (${orderBusinessKindSql(o)}) IN (${quoted(kinds)}))`,
+  };
+}

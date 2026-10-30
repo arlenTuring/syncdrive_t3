@@ -38,7 +38,7 @@ import {
  *   月台門  場域座標是 167.55, 344.49——那是容器網域的格線     根本沒映射過
  *   分區    兩個分區綁到同一條入口連結                        兩區設施疊在一起
  *   分區    連結指向已刪除的圖元，而且沒有地方可以接回來      整備區整個沒有場域
- *   格位    E1 高 24 公尺，比它所在的分區（9 公尺）還高        場域與圖面長邊相反
+ *   格位    E1 高 24 公尺，比它所在的分區（9 公尺）還高        超出分區
  *   格位    M3 與 M4 的場域範圍一模一樣                        兩台車疊在同一點
  * </pre>
  */
@@ -174,7 +174,7 @@ function auditZones(area: MapAreaObject): MapDataIssue[] {
   return out
 }
 
-/** 格位：在不在自己的分區裡、長邊對不對、有沒有跟別人重疊 */
+/** 格位：在不在自己的分區裡、有沒有跟別人重疊、外框與相對位置一不一致 */
 function auditZoneSlots(area: MapAreaObject): MapDataIssue[] {
   const out: MapDataIssue[] = []
   const boxes = new Map<string, string>()
@@ -212,21 +212,13 @@ function auditZoneSlots(area: MapAreaObject): MapDataIssue[] {
       }
     }
 
-    // 2. 場域的長邊要跟圖面的長邊同一個方向
-    const size = resolveFacilityAreaSize(f, area.domain, area.layout)
-    const fieldWide = (b.xMaxM ?? 0) - (b.xMinM ?? 0) >= (b.yMaxM ?? 0) - (b.yMinM ?? 0)
-    const drawnWide = size.w >= size.h
-    if (fieldWide !== drawnWide) {
-      out.push({
-        kind: 'slot',
-        target: label(f),
-        detail:
-          `場域是${fieldWide ? '橫' : '直'}的、圖上畫成${drawnWide ? '橫' : '直'}的`
-          + '——車頭會橫跨在格子上',
-      })
-    }
+    /*
+     * 場域與圖面長邊方向不同（現場直格、圖上畫成橫格）不再算錯：圖台會把停在格位裡的車頭
+     * 從現場長軸轉到圖面長軸畫（vehicles/yardSlotDisplayHeading.ts），車不會橫跨格子。
+     * 2026-10-28 版面改版刻意把 H／M 畫成橫格，現場資料不動。
+     */
 
-    // 3. 兩個格位不該共用同一塊現場
+    // 2. 兩個格位不該共用同一塊現場
     const key = [b.xMinM, b.xMaxM, b.yMinM, b.yMaxM].join(',')
     const taken = boxes.get(key)
     if (taken) {
@@ -239,7 +231,7 @@ function auditZoneSlots(area: MapAreaObject): MapDataIssue[] {
       boxes.set(key, label(f))
     }
 
-    // 4. 存的外框要跟 zoneLocalField 算出來的一致
+    // 3. 存的外框要跟 zoneLocalField 算出來的一致
     const local = readZoneLocalField(f.parameters)
     if (local && hasValidRefFieldBounds(zone.parameters)) {
       const rect = zoneLocalRectToAbsolute(local, getRefFieldBounds(zone.parameters))
