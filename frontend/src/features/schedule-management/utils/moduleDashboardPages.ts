@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { DASHBOARD_PLANES_STORAGE_KEY } from '../../../lib/canvasCacheReset';
 import type { DashboardPlane } from '../../dashboard/types';
 import {
@@ -121,13 +122,23 @@ export function writeModuleDashboardPages(pages: ModuleDashboardPage[]) {
 /**
  * 從後端拉回對應清單並寫入快取。
  *
- * 後端是空的就不覆蓋——那代表尚未遷移，沿用本機既有設定，下一次儲存會把它整批送
- * 上去，等於一次自動遷移。
+ * <code>pages</code> 是畫面該用的清單；<code>persisted</code> 是後端此刻實際存的
+ * 內容，呼叫端拿它當「已儲存」的基準，只有清單跟它不同才回寫——單純載入不該送出
+ * PUT。
+ *
+ * 後端是空的就不覆蓋——那代表尚未遷移，沿用本機既有設定；此時 <code>persisted</code>
+ * 是空陣列，本機若有對應就跟基準不同，會被整批送上去，等於一次自動遷移。
+ *
+ * 後端連不上時 <code>persisted</code> 為 null：不知道後端存了什麼，就不主動回寫，
+ * 等使用者真的改了再整批送。
  */
-export async function refreshModuleDashboardPages(): Promise<ModuleDashboardPage[]> {
+export async function refreshModuleDashboardPages(): Promise<{
+  pages: ModuleDashboardPage[];
+  persisted: ModuleDashboardPage[] | null;
+}> {
   try {
     const rows = await fetchModuleDashboardPages();
-    if (rows.length === 0) return readModuleDashboardPages();
+    if (rows.length === 0) return { pages: readModuleDashboardPages(), persisted: [] };
     const pages: ModuleDashboardPage[] = rows.map((row) => ({
       id: row.id,
       moduleId: row.moduleId,
@@ -140,11 +151,56 @@ export async function refreshModuleDashboardPages(): Promise<ModuleDashboardPage
     } catch {
       // ignore quota
     }
-    return pages;
+    return { pages, persisted: pages };
   } catch {
     // 後端不可用：沿用快取
-    return readModuleDashboardPages();
+    return { pages: readModuleDashboardPages(), persisted: null };
   }
+}
+
+/** 比對用的內容指紋：只取會送上後端的欄位，順序即 sortOrder */
+function pagesFingerprint(pages: ModuleDashboardPage[]): string {
+  return JSON.stringify(
+    pages.map((page) => [page.id, page.moduleId, page.label, page.planeId, page.createdAt]),
+  );
+}
+
+/**
+ * 模組頁面對應的 state，掛載後以後端為準，之後只在內容真的變了才回寫。
+ *
+ * <strong>為什麼要比對。</strong>同步完成時 setState 會觸發回寫 effect；不比對的話，
+ * 每次打開頁面都會把剛拉回來的清單原封不動 PUT 回去——沒改任何東西也在寫系統配置，
+ * 多人同時開頁面時還會互相覆蓋。
+ */
+export function useModuleDashboardPages() {
+  const [pages, setPages] = useState(readModuleDashboardPages);
+  // 後端的對應拉回來之前不能回寫：初始值是這台瀏覽器的舊快取，一掛載就送出去會把
+  // 其他人改好的對應（例如重新指定版面）蓋回舊值。
+  const syncedRef = useRef(false);
+  const savedFingerprintRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void refreshModuleDashboardPages().then(({ pages: loaded, persisted }) => {
+      if (cancelled) return;
+      syncedRef.current = true;
+      savedFingerprintRef.current = pagesFingerprint(persisted ?? loaded);
+      setPages(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!syncedRef.current) return;
+    const fingerprint = pagesFingerprint(pages);
+    if (fingerprint === savedFingerprintRef.current) return;
+    savedFingerprintRef.current = fingerprint;
+    writeModuleDashboardPages(pages);
+  }, [pages]);
+
+  return [pages, setPages] as const;
 }
 
 export function createModuleDashboardPageId(): string {

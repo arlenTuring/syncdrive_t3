@@ -3,7 +3,6 @@ import {
   Suspense,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -54,10 +53,8 @@ import {
   createModuleDashboardPageId,
   moduleDashboardViewId,
   parseModuleDashboardViewId,
-  readModuleDashboardPages,
   refreshDashboardPlanesCache,
-  refreshModuleDashboardPages,
-  writeModuleDashboardPages,
+  useModuleDashboardPages,
   type ModuleDashboardPage,
 } from "./utils/moduleDashboardPages";
 
@@ -340,35 +337,17 @@ export default function ScheduleManagementApp({
   const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === "map");
   const [adminMode] = useAdminModePreference();
-  const [modulePages, setModulePages] = useState(readModuleDashboardPages);
+  const [modulePages, setModulePages] = useModuleDashboardPages();
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
   const [accountRoleFilter, setAccountRoleFilter] = useState<string | null>(
     null,
   );
-  // 後端的對應拉回來之前不能回寫：初始值是這台瀏覽器的舊快取，一掛載就送出去會把
-  // 其他人改好的對應（例如重新指定版面）蓋回舊值。
-  const modulePagesSyncedRef = useRef(false);
 
-  /**
-   * 模組頁面對應以後端為準。
-   *
-   * 這份對應是系統配置而非個人偏好——管理者設定好之後，所有操作人員看到的模組頁面
-   * 必須一致。初始 state 先給快取讓畫面立刻有東西，掛載後再用後端覆蓋；後端是空的
-   * 或連不上就沿用快取。
-   */
+  // 模組頁面對應以後端為準（useModuleDashboardPages）。版面要一起拉：只補對應的話，
+  // 乾淨的瀏覽器點進子頁會看到「找不到儀表板平面」——對應查得到、版面還在後端沒進
+  // 本機快取。
   useEffect(() => {
-    let cancelled = false;
-    void refreshModuleDashboardPages().then((pages) => {
-      if (cancelled) return;
-      modulePagesSyncedRef.current = true;
-      setModulePages(pages);
-    });
-    // 版面要一起拉。只補對應的話，乾淨的瀏覽器點進子頁會看到「找不到儀表板平面」
-    // ——對應查得到、版面還在後端沒進本機快取。
     void refreshDashboardPlanesCache();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -406,11 +385,6 @@ export default function ScheduleManagementApp({
       window.removeEventListener(OPEN_VIDEO_HISTORY_EVENT, openHistory);
     };
   }, []);
-
-  useEffect(() => {
-    if (!modulePagesSyncedRef.current) return;
-    writeModuleDashboardPages(modulePages);
-  }, [modulePages]);
 
   const chrome = useWorkspaceChrome(view, modulePages);
   const { t } = useTranslation();
