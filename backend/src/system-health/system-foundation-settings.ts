@@ -64,6 +64,8 @@ export type GlobalParamSettings = {
   collisionProtectionSeconds: number;
   defaultVehicleSpeedLimitKmh: number;
   eventRetentionDays: number;
+  /** 超過計畫結束幾秒算班車延誤（規則見 order/trip-delay.ts） */
+  tripDelayToleranceSeconds: number;
 };
 
 export type SystemFoundationSettings = {
@@ -139,6 +141,7 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       collisionProtectionSeconds: 30,
       defaultVehicleSpeedLimitKmh: 40,
       eventRetentionDays: 90,
+      tripDelayToleranceSeconds: 60,
     },
   };
 }
@@ -313,6 +316,10 @@ export function normalizeSystemFoundationSettings(
         globalParams.eventRetentionDays,
         d.globalParams.eventRetentionDays,
       ),
+      tripDelayToleranceSeconds: Math.max(0, pickNumber(
+        globalParams.tripDelayToleranceSeconds,
+        d.globalParams.tripDelayToleranceSeconds,
+      )),
     },
   };
 }

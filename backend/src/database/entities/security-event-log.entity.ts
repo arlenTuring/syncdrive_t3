@@ -9,6 +9,8 @@ export enum EventCode {
   INTERLOCK_REQ         = 'INTERLOCK_REQ',
   // 預留：由 Health Monitor 連動產生的內部告警標記（僅記錄，不觸發 MRM）
   SYSTEM_HEALTH_DEGRADED = 'SYSTEM_HEALTH_DEGRADED',
+  // 中心端判定（班表部署管理的班車延誤監督），車端不能回報
+  TRIP_DELAYED = 'TRIP_DELAYED',
 }
 
 export type EventSourceType = 'VEHICLE' | 'FACILITY' | 'SYSTEM';

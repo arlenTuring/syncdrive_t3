@@ -1,3 +1,4 @@
+import { tripDelayMinutes } from './trip-delay';
 import {
   Injectable,
   NotFoundException,
@@ -771,11 +772,10 @@ export class OrderService {
         // 協議用 FAULTED 結案取消；記下原因，介面與統計跟真正故障分開
         order.payload = { ...((order.payload ?? {}) as Record<string, unknown>), closed_reason: 'cancelled_by_center' };
       }
-      // 延誤＝結束晚於計畫結束的整分鐘數（不到一分鐘算準點），以營運時間比。班次中心的「延誤班次」
-      // 與班次運行紀錄的準點／延誤篩選都讀這個欄位；先前只有示範模擬會寫它。
-      const plannedEnd = Number(order.plannedEnd);
-      if (targetStatus === OrderStatus.END && Number.isFinite(plannedEnd) && plannedEnd > 0) {
-        order.delayMinutes = Math.max(0, Math.floor((operatingNow - plannedEnd) / 60_000));
+      // 完成時定案延誤分鐘（規則見 trip-delay.ts）；有計畫結束才算
+      if (targetStatus === OrderStatus.END && Number(order.plannedEnd) > 0) {
+        const settings = await this.systemSettings?.get();
+        order.delayMinutes = tripDelayMinutes(order.plannedEnd, operatingNow, settings?.globalParams.tripDelayToleranceSeconds);
       }
     } else if (targetStatus === OrderStatus.PROCESSING) {
       // bigint 欄位清空須用 null，不可用空字串

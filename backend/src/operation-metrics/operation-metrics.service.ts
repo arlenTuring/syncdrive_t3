@@ -11,7 +11,7 @@ import {
   type ShiftCenterSummary,
 } from '../dispatch/daily-plan';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
-import { DELAY_TOLERANCE_MS, localMidnight, operatingDayOf, operatingDayStart } from '../operating-day/operating-day';
+import { localMidnight, operatingDayOf, operatingDayStart } from '../operating-day/operating-day';
 import {
   buildCapacityTrend,
   DAY_MINUTES,
@@ -96,7 +96,7 @@ export class OperationMetricsService {
           ...trip,
           operating_day: item.day,
           completed: Boolean(completedOrder),
-          delayed: Boolean(completedOrder && trip.end != null && completedOrder.completedAt != null && completedOrder.completedAt > trip.end + DELAY_TOLERANCE_MS),
+          delayed: (completedOrder?.delayMinutes ?? 0) > 0,
         });
       }
     }
@@ -144,8 +144,9 @@ export class OperationMetricsService {
       plan_digest: string | null;
       closed_reason: string | null;
       completed_at: string | null;
+      delay_minutes: number | null;
     }> = await this.dataSource.query(
-      `SELECT order_id,
+      `SELECT order_id, delay_minutes,
               COALESCE(payload->>'plan_trip_code', trip_code) AS trip_code,
               status::text AS status,
               payload->>'plan_digest' AS plan_digest,
@@ -164,6 +165,7 @@ export class OperationMetricsService {
         planDigest: row.plan_digest,
         closedReason: row.closed_reason,
         completedAt: row.completed_at != null ? Number(row.completed_at) : null,
+        delayMinutes: Number(row.delay_minutes ?? 0),
       }));
   }
 

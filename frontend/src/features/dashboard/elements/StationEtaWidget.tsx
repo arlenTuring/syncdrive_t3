@@ -94,8 +94,8 @@ function Place({ event, place, fontSize, icon, gap }: { event: StationEvent; pla
 }
 
 /**
- * 站點到站動態卡片（T3、N2W、S2W 共用）：標題下照時刻由近到遠最多三列；即將到站的列放大（大號分:秒倒數），
- * 其餘是緊湊列；同時兩班即將到站只排兩列（cardRows）。尺寸照設計稿 320×254（一大兩小）為 1×，依卡片尺寸等比（cardScale）；倒數用營運時間。
+ * 站點到站動態卡片（T3、N2W、S2W 共用）：標題下照時刻由近到遠最多三列；到站或出發快到的列放大（大號分:秒倒數，
+ * 秒數見 emphasisSeconds），其餘是緊湊列；同時兩班放大只排兩列（cardRows）。尺寸照設計稿 320×254（一大兩小）為 1×，依卡片尺寸等比（cardScale）；倒數用營運時間。
  * 卡片不畫誤點／延誤與即時／計畫來源；沒車、未部署、資料中斷、查詢失敗各自呈現。
  */
 export function StationEtaWidgetView({ widget }: { widget: StationEtaWidget }) {
@@ -110,7 +110,7 @@ export function StationEtaWidgetView({ widget }: { widget: StationEtaWidget }) {
   const clock = useOperatingClock();
   const response = (data[0] ?? null) as StationEtaResponse | null;
   const operatingNow = clock.operatingNow();
-  const rows = cardRows(visibleEvents(response, operatingNow, widget.limit), operatingNow);
+  const rows = cardRows(visibleEvents(response, operatingNow, widget.limit), operatingNow, widget.emphasisSeconds);
   useCountdownTick(rows.map((r) => r.event.at), clock);
   const message = cardMessage({ url, isEditMode, response, loading, error, rows: rows.length });
 

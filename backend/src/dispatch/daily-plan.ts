@@ -21,13 +21,12 @@
  *       整備、待命、暫停、純空車出入廠不算。</li>
  *   <li>完成：該計畫班次有一張訂單被車端以真實狀態 API 結束（END）。同一班次多張單只算一次。</li>
  *   <li>剩餘＝總班次－完成。故障、取消、沒執行的仍算未達成，另列原因。</li>
- *   <li>延誤：營運時間超過計畫結束＋允許延誤界線還沒完成（執行中或已派單待開始），或完成時已晚於
- *       界線。完成後仍保留曾延誤的事實。故障、取消結案不直接算延誤，列在未達成原因。</li>
+ *   <li>延誤：訂單 delay_minutes 大於 0（判定與寫入見 order/trip-delay.ts），含還沒完成與完成時已超過界線。
+ *       完成後仍保留曾延誤的事實。故障、取消結案不直接算延誤，列在未達成原因。</li>
  *   <li>不同版本的訂單不混進分母或完成數，另外計數讓畫面看得到。</li>
  * </ul>
  */
 
-import { DELAY_TOLERANCE_MS } from '../operating-day/operating-day';
 
 /** 計畫快照裡的一個載客班次（時間為營運日上的營運時刻，Epoch 毫秒） */
 export type DailyPlanTrip = {
@@ -249,6 +248,8 @@ export type DailyPlanOrderRow = {
   closedReason: string | null;
   /** 完成時的營運時刻；舊訂單沒有就退回實際完成時刻 */
   completedAt: number | null;
+  /** 訂單的延誤判定，統計只讀不再比時間 */
+  delayMinutes: number;
 };
 
 export type ShiftCenterSummary = {
@@ -330,18 +331,17 @@ export function summarizeDailyPlan(
   const unachieved = { faulted: 0, cancelled: 0, in_progress: 0, pending: 0, not_run_overdue: 0, not_due: 0 };
   for (const trip of adoption.passenger_trips) {
     const list = byTrip.get(trip.code) ?? [];
-    const lateLine = trip.end != null ? trip.end + DELAY_TOLERANCE_MS : null;
     const done = list.find((order) => order.status === 'END');
     if (done) {
       completed += 1;
-      if (lateLine != null && done.completedAt != null && done.completedAt > lateLine) delayed += 1;
+      if (done.delayMinutes > 0) delayed += 1;
       continue;
     }
     const open = list.filter((order) => order.status === 'PENDING' || order.status === 'PROCESSING');
     if (open.length > 0) {
       if (open.some((order) => order.status === 'PROCESSING')) unachieved.in_progress += 1;
       else unachieved.pending += 1;
-      if (lateLine != null && operatingNow > lateLine) delayed += 1;
+      if (open.some((order) => order.delayMinutes > 0)) delayed += 1;
       continue;
     }
     const closed = list.filter((order) => order.status === 'FAULTED');

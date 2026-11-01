@@ -814,6 +814,8 @@ export interface StationEtaWidget extends WidgetBase, WidgetDataBinding {
   stations: Array<{ stationId: string; label: string; events?: Array<'arrive' | 'depart'> }>;
   /** 最多幾筆（預設 3，含重點那一筆） */
   limit: number;
+  /** 到站、出發剩幾秒內放大顯示（預設 30；舊設定沒有這個欄位） */
+  emphasisSeconds?: number;
   /**
    * 字級倍率：12＝設計稿字級（站名 24、倒數 48、列 18…，見 stationEtaModel cardScale）。
    * 實際大小再乘卡片寬度 ÷ 320，整張卡等比；最小 10。
@@ -1651,6 +1653,7 @@ export function createWidget(type: WidgetType, x: number, y: number): ChildWidge
         title: '進站動態',
         stations: [],
         limit: 3,
+        emphasisSeconds: 30,
         fontSize: 12,
         color: '#F3F4F6',
         mutedColor: '#9CA3AF',

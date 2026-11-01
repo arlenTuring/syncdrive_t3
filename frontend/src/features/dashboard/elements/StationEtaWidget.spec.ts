@@ -159,17 +159,30 @@ describe('到站動態卡片：列與空狀態', () => {
     assert.equal(url, '/syncdrive-api/operation-metrics/station-eta?arrive=n2w_d_end,t3_u,s2w_d_end&depart=n2w_d_start,t3_u&limit=3');
   });
 
-  it('卡片列：由近到遠最多三列；即將到站才放大；兩班即將到站只排兩列；出發與計畫值不放大', () => {
+  it('卡片列：由近到遠最多三列；到站、出發 30 秒內放大；兩班放大只排兩列；計畫值與資料中斷不放大', () => {
     const shape = (rows: StationEvent[]) => cardRows(rows, NOW).map((r) => `${r.event.key}${r.big ? '*' : ''}`);
     const a = ev({ key: 'a', at: NOW + 30_000 });
-    const b = ev({ key: 'b', at: NOW + 50_000 });
+    const b = ev({ key: 'b', at: NOW + 20_000 });
     const c = ev({ key: 'c', at: NOW + 200_000 });
     const d = ev({ key: 'd', at: NOW + 400_000 });
     assert.deepEqual(shape([a, c, d, ev({ key: 'e', at: NOW + 900_000 })]), ['a*', 'c', 'd']);
     assert.deepEqual(shape([c, d, ev({ key: 'e', at: NOW + 900_000 })]), ['c', 'd', 'e']);
     assert.deepEqual(shape([a, b, c]), ['a*', 'b*']);
     assert.deepEqual(shape([ev({ key: 'p', at: NOW + 30_000, kind: 'plan' }), c]), ['p', 'c']);
-    assert.deepEqual(shape([ev({ key: 'x', event: 'depart', at_station: true, at: NOW - 5_000 }), a]), ['x', 'a*']);
+    assert.deepEqual(shape([ev({ key: 'x', event: 'depart', at_station: true, at: NOW - 5_000 }), c]), ['x*', 'c']);
+    assert.deepEqual(shape([ev({ key: 'y', event: 'depart', at_station: true, kind: 'plan', at: NOW + 25_000 }), c]), ['y*', 'c']);
+    assert.deepEqual(shape([ev({ key: 'z', event: 'depart', at: NOW + 31_000 }), c]), ['z', 'c']);
+    assert.deepEqual(shape([ev({ key: 'q', at: NOW + 10_000, time_state: 'stale' }), c]), ['q', 'c']);
+    assert.deepEqual(shape([ev({ key: 'n', at: NOW + 31_000 })]), ['n']);
     assert.deepEqual(shape([a]), ['a*']);
+  });
+
+  it('放大秒數可調：舊設定沒有欄位用 30 秒，0 只放大時間已到的', () => {
+    const big = (seconds: number | undefined, at: number) => cardRows([ev({ at })], NOW, seconds)[0].big;
+    assert.equal(big(undefined, NOW + 30_000), true);
+    assert.equal(big(undefined, NOW + 31_000), false);
+    assert.equal(big(60, NOW + 59_000), true);
+    assert.equal(big(0, NOW + 1_000), false);
+    assert.equal(big(0, NOW), true);
   });
 });

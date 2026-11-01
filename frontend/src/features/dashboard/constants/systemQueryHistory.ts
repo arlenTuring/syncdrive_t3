@@ -23,6 +23,12 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "commit": "c628653"
   },
   {
+    "family": "event-center-list",
+    "fingerprint": "0c3a359a080e21",
+    "firstSeen": "2026-10-19",
+    "commit": "2cc2479"
+  },
+  {
     "family": "mainline-fleet",
     "fingerprint": "0c886956767495",
     "firstSeen": "2026-06-25",
@@ -155,6 +161,24 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "commit": "f216d98"
   },
   {
+    "family": "mainline-shifts",
+    "fingerprint": "1234d80f65d9c8",
+    "firstSeen": "2026-10-11",
+    "commit": "a874f0a"
+  },
+  {
+    "family": "mainline-shifts",
+    "fingerprint": "126feec8e300c8",
+    "firstSeen": "2026-10-12",
+    "commit": "df1a3a5"
+  },
+  {
+    "family": "mainline-shifts",
+    "fingerprint": "1a3933f9e441e1",
+    "firstSeen": "2026-10-27",
+    "commit": "16aac99"
+  },
+  {
     "family": "maintenance-shifts",
     "fingerprint": "08882334305f5d",
     "firstSeen": "2026-06-25",
@@ -213,6 +237,18 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "fingerprint": "06c217fceda659",
     "firstSeen": "2026-10-06",
     "commit": "3beb061"
+  },
+  {
+    "family": "maintenance-shifts",
+    "fingerprint": "0d2797c8c1ad54",
+    "firstSeen": "2026-10-12",
+    "commit": "df1a3a5"
+  },
+  {
+    "family": "maintenance-shifts",
+    "fingerprint": "0acbea209374c6",
+    "firstSeen": "2026-10-27",
+    "commit": "16aac99"
   },
   {
     "family": "vehicle-status",
@@ -285,5 +321,17 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "fingerprint": "015f024903c2a5",
     "firstSeen": "2026-10-11",
     "commit": "2aa3bea"
+  },
+  {
+    "family": "vehicle-status",
+    "fingerprint": "120bfd45537ba9",
+    "firstSeen": "2026-10-12",
+    "commit": "df1a3a5"
+  },
+  {
+    "family": "vehicle-status",
+    "fingerprint": "036421c11a8a9e",
+    "firstSeen": "2026-10-27",
+    "commit": "16aac99"
   }
 ];

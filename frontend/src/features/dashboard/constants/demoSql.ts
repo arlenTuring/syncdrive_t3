@@ -299,7 +299,12 @@ SELECT
   16.9::float AS achievement_pct,
   313::int AS total_count,
   53::int AS completed_count,
-  1::int AS delayed_count,
+  (
+    SELECT COUNT(*)::int FROM operation_orders
+    WHERE payload->>'operating_day' = operating_day()
+      AND payload->>'task_type' = 'passenger'
+      AND COALESCE(delay_minutes, 0) > 0
+  ) AS delayed_count,
   0::int AS abnormal_count,
   0::int AS cancelled_count,
   ('總共 ' || 313::text) AS total_pill,
@@ -628,12 +633,8 @@ active_orders AS (
     /* 車端最後一次回報距今多久（毫秒）；從沒回報過就當作很久 */
     (EXTRACT(EPOCH FROM now()) * 1000)::bigint
       - COALESCE((o.payload->>'updated_at')::bigint, 0) AS report_age_ms,
-    /* 這班還在跑，但計畫結束時間已經過了 15 秒以上：逾時仍在執行 */
-    (
-      o.status = 'PROCESSING'
-      AND o.planned_end IS NOT NULL
-      AND o.planned_end < operating_now_ms() - 15000
-    ) AS is_overdue,
+    /* 這班還在跑，已被判定延誤（判定在後端寫進 delay_minutes，這裡不比時間） */
+    (o.status = 'PROCESSING' AND COALESCE(o.delay_minutes, 0) > 0) AS is_overdue,
     /* 同一台車有下一班已經到點、只是被這班佔住 */
     EXISTS (
       SELECT 1 FROM operation_orders nx
@@ -723,7 +724,7 @@ SELECT
     WHEN o.status = 'FAULTED' THEN '故障'
     WHEN o.status = 'PENDING' THEN '待發'
     WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '資料過期'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '延誤'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '延誤'
     WHEN o.status = 'PROCESSING' THEN '準時'
     ELSE '待命'
   END AS status_label,
@@ -731,7 +732,7 @@ SELECT
     WHEN o.status = 'FAULTED' THEN '#450a0a'
     WHEN o.status = 'PENDING' THEN '#27272a'
     WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '#27272a'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '#422006'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#422006'
     WHEN o.status = 'PROCESSING' THEN 'rgba(0, 212, 146, 0.3)'
     ELSE '#27272a'
   END AS status_bg,
@@ -739,14 +740,14 @@ SELECT
     WHEN o.status = 'FAULTED' THEN '#f87171'
     WHEN o.status = 'PENDING' THEN '#a1a1aa'
     WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN '#a1a1aa'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN '#fb923c'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN '#fb923c'
     WHEN o.status = 'PROCESSING' THEN '#00BC7D'
     ELSE '#a1a1aa'
   END AS status_color,
   CASE
     WHEN o.status = 'FAULTED' THEN 'rgba(239,68,68,0.75)'
     WHEN o.status = 'PROCESSING' AND o.report_age_ms > 30000 THEN 'rgba(113,113,122,0.55)'
-    WHEN COALESCE(o.delay_minutes, 0) > 0 OR o.is_overdue THEN 'rgba(249,115,22,0.75)'
+    WHEN COALESCE(o.delay_minutes, 0) > 0 THEN 'rgba(249,115,22,0.75)'
     WHEN o.status = 'PROCESSING' THEN '#009966'
     WHEN o.status = 'PENDING' THEN 'rgba(113,113,122,0.45)'
     ELSE 'rgba(113,113,122,0.35)'

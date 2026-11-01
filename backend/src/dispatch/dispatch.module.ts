@@ -11,6 +11,8 @@ import { DispatchController } from './dispatch.controller';
 import { DispatchEngineService } from './dispatch-engine.service';
 import { SimulationPlanService } from './simulation-plan.service';
 import { MapModule } from '../map/map.module';
+import { TripDelayMonitorService } from './trip-delay-monitor.service';
+import { SystemHealthModule } from '../system-health/system-health.module';
 
 @Module({
   imports: [
@@ -19,9 +21,10 @@ import { MapModule } from '../map/map.module';
     OrderModule,
     MaintenanceTaskModule,
     MapModule,
+    SystemHealthModule,
   ],
   controllers: [DispatchController],
-  providers: [DispatchEngineService, SimulationPlanService, DailyPlanStore],
+  providers: [DispatchEngineService, SimulationPlanService, DailyPlanStore, TripDelayMonitorService],
   exports: [DispatchEngineService, DailyPlanStore],
 })
 export class DispatchModule {}

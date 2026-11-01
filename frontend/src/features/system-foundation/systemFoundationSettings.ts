@@ -63,6 +63,7 @@ export type GlobalParamSettings = {
   collisionProtectionSeconds: number
   defaultVehicleSpeedLimitKmh: number
   eventRetentionDays: number
+  tripDelayToleranceSeconds: number
 }
 
 export type SystemFoundationSettings = {
@@ -230,6 +231,7 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       collisionProtectionSeconds: 30,
       defaultVehicleSpeedLimitKmh: 40,
       eventRetentionDays: 90,
+      tripDelayToleranceSeconds: 60,
     },
   }
 }

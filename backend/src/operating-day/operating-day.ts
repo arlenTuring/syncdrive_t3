@@ -16,7 +16,7 @@
  * 歸屬寫在訂單 payload.operating_day，不用訂單建立日期或發車日期去切。
  */
 
-/** 允許延誤界線：與訂單 delay_minutes（整分鐘、不到一分鐘算準點）及 ETA 的 MINOR_DELAY 門檻一致 */
+/** 允許延誤界線的預設值；實際秒數在系統基礎設定（班車延誤判定），規則見 order/trip-delay.ts */
 export const DELAY_TOLERANCE_MS = 60_000;
 
 const DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;

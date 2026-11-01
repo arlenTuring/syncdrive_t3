@@ -106,7 +106,7 @@ export function migrateStationEtaChildren(children: ChildWidget[]): ChildWidget[
     const card: StationEtaWidget = {
       id: list.id, type: 'station-eta', ...layout,
       title: `${station} 進站動態`,
-      stations, limit,
+      stations, limit, emphasisSeconds: 30,
       fontSize: 12, color: '#F3F4F6', mutedColor: '#9CA3AF',
       backgroundColor: '#212734', borderColor: '#4E525C', borderRadius: 20,
       dataUrl: base || STATION_ETA_URL,

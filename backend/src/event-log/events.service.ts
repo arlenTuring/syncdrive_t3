@@ -31,6 +31,7 @@ export const EVENT_CODE_LABEL: Record<string, string> = {
   DIRECTION_VIOLATION: '行向偏離',
   INTERLOCK_REQ: '路口聯鎖請求',
   SYSTEM_HEALTH_DEGRADED: '車載系統健康度下降',
+  TRIP_DELAYED: '班車延誤',
 };
 export const SEVERITY_LABEL: Record<string, string> = { INFO: '資訊', WARNING: '警告', CRITICAL: '嚴重' };
 export const SOURCE_TYPE_LABEL: Record<string, string> = { VEHICLE: '載具', FACILITY: '設施', SYSTEM: '系統' };

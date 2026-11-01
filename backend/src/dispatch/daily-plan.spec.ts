@@ -33,7 +33,7 @@ function adopt(planned: ReturnType<typeof plannedItem>[], previous: DailyPlanAdo
 }
 
 function order(tripCode: string, status: string, extra: Partial<DailyPlanOrderRow> = {}): DailyPlanOrderRow {
-  return { orderId: `${tripCode}-${Math.random()}`, tripCode, status, planDigest: 'v1', closedReason: null, completedAt: null, ...extra };
+  return { orderId: `${tripCode}-${Math.random()}`, tripCode, status, planDigest: 'v1', closedReason: null, delayMinutes: 0, completedAt: null, ...extra };
 }
 
 describe('每日計畫', () => {
@@ -100,21 +100,21 @@ describe('每日計畫', () => {
     expect(summary.other_version_orders).toBe(1);
   });
 
-  it('延誤：完成晚於界線、或執行中已超過界線；故障結案不算延誤，列為未達成', () => {
+  it('延誤只讀訂單的判定：完成或執行中 delayMinutes 大於 0；故障結案不算延誤，列為未達成', () => {
     const adoption = adopt(planned);
     const now = T0 + 90 * MIN;
     const summary = summarizeDailyPlan(adoption, [
-      order('NT01', 'END', { completedAt: T0 + 22 * MIN }), // 晚 2 分：延誤，但完成
-      order('TS01', 'PROCESSING'), // 計畫 50 分結束，現在 90 分：延誤
+      order('NT01', 'END', { completedAt: T0 + 22 * MIN, delayMinutes: 2 }), // 延誤，但完成
+      order('TS01', 'PROCESSING', { delayMinutes: 40 }),
       order('ST01', 'FAULTED'), // 故障：不算延誤
     ], now);
     expect(summary).toMatchObject({ completed_shifts: 1, delayed_shifts: 2 });
     expect(summary.unachieved).toMatchObject({ faulted: 1, in_progress: 1, not_due: 1 });
   });
 
-  it('剛好在允許界線內完成不算延誤', () => {
+  it('判定是準點就不算延誤，統計不自己比時間', () => {
     const adoption = adopt(planned);
-    const summary = summarizeDailyPlan(adoption, [order('NT01', 'END', { completedAt: T0 + 20 * MIN + 59_000 })], T0 + 30 * MIN);
+    const summary = summarizeDailyPlan(adoption, [order('NT01', 'END', { completedAt: T0 + 40 * MIN })], T0 + 30 * MIN);
     expect(summary.delayed_shifts).toBe(0);
   });
 

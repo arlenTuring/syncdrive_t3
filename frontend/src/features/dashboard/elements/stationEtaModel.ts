@@ -182,19 +182,29 @@ export function visibleEvents(response: StationEtaResponse | null, operatingNow:
 /** 卡片最多幾列（設計稿高度排得下：一張大卡＋兩列、或三列小列、或兩張大卡） */
 export const STATION_ETA_MAX_ROWS = 3;
 
-/** 即將到站（即時 60 秒內或時間已到）的到站列放大顯示；出發、資料中斷不放大 */
-export function isImminentArrival(event: StationEvent, operatingNow: number): boolean {
-  return event.event === 'arrive' && eventStatus(event, operatingNow).text === '即將到站';
+/** 剩幾秒內放大顯示（儀表板編輯器可調，舊設定沒有這個欄位時用這個值） */
+export const DEFAULT_EMPHASIS_SECONDS = 30;
+
+/**
+ * 到站、出發在 emphasisSeconds 秒內或時間已到就放大；資料中斷不放大。
+ * 計畫時刻沒有車真的要到的依據，時間到之前不放大（出發的車已停在站上就算有依據）。
+ */
+export function isEmphasized(event: StationEvent, operatingNow: number, emphasisSeconds = DEFAULT_EMPHASIS_SECONDS): boolean {
+  if (event.time_state === 'stale') return false;
+  const remain = event.at - operatingNow;
+  if (remain <= 0) return true;
+  if (event.kind !== 'live' && !(event.event === 'depart' && event.at_station)) return false;
+  return remain <= Math.max(0, emphasisSeconds) * 1000;
 }
 
 export type CardRow = { event: StationEvent; big: boolean };
 
 /**
- * 卡片上的列：照時刻由近到遠，最多三列（再受屬性「最多幾筆」限制）；即將到站的放大。
- * 兩張大卡就佔滿高度，所以同時有兩班（以上）即將到站時只排前兩列。
+ * 卡片上的列：照時刻由近到遠，最多三列（再受屬性「最多幾筆」限制）；快到的放大（isEmphasized）。
+ * 兩張大卡就佔滿高度，所以同時有兩班（以上）放大時只排前兩列。
  */
-export function cardRows(rows: StationEvent[], operatingNow: number): CardRow[] {
-  const out = rows.slice(0, STATION_ETA_MAX_ROWS).map((event) => ({ event, big: isImminentArrival(event, operatingNow) }));
+export function cardRows(rows: StationEvent[], operatingNow: number, emphasisSeconds = DEFAULT_EMPHASIS_SECONDS): CardRow[] {
+  const out = rows.slice(0, STATION_ETA_MAX_ROWS).map((event) => ({ event, big: isEmphasized(event, operatingNow, emphasisSeconds) }));
   return out.filter((r) => r.big).length >= 2 ? out.slice(0, 2) : out;
 }
 

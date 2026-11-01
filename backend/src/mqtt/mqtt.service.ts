@@ -446,7 +446,7 @@ export class MqttService {
     }
 
     // 3. 驗證 event_code 是否在規格書定義的白名單內（閉鎖式管理）
-    const validEventCodes = Object.values(EventCode) as string[];
+    const validEventCodes = (Object.values(EventCode) as string[]).filter((code) => code !== EventCode.TRIP_DELAYED);
     if (!validEventCodes.includes(event_code)) {
       this.logger.warn(`[Event Report] Unknown event_code: '${event_code}' from ${vehicleCode}, discarding.`);
       return null;

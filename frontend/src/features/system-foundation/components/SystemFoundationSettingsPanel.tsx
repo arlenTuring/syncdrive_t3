@@ -933,6 +933,22 @@ export function SystemFoundationSettingsPanel() {
                           }))
                         }
                       />
+                      <NumberStepperField
+                        label="班車延誤判定（超過計畫結束）"
+                        value={draft.globalParams.tripDelayToleranceSeconds}
+                        unit={t('systemFoundation.mqtt.seconds')}
+                        min={0}
+                        max={3600}
+                        onChange={(v) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            globalParams: {
+                              ...prev.globalParams,
+                              tripDelayToleranceSeconds: v,
+                            },
+                          }))
+                        }
+                      />
                     </div>
                   </div>
                 </>

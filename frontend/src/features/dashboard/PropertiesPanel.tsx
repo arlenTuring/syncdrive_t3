@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { usePlaneSourceResolver } from './context/PlaneDataSourceContext';
 import { getDataSourceById } from './store/useDataSourceStore';
 import { resolvePlaneRestUrl } from './elements/useWidgetData';
-import { stationEtaUrl, stationEvents } from './elements/stationEtaModel';
+import { DEFAULT_EMPHASIS_SECONDS, stationEtaUrl, stationEvents } from './elements/stationEtaModel';
 import { useTranslation } from 'react-i18next';
 import { useBindingIssueMap } from './context/BindingHealthContext';
 import type { 
@@ -2476,7 +2476,8 @@ function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; on
         />
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="最多幾列（上限 3；兩班即將到站只排 2）"><NumberInput value={w.limit} onChange={n => onUpdate({ limit: Math.max(1, Math.min(3, n)) })} className={inputCls} /></Field>
+        <Field label="最多幾列（上限 3；兩班放大只排 2）"><NumberInput value={w.limit} onChange={n => onUpdate({ limit: Math.max(1, Math.min(3, n)) })} className={inputCls} /></Field>
+        <Field label="到站／出發剩幾秒內放大"><NumberInput min={0} max={600} value={w.emphasisSeconds ?? DEFAULT_EMPHASIS_SECONDS} onChange={n => onUpdate({ emphasisSeconds: Math.max(0, Math.min(600, n)) })} className={inputCls} /></Field>
         <Field label="字級倍率（12＝設計稿；隨卡片寬度÷320 等比）"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
       </div>
       <Field label="資料端點（登入端內部 API）"><input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={`${inputCls} font-mono`} /></Field>
