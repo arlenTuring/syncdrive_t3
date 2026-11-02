@@ -63,7 +63,8 @@ async function refresh(base: string, entry: Entry): Promise<void> {
   }
 }
 
-function acquire(base: string, listener: (state: OperatingClockState) => void): () => void {
+/** 不在儀表板裡的元件訂閱營運時鐘用；同一個後端共用一份輪詢 */
+export function acquireOperatingClock(base: string, listener: (state: OperatingClockState) => void): () => void {
   let entry = entries.get(base);
   if (!entry) {
     entry = { state: { snapshot: null, receivedAt: 0, error: null }, listeners: new Set(), timer: null, unsubscribe: null, inflight: false };
@@ -124,7 +125,7 @@ export function useOperatingClock(): OperatingClockState & { operatingNow: () =>
   const resolve = usePlaneSourceResolver();
   const base = getDataSourceById(resolve('default-internal'))?.backendUrl ?? '';
   const [state, setState] = useState<OperatingClockState>(() => entries.get(base)?.state ?? { snapshot: null, receivedAt: 0, error: null });
-  useEffect(() => acquire(base, setState), [base]);
+  useEffect(() => acquireOperatingClock(base, setState), [base]);
   return useMemo(() => ({
     ...state,
     operatingNow: () => operatingNowFrom(state),
@@ -163,7 +164,7 @@ export function useOperatingClockPace(): OperatingClockPace {
     const state = entries.get(base)?.state;
     return state ? paceOf(state) : { replay: false, advancing: false, rate: 1 };
   });
-  useEffect(() => acquire(base, (state) => {
+  useEffect(() => acquireOperatingClock(base, (state) => {
     const next = paceOf(state);
     setPace((prev) => (prev.replay === next.replay && prev.advancing === next.advancing && prev.rate === next.rate ? prev : next));
   }), [base]);

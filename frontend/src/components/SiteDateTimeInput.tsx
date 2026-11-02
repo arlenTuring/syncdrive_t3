@@ -1,6 +1,7 @@
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Clock } from 'lucide-react';
 import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
 import { CustomDateTimePanel } from '../features/shift-records/components/CustomDateTimePanel';
+import { TimePickerPanel } from '../features/time-templates/components/TimeOfDayPicker';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
 
 type Kind = 'date' | 'time' | 'datetime-local';
@@ -38,6 +39,27 @@ function displayDateTimeValue(value: string, kind: Kind): string {
   return kind === 'datetime-local' ? value.replace('T', ' ') : value;
 }
 
+/** 只選時與分：不需要日期，用時段模板同一個時間面板 */
+function TimeOnlyPanel({ value, onConfirm }: { value: Date | null; onConfirm: (next: Date) => void }) {
+  const [hour, setHour] = useState(value?.getHours() ?? 0);
+  const [minute, setMinute] = useState(value?.getMinutes() ?? 0);
+  return (
+    <TimePickerPanel
+      hour={hour}
+      minute={minute}
+      second={0}
+      showSeconds={false}
+      onHourChange={setHour}
+      onMinuteChange={setMinute}
+      onConfirm={() => {
+        const next = new Date();
+        next.setHours(hour, minute, 0, 0);
+        onConfirm(next);
+      }}
+    />
+  );
+}
+
 /** 日期／時間輸入的網站深色面板；值格式維持原生 input 契約。 */
 export function SiteDateTimeInput({
   type,
@@ -57,6 +79,7 @@ export function SiteDateTimeInput({
   const [open, setOpen] = useState(false);
   const current = String(value ?? '');
   const includeSeconds = type === 'datetime-local' || current.split(':').length > 2 || Number(step) <= 1;
+  const timeOnly = type === 'time' && !includeSeconds;
   const emit = (nextDate: Date) => {
     let next = format(nextDate, type, includeSeconds);
     if (typeof min === 'string' && next < min) next = min;
@@ -82,7 +105,7 @@ export function SiteDateTimeInput({
         className={`flex min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       >
         <span className={`min-w-0 whitespace-nowrap tabular-nums ${current ? '' : 'text-zinc-500'}`}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
-        <CalendarClock className="size-4 shrink-0 text-zinc-500" aria-hidden />
+        {timeOnly ? <Clock className="size-4 shrink-0 text-zinc-500" aria-hidden /> : <CalendarClock className="size-4 shrink-0 text-zinc-500" aria-hidden />}
       </button>
       <AnchoredPopover
         open={open}
@@ -93,9 +116,13 @@ export function SiteDateTimeInput({
         align="start"
         offset={8}
         autoFocus={false}
-        className="w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50"
+        className={timeOnly ? undefined : 'w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50'}
       >
-        <CustomDateTimePanel key={`${type}-${current}`} value={parse(current, type)} onConfirm={emit} />
+        {timeOnly ? (
+          <TimeOnlyPanel key={current} value={parse(current, type)} onConfirm={emit} />
+        ) : (
+          <CustomDateTimePanel key={`${type}-${current}`} value={parse(current, type)} onConfirm={emit} />
+        )}
       </AnchoredPopover>
       {name ? <input type="hidden" name={name} value={current} /> : null}
     </>

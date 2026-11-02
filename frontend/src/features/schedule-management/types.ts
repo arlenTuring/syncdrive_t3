@@ -3,6 +3,7 @@ export type ShellView =
   | "shift-deployment"
   | "degraded-operation"
   | "dispatch-scheduling"
+  | "vehicle-rotation"
   | "scheduled-orders"
   | "order-records"
   | "psd-control"
@@ -67,6 +68,12 @@ export const OPERATIONS_NAV_ITEMS: ShellNavItem[] = [
   {
     id: "dispatch-scheduling",
     label: "nav.items.dispatch-scheduling",
+    enabled: true,
+    requiredPermission: "operations.dispatch.view",
+  },
+  {
+    id: "vehicle-rotation",
+    label: "nav.items.vehicle-rotation",
     enabled: true,
     requiredPermission: "operations.dispatch.view",
   },

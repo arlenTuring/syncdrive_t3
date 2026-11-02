@@ -17,6 +17,9 @@ export function SiteMultiSelect({
   allLabel = '全部',
   maxSelections = 100,
   className = '',
+  filterPlaceholder,
+  hideAllOption = false,
+  triggerLabel,
 }: {
   values: string[];
   options: SiteMultiSelectOption[];
@@ -25,9 +28,16 @@ export function SiteMultiSelect({
   allLabel?: string;
   maxSelections?: number;
   className?: string;
+  /** 有給才顯示清單上方的篩選框 */
+  filterPlaceholder?: string;
+  /** 空選代表「沒有選」而不是「全部」時用 */
+  hideAllOption?: boolean;
+  /** 取代按鈕上的「第一項 +N」摘要；選項另外列在畫面上時用 */
+  triggerLabel?: string;
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
   const selected = useMemo(() => new Set(values), [values]);
   const labels = options.filter((option) => selected.has(option.value)).map((option) => option.label);
   const summary = labels.length === 0 ? allLabel : labels.length === 1 ? labels[0] : `${labels[0]} +${labels.length - 1}`;
@@ -35,6 +45,9 @@ export function SiteMultiSelect({
     if (selected.has(value)) onChange(values.filter((item) => item !== value));
     else if (values.length < maxSelections) onChange([...values, value]);
   };
+
+  const keyword = filter.trim().toLowerCase();
+  const visible = keyword ? options.filter((option) => option.label.toLowerCase().includes(keyword)) : options;
 
   return (
     <>
@@ -53,7 +66,7 @@ export function SiteMultiSelect({
           }
         }}
       >
-        <span className="min-w-0 flex-1 truncate" title={labels.join('、') || allLabel}>{summary}</span>
+        <span className="min-w-0 flex-1 truncate" title={labels.join('、') || allLabel}>{triggerLabel ?? summary}</span>
         <ChevronDown className={`size-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
       <AnchoredPopover
@@ -67,17 +80,31 @@ export function SiteMultiSelect({
         className="max-h-80 overflow-y-auto rounded-lg border border-zinc-700 bg-[#18181b] py-1 shadow-xl shadow-black/50 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]"
         style={{ width: 280, maxWidth: 'calc(100vw - 24px)' }}
       >
-        <button
-          type="button"
-          role="option"
-          aria-selected={values.length === 0}
-          className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm ${values.length === 0 ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'}`}
-          onClick={() => onChange([])}
-        >
-          <span className="min-w-0 flex-1 truncate">{allLabel}</span>
-          {values.length === 0 ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : null}
-        </button>
-        {options.map((option) => {
+        {filterPlaceholder ? (
+          <div className="sticky top-0 z-10 border-b border-zinc-800 bg-[#18181b] p-2">
+            <input
+              type="text"
+              value={filter}
+              placeholder={filterPlaceholder}
+              aria-label={filterPlaceholder}
+              onChange={(event) => setFilter(event.target.value)}
+              className="h-7 w-full rounded-md bg-[#222831] px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500"
+            />
+          </div>
+        ) : null}
+        {hideAllOption ? null : (
+          <button
+            type="button"
+            role="option"
+            aria-selected={values.length === 0}
+            className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm ${values.length === 0 ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'}`}
+            onClick={() => onChange([])}
+          >
+            <span className="min-w-0 flex-1 truncate">{allLabel}</span>
+            {values.length === 0 ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : null}
+          </button>
+        )}
+        {visible.map((option) => {
           const active = selected.has(option.value);
           const disabled = option.disabled || (!active && values.length >= maxSelections);
           return (
@@ -97,7 +124,7 @@ export function SiteMultiSelect({
             </button>
           );
         })}
-        {options.length === 0 ? <div className="px-3 py-2 text-sm text-zinc-500">目前沒有來源標籤</div> : null}
+        {visible.length === 0 ? <div className="px-3 py-2 text-sm text-zinc-500">{keyword ? '沒有符合的項目' : '目前沒有來源標籤'}</div> : null}
       </AnchoredPopover>
     </>
   );

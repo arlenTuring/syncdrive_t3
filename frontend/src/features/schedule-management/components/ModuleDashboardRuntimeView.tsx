@@ -1,5 +1,5 @@
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Loader2, Maximize, Minimize } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BindingHealthProvider } from '../../dashboard/context/BindingHealthContext';
 import { DemoSimulationProvider } from '../../dashboard/context/DemoSimulationContext';
@@ -30,6 +30,38 @@ export function ModuleDashboardRuntimeView({
   pageLabel,
 }: ModuleDashboardRuntimeViewProps) {
   const { t } = useTranslation();
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState<'native' | 'web' | null>(null);
+
+  useEffect(() => {
+    const onChange = () => {
+      const ours = !!frameRef.current && document.fullscreenElement === frameRef.current;
+      setFullscreen((current) => (ours ? 'native' : current === 'web' ? 'web' : null));
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (fullscreen !== 'web') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullscreen(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen]);
+
+  const toggleFullscreen = () => {
+    if (fullscreen === 'web') return setFullscreen(null);
+    if (fullscreen === 'native') return void document.exitFullscreen().catch(() => undefined);
+    const frame = frameRef.current;
+    if (frame && document.fullscreenEnabled && typeof frame.requestFullscreen === 'function') {
+      // 瀏覽器拒絕時退回頁內滿版
+      frame.requestFullscreen().catch(() => setFullscreen('web'));
+    } else {
+      setFullscreen('web');
+    }
+  };
 
   /**
    * 版面以後端為準，每次進來都向後端拿；版面被別人存檔（或遷移腳本更新）時，後端會發
@@ -126,7 +158,19 @@ export function ModuleDashboardRuntimeView({
               apply: () => false,
             }}
           >
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950">
+            <div
+              ref={frameRef}
+              className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 ${fullscreen === 'web' ? 'fixed inset-0 z-[120]' : 'relative'}`}
+            >
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title={t(fullscreen ? 'shell.moduleDashboard.exitFullscreen' : 'shell.moduleDashboard.fullscreen')}
+                aria-label={t(fullscreen ? 'shell.moduleDashboard.exitFullscreen' : 'shell.moduleDashboard.fullscreen')}
+                className="absolute right-3 top-3 z-30 inline-flex size-8 items-center justify-center rounded-lg bg-[#1f1f22]/80 text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+              >
+                {fullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
+              </button>
               <VariableProvider variables={{}}>
                 <PlaneWorkspace
                   plane={plane}

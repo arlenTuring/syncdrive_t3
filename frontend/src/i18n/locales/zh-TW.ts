@@ -53,6 +53,7 @@ const zhTW = {
       "shift-deployment": "班表部署管理",
       "degraded-operation": "降級運轉管理",
       "dispatch-scheduling": "派遣調度管理",
+      "vehicle-rotation": "車輛輪替管理",
       "scheduled-orders": "排程訂單管理",
       "psd-control": "車門月台控制",
       map: "圖資資料管理",
@@ -117,6 +118,8 @@ const zhTW = {
       planeOption: "{{name}}（{{width}}×{{height}}）",
     },
     moduleDashboard: {
+      fullscreen: "全螢幕",
+      exitFullscreen: "離開全螢幕",
       loading: "載入儀表板平面…",
       notFoundTitle: "找不到儀表板平面",
       notFoundHint:

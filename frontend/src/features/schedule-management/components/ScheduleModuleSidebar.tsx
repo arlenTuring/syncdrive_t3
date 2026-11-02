@@ -7,7 +7,6 @@ import {
   ClipboardList,
   DoorOpen,
   FileText,
-  Headphones,
   LayoutDashboard,
   List,
   ListChecks,
@@ -19,6 +18,7 @@ import {
   Plus,
   Route,
   History,
+  Repeat,
   Send,
   Settings,
   ShieldCheck,
@@ -49,6 +49,7 @@ import {
   moduleDashboardViewId,
   parseModuleDashboardViewId,
 } from "../utils/moduleDashboardPages";
+import { ShellClock } from "./ShellClock";
 
 const SIDEBAR_COLLAPSED_KEY = "syncdrive_vtms_sidebar_collapsed";
 const VTMS_MARK_SRC = "/logo.svg";
@@ -75,6 +76,7 @@ const SUB_ICONS: Partial<Record<ShellView, typeof ClipboardList>> = {
   "shift-deployment": Activity,
   "degraded-operation": AlertTriangle,
   "dispatch-scheduling": Send,
+  "vehicle-rotation": Repeat,
   "scheduled-orders": ListChecks,
   "psd-control": DoorOpen,
   "virtual-fence": Pentagon,
@@ -598,17 +600,7 @@ export function ScheduleModuleSidebar({
           collapsed ? "px-1.5" : "px-2"
         }`}
       >
-        <button
-          type="button"
-          disabled
-          className={`flex w-full cursor-not-allowed items-center text-[14px] text-zinc-600 ${
-            collapsed ? "justify-center p-2.5" : "gap-2.5 px-3 py-2.5"
-          }`}
-          title={t("shell.comingSoon")}
-        >
-          <Headphones className="size-[18px] shrink-0" />
-          {!collapsed ? <span>{t("shell.comingSoon")}</span> : null}
-        </button>
+        <ShellClock compact={collapsed} />
       </div>
     </aside>
   );

@@ -17,6 +17,7 @@ import {
   Map,
   Pentagon,
   Route,
+  Repeat,
   Send,
   Settings2,
   Wrench,
@@ -66,6 +67,7 @@ const ShiftListApp = lazy(() => import("../shift-list"));
 const ShiftDeploymentApp = lazy(() => import("../shift-deployment"));
 const DegradedOperationApp = lazy(() => import("../degraded-operation"));
 const DispatchSchedulingApp = lazy(() => import("../dispatch-scheduling"));
+const VehicleRotationApp = lazy(() => import("../vehicle-rotation"));
 const ScheduledOrdersApp = lazy(() => import("../scheduled-orders"));
 const OrderRecordsPage = lazy(() => import("../order-records"));
 const PsdControlApp = lazy(() => import("../psd-control"));
@@ -199,6 +201,12 @@ function useWorkspaceChrome(
       return {
         title: t("nav.items.dispatch-scheduling"),
         icon: <Send className="size-4 text-sky-400" aria-hidden />,
+      };
+    }
+    if (view === "vehicle-rotation") {
+      return {
+        title: t("nav.items.vehicle-rotation"),
+        icon: <Repeat className="size-4 text-sky-400" aria-hidden />,
       };
     }
     if (view === "scheduled-orders") {
@@ -520,6 +528,22 @@ export default function ScheduleManagementApp({
                   })}
                 >
                   <DispatchSchedulingApp />
+                </ViewErrorBoundary>
+              </ShellWorkspaceFrame>
+            ) : null}
+
+            {view === "vehicle-rotation" ? (
+              <ShellWorkspaceFrame
+                title={chrome.title}
+                titleIcon={chrome.icon}
+                {...frameProps}
+              >
+                <ViewErrorBoundary
+                  title={t("shell.loadFailed", {
+                    title: t("nav.items.vehicle-rotation"),
+                  })}
+                >
+                  <VehicleRotationApp />
                 </ViewErrorBoundary>
               </ShellWorkspaceFrame>
             ) : null}

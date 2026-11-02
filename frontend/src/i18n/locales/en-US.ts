@@ -60,6 +60,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       "shift-deployment": "Shift Deployment",
       "degraded-operation": "Degraded Operation",
       "dispatch-scheduling": "Dispatch Scheduling",
+      "vehicle-rotation": "Vehicle Rotation",
       "scheduled-orders": "Scheduled Orders",
       "psd-control": "Door / PSD Control",
       map: "Map Data Management",
@@ -124,6 +125,8 @@ const enUS: DeepStringify<typeof zhTW> = {
       planeOption: "{{name}} ({{width}}×{{height}})",
     },
     moduleDashboard: {
+      fullscreen: "Full screen",
+      exitFullscreen: "Exit full screen",
       loading: "Loading dashboard plane…",
       notFoundTitle: "Dashboard plane not found",
       notFoundHint:
