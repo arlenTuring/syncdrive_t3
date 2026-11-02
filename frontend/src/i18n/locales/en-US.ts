@@ -187,7 +187,8 @@ const enUS: DeepStringify<typeof zhTW> = {
     sections: {
       locale: "Language & time zone",
       ntp: "Time sync (NTP)",
-      backup: "Data retention & backup",
+      dataRetention: "Data retention",
+      backup: "Data backup",
       ssl: "Transport encryption & SSL",
       security: "Security & dual confirmation",
       mqtt: "External messaging (MQTT)",

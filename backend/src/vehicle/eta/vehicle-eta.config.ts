@@ -25,14 +25,6 @@ export const vehicleEtaConfig = {
   get earlySeconds(): number {
     return envInt('EARLY_THRESHOLD_SECONDS', -30);
   },
-  /** delay_state 轉 MINOR_DELAY 的門檻（秒） */
-  get minorDelaySeconds(): number {
-    return envInt('MINOR_DELAY_THRESHOLD_SECONDS', 60);
-  },
-  /** delay_state 轉 MAJOR_DELAY 的門檻（秒） */
-  get majorDelaySeconds(): number {
-    return envInt('MAJOR_DELAY_THRESHOLD_SECONDS', 180);
-  },
   /** 資料逾時門檻（秒）；超過即 arrival_state = UNKNOWN */
   get dataStaleSeconds(): number {
     return envInt('DATA_STALE_THRESHOLD_SECONDS', 90);

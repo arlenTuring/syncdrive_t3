@@ -107,6 +107,7 @@ import {
   DataCleanupPlan,
   DataRetentionPolicy,
 } from './database/entities/data-retention.entities';
+import { SystemBackupRun, SystemBackupSettings } from './database/entities/system-backup.entities';
 import { ScheduledOrderEntry } from './database/entities/scheduled-order-entry.entity';
 
 @Module({
@@ -191,6 +192,8 @@ import { ScheduledOrderEntry } from './database/entities/scheduled-order-entry.e
           VehicleHistoryStreamKey,
           DataAdminAudit,
           DataRetentionPolicy,
+          SystemBackupSettings,
+          SystemBackupRun,
           DataCleanupPlan,
           DataCleanupJob,
           ScheduledOrderEntry,

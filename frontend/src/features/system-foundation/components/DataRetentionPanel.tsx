@@ -1,12 +1,11 @@
-import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useState } from 'react'
-import { HardDrive, History, ShieldAlert, Trash2 } from 'lucide-react'
+import { HardDrive, History, Trash2 } from 'lucide-react'
 import { useAuth } from '../../access-control/AuthContext'
 import { useDemoAccount } from '../../schedule-management/utils/demoAccountPreference'
 import {
   executeCleanupPlan, fetchCleanupCategories, fetchCleanupJobs, fetchRetentionOverview,
-  previewCleanup, previewRetentionPolicy, saveRetentionPolicy, stopCleanupJob,
-  type CleanupCategory, type CleanupJob, type CleanupPreview, type RetentionOverview, type RetentionPolicy,
+  previewCleanup, stopCleanupJob,
+  type CleanupCategory, type CleanupJob, type CleanupPreview, type RetentionOverview,
 } from '../api/dataAdminApi'
 
 const bytes = (value?: number | null) => value == null ? '無法取得' : new Intl.NumberFormat('zh-TW', { style: 'unit', unit: 'megabyte', maximumFractionDigits: 1 }).format(value / 1024 / 1024)
@@ -22,13 +21,11 @@ export function DataRetentionPanel() {
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [drafts, setDrafts] = useState<Record<string, { enabled: boolean; retentionValue: number; retentionUnit: 'hour' | 'day'; intervalMinutes: number }>>({})
 
   async function load() {
     try {
       const [nextOverview, nextCategories, nextJobs] = await Promise.all([fetchRetentionOverview(account), fetchCleanupCategories(account), fetchCleanupJobs(account)])
       setOverview(nextOverview); setCategories(nextCategories); setJobs(nextJobs)
-      setDrafts(Object.fromEntries(nextOverview.policies.map((p) => [p.category, { enabled: p.enabled, retentionValue: Number(p.retention_value), retentionUnit: p.retention_unit, intervalMinutes: Number(p.interval_minutes) }])))
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) }
   }
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -61,23 +58,6 @@ export function DataRetentionPanel() {
     try { await Promise.all(previews.map((preview) => executeCleanupPlan(account, preview.planId))); setConfirming(false); setPreviews([]); await load() }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
-  async function updatePolicy(policy: RetentionPolicy) {
-    if (!auth.require('system.data-admin.policy')) return
-    const draft = drafts[policy.category]; if (!draft) return
-    setBusy(true); setError('')
-    try {
-      let confirmationPlanId: string | undefined
-      const oldMs = Number(policy.retention_value) * (policy.retention_unit === 'day' ? 86_400_000 : 3_600_000)
-      const newMs = draft.retentionValue * (draft.retentionUnit === 'day' ? 86_400_000 : 3_600_000)
-      if ((draft.enabled && !policy.enabled) || (draft.enabled && newMs < oldMs)) {
-        const impact = await previewRetentionPolicy(account, policy.category, draft)
-        if (!window.confirm(`政策將影響約 ${impact.preview.records} 筆資料。${impact.preview.impact}\n\n啟用或縮短保留期限後，排程會進行不可還原的刪除。是否儲存？`)) return
-        confirmationPlanId = impact.planId
-      }
-      await saveRetentionPolicy(account, policy.category, { ...draft, confirmationPlanId }); await load()
-    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
-  }
-
   return <div className="space-y-3 text-xs">
     <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><HardDrive size={16} />資料容量概況<button type="button" disabled={busy || hasActiveJobs} onClick={() => void createQuickPreview(categories.map((item) => item.key))} className="ml-auto rounded bg-rose-700 px-3 py-1.5 text-white disabled:opacity-50"><Trash2 size={14} className="mr-1 inline" />全部清除</button><button type="button" onClick={() => void load()} className="text-sky-300">重新統計</button></div>
@@ -95,18 +75,7 @@ export function DataRetentionPanel() {
       <div className="mt-2 text-zinc-500">最後統計：{date(overview?.collectedAt)}。{overview?.countSemantics}</div>
     </section>
 
-    <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldAlert size={16} />自動保留政策</div>
-      <div className="space-y-2">{overview?.policies.map((policy) => { const draft = drafts[policy.category]; const info = categories.find((item) => item.key === policy.category); if (!draft) return null; return <div key={policy.category} className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-2 rounded bg-black p-2">
-        <div><strong>{info?.label ?? policy.category}</strong><div className="text-zinc-500">{policy.source === 'timescaledb_existing' ? policy.readOnlyReason : `最近成功 ${date(policy.last_success_at)}／下次 ${date(policy.next_run_at)}`}</div></div>
-        <label><input type="checkbox" checked={draft.enabled} disabled={policy.source === 'timescaledb_existing'} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, enabled: e.target.checked } })} /> 啟用</label>
-        <input aria-label={`${policy.category}保留數量`} type="number" min={1} value={draft.retentionValue} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, retentionValue: Number(e.target.value) } })} className="w-20 rounded border border-zinc-700 bg-zinc-900 p-1" />
-        <SiteSelect value={draft.retentionUnit} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, retentionUnit: e.target.value as 'hour' | 'day' } })} className="rounded border border-zinc-700 bg-zinc-900 p-1"><option value="hour">小時</option><option value="day">天</option></SiteSelect>
-        <label className="text-zinc-500">每 <input aria-label={`${policy.category}執行間隔`} type="number" min={15} value={draft.intervalMinutes} onChange={(e) => setDrafts({ ...drafts, [policy.category]: { ...draft, intervalMinutes: Number(e.target.value) } })} className="w-20 rounded border border-zinc-700 bg-zinc-900 p-1 text-zinc-200" /> 分鐘</label>
-        <button type="button" disabled={busy || policy.source === 'timescaledb_existing'} onClick={() => void updatePolicy(policy)} className="rounded border border-sky-700 px-2 py-1 text-sky-300">儲存</button>
-      </div>})}</div>
-      <div className="mt-2 text-zinc-500">執行間隔目前由後端保存（預設每日）；新政策全部預設停用。既有 TimescaleDB 政策只顯示、不建立第二個排程。</div>
-    </section>
+    <p className="text-zinc-500">自動保存天數已移到「系統基礎設定 › 資料保存天數」。</p>
 
     <section className="rounded border border-zinc-800 bg-zinc-900 p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><History size={16} />清理執行紀錄</div>

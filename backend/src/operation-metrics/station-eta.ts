@@ -101,6 +101,8 @@ export function mergeStationEvents(args: {
   operatingNow: number;
   staleAfterSeconds: number;
   limit: number;
+  /** 沒有即時資料的計畫列，過了表定時間再留多久（毫秒） */
+  planExpiredAfterMs?: number;
 }): StationEventGroup[] {
   const liveByTrip = new Map<string, LiveVehicle>();
   const staleVehicles = new Set<string>();
@@ -249,7 +251,7 @@ export function mergeStationEvents(args: {
       if (staleHere && at <= now + 30 * 60_000) group.staleHere.add(stop.vehicleCode);
     };
     // 沒有即時資料可依：計畫時刻已過就不列（已開始的班次沒有即時資料也一樣，不冒充即將發生）
-    const expired = (plannedAt: number) => !live && plannedAt < now - PLAN_EXPIRED_AFTER_MS;
+    const expired = (plannedAt: number) => !live && plannedAt < now - (args.planExpiredAfterMs ?? PLAN_EXPIRED_AFTER_MS);
 
     /*
      * 班與班接續的站（ST 的終點 T3上行＝下一班 TN 的起站）：計畫在兩班各記一次，其實是同一次

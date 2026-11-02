@@ -1,9 +1,10 @@
 import { AuditAction } from '../audit/audit-action.decorator';
-import { Body, Controller, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { type AuthenticatedRequest, RequirePermission } from '../access-control/access.guard';
 import { DataAdminService, type ExecuteAdminQuery } from './data-admin.service';
 import { LiveDataResetService } from './live-data-reset.service';
 import { DataRetentionService } from './data-retention.service';
+import { SystemBackupService } from './system-backup.service';
 
 @Controller('syncdrive-api/data-admin')
 @RequirePermission('system.data-admin.view')
@@ -12,6 +13,7 @@ export class DataAdminController {
     private readonly service: DataAdminService,
     private readonly liveReset: LiveDataResetService,
     private readonly retention: DataRetentionService,
+    private readonly backup: SystemBackupService,
   ) {}
 
   @Get('retention/categories')
@@ -55,6 +57,34 @@ export class DataAdminController {
   policySave(@Param('category') category: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return this.retention.savePolicy(category, body, request.authUser!.id);
   }
+
+  @Get('backup')
+  backupStatus() { return this.backup.status(); }
+
+  @Post('backup/check-dir')
+  @RequirePermission('system.data-admin.policy')
+  backupCheckDir(@Body() body: { dir?: unknown }) { return this.backup.inspectDir(body?.dir); }
+
+  @AuditAction('SYSTEM_BACKUP_SETTINGS')
+  @Put('backup/settings')
+  @RequirePermission('system.data-admin.policy')
+  backupSaveSettings(@Body() body: unknown, @Req() request: AuthenticatedRequest) {
+    return this.backup.saveSettings(body, request.authUser!.id);
+  }
+
+  @AuditAction('SYSTEM_BACKUP_RUN')
+  @Post('backup/runs')
+  @RequirePermission('system.data-admin.policy')
+  backupRun(@Req() request: AuthenticatedRequest) { return this.backup.start('manual', request.authUser!.id); }
+
+  @Post('backup/runs/:id/stop')
+  @RequirePermission('system.data-admin.policy')
+  backupStop(@Param('id') id: string) { return this.backup.stop(id); }
+
+  @AuditAction('SYSTEM_BACKUP_DELETE', { param: 'id' })
+  @Delete('backup/runs/:id')
+  @RequirePermission('system.data-admin.cleanup')
+  backupDelete(@Param('id') id: string) { return this.backup.remove(id); }
 
   @Get('metadata')
   metadata() {

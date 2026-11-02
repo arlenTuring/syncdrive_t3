@@ -11,6 +11,7 @@ export enum EventCode {
   SYSTEM_HEALTH_DEGRADED = 'SYSTEM_HEALTH_DEGRADED',
   // 中心端判定（班表部署管理的班車延誤監督），車端不能回報
   TRIP_DELAYED = 'TRIP_DELAYED',
+  SYSTEM_BACKUP_FAILED = 'SYSTEM_BACKUP_FAILED',
 }
 
 export type EventSourceType = 'VEHICLE' | 'FACILITY' | 'SYSTEM';

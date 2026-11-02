@@ -101,12 +101,20 @@ function resolveArrivalStateFromTasks(
   return null;
 }
 
-/** 規格書 7.10：delay_state。門檻可由部署參數調整，級距的開閉區間照規格。 */
-export function resolveDelayState(delaySeconds: number | null): DelayState {
+export const DEFAULT_DELAY_THRESHOLDS = { minorSeconds: 60, majorSeconds: 180 };
+
+/**
+ * 規格書 7.10：delay_state。延誤與嚴重延誤的秒數跟班車延誤判定共用同一組全域參數（系統基礎設定），
+ * 班次上寫延誤、ETA 給乘客看到的才會是同一條界線；比的是這一站預估到站與計畫到站的差。
+ */
+export function resolveDelayState(
+  delaySeconds: number | null,
+  thresholds: { minorSeconds: number; majorSeconds: number } = DEFAULT_DELAY_THRESHOLDS,
+): DelayState {
   if (delaySeconds == null) return 'NO_PLAN';
   if (delaySeconds < vehicleEtaConfig.earlySeconds) return 'EARLY';
-  if (delaySeconds <= vehicleEtaConfig.minorDelaySeconds) return 'ON_TIME';
-  if (delaySeconds <= vehicleEtaConfig.majorDelaySeconds) return 'MINOR_DELAY';
+  if (delaySeconds <= thresholds.minorSeconds) return 'ON_TIME';
+  if (delaySeconds <= thresholds.majorSeconds) return 'MINOR_DELAY';
   return 'MAJOR_DELAY';
 }
 

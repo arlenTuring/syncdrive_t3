@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   writeUserLocaleOverride,
@@ -37,11 +37,23 @@ import {
   SelectField,
   SettingsFooter,
   TextField,
-  TimeField,
   ToggleRow,
 } from './SettingsFormControls'
+import { BackupSettings } from './BackupSettings'
+import { DataRetentionSettings } from './DataRetentionSettings'
 import { useAdminModePreference } from '../../schedule-management/utils/adminModePreference'
 import { useSupervisorApprovalPreference } from '../../schedule-management/utils/supervisorApprovalPreference'
+
+/** 一組全域參數：標題與用途放在上方，讓人知道這些值給哪裡用 */
+function ParamGroup({ title, usage, children }: { title: string; usage: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-[13px] font-semibold text-zinc-200">{title}</h3>
+      <p className="mb-3 mt-0.5 text-[12px] text-zinc-500">用途：{usage}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
+    </section>
+  )
+}
 
 function SectionTitle({ children }: { children: string }) {
   return (
@@ -331,107 +343,17 @@ export function SystemFoundationSettingsPanel() {
                 </>
               ) : null}
 
+              {section === 'dataRetention' ? (
+                <>
+                  <SectionTitle>{sectionLabel}</SectionTitle>
+                  <DataRetentionSettings />
+                </>
+              ) : null}
+
               {section === 'backup' ? (
                 <>
                   <SectionTitle>{sectionLabel}</SectionTitle>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <NumberStepperField
-                        label={t('systemFoundation.backup.opLogDays')}
-                        value={draft.backup.operationLogRetentionDays}
-                        unit={t('systemFoundation.backup.days')}
-                        min={1}
-                        max={3650}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            backup: {
-                              ...prev.backup,
-                              operationLogRetentionDays: v,
-                            },
-                          }))
-                        }
-                      />
-                      <NumberStepperField
-                        label={t('systemFoundation.backup.telemetryDays')}
-                        value={draft.backup.telemetryRetentionDays}
-                        unit={t('systemFoundation.backup.days')}
-                        min={1}
-                        max={3650}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            backup: {
-                              ...prev.backup,
-                              telemetryRetentionDays: v,
-                            },
-                          }))
-                        }
-                      />
-                      <SelectField
-                        label={t('systemFoundation.backup.frequency')}
-                        value={draft.backup.backupFrequency}
-                        options={INTERVAL_OPTIONS}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            backup: {
-                              ...prev.backup,
-                              backupFrequency:
-                                v as typeof prev.backup.backupFrequency,
-                            },
-                          }))
-                        }
-                      />
-                      <TimeField
-                        label={t('systemFoundation.backup.dailyTime')}
-                        value={draft.backup.dailyBackupTime}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            backup: { ...prev.backup, dailyBackupTime: v },
-                          }))
-                        }
-                      />
-                    </div>
-                    <TextField
-                      label={t('systemFoundation.backup.localPath')}
-                      value={draft.backup.localBackupPath}
-                      onChange={(v) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          backup: { ...prev.backup, localBackupPath: v },
-                        }))
-                      }
-                    />
-                    <div className="border-t border-zinc-800 pt-4">
-                      <ToggleRow
-                        label={t('systemFoundation.backup.cloudSync')}
-                        checked={draft.backup.cloudBackupEnabled}
-                        onChange={(checked) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            backup: {
-                              ...prev.backup,
-                              cloudBackupEnabled: checked,
-                            },
-                          }))
-                        }
-                      />
-                      <div className="mt-3">
-                        <TextField
-                          label={t('systemFoundation.backup.cloudPath')}
-                          value={draft.backup.cloudBackupPath}
-                          onChange={(v) =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              backup: { ...prev.backup, cloudBackupPath: v },
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <BackupSettings />
                 </>
               ) : null}
 
@@ -870,71 +792,10 @@ export function SystemFoundationSettingsPanel() {
               {section === 'globalParams' ? (
                 <>
                   <SectionTitle>{sectionLabel}</SectionTitle>
-                  <div className="space-y-4">
-                    <ToggleRow
-                      label={t('systemFoundation.globalParams.mapActiveSync')}
-                      checked={draft.globalParams.mapActiveSyncEnabled}
-                      onChange={(checked) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          globalParams: {
-                            ...prev.globalParams,
-                            mapActiveSyncEnabled: checked,
-                          },
-                        }))
-                      }
-                    />
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-6">
+                    <ParamGroup title="班次營運" usage="班車延誤事件、班次統計、班次運行紀錄、儀表板，以及給乘客與對外 API 的 ETA 延誤狀態">
                       <NumberStepperField
-                        label="碰撞防護緩衝時間"
-                        value={draft.globalParams.collisionProtectionSeconds}
-                        unit={t('systemFoundation.mqtt.seconds')}
-                        min={0}
-                        max={600}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            globalParams: {
-                              ...prev.globalParams,
-                              collisionProtectionSeconds: v,
-                            },
-                          }))
-                        }
-                      />
-                      <NumberStepperField
-                        label="預設車速上限"
-                        value={draft.globalParams.defaultVehicleSpeedLimitKmh}
-                        unit="km/h"
-                        min={1}
-                        max={200}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            globalParams: {
-                              ...prev.globalParams,
-                              defaultVehicleSpeedLimitKmh: v,
-                            },
-                          }))
-                        }
-                      />
-                      <NumberStepperField
-                        label="事件資料保存天數"
-                        value={draft.globalParams.eventRetentionDays}
-                        unit={t('systemFoundation.backup.days')}
-                        min={1}
-                        max={3650}
-                        onChange={(v) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            globalParams: {
-                              ...prev.globalParams,
-                              eventRetentionDays: v,
-                            },
-                          }))
-                        }
-                      />
-                      <NumberStepperField
-                        label="班車延誤判定（超過計畫結束）"
+                        label="班車延誤判定（超過計畫）"
                         value={draft.globalParams.tripDelayToleranceSeconds}
                         unit={t('systemFoundation.mqtt.seconds')}
                         min={0}
@@ -949,7 +810,41 @@ export function SystemFoundationSettingsPanel() {
                           }))
                         }
                       />
-                    </div>
+                      <NumberStepperField
+                        label="班車嚴重延誤判定（超過計畫）"
+                        value={draft.globalParams.tripMajorDelaySeconds}
+                        unit={t('systemFoundation.mqtt.seconds')}
+                        min={0}
+                        max={3600}
+                        onChange={(v) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            globalParams: {
+                              ...prev.globalParams,
+                              tripMajorDelaySeconds: v,
+                            },
+                          }))
+                        }
+                      />
+                    </ParamGroup>
+                    <ParamGroup title="降級運轉" usage="降級解除時，車輛恢復使用的車速上限（降級運轉管理）">
+                      <NumberStepperField
+                        label="解除後恢復車速上限"
+                        value={draft.globalParams.defaultVehicleSpeedLimitKmh}
+                        unit="km/h"
+                        min={1}
+                        max={200}
+                        onChange={(v) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            globalParams: {
+                              ...prev.globalParams,
+                              defaultVehicleSpeedLimitKmh: v,
+                            },
+                          }))
+                        }
+                      />
+                    </ParamGroup>
                   </div>
                 </>
               ) : null}
@@ -982,7 +877,7 @@ export function SystemFoundationSettingsPanel() {
             </div>
 
             {/* 操作模式是這台瀏覽器的偏好、切換即生效，不走系統設定的儲存流程 */}
-            {section === 'operation' ? null : (
+            {section === 'operation' || section === 'dataRetention' || section === 'backup' ? null : (
               <SettingsFooter
                 saving={saving}
                 error={error}

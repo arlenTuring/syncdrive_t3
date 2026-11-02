@@ -12,16 +12,6 @@ export type NtpSettings = {
   currentOffsetMs: number | null
 }
 
-export type BackupSettings = {
-  operationLogRetentionDays: number
-  telemetryRetentionDays: number
-  backupFrequency: '15m' | '1h' | '6h' | '12h' | '24h'
-  dailyBackupTime: string
-  localBackupPath: string
-  cloudBackupEnabled: boolean
-  cloudBackupPath: string
-}
-
 export type SslSettings = {
   allowTls11: boolean
   allowTls12: boolean
@@ -59,17 +49,14 @@ export type AuditorRoleOption = {
 }
 
 export type GlobalParamSettings = {
-  mapActiveSyncEnabled: boolean
-  collisionProtectionSeconds: number
   defaultVehicleSpeedLimitKmh: number
-  eventRetentionDays: number
   tripDelayToleranceSeconds: number
+  tripMajorDelaySeconds: number
 }
 
 export type SystemFoundationSettings = {
   locale: LocaleSettings
   ntp: NtpSettings
-  backup: BackupSettings
   ssl: SslSettings
   security: SecuritySettings
   mqtt: MqttSettings
@@ -79,6 +66,7 @@ export type SystemFoundationSettings = {
 export type FoundationSectionId =
   | 'locale'
   | 'ntp'
+  | 'dataRetention'
   | 'backup'
   | 'ssl'
   | 'security'
@@ -93,6 +81,7 @@ export const FOUNDATION_SECTIONS: Array<{
 }> = [
   { id: 'locale', labelKey: 'locale' },
   { id: 'ntp', labelKey: 'ntp' },
+  { id: 'dataRetention', labelKey: 'dataRetention' },
   { id: 'backup', labelKey: 'backup' },
   { id: 'ssl', labelKey: 'ssl' },
   { id: 'security', labelKey: 'security' },
@@ -195,15 +184,6 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       lastSyncAt: null,
       currentOffsetMs: null,
     },
-    backup: {
-      operationLogRetentionDays: 90,
-      telemetryRetentionDays: 180,
-      backupFrequency: '1h',
-      dailyBackupTime: '02:00',
-      localBackupPath: '/var/backups/avms_db/',
-      cloudBackupEnabled: true,
-      cloudBackupPath: 's3://avms-fleet-backup-vault/prod/',
-    },
     ssl: {
       allowTls11: false,
       allowTls12: true,
@@ -227,11 +207,9 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       password: '',
     },
     globalParams: {
-      mapActiveSyncEnabled: true,
-      collisionProtectionSeconds: 30,
       defaultVehicleSpeedLimitKmh: 40,
-      eventRetentionDays: 90,
       tripDelayToleranceSeconds: 60,
+      tripMajorDelaySeconds: 180,
     },
   }
 }

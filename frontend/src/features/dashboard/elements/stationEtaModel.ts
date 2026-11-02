@@ -82,7 +82,7 @@ export function stationEvents(station: StationConfig): Array<'arrive' | 'depart'
 }
 
 /** 清單的網址：到站、出發的站點各自帶上 */
-export function stationEtaUrl(widget: Pick<StationEtaWidget, 'dataUrl' | 'stations' | 'limit'>): string {
+export function stationEtaUrl(widget: Pick<StationEtaWidget, 'dataUrl' | 'stations' | 'limit' | 'planKeepSeconds'>): string {
   const base = widget.dataUrl || '';
   const pick = (event: 'arrive' | 'depart') => widget.stations
     .filter((s) => s.stationId.trim() && stationEvents(s).includes(event))
@@ -94,6 +94,7 @@ export function stationEtaUrl(widget: Pick<StationEtaWidget, 'dataUrl' | 'statio
     arrive.length ? `arrive=${arrive.join(',')}` : '',
     depart.length ? `depart=${depart.join(',')}` : '',
     `limit=${Math.max(1, Math.min(10, widget.limit || 3))}`,
+    widget.planKeepSeconds != null ? `plan_keep_seconds=${widget.planKeepSeconds}` : '',
   ].filter(Boolean).join('&');
   return `${base}${base.includes('?') ? '&' : '?'}${params}`;
 }
@@ -164,11 +165,12 @@ export function rowTag(event: StationEvent): EventStatus | null {
  * 要顯示的列：同一車同一次停靠（row_key）只留一筆；計畫值過期先拿掉（與後端同門檻），
  * 即時與停靠中的不拿；依時刻排，平手用 key，順序不會每秒跳。
  */
-export function visibleEvents(response: StationEtaResponse | null, operatingNow: number, limit: number): StationEvent[] {
+export function visibleEvents(response: StationEtaResponse | null, operatingNow: number, limit: number, planKeepSeconds?: number): StationEvent[] {
+  const keepMs = planKeepSeconds != null ? planKeepSeconds * 1000 : PLAN_EXPIRED_AFTER_MS;
   const seen = new Set<string>();
   return (response?.stations ?? [])
     .flatMap((group) => group.events ?? [])
-    .filter((e) => e.kind === 'live' || e.at_station || e.at >= operatingNow - PLAN_EXPIRED_AFTER_MS)
+    .filter((e) => e.kind === 'live' || e.at_station || e.at >= operatingNow - keepMs)
     .sort((a, b) => a.at - b.at || a.key.localeCompare(b.key))
     .filter((e) => {
       const id = e.row_key || e.key;

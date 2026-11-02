@@ -13,10 +13,12 @@ import { DataCleanupJob, DataCleanupPlan, DataRetentionPolicy } from '../databas
 import { VehicleHistoryModule } from '../vehicle-history/vehicle-history.module';
 import { DegradedReplayModule } from '../degraded-replay/degraded-replay.module';
 import { DataRetentionService } from './data-retention.service';
+import { SystemBackupService } from './system-backup.service';
+import { EventsModule } from '../events/events.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DataAdminAudit, DataCleanupJob, DataCleanupPlan, DataRetentionPolicy]), RedisModule, MqttModule, DemoSimulationModule, DispatchModule, VehicleHistoryModule, DegradedReplayModule],
+  imports: [TypeOrmModule.forFeature([DataAdminAudit, DataCleanupJob, DataCleanupPlan, DataRetentionPolicy]), RedisModule, MqttModule, DemoSimulationModule, DispatchModule, VehicleHistoryModule, DegradedReplayModule, EventsModule],
   controllers: [DataAdminController],
-  providers: [DataAdminService, DataAdminGuard, LiveDataResetService, DataRetentionService],
+  providers: [DataAdminService, DataAdminGuard, LiveDataResetService, DataRetentionService, SystemBackupService],
 })
 export class DataAdminModule {}

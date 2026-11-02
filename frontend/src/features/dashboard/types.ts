@@ -816,6 +816,8 @@ export interface StationEtaWidget extends WidgetBase, WidgetDataBinding {
   limit: number;
   /** 到站、出發剩幾秒內放大顯示（預設 30；舊設定沒有這個欄位） */
   emphasisSeconds?: number;
+  /** 沒有即時資料的計畫列，過了表定時間再留幾秒（預設 30；舊設定沒有這個欄位） */
+  planKeepSeconds?: number;
   /**
    * 字級倍率：12＝設計稿字級（站名 24、倒數 48、列 18…，見 stationEtaModel cardScale）。
    * 實際大小再乘卡片寬度 ÷ 320，整張卡等比；最小 10。

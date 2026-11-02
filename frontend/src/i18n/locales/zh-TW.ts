@@ -180,7 +180,8 @@ const zhTW = {
     sections: {
       locale: "系統語系與時區",
       ntp: "時間同步服務 (NTP)",
-      backup: "數據保存與自動備份",
+      dataRetention: "資料保存天數",
+      backup: "資料備份",
       ssl: "傳輸加密與 SSL 憑證",
       security: "安全政策與雙重確認",
       mqtt: "外部通訊 (MQTT)",

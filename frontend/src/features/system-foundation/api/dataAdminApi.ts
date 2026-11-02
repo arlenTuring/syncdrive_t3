@@ -37,6 +37,19 @@ export async function stopCleanupJob(account: DemoAccount, jobId: string) { retu
 export async function previewRetentionPolicy(account: DemoAccount, category: string, body: { enabled: boolean; retentionValue: number; retentionUnit: 'hour' | 'day'; intervalMinutes: number }) { return readResponse<CleanupPreview>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/policies/${category}/preview`, { method: 'POST', headers: adminHeaders(account), body: JSON.stringify(body) })) }
 export async function saveRetentionPolicy(account: DemoAccount, category: string, body: { enabled: boolean; retentionValue: number; retentionUnit: 'hour' | 'day'; intervalMinutes: number; confirmationPlanId?: string }) { return readResponse<RetentionPolicy>(await fetch(`${apiBase()}/syncdrive-api/data-admin/retention/policies/${category}`, { method: 'PUT', headers: adminHeaders(account), body: JSON.stringify(body) })) }
 
+export type BackupSettingsValue = { manualDir: string; autoDir: string; autoEnabled: boolean; autoTime: string; keepCount: number; includeFiles: boolean }
+export type BackupRun = { id: string; trigger: 'manual' | 'auto'; status: 'running' | 'success' | 'failed' | 'stopped'; dir: string; name: string; include_files: boolean; started_at: string; finished_at: string | null; database_bytes: string | null; files_bytes: string | null; database_sha256: string | null; verified: boolean; error: string | null; operator_id: string | null; files_exist: boolean | null }
+export type BackupStatus = { settings: BackupSettingsValue & { nextRunAt: number | null }; tools: { available: boolean; version: string | null; error?: string }; databaseBytes: number; runs: BackupRun[] }
+export type BackupLocation = { path: string; totalBytes: number; freeBytes: number; sameDiskAsSystem: boolean }
+
+const backupUrl = (path = '') => `${apiBase()}/syncdrive-api/data-admin/backup${path}`
+export async function fetchBackupStatus(account: DemoAccount) { return readResponse<BackupStatus>(await fetch(backupUrl(), { headers: adminHeaders(account) })) }
+export async function checkBackupDir(account: DemoAccount, dir: string) { return readResponse<BackupLocation>(await fetch(backupUrl('/check-dir'), { method: 'POST', headers: adminHeaders(account), body: JSON.stringify({ dir }) })) }
+export async function saveBackupSettings(account: DemoAccount, body: BackupSettingsValue) { return readResponse<BackupStatus>(await fetch(backupUrl('/settings'), { method: 'PUT', headers: adminHeaders(account), body: JSON.stringify(body) })) }
+export async function startBackup(account: DemoAccount) { return readResponse<BackupRun>(await fetch(backupUrl('/runs'), { method: 'POST', headers: adminHeaders(account) })) }
+export async function stopBackup(account: DemoAccount, id: string) { return readResponse<{ stopping: boolean }>(await fetch(backupUrl(`/runs/${id}/stop`), { method: 'POST', headers: adminHeaders(account) })) }
+export async function deleteBackup(account: DemoAccount, id: string) { return readResponse<{ deleted: boolean }>(await fetch(backupUrl(`/runs/${id}`), { method: 'DELETE', headers: adminHeaders(account) })) }
+
 async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {

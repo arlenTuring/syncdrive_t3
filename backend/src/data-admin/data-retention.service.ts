@@ -20,6 +20,13 @@ const CATEGORY_INFO: Record<CleanupCategory, { label: string; impact: string; ta
   security_events: { label: '事件紀錄', impact: '只清除已人工確認的事件；清除後歷史事件與事件報表查不到該期間的已確認事件（含確認紀錄）。待確認事件一律保留在事件管理清單的待確認標籤；操作、權限與登入稽核不受影響。', tables: ['security_event_logs'], vehicleFilter: true, trustedTime: 'received_at（後端接收時間；缺值的舊資料排除）' },
 };
 
+/** 資料庫排程目前的遙測保留設定；沒有排程就是不清理 */
+function telemetrySchedule(job: { config?: { drop_after?: string } } | null) {
+  if (!job) return { enabled: false };
+  const match = /^(\d+) (day|hour)/.exec(job.config?.drop_after ?? '');
+  return match ? { enabled: true, retention_value: Number(match[1]), retention_unit: match[2] } : { enabled: true };
+}
+
 @Injectable()
 export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DataRetentionService.name);
@@ -52,7 +59,7 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
 
   private async legacyTelemetryPolicy() {
     try {
-      const rows = await this.db.query(`SELECT job_id, schedule_interval::text, config, next_start, last_run_status, last_successful_finish FROM timescaledb_information.jobs WHERE proc_name='policy_retention' AND hypertable_name='telemetry_logs' LIMIT 1`);
+      const rows = await this.db.query(`SELECT j.job_id, j.schedule_interval::text, j.config, s.next_start, s.last_run_status, s.last_successful_finish FROM timescaledb_information.jobs j LEFT JOIN timescaledb_information.job_stats s USING (job_id) WHERE j.proc_name='policy_retention' AND j.hypertable_name='telemetry_logs' LIMIT 1`);
       return rows[0] ?? null;
     } catch { return null; }
   }
@@ -60,9 +67,10 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
   async policies() {
     const rows = await this.db.query(`SELECT * FROM data_retention_policies ORDER BY category`);
     const legacy = await this.legacyTelemetryPolicy();
-    return rows.map((row: any) => row.category === 'telemetry' && legacy ? {
-      ...row, enabled: true, source: 'timescaledb_existing', readOnlyReason: '既有 TimescaleDB 政策仍由資料庫排程；本功能不會重複排程或自動縮短期限。', external: legacy,
-    } : { ...row, source: 'syncdrive', external: null });
+    return rows.map((row: any) => row.category === 'telemetry'
+      // 遙測由 TimescaleDB 整塊刪除，資料庫排程才是實際狀態
+      ? { ...row, ...telemetrySchedule(legacy), source: 'timescaledb', external: legacy }
+      : { ...row, source: 'syncdrive', external: null });
   }
 
   async overview() {
@@ -303,24 +311,28 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
 
   async savePolicy(category: string, input: any, operatorId: string) {
     if (!CATEGORY_INFO[category as CleanupCategory]) throw new BadRequestException('不支援的資料類別');
-    if (category === 'telemetry' && await this.legacyTelemetryPolicy()) throw new ConflictException('目前有既有 TimescaleDB 遙測政策；請先由維運流程確認並移轉，系統不會建立第二個排程');
     const enabled = Boolean(input?.enabled); const value = Number(input?.retentionValue); const unit = input?.retentionUnit; const interval = Number(input?.intervalMinutes);
     if (!['hour','day'].includes(unit) || !Number.isInteger(value) || value < 1 || !Number.isInteger(interval) || interval < 15) throw new BadRequestException('政策設定無效');
-    const [current] = await this.db.query(`SELECT * FROM data_retention_policies WHERE category=$1`, [category]);
+    const [stored] = await this.db.query(`SELECT * FROM data_retention_policies WHERE category=$1`, [category]);
+    const current = category === 'telemetry' ? { ...stored, ...telemetrySchedule(await this.legacyTelemetryPolicy()) } : stored;
     const oldMs = Number(current?.retention_value ?? value) * (current?.retention_unit === 'hour' ? 3_600_000 : 86_400_000); const newMs = value * (unit === 'hour' ? 3_600_000 : 86_400_000);
     if ((enabled && !current?.enabled) || (enabled && newMs < oldMs)) {
       const [plan] = await this.db.query(`SELECT * FROM data_cleanup_plans WHERE id=$1 AND operator_id=$2 AND expires_at>=$3 AND consumed_at IS NULL`, [input?.confirmationPlanId, operatorId, Date.now()]);
       if (!plan || plan.category !== category || plan.criteria?.purpose !== 'policy') throw new ConflictException('啟用或縮短政策前必須重新預覽並確認');
     }
-    const now = Date.now(); const next = enabled ? now + interval * 60_000 : null;
+    const now = Date.now(); const next = enabled && category !== 'telemetry' ? now + interval * 60_000 : null;
+    if (category === 'telemetry') {
+      await this.db.query(`SELECT remove_retention_policy('telemetry_logs', if_exists => true)`);
+      if (enabled) await this.db.query(`SELECT add_retention_policy('telemetry_logs', $1::interval)`, [`${value} ${unit}s`]);
+    }
     const rows = await this.db.query(`INSERT INTO data_retention_policies(category,enabled,retention_value,retention_unit,interval_minutes,next_run_at,updated_by,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(category) DO UPDATE SET enabled=EXCLUDED.enabled,retention_value=EXCLUDED.retention_value,retention_unit=EXCLUDED.retention_unit,interval_minutes=EXCLUDED.interval_minutes,next_run_at=EXCLUDED.next_run_at,updated_by=EXCLUDED.updated_by,updated_at=EXCLUDED.updated_at RETURNING *`, [category, enabled, value, unit, interval, next, operatorId, now]);
     return rows[0];
   }
 
   private async runDuePolicies() {
     try {
-      const due = await this.db.query(`SELECT * FROM data_retention_policies WHERE enabled=true AND next_run_at <= $1 ORDER BY next_run_at LIMIT 1`, [Date.now()]);
-      if (!due.length || due[0].category === 'telemetry' && await this.legacyTelemetryPolicy()) return;
+      const due = await this.db.query(`SELECT * FROM data_retention_policies WHERE enabled=true AND category<>'telemetry' AND next_run_at <= $1 ORDER BY next_run_at LIMIT 1`, [Date.now()]);
+      if (!due.length) return;
       const p = due[0]; const unitMs = p.retention_unit === 'hour' ? 3_600_000 : 86_400_000; const cutoff = Date.now() - Number(p.retention_value) * unitMs; const criteria = this.normalize({ category: p.category, to: cutoff }, 'policy'); const now = Date.now();
       const counts = await this.exactCounts(criteria);
       (criteria as CleanupCriteria & { expectedRecords: number }).expectedRecords = counts.records + counts.relatedRecords;

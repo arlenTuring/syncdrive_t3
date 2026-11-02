@@ -110,7 +110,7 @@ export function StationEtaWidgetView({ widget }: { widget: StationEtaWidget }) {
   const clock = useOperatingClock();
   const response = (data[0] ?? null) as StationEtaResponse | null;
   const operatingNow = clock.operatingNow();
-  const rows = cardRows(visibleEvents(response, operatingNow, widget.limit), operatingNow, widget.emphasisSeconds);
+  const rows = cardRows(visibleEvents(response, operatingNow, widget.limit, widget.planKeepSeconds), operatingNow, widget.emphasisSeconds);
   useCountdownTick(rows.map((r) => r.event.at), clock);
   const message = cardMessage({ url, isEditMode, response, loading, error, rows: rows.length });
 

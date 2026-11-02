@@ -134,6 +134,13 @@ describe('resolveDelayState（規格書 7.10 暫定門檻）', () => {
   it('沒有計畫值 → NO_PLAN', () => {
     expect(resolveDelayState(null)).toBe('NO_PLAN');
   });
+
+  it('跟班車延誤判定共用全域秒數', () => {
+    const thresholds = { minorSeconds: 120, majorSeconds: 300 };
+    expect(resolveDelayState(100, thresholds)).toBe('ON_TIME');
+    expect(resolveDelayState(200, thresholds)).toBe('MINOR_DELAY');
+    expect(resolveDelayState(301, thresholds)).toBe('MAJOR_DELAY');
+  });
 });
 
 describe('resolveDataQuality（規格書 7.3）', () => {

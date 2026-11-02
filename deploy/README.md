@@ -75,6 +75,28 @@ Git SHA 與資料快照。流程依序完成乾淨建置、可恢復備份、獨
 同步範圍。正式環境固定 `DB_SYNCHRONIZE=false`，Migration 明確順序與校驗記錄在
 `deploy/migrations/order.txt`。
 
+### 從系統備份還原
+
+系統基礎設定的「資料備份」會在儲存位置產生 `syncdrive-日期-時間-manual|auto` 資料夾，內含
+`database.dump`、`app-data.tar.gz`（圖資、媒體與金鑰檔，不含錄影）與 `manifest.json`。
+備份預設放在 `backupdata` volume；要放 NAS 或獨立磁碟時，在 `deploy/.env` 設
+`BACKUP_HOST_DIR=/主機路徑`。
+
+還原會覆蓋現有資料，必須先停寫入端。`BACKUP` 是主機上的備份資料夾路徑：
+
+```bash
+docker stop syncdrive_web syncdrive_backend syncdrive_video_worker
+docker cp "$BACKUP/database.dump" syncdrive_postgres:/tmp/syncdrive-restore.dump
+docker exec syncdrive_postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker exec syncdrive_postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE" -c "SELECT timescaledb_pre_restore()"'
+docker exec syncdrive_postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error /tmp/syncdrive-restore.dump'
+docker exec syncdrive_postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT timescaledb_post_restore()"'
+docker run --rm -v deploy_backenddata:/app/data -v "$BACKUP":/restore:ro alpine sh -c 'tar -xzf /restore/app-data.tar.gz -C /app/data'
+docker start syncdrive_backend syncdrive_web syncdrive_video_worker
+```
+
+備份不含 `deploy/.env` 與 MQTT／HTTPS 憑證，這些要另外保管。
+
 ### 驗收
 
 ```bash

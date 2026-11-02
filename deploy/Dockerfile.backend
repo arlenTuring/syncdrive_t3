@@ -39,9 +39,15 @@ ENV NODE_ENV=production
 
 # alpine 不含時區資料庫。少了它，設 TZ=Asia/Taipei 也不會生效——Node 會靜靜地
 # 退回 UTC，班表 05:05 的班次於是等到台北 13:05 才發訂單，而且不報任何錯。
+# 資料備份用 pg_dump。主版本要跟資料庫（PostgreSQL 15）一樣，否則資料庫容器內的
+# pg_restore 讀不了新版格式；Alpine 3.23 已不收 15，所以這個套件從 3.22 取。
 RUN apk add --no-cache tzdata ffmpeg \
-  && mkdir -p /app/data/media/objects /app/data/media/.tmp \
-  && chown -R node:node /app/data
+  && apk add --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/main \
+    postgresql15-client \
+  && mkdir -p /app/data/media/objects /app/data/media/.tmp /app/backups \
+  && chown -R node:node /app/data /app/backups
 
 # scripts/ 要帶上：map.service 等模組會在執行期載入其中的產圖腳本
 COPY --from=vmaf /usr/local/bin/vmaf /usr/local/bin/vmaf

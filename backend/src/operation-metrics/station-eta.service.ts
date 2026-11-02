@@ -54,6 +54,7 @@ export class StationEtaService {
   async byStation(
     stations: Array<{ stationId: string; events: StationEventKind[] }>,
     limit: number,
+    planExpiredAfterMs?: number,
   ) {
     const operatingNow = this.clock.now();
     const day = this.clock.operatingDay();
@@ -147,6 +148,7 @@ export class StationEtaService {
       operatingNow,
       staleAfterSeconds: vehicleEtaConfig.dataStaleSeconds,
       limit,
+      planExpiredAfterMs,
     });
     const clock = this.clock.snapshot();
     return {

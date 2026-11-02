@@ -1,3 +1,4 @@
+import { SystemFoundationSettingsService } from '../../system-health/system-foundation-settings.service';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
@@ -11,6 +12,7 @@ import {
   dataAgeSeconds,
   resolveArrivalState,
   resolveDataQuality,
+  DEFAULT_DELAY_THRESHOLDS,
   resolveDelayState,
   type TaskGroupItem,
 } from './vehicle-eta.derive';
@@ -78,7 +80,11 @@ export class VehicleEtaService {
     @Optional()
     @InjectRepository(Vehicle)
     private readonly vehicleRepository?: Repository<Vehicle>,
+    @Optional() private readonly systemSettings?: SystemFoundationSettingsService,
   ) {}
+
+  /** 這次查詢用的延誤界線，loadContext 時從系統基礎設定讀 */
+  private delayThresholds = DEFAULT_DELAY_THRESHOLDS;
 
   async getByStation(query: {
     stationIds?: string[];
@@ -322,13 +328,15 @@ export class VehicleEtaService {
             ? toClock(plannedDepartureAt)
             : null,
         delay_seconds: delaySeconds,
-        delay_state: resolveDelayState(delaySeconds),
+        delay_state: resolveDelayState(delaySeconds, this.delayThresholds),
       },
     };
   }
 
   /** 一次備齊兩份資料來源，兩支 API 共用 */
   private async loadContext(): Promise<EtaContext> {
+    const params = (await this.systemSettings?.get())?.globalParams;
+    if (params) this.delayThresholds = { minorSeconds: params.tripDelayToleranceSeconds, majorSeconds: params.tripMajorDelaySeconds };
     const generatedAt = Date.now();
     const registered = this.vehicleRepository
       ? await this.vehicleRepository.find({

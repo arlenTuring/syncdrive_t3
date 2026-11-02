@@ -47,6 +47,7 @@ export class OperationMetricsController {
     @Query('arrive') arrive?: string | string[],
     @Query('depart') depart?: string | string[],
     @Query('limit') limit?: string,
+    @Query('plan_keep_seconds') planKeepSeconds?: string,
   ) {
     const list = (raw?: string | string[]) => (Array.isArray(raw) ? raw : raw ? [raw] : [])
       .flatMap((value) => String(value).split(','))
@@ -62,9 +63,12 @@ export class OperationMetricsController {
     if (byId.size === 0) throw new BadRequestException('需要 arrive 或 depart（站點 ID）');
     const n = limit == null ? 3 : Number(limit);
     if (!Number.isInteger(n) || n < 1 || n > 10) throw new BadRequestException('limit 需為 1～10 的整數');
+    const keep = planKeepSeconds == null ? null : Number(planKeepSeconds);
+    if (keep != null && (!Number.isInteger(keep) || keep < 0 || keep > 3600)) throw new BadRequestException('plan_keep_seconds 需為 0～3600 的整數');
     return this.stationEtaService.byStation(
       [...byId].map(([stationId, events]) => ({ stationId, events: [...events] })),
       n,
+      keep == null ? undefined : keep * 1000,
     );
   }
 }

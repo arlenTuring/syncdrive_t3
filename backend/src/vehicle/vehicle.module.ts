@@ -11,6 +11,8 @@ import { VehicleEtaService } from './eta/vehicle-eta.service';
 import { AuditModule } from '../audit/audit.module';
 import { MqttModule } from '../mqtt/mqtt.module';
 
+import { SystemHealthModule } from '../system-health/system-health.module';
+
 @Module({
   // 即時 ETA 的計畫值與班表計畫 ETA 同源，避免兩支對外 API 的計畫時刻出現落差
   imports: [
@@ -18,6 +20,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
     OperationShiftModule,
     AuditModule,
     MqttModule,
+    SystemHealthModule,
     TypeOrmModule.forFeature([Vehicle]),
   ],
   controllers: [VehicleController, VehicleEtaController],

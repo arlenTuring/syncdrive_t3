@@ -16,16 +16,6 @@ export type NtpSettings = {
   currentOffsetMs: number | null;
 };
 
-export type BackupSettings = {
-  operationLogRetentionDays: number;
-  telemetryRetentionDays: number;
-  backupFrequency: '15m' | '1h' | '6h' | '12h' | '24h';
-  dailyBackupTime: string;
-  localBackupPath: string;
-  cloudBackupEnabled: boolean;
-  cloudBackupPath: string;
-};
-
 export type SslSettings = {
   /** TLS 1.1 一律停用；保留欄位僅相容舊資料 */
   allowTls11: boolean;
@@ -60,18 +50,16 @@ export type MqttSettings = {
 };
 
 export type GlobalParamSettings = {
-  mapActiveSyncEnabled: boolean;
-  collisionProtectionSeconds: number;
   defaultVehicleSpeedLimitKmh: number;
-  eventRetentionDays: number;
   /** 超過計畫結束幾秒算班車延誤（規則見 order/trip-delay.ts） */
   tripDelayToleranceSeconds: number;
+  /** 超過計畫幾秒算嚴重延誤（ETA 的 MAJOR_DELAY 與之後的延誤分級共用） */
+  tripMajorDelaySeconds: number;
 };
 
 export type SystemFoundationSettings = {
   locale: LocaleSettings;
   ntp: NtpSettings;
-  backup: BackupSettings;
   ssl: SslSettings;
   security: SecuritySettings;
   mqtt: MqttSettings;
@@ -81,7 +69,6 @@ export type SystemFoundationSettings = {
 export type FoundationSectionId =
   | 'locale'
   | 'ntp'
-  | 'backup'
   | 'ssl'
   | 'security'
   | 'mqtt'
@@ -104,15 +91,6 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       maxDriftMs: 500,
       lastSyncAt: null,
       currentOffsetMs: null,
-    },
-    backup: {
-      operationLogRetentionDays: 90,
-      telemetryRetentionDays: 180,
-      backupFrequency: '1h',
-      dailyBackupTime: '02:00',
-      localBackupPath: '/var/backups/avms_db/',
-      cloudBackupEnabled: true,
-      cloudBackupPath: 's3://avms-fleet-backup-vault/prod/',
     },
     ssl: {
       allowTls11: false,
@@ -137,11 +115,9 @@ export function createDefaultSystemFoundationSettings(): SystemFoundationSetting
       password: '',
     },
     globalParams: {
-      mapActiveSyncEnabled: true,
-      collisionProtectionSeconds: 30,
       defaultVehicleSpeedLimitKmh: 40,
-      eventRetentionDays: 90,
       tripDelayToleranceSeconds: 60,
+      tripMajorDelaySeconds: 180,
     },
   };
 }
@@ -167,7 +143,6 @@ export function normalizeSystemFoundationSettings(
 
   const locale = isRecord(raw.locale) ? raw.locale : {};
   const ntp = isRecord(raw.ntp) ? raw.ntp : {};
-  const backup = isRecord(raw.backup) ? raw.backup : {};
   const ssl = isRecord(raw.ssl) ? raw.ssl : {};
   const security = isRecord(raw.security) ? raw.security : {};
   const mqtt = isRecord(raw.mqtt) ? raw.mqtt : {};
@@ -186,15 +161,6 @@ export function normalizeSystemFoundationSettings(
     ? (syncIntervalRaw as NtpSettings['syncInterval'])
     : d.ntp.syncInterval;
 
-  const backupFreqRaw = pickString(
-    backup.backupFrequency,
-    d.backup.backupFrequency,
-  );
-  const backupFrequency = (
-    ['15m', '1h', '6h', '12h', '24h'] as const
-  ).includes(backupFreqRaw as BackupSettings['backupFrequency'])
-    ? (backupFreqRaw as BackupSettings['backupFrequency'])
-    : d.backup.backupFrequency;
 
   return {
     locale: {
@@ -214,33 +180,6 @@ export function normalizeSystemFoundationSettings(
         ntp.currentOffsetMs === null
           ? null
           : pickNumber(ntp.currentOffsetMs, d.ntp.currentOffsetMs ?? 0),
-    },
-    backup: {
-      operationLogRetentionDays: pickNumber(
-        backup.operationLogRetentionDays,
-        d.backup.operationLogRetentionDays,
-      ),
-      telemetryRetentionDays: pickNumber(
-        backup.telemetryRetentionDays,
-        d.backup.telemetryRetentionDays,
-      ),
-      backupFrequency,
-      dailyBackupTime: pickString(
-        backup.dailyBackupTime,
-        d.backup.dailyBackupTime,
-      ),
-      localBackupPath: pickString(
-        backup.localBackupPath,
-        d.backup.localBackupPath,
-      ),
-      cloudBackupEnabled: pickBool(
-        backup.cloudBackupEnabled,
-        d.backup.cloudBackupEnabled,
-      ),
-      cloudBackupPath: pickString(
-        backup.cloudBackupPath,
-        d.backup.cloudBackupPath,
-      ),
     },
     ssl: {
       allowTls11: false,
@@ -300,25 +239,17 @@ export function normalizeSystemFoundationSettings(
       password: pickString(mqtt.password, d.mqtt.password),
     },
     globalParams: {
-      mapActiveSyncEnabled: pickBool(
-        globalParams.mapActiveSyncEnabled,
-        d.globalParams.mapActiveSyncEnabled,
-      ),
-      collisionProtectionSeconds: pickNumber(
-        globalParams.collisionProtectionSeconds,
-        d.globalParams.collisionProtectionSeconds,
-      ),
       defaultVehicleSpeedLimitKmh: pickNumber(
         globalParams.defaultVehicleSpeedLimitKmh,
         d.globalParams.defaultVehicleSpeedLimitKmh,
       ),
-      eventRetentionDays: pickNumber(
-        globalParams.eventRetentionDays,
-        d.globalParams.eventRetentionDays,
-      ),
       tripDelayToleranceSeconds: Math.max(0, pickNumber(
         globalParams.tripDelayToleranceSeconds,
         d.globalParams.tripDelayToleranceSeconds,
+      )),
+      tripMajorDelaySeconds: Math.max(0, pickNumber(
+        globalParams.tripMajorDelaySeconds,
+        d.globalParams.tripMajorDelaySeconds,
       )),
     },
   };
