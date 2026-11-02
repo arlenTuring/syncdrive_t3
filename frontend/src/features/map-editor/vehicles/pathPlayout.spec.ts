@@ -109,6 +109,38 @@ describe('實際畫面：逐幀播放、樣本陸續送到', () => {
   })
 })
 
+describe('畫面時刻只往前走', () => {
+  const T0 = 9_000_000
+
+  it('中心端卡住 6 秒後整批送到：車只會停或前進，不會倒退', () => {
+    const samples = Array.from({ length: 40 }, (_, i) => {
+      const stalled = i >= 15 && i < 21
+      return {
+        sampleMs: T0 + 1000 * i,
+        // 第 15～20 筆卡在第 21 筆送到的時候才一起到
+        arrivalMs: stalled ? T0 + 21_020 : T0 + 1000 * i + 20,
+        along: STEP * i,
+      }
+    })
+    const frames = playFrames(samples, T0 + 3000, T0 + 40_000)
+    for (const d of stepsOf(frames)) expect(d).toBeGreaterThanOrEqual(0)
+    // 不是靠停住換來的：資料回來後車要繼續走到最新位置附近
+    expect(frames[frames.length - 1]).toBeGreaterThan(STEP * 36)
+  })
+
+  it('送達忽快忽慢把倍速估偏：一樣不倒退', () => {
+    const delays = [0, 2600, 100, 3100, 40, 1800, 90, 2900, 30, 2300, 70, 3400, 20, 2100, 60, 2700]
+    const samples = Array.from({ length: 64 }, (_, i) => ({
+      sampleMs: T0 + 1000 * i,
+      arrivalMs: T0 + 1000 * i + delays[i % delays.length]!,
+      along: STEP * i,
+    })).sort((a, b) => a.arrivalMs - b.arrivalMs)
+    for (const d of stepsOf(playFrames(samples, T0 + 3000, T0 + 64_000))) {
+      expect(d).toBeGreaterThanOrEqual(0)
+    }
+  })
+})
+
 describe('停站', () => {
   it('停著不動不排下一幀；再開動（新的一筆送到）就恢復', () => {
     const T0 = 7_000_000
@@ -123,6 +155,11 @@ describe('停站', () => {
 })
 
 describe('倍速估計', () => {
+  it('比 1 慢的估計都是抖動：當 1', () => {
+    const samples = [0, 1000, 2000, 3000].map((sampleMs) => ({ sampleMs, arrivalMs: sampleMs * 1.6 }))
+    expect(estimatePlayoutRate(samples as never)).toBe(1)
+  })
+
   it('時間戳跟送達同速當 1；20 倍速估出 20', () => {
     const T0 = 5_000_000
     const same = createPlayoutState(pose(0), T0, T0)

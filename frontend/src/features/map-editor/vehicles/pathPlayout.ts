@@ -22,6 +22,11 @@ import { planPathTween, samplePathTween, type PathPose, type PathTween } from '.
  * <h3>倍速</h3>
  * 模擬器倍速時時間戳走得比牆上時間快。時間戳與接收時刻的比例（rate）由最近幾筆估出來；
  * 接近 1 就當 1，避免估計誤差讓畫面時刻忽快忽慢。
+ *
+ * <h3>畫面時刻只往前走</h3>
+ * 上面算出來的是目標時刻，不能直接拿來畫：一筆晚到的樣本會把延遲包絡拉大，整批晚到又會把
+ * rate 估偏，目標時刻當場往回跳（2026-11-02 實測最多退 6.5 秒），車就在軌道上倒退一截。
+ * 所以每台車有自己的播放頭：照牆上時間往前走，落後或超前目標時只調快慢，慢慢貼回去，絕不後退。
  */
 
 export type PlayoutSample = {
@@ -34,7 +39,13 @@ export type PlayoutSample = {
   tween: PathTween | null
 }
 
-export type PlayoutState = { samples: PlayoutSample[] }
+export type PlayoutState = {
+  samples: PlayoutSample[]
+  /** 畫面實際播到的車端時刻（毫秒）；只往前走 */
+  playheadMs: number | null
+  /** 上一次推進播放頭的牆上時刻；車停著沒在播時是 null */
+  playheadWallMs: number | null
+}
 
 /** 留幾筆：夠估 rate、夠蓋過最大延遲即可 */
 export const PLAYOUT_MAX_SAMPLES = 8
@@ -42,9 +53,14 @@ export const PLAYOUT_MAX_SAMPLES = 8
 export const PLAYOUT_MARGIN_MS = 120
 /** 時間戳與接收時刻比例在這個範圍內就當即時（1 倍） */
 const REALTIME_RATE_TOLERANCE = 0.12
+/** 播放頭差目標這麼多（毫秒）時，速度調到上下限；差越少調越小 */
+const PLAYHEAD_SLEW_HORIZON_MS = 2000
+/** 播放頭貼回目標時的速度上下限（相對正常速度） */
+const PLAYHEAD_MIN_PACE = 0.5
+const PLAYHEAD_MAX_PACE = 1.5
 
 export function createPlayoutState(pose: PathPose, sampleMs: number, arrivalMs: number): PlayoutState {
-  return { samples: [{ pose, sampleMs, arrivalMs, tween: null }] }
+  return { samples: [{ pose, sampleMs, arrivalMs, tween: null }], playheadMs: null, playheadWallMs: null }
 }
 
 /**
@@ -78,7 +94,8 @@ export function estimatePlayoutRate(samples: readonly PlayoutSample[]): number {
   const spanArrival = last.arrivalMs - first.arrivalMs
   if (!(spanSample > 0) || !(spanArrival > 0)) return 1
   const rate = Math.max(0.05, Math.min(200, spanSample / spanArrival))
-  return Math.abs(rate - 1) <= REALTIME_RATE_TOLERANCE ? 1 : rate
+  // 模擬器只會加速不會慢放：比 1 小都是送達時間抖出來的
+  return rate - 1 <= REALTIME_RATE_TOLERANCE ? 1 : rate
 }
 
 /** 樣本間隔（車端時間戳，毫秒）：取中位數，偶爾斷訊一次的長間隔不會把畫面延遲拉長 */
@@ -88,6 +105,32 @@ export function estimatePlayoutIntervalMs(samples: readonly PlayoutSample[]): nu
   if (gaps.length === 0) return 0
   gaps.sort((a, b) => a - b)
   return gaps[Math.floor(gaps.length / 2)]!
+}
+
+/** 目標時刻：現在往回退「延遲包絡＋一個樣本間隔＋餘裕」（見檔頭） */
+function playoutTargetMs(samples: readonly PlayoutSample[], rate: number, nowMs: number): number {
+  // 延遲包絡：最近幾筆「收到時刻 − 換算成牆上時間的時間戳」的最大值
+  let lag = -Infinity
+  for (const sample of samples) lag = Math.max(lag, sample.arrivalMs - sample.sampleMs / rate)
+  // 再退一個樣本間隔：下一筆送到之前，畫面還在上一段中間（見檔頭）
+  const intervalWallMs = estimatePlayoutIntervalMs(samples) / rate
+  return (nowMs - lag - intervalWallMs - PLAYOUT_MARGIN_MS) * rate
+}
+
+/** 推進播放頭：照牆上時間往前走，朝目標調快慢；只夾在樣本範圍內，所以不會後退 */
+function advancePlayhead(state: PlayoutState, targetMs: number, rate: number, nowMs: number): number {
+  const samples = state.samples
+  let head = targetMs
+  if (state.playheadMs != null) {
+    const wallDelta = state.playheadWallMs == null ? 0 : Math.max(0, nowMs - state.playheadWallMs)
+    const pace = 1 + (targetMs - state.playheadMs) / (PLAYHEAD_SLEW_HORIZON_MS * rate)
+    head = state.playheadMs + wallDelta * rate * Math.max(PLAYHEAD_MIN_PACE, Math.min(PLAYHEAD_MAX_PACE, pace))
+  }
+  head = Math.max(head, samples[0]!.sampleMs)
+  head = Math.min(head, samples[samples.length - 1]!.sampleMs)
+  state.playheadMs = head
+  state.playheadWallMs = nowMs
+  return head
 }
 
 /** 這一刻該畫的位置；animating＝還在兩筆之間（需要繼續排下一幀） */
@@ -100,13 +143,19 @@ export function resolvePlayoutPose(
   if (samples.length === 1) return { pose: last.pose, animating: false }
 
   const rate = estimatePlayoutRate(samples)
-  // 延遲包絡：最近幾筆「收到時刻 − 換算成牆上時間的時間戳」的最大值
-  let lag = -Infinity
-  for (const sample of samples) lag = Math.max(lag, sample.arrivalMs - sample.sampleMs / rate)
-  // 再退一個樣本間隔：下一筆送到之前，畫面還在上一段中間（見檔頭）
-  const intervalWallMs = estimatePlayoutIntervalMs(samples) / rate
-  const displayMs = (nowMs - lag - intervalWallMs - PLAYOUT_MARGIN_MS) * rate
+  const displayMs = advancePlayhead(state, playoutTargetMs(samples, rate, nowMs), rate, nowMs)
 
+  const result = poseAtPlayhead(samples, displayMs)
+  // 沒在播的時候不累積牆上時間：開動那一刻不會一口氣跳一段
+  if (!result.animating) state.playheadWallMs = null
+  return result
+}
+
+function poseAtPlayhead(
+  samples: readonly PlayoutSample[],
+  displayMs: number,
+): { pose: PathPose; animating: boolean } {
+  const last = samples[samples.length - 1]!
   if (displayMs >= last.sampleMs) return { pose: last.pose, animating: false }
   const first = samples[0]!
   if (displayMs <= first.sampleMs) return { pose: first.pose, animating: stillMovingFrom(samples, 0) }
