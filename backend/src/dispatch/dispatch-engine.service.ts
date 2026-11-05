@@ -41,6 +41,8 @@ import {
   operatingDayStart,
 } from '../operating-day/operating-day';
 import { ScheduledOrderService } from '../order/scheduled-order.service';
+import { RotationOverlayStore } from './rotation-overlay.store';
+import { applyRotationOverlay, fleetAfterRotations } from './rotation.overlay';
 
 type ShiftSource = Awaited<ReturnType<OperationShiftService['getShiftTrips']>>;
 
@@ -113,6 +115,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly orderRepository: Repository<OperationOrder>,
     private readonly dailyPlans: DailyPlanStore,
     private readonly scheduledOrders: ScheduledOrderService,
+    private readonly rotationOverlays: RotationOverlayStore,
   ) {}
 
   /**
@@ -200,7 +203,11 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     return {
       shiftId: source.shiftId,
       body: source.body,
-      fleet: await this.loadFleet(),
+      fleet: fleetAfterRotations(
+        await this.loadFleet(),
+        await this.rotationOverlays.overlaysUntil(day),
+        day,
+      ),
     };
   }
 
@@ -456,6 +463,19 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     return this.operationShiftService.publishBlockReason(body);
   }
 
+  /**
+   * 某營運日的計畫，不含當天輪替的調車與取消，車輛指派已含之前的輪替。
+   * 輪替報告用它算換手點：還沒確認的換手不能影響計算的基準。
+   */
+  async planForRotation(day: string) {
+    const reference = operatingDayReference(day);
+    if (reference == null) throw new Error(`營運日格式不對：${day}`);
+    const resolved = await this.resolveDailySource(day, { allowAuto: true });
+    if (!resolved) return null;
+    const source = await resolved.load();
+    return this.buildPlan(source, reference, { rotationOverlay: false });
+  }
+
   /** 班表內容 → 今日待下訂單。planToday 與 planForShift 共用，演算法只有這一份。 */
   private async buildPlan(
     deployed: {
@@ -467,13 +487,16 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       body: Record<string, unknown>;
     },
     reference: number,
+    options: { rotationOverlay?: boolean } = {},
   ): Promise<{
     shiftId: string;
     shiftName: string;
     planned: PlannedDispatch[];
     skipped: Array<{ tripCode: string; reason: string }>;
   }> {
-    const fleet = await this.loadFleet();
+    const day = operatingDayOf(localMidnight(reference));
+    const overlays = await this.rotationOverlays.overlaysUntil(day);
+    const fleet = fleetAfterRotations(await this.loadFleet(), overlays, day);
     const taskTypes = dispatchConfig.taskTypes;
 
     // 空車移動要走 extractYardMoves，不能讓它再從班次展開結果進來一次。
@@ -539,7 +562,11 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    const unique = dropDuplicateOrderIds(planned);
+    const withRotation =
+      options.rotationOverlay === false
+        ? planned
+        : applyRotationOverlay(planned, overlays, day);
+    const unique = dropDuplicateOrderIds(withRotation);
     skipped.push(...unique.skipped);
 
     return {
@@ -615,7 +642,12 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
 
       const due: PlannedDispatch[] = [];
       const expired: PlannedDispatch[] = [];
-      for (const item of plan.planned) {
+      // 換手可能落在午夜之後：那時今天的計畫已換成下一營運日，前一天的調車要另外帶上
+      const previousDay = operatingDayOf(localMidnight(now - 86_400_000));
+      const lateShunts = (await this.rotationOverlays.overlaysUntil(previousDay))
+        .filter((overlay) => overlay.operatingDay === previousDay)
+        .flatMap((overlay) => overlay.shunts);
+      for (const item of [...plan.planned, ...lateShunts]) {
         if (this.issued.has(item.orderId)) continue;
         const decision = dispatchDecision({
           departAt: item.departAt,

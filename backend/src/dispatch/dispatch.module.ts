@@ -13,6 +13,7 @@ import { SimulationPlanService } from './simulation-plan.service';
 import { MapModule } from '../map/map.module';
 import { TripDelayMonitorService } from './trip-delay-monitor.service';
 import { SystemHealthModule } from '../system-health/system-health.module';
+import { RotationOverlayStore } from './rotation-overlay.store';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { SystemHealthModule } from '../system-health/system-health.module';
     SystemHealthModule,
   ],
   controllers: [DispatchController],
-  providers: [DispatchEngineService, SimulationPlanService, DailyPlanStore, TripDelayMonitorService],
+  providers: [DispatchEngineService, SimulationPlanService, DailyPlanStore, TripDelayMonitorService, RotationOverlayStore],
   exports: [DispatchEngineService, DailyPlanStore],
 })
 export class DispatchModule {}

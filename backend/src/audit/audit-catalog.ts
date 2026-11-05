@@ -128,6 +128,11 @@ export const AUDIT_ACTIONS = {
   VIDEO_RECORDING_PROTECT: sys('保護錄影片段', 'VIDEO_RECORDING'),
   VIDEO_EXPORT: sys('下載錄影片段', 'VIDEO_RECORDING'),
   LOG_EXPORT: sys('匯出日誌', 'LOG'),
+  VEHICLE_ROTATION_RULES: sys('部署車輛輪替規則', 'VEHICLE_ROTATION'),
+  VEHICLE_ROTATION_GENERATE: sys('產出車輛輪替報告', 'VEHICLE_ROTATION'),
+  VEHICLE_ROTATION_CONFIRM: sys('確認車輛輪替', 'VEHICLE_ROTATION'),
+  VEHICLE_ROTATION_SKIP: sys('略過車輛輪替', 'VEHICLE_ROTATION'),
+  VEHICLE_ROTATION_HOLD: sys('設定車輛輪替狀態', 'VEHICLE_ROTATION'),
 } as const satisfies Record<string, AuditActionInfo>;
 
 export type AuditActionCode = keyof typeof AUDIT_ACTIONS;

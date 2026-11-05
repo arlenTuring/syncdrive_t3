@@ -1,5 +1,5 @@
 /**
- * 車輛輪替 POC 的計算。全部是純函式，不打 API、不寫入任何資料。
+ * 車輛輪替的計算。全部是純函式，不碰資料庫；讀寫在 vehicle-rotation.service.ts。
  *
  * <h3>誰該下來</h3>
  * 只看這台車自己：目前里程 ≥ 上次輪替里程 + 輪替基數。不跟別台車比，所以
@@ -16,9 +16,11 @@
  * 那一列的任務改由被換車接。換手地點來自班表：
  * <ul>
  *   <li>場內：該列本來就進場（充電、待命、行檢），被換車留在場內，接手車去接下一班。</li>
- *   <li>收班後：當天最後一班之後車本來就在場內，接手車只要去接最後那段出場，當天班次都不受影響。</li>
+ *   <li>收班後：這一列當天最後一段任務。班表是 24 小時循環，這裡就是換日點：接手車接下最後那段，
+ *   當天載客班次都不受影響，下一營運日起這一列由接手車擔任。</li>
  *   <li>月台空檔：連續兩班之間停得夠久。T3 目前停站接近 0 秒，不會出現在這裡。</li>
  * </ul>
+ * 第一版只用收班後換手：白天換手要改派已排定的班次，先不開放。
  * 報告只在規則的時間範圍內找換手點，會略過充電、行檢或保養的換手點不採用。
  */
 
@@ -73,7 +75,8 @@ export type FleetCar = {
   currentKm: number;
   /** 上次輪替上場時的里程，不歸零 */
   lastRotationKm: number;
-  batteryPct: number;
+  /** 還沒收到車端遙測時是 null */
+  batteryPct: number | null;
   /** 下線時刻；線上的車為 null */
   restSince: number | null;
   /** 車輛清單上的設定：可輪替、保留、大保養 */
@@ -232,6 +235,16 @@ function movementEdges(tasks: readonly PlanTask[]): Map<string, Map<string, numb
   return edges;
 }
 
+const slotGroup = (name: string) => /^([A-Z]+)\d+$/.exec(name)?.[1] ?? null;
+
+/** 班表沒有這一格的移動時，用同一區相鄰格位的移動代替（M4 → M1） */
+function siblingSlot(edges: Map<string, Map<string, number>>, name: string, wantTarget: boolean): string | null {
+  const group = slotGroup(name);
+  if (!group) return null;
+  const nodes = wantTarget ? [...edges.values()].flatMap((targets) => [...targets.keys()]) : [...edges.keys()];
+  return nodes.filter((node) => slotGroup(node) === group).sort()[0] ?? null;
+}
+
 /** 沿班表出現過的移動找最短時間；班表裡走不到就用預設值，畫面標「預估」 */
 function moveEstimate(
   edges: Map<string, Map<string, number>>,
@@ -240,8 +253,12 @@ function moveEstimate(
   fallbackMs: number,
 ): { ms: number; estimated: boolean } {
   if (from === to) return { ms: 0, estimated: false };
-  const best = new Map<string, number>([[from, 0]]);
-  const open = new Set([from]);
+  const start = edges.has(from) ? from : siblingSlot(edges, from, false);
+  const hasTarget = [...edges.values()].some((targets) => targets.has(to));
+  const end = hasTarget ? to : siblingSlot(edges, to, true);
+  if (!start || !end) return { ms: fallbackMs, estimated: true };
+  const best = new Map<string, number>([[start, 0]]);
+  const open = new Set([start]);
   while (open.size) {
     const here = [...open].sort((a, b) => best.get(a)! - best.get(b)!)[0];
     open.delete(here);
@@ -253,8 +270,9 @@ function moveEstimate(
       }
     }
   }
-  const found = best.get(to);
-  return found == null ? { ms: fallbackMs, estimated: true } : { ms: found, estimated: false };
+  const found = best.get(end);
+  if (found == null) return { ms: fallbackMs, estimated: true };
+  return { ms: found, estimated: start !== from || end !== to };
 }
 
 /** 某一列在某時刻停在哪：最後一個已開始任務的終點 */
@@ -331,15 +349,28 @@ export function findSwapWindows(args: {
 
     const from = rowLocationAt(tasks, takeoverRow, readyAt) ?? '';
     const meetAt = endOfDay ? next.destination : next.origin;
+    // 收班後車留在原格位（第 5、7 列）：接手車要進的格位正被被換車佔著，實體上換不了
+    if (endOfDay && meetAt === location) return;
+    // 被換車跟接手車停在同一個入口（白天或收班後都一樣）：接手車出場要經過被換車，
+    // 被換車又要等接手車到位才回接手車的格位，兩邊互等，接手車晚到就趕不上第一班
+    if (type === 'yard' && slotGroup(location) != null && slotGroup(location) === slotGroup(from)) return;
     const moveIn = moveEstimate(edges, from, meetAt, fallbackMs);
     const deadline = endOfDay ? taskEnd(next) : next.depart_at;
-    const takeoverDepartAt = deadline - MARGIN_MS - moveIn.ms;
+    // 收班後接替車取代那趟出場，到位時刻照原班表：場區單線上的對向移動都是照這個時間排開的，
+    // 提早出場會跟其他車對向卡死
+    const arriveBy = deadline - (endOfDay ? 0 : MARGIN_MS);
+    const takeoverDepartAt = arriveBy - moveIn.ms;
     const slackMs = takeoverDepartAt - readyAt;
     if (slackMs < 0 || takeoverDepartAt < notBefore) return;
     const busy = takeoverTasks.some(
       (task) => task.kind !== 'maintenance' && task.depart_at < deadline && taskEnd(task) > takeoverDepartAt,
     );
     if (busy) return;
+
+    // 接手車到位前就做完的場內任務照做：被換車手上有任務才不會閒置擋住場區入口
+    const dropped = (endOfDay ? [...cancelled, next] : cancelled).filter(
+      (task) => task.kind !== 'maintenance' || taskEnd(task) > arriveBy,
+    );
 
     windows.push({
       id: next.trip_code,
@@ -351,8 +382,8 @@ export function findSwapWindows(args: {
       next,
       endOfDay,
       meetAt,
-      skippedService: skippedService(endOfDay ? [...cancelled, next] : cancelled),
-      cancelled: endOfDay ? [...cancelled, next] : cancelled,
+      skippedService: skippedService(dropped),
+      cancelled: dropped,
       hourDepartures: load[Math.floor((next.depart_at - dayStart) / HOUR_MS)]?.departures ?? 0,
       slackMs,
       moveInMs: moveIn.ms,
@@ -519,20 +550,8 @@ export function inTimeRange(at: number, start: string, end: string): boolean {
   return from <= to ? minute >= from && minute <= to : minute >= from || minute <= to;
 }
 
-export type ReportStatus = 'pending' | 'confirmed' | 'skipped' | 'done';
-
-export type ReportItem = {
-  id: string;
-  order: ShuntOrder;
-  status: ReportStatus;
-  /** 已完成幾個關鍵步驟 */
-  stepsDone: number;
-  /** 目前這一步異常 */
-  fault: boolean;
-};
-
 export type DailyReport = {
-  items: ReportItem[];
+  orders: ShuntOrder[];
   /** 到了輪替里程但今天排不進去 */
   blocked: { code: string; reason: string }[];
 };
@@ -541,7 +560,7 @@ const swapSpan = (window: SwapWindow): [number, number] => [window.takeoverDepar
 const overlaps = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
 
 /**
- * 產出今天的輪替報告。已確認、略過、完成的項目照舊保留，只重排還沒確認的。
+ * 產出輪替報告。已確認、略過、完成的項目不動，只排還沒處理的車。
  * 隊伍最前面的車先配里程最低的接替車；同一時間只做一組，場區才不會兩組同時進出。
  */
 export function buildDailyReport(args: {
@@ -552,12 +571,14 @@ export function buildDailyReport(args: {
   dayStart: number;
   /** 不早於這個時刻才算換手點 */
   notBefore: number;
-  keep?: readonly ReportItem[];
+  /** 已確認、略過或完成的項目：這些車今天不再排，時間也不重疊 */
+  keep?: readonly { order: ShuntOrder; status: string }[];
 }): DailyReport {
   const { tasks, cars, rules, now, dayStart, notBefore, keep = [] } = args;
-  const items = keep.filter((item) => item.status !== 'pending');
-  const used = new Set(items.flatMap((item) => [item.order.outgoing, item.order.incoming]));
-  const spans = items.filter((item) => item.status !== 'skipped').map((item) => swapSpan(item.order.window));
+  const kept = keep.filter((item) => item.status !== 'pending');
+  const used = new Set(kept.flatMap((item) => [item.order.outgoing, item.order.incoming]));
+  const spans = kept.filter((item) => item.status !== 'skipped').map((item) => swapSpan(item.order.window));
+  const orders: ShuntOrder[] = [];
   const spares = takeoverCandidates({ tasks, cars, rules, now, dayStart }).filter((car) => !used.has(car.code));
   const blocked: DailyReport['blocked'] = [];
 
@@ -572,6 +593,7 @@ export function buildDailyReport(args: {
         incoming,
         window: findSwapWindows({ tasks, row: outgoing.row, takeoverRow: incoming.row, dayStart, notBefore }).find(
           (window) =>
+            window.endOfDay &&
             window.skippedService.length === 0 &&
             inTimeRange(window.takeoverDepartAt, rules.windowStart, rules.windowEnd) &&
             !spans.some((span) => overlaps(span, swapSpan(window))),
@@ -582,48 +604,9 @@ export function buildDailyReport(args: {
       blocked.push({ code: outgoing.code, reason: `${rules.windowStart}–${rules.windowEnd} 內找不到可換手的時間` });
       continue;
     }
-    const order = buildShuntOrder({ tasks, outgoing, incoming: match.incoming, window: match.window });
-    items.push({ id: order.code, order, status: 'pending', stepsDone: 0, fault: false });
+    orders.push(buildShuntOrder({ tasks, outgoing, incoming: match.incoming, window: match.window }));
     spans.push(swapSpan(match.window));
     spares.splice(spares.indexOf(match.incoming), 1);
   }
-  return { items, blocked };
-}
-
-export type MonitorStep = { key: string; label: string; detail: string; at: number | null };
-
-/** 監看的關鍵步驟 */
-export function monitorSteps(order: ShuntOrder): MonitorStep[] {
-  const { window, incoming, outgoing } = order;
-  const back = order.changes.find((change) => change.key === 'add-outgoing');
-  return [
-    { key: 'depart', label: '接替車前往接續地點', detail: `${incoming} 前往 ${window.meetAt}`, at: window.takeoverDepartAt },
-    { key: 'arrive', label: '抵達接續地點', detail: `${incoming} 到達 ${window.meetAt}`, at: window.takeoverDepartAt + window.moveInMs },
-    {
-      key: 'takeover',
-      label: '承接班次',
-      detail: window.endOfDay ? `${incoming} 接第 ${window.row} 列，下一營運日第一班開始` : `${incoming} 開 ${window.next.trip_code}`,
-      at: window.endOfDay ? null : window.next.depart_at,
-    },
-    { key: 'return', label: '換下的車回到格位', detail: `${outgoing}：${back?.route ?? ''}`, at: back?.at ?? null },
-  ];
-}
-
-/**
- * 模擬換手完成（只改畫面狀態）：接手車以目前里程記下新的輪替起點，
- * 被換車下線、里程起點留到下次上場才更新。
- */
-export function applySimulatedSwap(cars: readonly FleetCar[], order: ShuntOrder, now: number): FleetCar[] {
-  const outgoing = cars.find((car) => car.code === order.outgoing);
-  const incoming = cars.find((car) => car.code === order.incoming);
-  if (!outgoing || !incoming) return [...cars];
-  return cars.map((car) => {
-    if (car.code === outgoing.code) {
-      return { ...car, row: incoming.row, onLine: false, restSince: now, rotatedOutAt: now };
-    }
-    if (car.code === incoming.code) {
-      return { ...car, row: outgoing.row, onLine: true, restSince: null, lastRotationKm: car.currentKm };
-    }
-    return car;
-  });
+  return { orders, blocked };
 }

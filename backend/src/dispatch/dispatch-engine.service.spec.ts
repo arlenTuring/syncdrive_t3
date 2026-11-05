@@ -170,6 +170,7 @@ function build(
     orderRepository as never,
     dailyPlans as never,
     scheduledOrders as never,
+    { overlaysUntil: jest.fn().mockResolvedValue([]) } as never,
   );
   return {
     engine,

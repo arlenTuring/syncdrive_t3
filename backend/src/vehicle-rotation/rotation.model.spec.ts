@@ -1,20 +1,16 @@
-import { describe, expect, it } from 'vitest'
 import {
-  applySimulatedSwap,
   buildDailyReport,
   buildShuntOrder,
   DEFAULT_ROTATION_RULES,
   findSwapWindows,
   inTimeRange,
-  isDue,
-  monitorSteps,
   nextRotationKm,
   rotationQueue,
   takeoverBlockers,
   takeoverCandidates,
   type FleetCar,
   type PlanTask,
-} from './rotationModel'
+} from './rotation.model'
 
 const rules = { ...DEFAULT_ROTATION_RULES, takeoverSlots: ['D1', 'M4'], windowStart: '00:00', windowEnd: '23:59' }
 const MIN = 60_000
@@ -121,7 +117,7 @@ describe('換手窗口與調車單', () => {
     // T3 停站 0 秒
     task({ trip_code: 'P3', depart_at: 10 * HOUR + 11 * MIN, arrive_at: 10 * HOUR + 20 * MIN, origin: 'T3', destination: 'NW' }),
     task({ trip_code: 'P4', vehicle_code: 'PMS02', timeline_row: 2, depart_at: 10 * HOUR + 5 * MIN }),
-    task({ trip_code: 'S10', vehicle_code: 'PMS10', timeline_row: 10, kind: 'maintenance', depart_at: 0, arrive_at: 20 * HOUR, origin: 'D1', destination: 'D1' }),
+    task({ trip_code: 'S10', vehicle_code: 'PMS10', timeline_row: 10, kind: 'maintenance', depart_at: 0, arrive_at: 20 * HOUR, origin: 'M4', destination: 'M4' }),
   ]
   const find = (notBefore = now) =>
     findSwapWindows({ tasks: plan, row: 1, takeoverRow: 10, dayStart, notBefore })
@@ -129,6 +125,46 @@ describe('換手窗口與調車單', () => {
   it('充電區是窗口，T3 停站 0 秒不是', () => {
     const windows = find()
     expect(windows.map((item) => [item.id, item.zone, item.location])).toEqual([['P2', '充電區', 'E1']])
+  })
+
+  it('收班後車留在原格位不是窗口：接手車進不去', () => {
+    const night = [
+      ...plan,
+      task({ trip_code: 'IN2', kind: 'movement', depart_at: 10 * HOUR + 20 * MIN, arrive_at: 10 * HOUR + 21 * MIN, origin: 'NW', destination: 'D1' }),
+      task({ trip_code: 'S2', kind: 'maintenance', depart_at: 10 * HOUR + 21 * MIN, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'OT2', kind: 'movement', depart_at: 23 * HOUR, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1' }),
+    ]
+    expect(findSwapWindows({ tasks: night, row: 1, takeoverRow: 10, dayStart, notBefore: now }).some((item) => item.endOfDay)).toBe(false)
+  })
+
+  it('白天被換車跟接手車停同一個入口不是窗口：兩邊互等', () => {
+    const sameEntry = plan.map((item) =>
+      item.trip_code === 'S10' ? { ...item, origin: 'E4', destination: 'E4' } : item,
+    )
+    expect(findSwapWindows({ tasks: sameEntry, row: 1, takeoverRow: 10, dayStart, notBefore: now })).toEqual([])
+  })
+
+  it('收班後被換車跟接手車停同一個入口也不是窗口：接手車出場被擋', () => {
+    const night = [
+      ...plan.map((item) => (item.trip_code === 'S10' ? { ...item, origin: 'D4', destination: 'D4' } : item)),
+      task({ trip_code: 'IN2', kind: 'movement', depart_at: 10 * HOUR + 20 * MIN, arrive_at: 10 * HOUR + 21 * MIN, origin: 'NW', destination: 'D1' }),
+      task({ trip_code: 'S2', kind: 'maintenance', depart_at: 10 * HOUR + 21 * MIN, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'OT2', kind: 'movement', depart_at: 23 * HOUR, arrive_at: 23 * HOUR + MIN, origin: 'D1', destination: 'NW' }),
+    ]
+    expect(findSwapWindows({ tasks: night, row: 1, takeoverRow: 10, dayStart, notBefore: now }).some((item) => item.endOfDay)).toBe(false)
+  })
+
+  it('接手車到位前做完的場內任務留給被換車', () => {
+    const night = [
+      ...plan,
+      task({ trip_code: 'IN2', kind: 'movement', depart_at: 10 * HOUR + 20 * MIN, arrive_at: 10 * HOUR + 21 * MIN, origin: 'NW', destination: 'D1' }),
+      task({ trip_code: 'S2', kind: 'maintenance', depart_at: 10 * HOUR + 21 * MIN, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'WT2', kind: 'maintenance', depart_at: 23 * HOUR, arrive_at: 23 * HOUR + 5 * MIN, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'OT2', kind: 'movement', depart_at: 23 * HOUR + 5 * MIN, arrive_at: 23 * HOUR + 9 * MIN, origin: 'D1', destination: 'NW' }),
+    ]
+    const [window] = findSwapWindows({ tasks: night, row: 1, takeoverRow: 10, dayStart, notBefore: now })
+    expect(window.cancelled.map((item) => item.trip_code)).toEqual(['OT2'])
+    expect(window.takeoverDepartAt + window.moveInMs).toBe(23 * HOUR + 9 * MIN)
   })
 
   it('收班後的窗口排最前面，當天班次都不受影響', () => {
@@ -174,63 +210,45 @@ describe('換手窗口與調車單', () => {
     expect(order.counts.unaffected).toBe(plan.length - 3)
   })
 
-  it('模擬換手後不會立刻互換回去', () => {
-    const outgoing = car({ currentKm: 11_000, lastRotationKm: 9_500 })
-    const incoming = spare({ currentKm: 8_000, lastRotationKm: 7_500 })
-    expect(isDue(outgoing, rules)).toBe(true)
-    const order = buildShuntOrder({ tasks: plan, outgoing, incoming, window: find()[0] })
-    const after = applySimulatedSwap([outgoing, incoming], order, now)
-    const [down, up] = after
-    expect(up).toMatchObject({ row: 1, onLine: true, lastRotationKm: 8_000 })
-    expect(isDue(up, rules)).toBe(false)
-    expect(down).toMatchObject({ row: 10, onLine: false, lastRotationKm: 9_500 })
-    expect(takeoverBlockers(down, rules, 'M4', dayStart)).toEqual(['今天剛換下'])
-    expect(rotationQueue(after, rules)).toEqual([])
-  })
-
   describe('今日報告', () => {
     const due = car({ currentKm: 11_000, lastRotationKm: 9_500 })
-    const report = (over: Partial<typeof rules> = {}, cars: FleetCar[] = [due, spare({})]) =>
-      buildDailyReport({ tasks: plan, cars, rules: { ...rules, ...over }, now, dayStart, notBefore: 0 })
+    const night = [
+      ...plan,
+      task({ trip_code: 'IN2', kind: 'movement', depart_at: 10 * HOUR + 20 * MIN, arrive_at: 10 * HOUR + 21 * MIN, origin: 'NW', destination: 'D1' }),
+      task({ trip_code: 'S2', kind: 'maintenance', depart_at: 10 * HOUR + 21 * MIN, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'OT2', kind: 'movement', depart_at: 23 * HOUR, arrive_at: 23 * HOUR + MIN, origin: 'D1', destination: 'NW' }),
+    ]
+    const report = (over: Partial<typeof rules> = {}, cars: FleetCar[] = [due, spare({})], tasks = night) =>
+      buildDailyReport({ tasks, cars, rules: { ...rules, ...over }, now, dayStart, notBefore: 0 })
 
-    it('到里程的車配上接替車', () => {
-      const { items, blocked } = report()
+    it('到里程的車配上接替車，只用收班後的換手點', () => {
+      const { orders, blocked } = report()
       expect(blocked).toEqual([])
-      expect(items).toHaveLength(1)
-      expect(items[0]).toMatchObject({ status: 'pending', order: { outgoing: 'PMS01', incoming: 'PMS10' } })
+      expect(orders).toHaveLength(1)
+      expect(orders[0]).toMatchObject({ outgoing: 'PMS01', incoming: 'PMS10', window: { endOfDay: true } })
+    })
+
+    it('沒有收班後換手點就不換', () => {
+      expect(report({}, [due, spare({})], plan).orders).toEqual([])
     })
 
     it('時段內找不到換手點就寫原因，不硬換', () => {
-      const { items, blocked } = report({ windowStart: '20:00', windowEnd: '21:00' })
-      expect(items).toEqual([])
-      expect(blocked).toEqual([{ code: 'PMS01', reason: '20:00–21:00 內找不到可換手的時間' }])
+      const local = new Date(night.find((item) => item.trip_code === 'OT2')!.depart_at)
+      const hour = (local.getHours() + 12) % 24
+      const out = String(hour).padStart(2, '0')
+      const { orders, blocked } = report({ windowStart: `${out}:00`, windowEnd: `${out}:30` })
+      expect(orders).toEqual([])
+      expect(blocked).toEqual([{ code: 'PMS01', reason: `${out}:00–${out}:30 內找不到可換手的時間` }])
     })
 
     it('沒有可接替車輛就寫原因', () => {
       expect(report({ takeoverSlots: [] }).blocked).toEqual([{ code: 'PMS01', reason: '沒有可接替車輛' }])
     })
 
-    it('會略過行檢的換手點不採用', () => {
-      const inspect = plan.map((item) =>
-        item.trip_code === 'OT' ? { ...item, kind: 'maintenance' as const, origin: 'E1', destination: 'E1', maintenance: { maintenance_task_type: 'inspection' } } : item,
-      )
-      const { items, blocked } = buildDailyReport({ tasks: inspect, cars: [due, spare({})], rules, now, dayStart, notBefore: 0 })
-      expect(items).toEqual([])
-      expect(blocked).toHaveLength(1)
-    })
-
-    it('重新產出時保留已確認的項目', () => {
-      const first = report().items[0]
-      const confirmed = { ...first, status: 'confirmed' as const, stepsDone: 2 }
-      const again = buildDailyReport({ tasks: plan, cars: [due, spare({})], rules, now, dayStart, notBefore: 0, keep: [confirmed] })
-      expect(again.items).toEqual([confirmed])
-    })
-
-    it('監看步驟依序：前往、抵達、承接、換下的車回格位', () => {
-      const steps = monitorSteps(report().items[0].order)
-      expect(steps.map((step) => step.key)).toEqual(['depart', 'arrive', 'takeover', 'return'])
-      const times = steps.map((step) => step.at ?? 0)
-      expect([...times].sort((a, b) => a - b)).toEqual(times)
+    it('已確認的車不重排', () => {
+      const first = report().orders[0]
+      const again = buildDailyReport({ tasks: night, cars: [due, spare({})], rules, now, dayStart, notBefore: 0, keep: [{ order: first, status: 'confirmed' }] })
+      expect(again.orders).toEqual([])
     })
   })
 })

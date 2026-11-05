@@ -84,6 +84,7 @@ import { SystemHealthModule } from './system-health/system-health.module';
 import { DatabaseInitService } from './database/database-init.service';
 import { DataAdminAudit } from './database/entities/data-admin-audit.entity';
 import { DataAdminModule } from './data-admin/data-admin.module';
+import { VehicleRotationModule } from './vehicle-rotation/vehicle-rotation.module';
 import { DegradedOperationPlan } from './database/entities/degraded-operation-plan.entity';
 import { DegradedOperationExecution } from './database/entities/degraded-operation-execution.entity';
 import { DegradedOperationEvent } from './database/entities/degraded-operation-event.entity';
@@ -247,6 +248,7 @@ import { ScheduledOrderEntry } from './database/entities/scheduled-order-entry.e
     PartnerAccessModule,
     SystemHealthModule,
     DataAdminModule,
+    VehicleRotationModule,
     DegradedOperationModule,
     AccessControlModule,
     VehicleHistoryModule,

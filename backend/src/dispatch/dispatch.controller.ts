@@ -4,7 +4,7 @@ import { maintenancePayloadFields } from './dispatch.charging';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DailyPlanVersionMismatch, DispatchEngineService } from './dispatch-engine.service';
 import { describeSwitch, type DailyPlanAdoption } from './daily-plan';
-import { isOperatingDay, operatingDayOf } from '../operating-day/operating-day';
+import { isOperatingDay, operatingDayOf, operatingDayReference } from '../operating-day/operating-day';
 import { OperatingClockService } from '../operating-day/operating-clock.service';
 import type { PlannedDispatch } from './dispatch.plan';
 import { SimulationPlanService } from './simulation-plan.service';
@@ -193,16 +193,19 @@ export class DispatchController {
       '依班表 ID 展開成今日全部任務（正線、出入廠／轉場、整備），與正式調度同一套展開與車輛指派。' +
       '找不到該班表回 404，不會退回部署中或最新的班表。回傳班表製作／儲存時間、引用地圖、' +
       '能否模擬與原因、版本摘要（identity）。純讀取：不下訂單、不發布、不改使用狀態。' +
-      '`full=1` 時每筆多帶完整起訖點與站序；`map=1` 時附上引用地圖的完整內容。',
+      '`full=1` 時每筆多帶完整起訖點與站序；`map=1` 時附上引用地圖的完整內容；`day=YYYY-MM-DD` 展開指定營運日。',
   })
   async planForShift(
     @Param('shiftId') shiftId: string,
     @Query('full') full?: string,
     @Query('map') map?: string,
+    @Query('day') day?: string,
   ): Promise<Record<string, unknown>> {
     const detailed = full === '1' || full === 'true';
     const withMap = map === '1' || map === 'true';
-    const result = await this.simulationPlan.build(shiftId);
+    const reference = day ? operatingDayReference(day) : null;
+    if (day && reference == null) throw new BadRequestException(`營運日格式不對：${day}`);
+    const result = await this.simulationPlan.build(shiftId, reference == null ? {} : { reference });
     const { planned, mapDocument, ...meta } = result;
     return {
       ...meta,
