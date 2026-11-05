@@ -248,7 +248,8 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
         await this.db.query(`UPDATE data_cleanup_jobs SET deleted_count=$2 WHERE id=$1`, [jobId, deleted]);
         if (count < BATCH_SIZE) break;
       }
-      if (criteria.category === 'vehicle_history') await this.finalizeHistory(criteria);
+      // 沒刪到資料就不用重算串流索引，也不用記缺段
+      if (criteria.category === 'vehicle_history' && deleted > 0) await this.finalizeHistory(criteria);
       if (criteria.category === 'degraded_replay') await this.db.query(`DELETE FROM degraded_replay_maps m WHERE NOT EXISTS (SELECT 1 FROM degraded_replay_sessions s WHERE s.map_hash=m.map_hash)`);
       await this.finish(jobId, 'completed', deleted, beforeDb, beforeDisk);
     } catch (error) {
@@ -295,8 +296,12 @@ export class DataRetentionService implements OnModuleInit, OnModuleDestroy {
 
   private async finalizeHistory(c: CleanupCriteria) {
     await this.db.query(`INSERT INTO vehicle_history_gaps(segment_id,vehicle_code,from_real,to_real,reason,count,detail) VALUES(NULL,$1,$2,$3,'retention_cleanup',0,'資料已依手動清理或保留政策清除')`, [c.vehicleCode ?? null, c.from ?? 0, c.to]);
-    await this.db.query(`DELETE FROM vehicle_history_stream_keys k WHERE NOT EXISTS (SELECT 1 FROM vehicle_history_frames f WHERE f.stream_key=k.stream_key)`);
-    await this.db.query(`UPDATE vehicle_history_stream_keys k SET first_real=x.first_real,last_real=x.last_real FROM (SELECT stream_key,min(received_at) first_real,max(received_at) last_real FROM vehicle_history_frames GROUP BY stream_key) x WHERE x.stream_key=k.stream_key`);
+    // 錄製器每秒都在 upsert 串流索引（依 stream_key COLLATE "C" 排序）；這裡也照同樣順序鎖列、只動真的有變的列，
+    // 兩邊鎖的順序一致才不會互鎖，彙總也先算完再鎖，不會鎖著列等整張 frames 掃完
+    await this.db.query(`DELETE FROM vehicle_history_stream_keys WHERE stream_key IN (SELECT k.stream_key FROM vehicle_history_stream_keys k WHERE NOT EXISTS (SELECT 1 FROM vehicle_history_frames f WHERE f.stream_key=k.stream_key) ORDER BY k.stream_key COLLATE "C" FOR UPDATE)`);
+    await this.db.query(`WITH x AS MATERIALIZED (SELECT stream_key,min(received_at) first_real,max(received_at) last_real FROM vehicle_history_frames GROUP BY stream_key),
+      t AS (SELECT k.stream_key,x.first_real,x.last_real FROM vehicle_history_stream_keys k JOIN x ON x.stream_key=k.stream_key WHERE k.first_real IS DISTINCT FROM x.first_real OR k.last_real IS DISTINCT FROM x.last_real ORDER BY k.stream_key COLLATE "C" FOR UPDATE OF k)
+      UPDATE vehicle_history_stream_keys k SET first_real=t.first_real,last_real=t.last_real FROM t WHERE t.stream_key=k.stream_key`);
   }
 
   async previewPolicy(category: string, input: any, operatorId: string) {

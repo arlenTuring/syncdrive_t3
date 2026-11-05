@@ -417,7 +417,10 @@ export class VehicleHistoryRecorder implements OnModuleInit, OnModuleDestroy {
   }
 
   private async flushStreamKeys() {
-    const dirty = [...this.streamKeys.entries()].filter(([, value]) => value.dirty);
+    // 依 stream_key 排序（跟 PostgreSQL COLLATE "C" 同序），跟保留清理的鎖順序一致才不會互鎖
+    const dirty = [...this.streamKeys.entries()]
+      .filter(([, value]) => value.dirty)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     if (dirty.length === 0) return;
     const values: unknown[] = [];
     const rows = dirty.map(([key, value], index) => {
