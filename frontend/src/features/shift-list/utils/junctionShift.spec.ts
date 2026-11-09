@@ -84,3 +84,23 @@ describe('轉折點錯開 solveJunctionShift', () => {
     assert.equal(shift, 70);
   });
 });
+
+describe('單線路段：只防對開，同方向跟車不互斥', () => {
+  const segment = 'seg:a|b';
+  it('同方向的車剛開上同一段：路段不擋（先進先出由兩端點的錯開保證）', () => {
+    const shift = solveJunctionShift(query({
+      points: [{ nodeId: `${segment}#f`, instant: 1000, until: 1050 }],
+      bookings: [{ nodeId: `${segment}#f`, instant: 980, until: 1030, timelineRow: 2 }],
+    }));
+    assert.equal(shift, 0);
+  });
+
+  it('反方向的車還在這一段上：要等它開完再加一個保護間隔才能上去', () => {
+    const shift = solveJunctionShift(query({
+      points: [{ nodeId: `${segment}#f`, instant: 1000, until: 1050 }],
+      bookings: [{ nodeId: `${segment}#r`, instant: 980, until: 1030, timelineRow: 2 }],
+      maxShift: 200,
+    }));
+    assert.equal(shift, 90); // 1030 + 60 − 1000
+  });
+});

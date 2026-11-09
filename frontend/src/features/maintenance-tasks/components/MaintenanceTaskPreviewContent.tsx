@@ -104,6 +104,79 @@ export function PreviewList({ items }: { items: string[] }) {
   );
 }
 
+type SectionKey = 'charging' | 'carWash' | 'maintenance' | 'preTrip' | 'mobile';
+type SectionLines = { enabled: boolean; conditions: string[]; facilities: string[] };
+
+/**
+ * 各整備區段的「條件」與「設施」兩組文字。
+ * omitEmptyChargeRate：沒填每分鐘充電率時不帶充電率（建立班表精靈）；否則顯示「—」。
+ */
+function buildSectionLines(
+  draft: MaintenanceTaskCreateDraft,
+  t: ReturnType<typeof useTranslation>['t'],
+  { omitEmptyChargeRate = false }: { omitEmptyChargeRate?: boolean } = {},
+): Record<SectionKey, SectionLines> {
+  const charging = normalizeChargingDraft(draft.charging);
+  const carWash = normalizeCarWashDraft(draft.carWash);
+  const maintenance = normalizeMaintenanceDraft(draft.maintenance);
+  const preTrip = normalizePreTripDraft(draft.preTrip);
+  const mobile = normalizeMobileDraft(draft.mobile);
+  const facilities = (rows: ReadonlyArray<Parameters<typeof formatEquipmentRowPreviewLine>[0]>) =>
+    rows.filter((row) => row.mapCode).map((row) => formatEquipmentRowPreviewLine(row));
+
+  const chargingConditions: string[] = [];
+  if (charging.stepEnabled && charging.triggerPercent) {
+    chargingConditions.push(t('maintenanceTasks.charging.triggerPreview', { percent: charging.triggerPercent }));
+  }
+  if (charging.stepEnabled && charging.upperLimitDetectionEnabled && charging.upperLimitPercent) {
+    chargingConditions.push(t('maintenanceTasks.charging.upperPreview', { percent: charging.upperLimitPercent }));
+  }
+  const chargingFacilities = charging.equipmentRows
+    .filter((row) => row.mapCode)
+    .map((row) => {
+      const rate = String(row.chargeRateKwhPerMin ?? '').trim();
+      if (!rate && omitEmptyChargeRate) return formatEquipmentRowPreviewLine(row);
+      return formatEquipmentRowPreviewLine(row, t('maintenanceTasks.charging.chargeRatePreview', { rate: rate || '—' }));
+    });
+
+  const carWashConditions: string[] = [];
+  if (carWash.mileageDetectionEnabled && carWash.mileageTriggerKm) {
+    carWashConditions.push(t('maintenanceTasks.carWash.mileagePreview', { km: carWash.mileageTriggerKm }));
+  }
+  if (carWash.timeDetectionEnabled && carWash.timeTriggerHours) {
+    carWashConditions.push(t('maintenanceTasks.carWash.timePreview', { hours: carWash.timeTriggerHours }));
+  }
+  if (carWash.operationDurationMinutes) {
+    carWashConditions.push(t('maintenanceTasks.carWash.durationPreview', { minutes: carWash.operationDurationMinutes }));
+  }
+
+  return {
+    charging: { enabled: charging.stepEnabled, conditions: chargingConditions, facilities: chargingFacilities },
+    carWash: { enabled: carWash.stepEnabled, conditions: carWashConditions, facilities: facilities(carWash.equipmentRows) },
+    maintenance: {
+      enabled: maintenance.stepEnabled,
+      conditions: maintenance.cycleConditions.map(formatMaintenanceCycleCondition),
+      facilities: facilities(maintenance.equipmentRows),
+    },
+    preTrip: {
+      enabled: preTrip.stepEnabled,
+      conditions: preTrip.operationDurationMinutes
+        ? [t('maintenanceTasks.preTrip.durationLine', { minutes: preTrip.operationDurationMinutes })]
+        : [],
+      facilities: facilities(preTrip.equipmentRows),
+    },
+    mobile: {
+      enabled: mobile.stepEnabled,
+      conditions: mobile.durationFollowTemplate !== false
+        ? [t('maintenanceTasks.mobile.durationFollowSchedule')]
+        : mobile.operationDurationMinutes
+          ? [t('maintenanceTasks.mobile.durationLine', { minutes: mobile.operationDurationMinutes })]
+          : [],
+      facilities: facilities(mobile.equipmentRows),
+    },
+  };
+}
+
 type MaintenanceTaskPreviewContentProps = {
   draft: MaintenanceTaskCreateDraft;
   onEditStep?: (step: CreateMaintenanceTaskStep) => void;
@@ -111,81 +184,44 @@ type MaintenanceTaskPreviewContentProps = {
    * 班表 Step 2 用：插入各整備區塊內容頂部（例如正線優先讓渡餘裕）。
    * key 對應充電／洗車／保養／行檢／待命。
    */
-  sectionExtras?: Partial<{
-    charging: ReactNode;
-    carWash: ReactNode;
-    maintenance: ReactNode;
-    preTrip: ReactNode;
-    mobile: ReactNode;
-  }>;
+  sectionExtras?: Partial<Record<SectionKey, ReactNode>>;
+  /** wizard：建立班表精靈的設計稿外觀（灰底卡片、條件設定與營運設施分開、只列啟用的區段） */
+  appearance?: 'default' | 'wizard';
 };
+
+const SECTION_ORDER: Array<{ key: SectionKey; step: number }> = [
+  { key: 'charging', step: 2 },
+  { key: 'carWash', step: 3 },
+  { key: 'maintenance', step: 4 },
+  { key: 'preTrip', step: 5 },
+  { key: 'mobile', step: 6 },
+];
+
+function WizardBulletCard({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-lg bg-[#1b1b1f] px-4 py-3">
+      <h4 className="mb-2 text-sm font-medium text-zinc-100">{title}</h4>
+      <ul className="space-y-1.5">
+        {items.map((item, index) => (
+          <li key={`${index}-${item}`} className="flex gap-2 text-sm text-zinc-200">
+            <span className="shrink-0 text-zinc-500" aria-hidden>•</span>
+            <span className="min-w-0 break-words">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export function MaintenanceTaskPreviewContent({
   draft,
   onEditStep,
   sectionExtras,
+  appearance = 'default',
 }: MaintenanceTaskPreviewContentProps) {
   const { t } = useTranslation();
-  const charging = normalizeChargingDraft(draft.charging);
-  const carWash = normalizeCarWashDraft(draft.carWash);
-  const maintenance = normalizeMaintenanceDraft(draft.maintenance);
-  const preTrip = normalizePreTripDraft(draft.preTrip);
-  const mobile = normalizeMobileDraft(draft.mobile);
-
-  const chargingLines: string[] = [];
-  if (charging.stepEnabled && charging.triggerPercent) {
-    chargingLines.push(
-      t('maintenanceTasks.charging.triggerPreview', { percent: charging.triggerPercent }),
-    );
-  }
-  if (charging.stepEnabled && charging.upperLimitDetectionEnabled && charging.upperLimitPercent) {
-    chargingLines.push(
-      t('maintenanceTasks.charging.upperPreview', { percent: charging.upperLimitPercent }),
-    );
-  }
-  for (const row of charging.equipmentRows) {
-    if (row.mapCode) {
-      chargingLines.push(
-        formatEquipmentRowPreviewLine(
-          row,
-          t('maintenanceTasks.charging.chargeRatePreview', {
-            rate: row.chargeRateKwhPerMin || '—',
-          }),
-        ),
-      );
-    }
-  }
-
-  const carWashLines: string[] = [];
-  if (carWash.mileageDetectionEnabled && carWash.mileageTriggerKm) {
-    carWashLines.push(
-      t('maintenanceTasks.carWash.mileagePreview', { km: carWash.mileageTriggerKm }),
-    );
-  }
-  if (carWash.timeDetectionEnabled && carWash.timeTriggerHours) {
-    carWashLines.push(
-      t('maintenanceTasks.carWash.timePreview', { hours: carWash.timeTriggerHours }),
-    );
-  }
-  if (carWash.operationDurationMinutes) {
-    carWashLines.push(
-      t('maintenanceTasks.carWash.durationPreview', {
-        minutes: carWash.operationDurationMinutes,
-      }),
-    );
-  }
-  for (const row of carWash.equipmentRows) {
-    if (row.mapCode) {
-      carWashLines.push(formatEquipmentRowPreviewLine(row));
-    }
-  }
-
-  const maintenanceLines = [
-    ...maintenance.equipmentRows
-      .filter((row) => row.mapCode)
-      .map((row) => formatEquipmentRowPreviewLine(row)),
-    ...maintenance.cycleConditions.map(formatMaintenanceCycleCondition),
-  ];
+  const lines = buildSectionLines(draft, t, { omitEmptyChargeRate: appearance === 'wizard' });
 
   const stepLabels = Object.fromEntries(
     CREATE_MAINTENANCE_TASK_STEPS.map((s) => [
@@ -193,6 +229,33 @@ export function MaintenanceTaskPreviewContent({
       t(`maintenanceTasks.createWizard.steps.${s.step}`),
     ]),
   ) as Record<number, string>;
+
+  const basicRows = (
+    <dl className="space-y-3">
+      <PreviewRow label={t('maintenanceTasks.previewChrome.basicName')} value={draft.basic.name.trim() || '—'} />
+      <PreviewRow label={t('maintenanceTasks.previewChrome.version')} value={draft.basic.version.trim() || '—'} />
+      <PreviewRow label={t('maintenanceTasks.previewChrome.remarks')} value={draft.basic.remarks.trim() || '—'} />
+    </dl>
+  );
+
+  if (appearance === 'wizard') {
+    return (
+      <div className="space-y-4">
+        <section className="rounded-xl bg-[#232329] px-5 py-5">
+          <h3 className="mb-4 text-base font-medium text-zinc-100">{stepLabels[1]}</h3>
+          {basicRows}
+        </section>
+        {SECTION_ORDER.filter(({ key }) => lines[key].enabled).map(({ key, step }) => (
+          <section key={key} className="space-y-4 rounded-xl bg-[#232329] px-5 py-5">
+            <h3 className="text-base font-medium text-zinc-100">{stepLabels[step]}</h3>
+            {sectionExtras?.[key]}
+            <WizardBulletCard title="條件設定" items={lines[key].conditions} />
+            <WizardBulletCard title="營運設施" items={lines[key].facilities} />
+          </section>
+        ))}
+      </div>
+    );
+  }
 
   const wrapSection = (extra: ReactNode | undefined, body: ReactNode) => {
     if (!extra) return body;
@@ -203,89 +266,25 @@ export function MaintenanceTaskPreviewContent({
       </div>
     );
   };
+  // 原本的預覽順序：充電與洗車先條件後設施；保養、行檢、待命先設施後條件
+  const ordered = (key: SectionKey) =>
+    key === 'charging' || key === 'carWash'
+      ? [...lines[key].conditions, ...lines[key].facilities]
+      : [...lines[key].facilities, ...lines[key].conditions];
 
   return (
     <div className="space-y-4">
       <PreviewSection step={1} title={stepLabels[1]} onEdit={onEditStep}>
-        <dl className="space-y-3">
-          <PreviewRow
-            label={t('maintenanceTasks.previewChrome.basicName')}
-            value={draft.basic.name.trim() || '—'}
-          />
-          <PreviewRow
-            label={t('maintenanceTasks.previewChrome.version')}
-            value={draft.basic.version.trim() || '—'}
-          />
-          <PreviewRow
-            label={t('maintenanceTasks.previewChrome.remarks')}
-            value={draft.basic.remarks.trim() || '—'}
-          />
-        </dl>
+        {basicRows}
       </PreviewSection>
-
-      <PreviewSection step={2} title={stepLabels[2]} enabled={charging.stepEnabled} onEdit={onEditStep}>
-        {wrapSection(
-          charging.stepEnabled ? sectionExtras?.charging : undefined,
-          <PreviewList items={chargingLines} />,
-        )}
-      </PreviewSection>
-
-      <PreviewSection step={3} title={stepLabels[3]} enabled={carWash.stepEnabled} onEdit={onEditStep}>
-        {wrapSection(
-          carWash.stepEnabled ? sectionExtras?.carWash : undefined,
-          <PreviewList items={carWashLines} />,
-        )}
-      </PreviewSection>
-
-      <PreviewSection step={4} title={stepLabels[4]} enabled={maintenance.stepEnabled} onEdit={onEditStep}>
-        {wrapSection(
-          maintenance.stepEnabled ? sectionExtras?.maintenance : undefined,
-          <PreviewList items={maintenanceLines} />,
-        )}
-      </PreviewSection>
-
-
-      <PreviewSection step={5} title={stepLabels[5]} enabled={preTrip.stepEnabled} onEdit={onEditStep}>
-        {wrapSection(
-          preTrip.stepEnabled ? sectionExtras?.preTrip : undefined,
-          <PreviewList
-            items={[
-              ...preTrip.equipmentRows
-                .filter((row) => row.mapCode)
-                .map((row) => formatEquipmentRowPreviewLine(row)),
-              ...(preTrip.operationDurationMinutes
-                ? [
-                    t('maintenanceTasks.preTrip.durationLine', {
-                      minutes: preTrip.operationDurationMinutes,
-                    }),
-                  ]
-                : []),
-            ]}
-          />,
-        )}
-      </PreviewSection>
-
-      <PreviewSection step={6} title={stepLabels[6]} enabled={mobile.stepEnabled} onEdit={onEditStep}>
-        {wrapSection(
-          mobile.stepEnabled ? sectionExtras?.mobile : undefined,
-          <PreviewList
-            items={[
-              ...mobile.equipmentRows
-                .filter((row) => row.mapCode)
-                .map((row) => formatEquipmentRowPreviewLine(row)),
-              ...(mobile.durationFollowTemplate !== false
-                ? [t('maintenanceTasks.mobile.durationFollowSchedule')]
-                : mobile.operationDurationMinutes
-                ? [
-                    t('maintenanceTasks.mobile.durationLine', {
-                      minutes: mobile.operationDurationMinutes,
-                    }),
-                  ]
-                : []),
-            ]}
-          />,
-        )}
-      </PreviewSection>
+      {SECTION_ORDER.map(({ key, step }) => (
+        <PreviewSection key={key} step={step} title={stepLabels[step]} enabled={lines[key].enabled} onEdit={onEditStep}>
+          {wrapSection(
+            lines[key].enabled ? sectionExtras?.[key] : undefined,
+            <PreviewList items={ordered(key)} />,
+          )}
+        </PreviewSection>
+      ))}
     </div>
   );
 }

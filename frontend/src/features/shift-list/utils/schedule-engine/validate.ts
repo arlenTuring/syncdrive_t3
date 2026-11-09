@@ -38,6 +38,7 @@ import {
 } from '../buildBlockStationDepartures';
 import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDayCycle';
 import { nonZeroYardWorkSeconds } from '../yardWorkMinimum';
+import { collectTrajectories, describePathConflict, findPathConflicts, movePassBufferSeconds } from '../pathOccupancy';
 import {
   collectStationBerthOccupancies,
   findStationBerthCollisions,
@@ -1555,9 +1556,23 @@ export function validateFacilityOccupancy(
   const protectionSeconds = Math.max(0, options.collisionProtectionSeconds ?? 0);
   const occupancies = collectFacilityOccupancies(timelines);
   const collisions = findFacilityOccupancyCollisions(occupancies, protectionSeconds);
+  const zoneByBlockId = new Map<string, string>();
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.yardZoneId) zoneByBlockId.set(block.id, block.yardZoneId);
+    }
+  }
 
   for (const collision of collisions) {
     const { earlier, later } = collision;
+    // 場區內的格位：車在區內自己移動，交接只要求不重疊（重疊仍是硬錯誤）
+    if (
+      collision.kind !== 'overlap'
+      && zoneByBlockId.has(earlier.blockId)
+      && zoneByBlockId.get(earlier.blockId) === zoneByBlockId.get(later.blockId)
+    ) {
+      continue;
+    }
     const detail = {
       facilityNodeId: collision.facilityNodeId,
       facilityLabel: collision.facilityLabel,
@@ -1743,6 +1758,51 @@ export function validateVehicleLocationContinuity(args: {
 }
 
 /**
+ * 移動卡整條路徑跟別列車撞上（硬錯誤）。
+ *
+ * 轉折點檢查只比移動卡彼此、只看中途節點；載客班次停在月台的那段、同向後車要超前車、
+ * 場區聯絡線對頭開，都不在裡面。2026-11-08 實測出場移動 22:01:30 穿過 T3上行，
+ * 別列車 22:01:30～22:02:10 正停在那裡，模擬器照實際行駛只能等、晚到 41 秒。
+ * 規則見 pathOccupancy.ts。
+ */
+export function validateMovePathConflicts(args: {
+  timelines: GeneratedSchedulePlan['timelines'];
+  selectedRoutes: ShiftScheduleSelectedRoute[] | null | undefined;
+  topology: PointTopology | null | undefined;
+  collisionProtectionSeconds: number;
+  errors: FeasibilityIssue[];
+}): void {
+  const bufferSeconds = movePassBufferSeconds(args.collisionProtectionSeconds);
+  if (!args.topology) return;
+  const trajectories = collectTrajectories(args.timelines, args.selectedRoutes, args.topology);
+  const seen = new Set<string>();
+  for (const conflict of findPathConflicts(trajectories, bufferSeconds)) {
+    const key = `${conflict.kind}|${conflict.mine.blockId}|${conflict.other.blockId}|${conflict.nodeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pushIssue(args.errors, {
+      code: 'MOVE_PATH_CONFLICT',
+      severity: 'error',
+      kind: 'limit',
+      message: describePathConflict(conflict, (second) => formatMinuteHms(secondToMinute(second)))
+        + '。移動卡要錯開時刻或改走別條路。',
+      detail: {
+        conflictKind: conflict.kind,
+        nodeId: conflict.nodeId,
+        nodeLabel: conflict.nodeLabel,
+        toNodeId: conflict.toNodeId,
+        blockId: conflict.other.blockId,
+        earlierBlockId: conflict.mine.blockId,
+        timelineRow: conflict.mine.timelineRow,
+        otherTimelineRow: conflict.other.timelineRow,
+        gapSeconds: conflict.gapSeconds != null ? Math.round(conflict.gapSeconds) : undefined,
+        shortfallSeconds: conflict.gapSeconds != null ? Math.max(0, bufferSeconds - conflict.gapSeconds) : bufferSeconds,
+      },
+    });
+  }
+}
+
+/**
  * 移動卡在同一個轉折點貼太近（警告、擋發布）。
  *
  * 排卡時 insertMaintenanceTransferCards 會錯開轉折點，但讓站、提早進廠等策略
@@ -1756,7 +1816,7 @@ export function validateMoveJunctionConflicts(args: {
   collisionProtectionSeconds: number;
   warnings: FeasibilityIssue[];
 }): void {
-  const bufferSeconds = Math.max(0, args.collisionProtectionSeconds) * 2;
+  const bufferSeconds = movePassBufferSeconds(args.collisionProtectionSeconds);
   if (!args.topology) return;
   const missing = new Set<string>();
   const passes = collectMoveJunctionPasses(args.timelines, args.topology, (gap) => {

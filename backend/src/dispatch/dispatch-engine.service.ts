@@ -476,6 +476,29 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     return this.buildPlan(source, reference, { rotationOverlay: false });
   }
 
+  /**
+   * 輪替監看直接下的單：重發的調車、中止時補發被換車的任務、接替車開回格位。
+   * 這些單依現場狀況產生，不在每日計畫裡，訂單欄位跟計畫裡的單一樣。
+   */
+  async issueRotationOrder(item: PlannedDispatch, day: string): Promise<void> {
+    const reference = operatingDayReference(day);
+    if (reference == null) throw new Error(`營運日格式不對：${day}`);
+    const resolved = await this.resolveDailySource(day, { allowAuto: true });
+    if (!resolved) throw new Error(`${day} 沒有可用的班表`);
+    const source = await resolved.load();
+    const plan = await this.buildPlan(source, reference, { rotationOverlay: false });
+    const existing = await this.orderRepository.findOne({ where: { id: item.orderId }, select: { id: true } });
+    if (existing) return;
+    await this.issueOrder(item, {
+      shiftId: plan.shiftId,
+      shiftName: plan.shiftName,
+      operatingDay: day,
+      planDigest: planDigestOf(plan.planned),
+      mapId: resolveMapIdFromShiftBody(source.body),
+    });
+    this.issued.add(item.orderId);
+  }
+
   /** 班表內容 → 今日待下訂單。planToday 與 planForShift 共用，演算法只有這一份。 */
   private async buildPlan(
     deployed: {

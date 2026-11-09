@@ -8,6 +8,7 @@ import type {
 import {
   validateFacilityOccupancy,
   validateMoveJunctionConflicts,
+  validateMovePathConflicts,
   validateStationBerthCollisions,
   validateStationTimingsWithinBlocks,
   validateTimelineOverlaps,
@@ -212,6 +213,14 @@ export function runSchedulePublishCheck(args: {
     topology,
     collisionProtectionSeconds,
     warnings,
+  });
+  // 移動卡整條路徑：穿過有車停的月台、同向超車、聯絡線對開（見 pathOccupancy.ts）
+  validateMovePathConflicts({
+    timelines: plan.timelines,
+    selectedRoutes,
+    topology,
+    collisionProtectionSeconds,
+    errors,
   });
 
   const blockingIssues = [...errors, ...warnings].filter((issue) =>

@@ -25,6 +25,10 @@ import { AttributeLegendBadgeChip } from './AttributeLegendBadgeChip';
 
 const ROW_HEIGHT_PX = 36;
 const ROW_LABEL_WIDTH = 48;
+/** 建立班表精靈的外觀：每格 30 分鐘再切成 3 條 10 分鐘刻度 */
+const WIZARD_TICKS_PER_SLOT = 3;
+const WIZARD_ROW_HEIGHT_PX = 46;
+const WIZARD_ROW_GAP_PX = 8;
 
 function formatSlotLabel(slotIndex: number): string {
   const totalMinutes = slotIndex * SCHEDULE_SLOT_MINUTES;
@@ -80,10 +84,15 @@ function PreviewTaskBar({
   task,
   slotWidthPx,
   activeIntervalRanges,
+  rowHeight = ROW_HEIGHT_PX,
+  wizard = false,
 }: {
   task: ScheduleTask;
   slotWidthPx: number;
   activeIntervalRanges: ReturnType<typeof parseIntervalMinuteRanges>;
+  rowHeight?: number;
+  /** 建立班表精靈：相鄰任務之間留縫、字大一點，邊界看得出來 */
+  wizard?: boolean;
 }) {
   const colors = TASK_TYPE_COLORS[task.taskType];
   const widthPx = (task.durationMinutes / SCHEDULE_SLOT_MINUTES) * slotWidthPx;
@@ -97,11 +106,12 @@ function PreviewTaskBar({
 
   return (
     <div
-      className="pointer-events-none absolute top-[2px] isolate flex items-center overflow-hidden rounded-[4px]"
+      className={`pointer-events-none absolute top-[2px] isolate flex items-center overflow-hidden ${wizard ? 'rounded-md' : 'rounded-[4px]'}`}
       style={{
         left: leftPx,
-        width: widthPx,
-        height: ROW_HEIGHT_PX - 4,
+        // 精靈：每段右邊讓出 2px，相鄰兩段不會黏成一條
+        width: wizard ? Math.max(widthPx - 2, 2) : widthPx,
+        height: rowHeight - 4,
         backgroundColor: colors.bg,
         zIndex: 1,
       }}
@@ -123,6 +133,13 @@ function PreviewTaskBar({
         style={{ backgroundColor: colors.bar }}
       />
       <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center px-1.5">
+        {wizard ? (
+          <span className="max-w-full truncate text-center text-xs leading-5" style={{ color: colors.text }}>
+            {task.label}
+            <span className="mx-1.5 opacity-50">｜</span>
+            <span className="tabular-nums opacity-80">{timeLabel}</span>
+          </span>
+        ) : (
         <span
           className="max-w-full truncate text-center text-[10px] font-normal leading-[18px] tracking-[0.5px]"
           style={{ color: colors.text }}
@@ -130,6 +147,7 @@ function PreviewTaskBar({
           {task.label}
           <span className="opacity-70"> | {timeLabel}</span>
         </span>
+        )}
       </div>
     </div>
   );
@@ -143,7 +161,147 @@ type StepOverallPreviewProps = {
   rowCount: number;
   emptyHint?: string;
   readOnly?: boolean;
+  /** wizard：建立班表精靈的設計稿外觀（不顯示模板名稱、時段標籤靠右、10 分鐘刻度、提示在下方） */
+  appearance?: 'default' | 'wizard';
 };
+
+function formatTickLabel(minutes: number): string {
+  const hh = Math.floor(minutes / 60);
+  const mm = minutes % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/** 建立班表精靈用的唯讀時間軸（依設計稿） */
+function WizardTimeline({
+  intervals,
+  attributes,
+  tasks,
+  rows,
+  slotWidthPx,
+  activeIntervalRanges,
+  legends,
+  emptyHint,
+  scrollHint,
+}: {
+  intervals: TimeSlotInterval[];
+  attributes: TimeSlotAttribute[];
+  tasks: ScheduleTask[];
+  rows: number[];
+  slotWidthPx: number;
+  activeIntervalRanges: ReturnType<typeof parseIntervalMinuteRanges>;
+  legends: ReturnType<typeof buildAttributeIntervalLegends>;
+  emptyHint: string;
+  scrollHint: string;
+}) {
+  void intervals;
+  void attributes;
+  const tickWidth = slotWidthPx / WIZARD_TICKS_PER_SLOT;
+  const tickMinutes = SCHEDULE_SLOT_MINUTES / WIZARD_TICKS_PER_SLOT;
+  const ticks = Array.from({ length: SCHEDULE_VISIBLE_SLOTS * WIZARD_TICKS_PER_SLOT }, (_, i) => i);
+  const totalWidth = SCHEDULE_VISIBLE_SLOTS * slotWidthPx;
+  const gridLines = {
+    backgroundImage: `repeating-linear-gradient(to right, rgba(148,148,184,0.22) 0, rgba(148,148,184,0.22) 1px, transparent 1px, transparent ${tickWidth}px)`,
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border border-[#2B7FFF]/60 bg-[#232329] p-4">
+      {legends.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {legends.map((item) => (
+            <AttributeLegendBadgeChip
+              key={item.attributeId}
+              item={item}
+              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm"
+            />
+          ))}
+        </div>
+      )}
+      {tasks.length === 0 ? (
+        <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-[#25253a] p-6">
+          <PanelNoData />
+          <p className="text-xs text-zinc-500">{emptyHint}</p>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg bg-[#18181b]" style={{ scrollbarColor: '#52525b transparent' }}>
+          <div className="min-w-max" style={{ width: totalWidth + ROW_LABEL_WIDTH }}>
+            <div className="sticky top-0 z-10 flex">
+              <div className="sticky left-0 z-20 shrink-0 bg-[#18181b]" style={{ width: ROW_LABEL_WIDTH }} />
+              <div className="relative flex rounded-t-lg bg-[#2d2d4a]">
+                {ticks.map((tick) => (
+                  <div
+                    key={tick}
+                    className="shrink-0 border-l border-[#9494b8]/25 py-2 pl-1.5 text-left text-xs tabular-nums text-zinc-300"
+                    style={{ width: tickWidth }}
+                  >
+                    {formatTickLabel(tick * tickMinutes)}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="relative flex">
+              <div className="sticky left-0 z-10 shrink-0 bg-[#18181b]" style={{ width: ROW_LABEL_WIDTH }}>
+                {rows.map((row) => (
+                  <div
+                    key={row}
+                    className="flex items-center justify-center text-sm tabular-nums text-zinc-300"
+                    style={{ height: WIZARD_ROW_HEIGHT_PX, marginTop: WIZARD_ROW_GAP_PX }}
+                  >
+                    {String(row).padStart(2, '0')}
+                  </div>
+                ))}
+              </div>
+              {/* 暗縫＋刻度線只在列與列之間露出；每一列是一條軌道底板（設計稿的邊界感） */}
+              <div className="relative pb-1" style={{ width: totalWidth, ...gridLines }}>
+                {rows.map((row) => {
+                  const rowTasks = tasks.filter((task) => task.rowIndex === row);
+                  return (
+                    <div
+                      key={row}
+                      // 每一列自己的底色，列與列之間露出外框底色，看得出邊界
+                      className="relative border-y border-white/[0.05] bg-[#26262b]"
+                      style={{ height: WIZARD_ROW_HEIGHT_PX, marginTop: WIZARD_ROW_GAP_PX }}
+                    >
+                      {Array.from({ length: SCHEDULE_VISIBLE_SLOTS }, (_, col) => {
+                        const slotStart = col * SCHEDULE_SLOT_MINUTES;
+                        const slotEnd = slotStart + SCHEDULE_SLOT_MINUTES;
+                        const slotActive = activeIntervalRanges.some(
+                          (range) => range.start < slotEnd && range.end > slotStart,
+                        );
+                        return slotActive ? null : (
+                          <div
+                            key={col}
+                            className="schedule-inactive-cell absolute inset-y-0"
+                            style={{ left: col * slotWidthPx, width: slotWidthPx }}
+                            aria-hidden
+                          />
+                        );
+                      })}
+                      {rowTasks.map((task) => (
+                        <PreviewTaskBar
+                          key={task.id}
+                          task={task}
+                          slotWidthPx={slotWidthPx}
+                          activeIntervalRanges={activeIntervalRanges}
+                          rowHeight={WIZARD_ROW_HEIGHT_PX}
+                          wizard
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <p className="flex shrink-0 items-center justify-center gap-2 text-sm text-zinc-300">
+        <Info className="size-4 shrink-0" aria-hidden />
+        <span>{scrollHint}</span>
+        <span aria-hidden>← →</span>
+      </p>
+    </div>
+  );
+}
 
 export function StepOverallPreview({
   name,
@@ -153,6 +311,7 @@ export function StepOverallPreview({
   rowCount,
   emptyHint,
   readOnly = false,
+  appearance = 'default',
 }: StepOverallPreviewProps) {
   const { t } = useTranslation();
   const resolvedEmptyHint = emptyHint ?? t('timeTemplates.overallPreview.emptyHint');
@@ -170,6 +329,22 @@ export function StepOverallPreview({
     () => buildAttributeIntervalLegends(intervals, attributes),
     [intervals, attributes],
   );
+
+  if (appearance === 'wizard') {
+    return (
+      <WizardTimeline
+        intervals={intervals}
+        attributes={attributes}
+        tasks={tasks}
+        rows={rows}
+        slotWidthPx={slotWidthPx}
+        activeIntervalRanges={activeIntervalRanges}
+        legends={legends}
+        emptyHint={resolvedEmptyHint}
+        scrollHint={t('timeTemplates.overallPreview.scrollHint')}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">

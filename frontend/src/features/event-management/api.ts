@@ -1,4 +1,4 @@
-import { downloadCsv, getJson, postJson } from '../event-log-shared/api';
+import { downloadCsv, getJson, postJson, putJson } from '../event-log-shared/api';
 
 export type EventItem = {
   id: string;
@@ -27,24 +27,42 @@ export type EventDetail = EventItem & {
   params: unknown;
   detail: string | null;
   acknowledgementNote: string | null;
+  /** 事件類型管理設定的建議處置 SOP；沒設定為 null */
+  sop: { text: string | null; url: string | null } | null;
   trail: Array<{ id: string; action: string; operatorName: string | null; sourceIp: string | null; result: string; failureReason: string | null; note: string | null; at: number }>;
   alreadyAcknowledged?: boolean;
 };
 
 export type EventList = { items: EventItem[]; total: number; page: number; pageSize: number; snapshot: string; range: { from: number; to: number } | null; timeZone: string };
 
-export type LiveBucket = 'pending' | 'confirmed';
-/** 事件管理工作集合：待確認／已確認由後端分開查詢與排序。 */
+export type LiveSort = 'occurred_at' | 'severity' | 'status';
+
+export type LiveQuery = {
+  page: number;
+  keyword?: string;
+  vehicleCode?: string;
+  eventCode?: string;
+  sortBy: LiveSort;
+  direction: 'asc' | 'desc';
+};
+
 export type LiveEvents = {
   items: EventItem[];
   total: number;
+  page: number;
+  pageSize: number;
   pendingTotal: number;
   confirmedTotal: number;
-  hasMore: boolean;
-  nextCursor: string | null;
-  version: string;
   serverTime: number;
   timeZone: string;
+};
+
+export type EventType = {
+  code: string;
+  name: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  sopText: string | null;
+  sopUrl: string | null;
 };
 
 export type EventOptions = {
@@ -80,8 +98,10 @@ export type Playback = {
 
 export const fetchEventOptions = (signal?: AbortSignal) => getJson<EventOptions>('/events/options', undefined, signal);
 export const fetchEvents = (query: EventQuery & { page: number; snapshot?: string }, signal?: AbortSignal) => getJson<EventList>('/events', query, signal);
-export const fetchLiveEvents = (params: { bucket: LiveBucket; limit: number; after?: string }, signal?: AbortSignal) => getJson<LiveEvents>('/events/live', params, signal);
+export const fetchLiveEvents = (params: LiveQuery, signal?: AbortSignal) => getJson<LiveEvents>('/events/live', params, signal);
 export const fetchEvent = (id: string, signal?: AbortSignal) => getJson<EventDetail>(`/events/${encodeURIComponent(id)}`, undefined, signal);
 export const acknowledgeEvent = (id: string, note: string) => postJson<EventDetail>(`/events/${encodeURIComponent(id)}/acknowledgement`, { note });
 export const fetchPlayback = (id: string, signal?: AbortSignal) => getJson<Playback>(`/events/${encodeURIComponent(id)}/playback`, undefined, signal);
 export const exportEvents = (query: EventQuery) => downloadCsv('/events/export', query);
+export const fetchEventTypes = (signal?: AbortSignal) => getJson<{ items: EventType[] }>('/event-types', undefined, signal);
+export const saveEventTypes = (items: EventType[]) => putJson<{ items: EventType[] }>('/event-types', { items });

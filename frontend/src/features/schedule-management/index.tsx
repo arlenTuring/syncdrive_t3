@@ -344,7 +344,10 @@ export default function ScheduleManagementApp({
   const auth = useAuth();
   const { user } = auth;
   const [mapMounted, setMapMounted] = useState(initialView === "map");
-  const [adminMode] = useAdminModePreference();
+  const [adminModePreference] = useAdminModePreference();
+  // 管理模式是瀏覽器偏好；沒有儀表板編輯權限的帳號（例如廠商）在同一台電腦登入也不顯示編輯入口
+  const adminMode =
+    adminModePreference && auth.can("dashboard.dashboard.edit");
   const [modulePages, setModulePages] = useModuleDashboardPages();
   const [attachModuleId, setAttachModuleId] = useState<string | null>(null);
   const [accountRoleFilter, setAccountRoleFilter] = useState<string | null>(
@@ -419,6 +422,19 @@ export default function ScheduleManagementApp({
     : VIEW_PERMISSIONS[view as ShellView];
   const viewAllowed =
     !requiredPermission || permissionSatisfied(requiredPermission, auth.can);
+
+  // 側欄沒有任何內建頁面可看的帳號（例如只開數據監控的廠商），預設頁會落在沒權限的
+  // 「班次運行紀錄」；改開它看得到的第一個儀表板頁面（數據監控模組優先）。
+  const fallbackDashboardView = useMemo(() => {
+    if (!auth.can("dashboard.dashboard.view")) return null;
+    const page =
+      modulePages.find((item) => item.moduleId === "monitor") ?? modulePages[0];
+    return page ? moduleDashboardViewId(page.id) : null;
+  }, [auth, modulePages]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!viewAllowed && fallbackDashboardView) setView(fallbackDashboardView);
+  }, [viewAllowed, fallbackDashboardView]);
 
   const scheduleContent = (
     <>

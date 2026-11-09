@@ -147,7 +147,7 @@ export class AuthService implements OnModuleInit {
       let role = await manager.findOne(Role, { where: { roleCode: VENDOR_ROLE_CODE } });
       if (!role) {
         role = await manager.save(Role, manager.create(Role, {
-          roleCode: VENDOR_ROLE_CODE, displayName: '廠商（唯讀）', description: '部署設定的廠商帳號使用；預設只有檢視權限',
+          roleCode: VENDOR_ROLE_CODE, displayName: '廠商（唯讀）', description: '部署設定的廠商帳號使用；預設只能檢視數據監控模組',
           isSystem: false, createdAt: now, updatedAt: now,
         }));
         const permissions = await manager.findBy(Permission, { permissionCode: In([...VENDOR_ROLE_PERMISSIONS]) });

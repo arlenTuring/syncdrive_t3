@@ -70,7 +70,7 @@ export const AUDIT_ACTIONS = {
   DEGRADED_PARAMETERS: op('調整降級參數', 'DEGRADED_EXECUTION'),
   DEGRADED_CONTENT: op('修改降級內容', 'DEGRADED_EXECUTION'),
   DEGRADED_RESTORE: op('解除降級運轉', 'DEGRADED_EXECUTION'),
-  EVENT_ACKNOWLEDGE: op('人工確認事件', 'EVENT'),
+  EVENT_ACKNOWLEDGE: op('回報事件', 'EVENT'),
 
   // ── 系統：設定、地圖、載具模型、媒體、儀表板、資料管理 ──
   SYSTEM_SETTINGS_UPDATE: sys('修改系統基礎設定', 'SYSTEM_SETTINGS'),
@@ -108,6 +108,7 @@ export const AUDIT_ACTIONS = {
   SYSTEM_BACKUP_DELETE: sys('刪除資料備份', 'DATA_RETENTION'),
   DATA_LIVE_RESET: sys('重置即時資料', 'DATABASE'),
   EVENT_EXPORT: sys('匯出事件報表', 'EVENT'),
+  EVENT_TYPE_UPDATE: sys('修改事件類型', 'EVENT_TYPE'),
   VIDEO_TAB_CREATE: sys('建立監控標籤', 'VIDEO_TAB'),
   VIDEO_TAB_UPDATE: sys('修改監控標籤', 'VIDEO_TAB'),
   VIDEO_TAB_DELETE: sys('刪除監控標籤', 'VIDEO_TAB'),
@@ -154,6 +155,7 @@ export const TARGET_TYPE_LABEL: Record<string, string> = {
   DEGRADED_PLAN: '降級計畫',
   DEGRADED_EXECUTION: '降級運轉',
   EVENT: '事件',
+  EVENT_TYPE: '事件類型',
   SYSTEM_SETTINGS: '系統設定',
   MAP: '圖資',
   VEHICLE_MODEL: '載具模型',

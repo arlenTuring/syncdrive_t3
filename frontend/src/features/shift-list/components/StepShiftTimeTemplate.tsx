@@ -19,7 +19,7 @@ import { MainlineSlackSecondsField } from './MainlineSlackSecondsField';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
 
 const SELECT_CLASS =
-  'h-[42px] w-full min-w-0 flex-1 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]';
+  'h-9 w-full min-w-0 flex-1 rounded-lg border border-transparent bg-[#232730] px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]';
 
 type StepShiftTimeTemplateProps = {
   draft: ShiftScheduleTimeTemplateDraft;
@@ -134,69 +134,68 @@ export function StepShiftTimeTemplate({
     });
   };
 
+  const showHighDensity = Boolean(draft.templateId) && !previewLoading && !previewError && highDensityAttrs.length > 0;
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
-      <h2 className="mb-6 shrink-0 text-base font-medium text-zinc-100">{t('shiftList.stepTimeTemplate.title')}</h2>
+      <h2 className="mb-5 shrink-0 text-lg font-medium text-zinc-100">{t('shiftList.stepTimeTemplate.title')}</h2>
 
-      <div className="max-w-4xl shrink-0">
+      <div className="shrink-0">
+        {/* 標籤列：左邊「時間模板 ⓘ」，高密度提醒放同一列最右邊，不另佔一列壓縮下方時間軸 */}
+        <div className="mb-2 flex items-center gap-1.5 px-1 text-sm text-zinc-300">
+          <span className="text-red-500">*</span>
+          <span>{t('shiftList.stepTimeTemplate.label')}</span>
+          {showHighDensity ? (
+            <HelpTip
+              label={t('shiftList.stepTimeTemplate.highDensityHelpLabel')}
+              widthClass="w-72"
+              side="bottom"
+            >
+              <p>
+                {t('shiftList.stepTimeTemplate.highDensityHelp')}
+              </p>
+              <ul className="mt-2 space-y-1">
+                {highDensityAttrs.map((attr) => (
+                  <li key={attr.id} className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: attr.color }}
+                    />
+                    <span className="font-medium text-zinc-100">{attr.name}</span>
+                    <span className="text-zinc-400">{t('shiftList.stepTimeTemplate.headwaySeconds', { seconds: attr.headwaySeconds })}</span>
+                  </li>
+                ))}
+              </ul>
+            </HelpTip>
+          ) : null}
+          {showHighDensity ? (
+            <span className="ml-auto min-w-0 truncate text-sm font-medium text-amber-200">
+              {t('shiftList.stepTimeTemplate.highDensityWarn')}
+            </span>
+          ) : null}
+        </div>
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
-            {t('shiftList.stepTimeTemplate.label')}
-          </span>
+          <span className="sr-only">{t('shiftList.stepTimeTemplate.label')}</span>
           {loading ? (
             <div className="flex h-[42px] items-center gap-2 text-sm text-zinc-500">
               <Loader2 className="size-4 animate-spin" />
               {t('shiftList.stepTimeTemplate.loading')}
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <SiteSelect
-                value={draft.templateId}
-                onChange={(e) => handleSelect(e.target.value)}
-                className={SELECT_CLASS}
-                disabled={Boolean(error) || items.length === 0}
-              >
-                <option value="">{t('shiftList.stepTimeTemplate.pleaseSelect')}</option>
-                {items.map((item) => (
-                  <option key={item.template_id} value={item.template_id}>
-                    {item.name}
-                    {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
-                  </option>
-                ))}
-              </SiteSelect>
-              {draft.templateId
-                && !previewLoading
-                && !previewError
-                && highDensityAttrs.length > 0 ? (
-                <p className="flex max-w-[min(100%,22rem)] shrink-0 items-center gap-1.5 text-sm font-medium text-amber-200">
-                  <span className="min-w-0 leading-snug">
-                    {t('shiftList.stepTimeTemplate.highDensityWarn')}
-                  </span>
-                  <HelpTip
-                    label={t('shiftList.stepTimeTemplate.highDensityHelpLabel')}
-                    widthClass="w-72"
-                    side="bottom"
-                  >
-                    <p>
-                      {t('shiftList.stepTimeTemplate.highDensityHelp')}
-                    </p>
-                    <ul className="mt-2 space-y-1">
-                      {highDensityAttrs.map((attr) => (
-                        <li key={attr.id} className="flex items-center gap-1.5">
-                          <span
-                            className="inline-block size-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: attr.color }}
-                          />
-                          <span className="font-medium text-zinc-100">{attr.name}</span>
-                          <span className="text-zinc-400">{t('shiftList.stepTimeTemplate.headwaySeconds', { seconds: attr.headwaySeconds })}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </HelpTip>
-                </p>
-              ) : null}
-            </div>
+            <SiteSelect
+              value={draft.templateId}
+              onChange={(e) => handleSelect(e.target.value)}
+              className={SELECT_CLASS}
+              disabled={Boolean(error) || items.length === 0}
+            >
+              <option value="">{t('shiftList.stepTimeTemplate.pleaseSelect')}</option>
+              {items.map((item) => (
+                <option key={item.template_id} value={item.template_id}>
+                  {item.name}
+                  {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
+                </option>
+              ))}
+            </SiteSelect>
           )}
           {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           {!loading && !error && items.length === 0 && (
@@ -233,7 +232,7 @@ export function StepShiftTimeTemplate({
         </div>
       )}
 
-      <div className="mt-8 flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+      <div className={`mt-6 flex min-h-[280px] flex-1 flex-col overflow-hidden ${draft.templateId && !previewLoading && !previewError ? '' : 'rounded-xl border border-zinc-800/80 bg-zinc-950/40'}`}>
         {!draft.templateId ? (
           <ShiftSelectionEmptyState />
         ) : previewLoading ? (
@@ -246,8 +245,9 @@ export function StepShiftTimeTemplate({
             {previewError}
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <StepOverallPreview
+              appearance="wizard"
               name={previewName}
               intervals={previewData.intervals}
               attributes={previewData.attributes}

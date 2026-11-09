@@ -262,6 +262,25 @@ describe('OrderService 狀態機 (VALID_TRANSITIONS)', () => {
       expect(cancelOrderRepo.save).not.toHaveBeenCalled();
     });
 
+    it('已請求取消、車端還沒結案：resend 重送通知，取消時刻不變', async () => {
+      const order = makeOrder(OrderStatus.PROCESSING);
+      order.payload = { cancel_requested_at: 1700000000000 };
+      cancelOrderRepo.findOne.mockResolvedValue(order);
+      const result = await cancelService.requestCancel('260624-U1030', { resend: true });
+      expect(result.payload).toMatchObject({ cancel_requested_at: 1700000000000 });
+      expect(result.payload).toHaveProperty('cancel_resent_at');
+      expect(publisherMock.publishCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('retireFaulted：故障中的單記下取消，之後不能再由車端復歸', async () => {
+      const order = makeOrder(OrderStatus.FAULTED);
+      cancelOrderRepo.findOne.mockResolvedValue(order);
+      const result = await cancelService.requestCancel('260624-U1030', { retireFaulted: true });
+      expect(result.payload).toHaveProperty('cancel_requested_at');
+      expect(result.payload).toMatchObject({ closed_reason: 'superseded' });
+      expect(result.status).toBe(OrderStatus.FAULTED);
+    });
+
     it('找不到訂單時拋 NotFound', async () => {
       cancelOrderRepo.findOne.mockResolvedValue(null);
       await expect(cancelService.requestCancel('nope')).rejects.toBeInstanceOf(NotFoundException);

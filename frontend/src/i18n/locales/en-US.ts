@@ -72,7 +72,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       "media-content": "Media Content",
       "media-groups": "Media Groups",
       "media-schedule": "Media Schedules",
-      "event-list": "Live Event Management",
+      "event-list": "Live Event List",
       "event-history": "Event Records",
       "order-records": "Order Records",
       "video-monitor": "Live Video Monitoring",
@@ -549,6 +549,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     },
     overallPreview: {
       templateName: "Template name",
+      scrollHint: "Scroll the timeline sideways to see more tasks",
       emptyHint: "Place tasks in the “Task scheduling” step before previewing",
       readOnlyHint: "Preview only — scroll horizontally to browse the schedule",
     },
@@ -590,6 +591,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       previous: "Back",
       next: "Next",
       saveCreate: "Save & create",
+      saveAndPreview: "Save & final preview",
       savingDraft: "Saving draft…",
       draftSaved: "Draft auto-saved ({{time}})",
       autoSaveFailed: "Auto-save failed",
@@ -980,8 +982,22 @@ const enUS: DeepStringify<typeof zhTW> = {
         "Hover the time axis for interval attributes; hover trip i for topology & dwell/slack; select a block to adjust planned departure (10 s); click empty to deselect",
       hintReadonly:
         "Hover the time axis for interval attributes; hover trip i for topology & dwell/slack; pan the axis horizontally",
+      hintWizardDetail:
+        "Hover the time axis for interval attributes; hover trip ⓘ for topology & dwell/slack; select a trip card to delete it from the toolbar; click empty space to deselect",
     },
     scheduleAdjust: {
+      checkReport: "Check report",
+      recheck: "Re-check",
+      safetyPassed: "Safety check passed!",
+      safetyFailed: "Safety check failed: {{count}} blocking publish",
+      qualityPassed: "Quality check passed!",
+      qualityFailed: "Quality below target!",
+      blocksPublish: "Blocks publish",
+      unresolved: "Unresolved",
+      itemCount: "{{count}}",
+      showPolicyWarnings: "{{count}} policy warnings hidden — show",
+      hidePolicyWarnings: "Hide policy warnings",
+      rootCauseLabel: "Root cause: ",
       rootFleet: "Not enough vehicles",
       rootFleetHint:
         "Concurrent vehicles below round-trip ÷ headway. Add vehicles or relax headway; the analysis report lists the required figures.",

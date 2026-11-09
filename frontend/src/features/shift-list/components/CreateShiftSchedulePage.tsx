@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Check,
   ClipboardList,
+  Lightbulb,
   Loader2,
   RefreshCw,
   Trash2,
@@ -55,8 +56,9 @@ type CreateShiftSchedulePageProps = {
   initialCreationMode?: 'parametric' | 'manual';
 };
 
+/** 設計稿：無外框、灰藍底的輸入框 */
 const INPUT_CLASS =
-  'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 
@@ -83,7 +85,7 @@ function AutoSaveDraftBadge({
   if (status === 'idle' && !savedAt) return null;
 
   return (
-    <div className="absolute right-6 top-6 flex items-center gap-2 text-xs text-zinc-400">
+    <div className="absolute right-8 top-[3.25rem] flex items-center gap-2 text-xs text-zinc-400">
       {status === 'saving' ? (
         <>
           <Loader2 className="size-3 animate-spin text-zinc-500" />
@@ -111,7 +113,6 @@ function CreateStepSidebar({
   turnaroundLimitSeconds,
   isScheduleInvalidated,
   onBack,
-  onDiscard,
   onStepClick,
 }: {
   currentStep: CreateShiftScheduleStep;
@@ -121,29 +122,26 @@ function CreateStepSidebar({
   turnaroundLimitSeconds: number | null;
   isScheduleInvalidated: boolean;
   onBack: () => void;
-  onDiscard: () => void;
   onStepClick: (step: CreateShiftScheduleStep) => void;
 }) {
   const { t } = useTranslation();
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
-      <div className="border-b border-zinc-800/80 px-4 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
-        >
-          <ArrowLeft className="size-4" />
-          {t('shiftList.createWizard.backToPlatform')}
-        </button>
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
-          <ClipboardList className="size-4 text-[#2B7FFF]" />
-          {t('shiftList.createWizard.title')}
-        </div>
+    <aside className="flex w-[260px] shrink-0 flex-col rounded-2xl bg-[#1b1b1f] px-4 py-5">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-3 px-1 text-base font-medium text-zinc-100 transition hover:text-white"
+      >
+        <ArrowLeft className="size-5" />
+        {t('shiftList.createWizard.backToPlatform')}
+      </button>
+      <div className="mt-4 flex items-center gap-2 border-t border-zinc-700/70 px-1 pt-5 text-base font-medium text-zinc-100">
+        <ClipboardList className="size-5 text-zinc-300" />
+        {t('shiftList.createWizard.title')}
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-auto px-3 py-4">
-        <ol className="space-y-1">
+      <nav className="mt-4 min-h-0 flex-1 overflow-auto">
+        <ol className="space-y-1.5">
           {(() => {
             const visibleSteps = resolveVisibleCreateShiftSteps(draft.creationMode);
             return visibleSteps.map((item, index) => {
@@ -180,48 +178,41 @@ function CreateStepSidebar({
                       ? t('shiftList.createWizard.scheduleLockedHint')
                       : undefined
                   }
-                  className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                  aria-current={active ? 'step' : undefined}
+                  className={`relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
                     active
-                      ? 'bg-[rgba(43,127,255,0.12)]'
+                      ? 'border-[#3d5f8f] bg-[#232a36]'
                       : canClick
-                        ? 'hover:bg-zinc-900/80'
-                        : isStepLockedByInvalidation
-                          ? 'cursor-not-allowed'
-                          : 'cursor-not-allowed opacity-50'
+                        ? 'border-transparent hover:bg-white/5'
+                        : 'cursor-not-allowed border-transparent'
                   }`}
                 >
-                  {active && (
-                    <span
-                      className="absolute inset-y-2 left-0 w-1 rounded-r bg-[#2B7FFF]"
-                      aria-hidden
-                    />
-                  )}
                   <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-medium ${
                       active
-                        ? 'bg-[#2B7FFF] text-white'
+                        ? 'border-[#2B7FFF] bg-[#2B7FFF] text-white'
                         : isStepLockedByInvalidation
-                          ? 'bg-amber-400 text-zinc-950'
+                          ? 'border-amber-400 bg-amber-400 text-zinc-950'
                           : completed
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : 'bg-zinc-800 text-zinc-500'
+                            ? 'border-emerald-600 bg-emerald-500/15 text-emerald-400'
+                            : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
                     }`}
                   >
                     {isStepLockedByInvalidation ? (
-                      <AlertTriangle className="size-3.5" strokeWidth={2.5} aria-hidden />
+                      <AlertTriangle className="size-4" strokeWidth={2.5} aria-hidden />
                     ) : completed ? (
-                      <Check className="size-3.5" strokeWidth={2.5} />
+                      <Check className="size-4" strokeWidth={2.5} />
                     ) : (
                       displayIndex
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] uppercase tracking-wider text-zinc-600">
+                    <span className="block text-xs text-zinc-400">
                       STEP {displayIndex}
                     </span>
                     <span
-                      className={`block truncate text-sm ${
-                        active ? 'font-medium text-zinc-100' : 'text-zinc-400'
+                      className={`block truncate text-[15px] ${
+                        canClick || active ? 'text-zinc-100' : 'text-zinc-300'
                       }`}
                     >
                       {t(`shiftList.createWizard.steps.${item.step}`)}
@@ -235,16 +226,6 @@ function CreateStepSidebar({
         </ol>
       </nav>
 
-      <div className="border-t border-zinc-800/80 p-4">
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
-        >
-          <Trash2 className="size-4" />
-          {t('shiftList.createWizard.discardDraft')}
-        </button>
-      </div>
     </aside>
   );
 }
@@ -263,10 +244,10 @@ function StepBasicInfo({
 
   return (
     <div className="w-full">
-      <h2 className="mb-6 text-base font-medium text-zinc-100">設定班表名稱與時間基準</h2>
+      <h2 className="mb-5 text-lg font-medium text-zinc-100">設定班表名稱與時間基準</h2>
       <div className="space-y-5">
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
+          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
             班表名稱
           </span>
@@ -290,7 +271,7 @@ function StepBasicInfo({
           )}
         </label>
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
+          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
             版本編號
           </span>
@@ -303,7 +284,7 @@ function StepBasicInfo({
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm text-zinc-300">備註說明</span>
+          <span className="mb-2 block px-1 text-sm text-zinc-300">備註說明</span>
           <input
             type="text"
             value={draft.remarks}
@@ -548,6 +529,10 @@ export function CreateShiftSchedulePage({
       updateDraft((prev) => ({ ...prev, routeGroups: { ...prev.routeGroups, dataCheck: record } })),
   });
 
+  /** 第 4 步底部「檢查」：重新列出路線組合並重跑資料檢查，之後才顯示檢查報告 */
+  const [routeCheckSignal, setRouteCheckSignal] = useState(0);
+  const [routeChecked, setRouteChecked] = useState(false);
+
   const canGoNext = useMemo(() => {
     if (loading || loadError) return false;
     const nameUnique = nameUniqueState === 'unique';
@@ -657,7 +642,8 @@ export function CreateShiftSchedulePage({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex bg-[#0a0a0b] text-zinc-100">
+    <div className="fixed inset-0 z-[60] flex flex-col gap-4 bg-black p-5 pb-4 text-zinc-100">
+      <div className="flex min-h-0 flex-1 gap-5">
       <CreateStepSidebar
         currentStep={draft.currentStep}
         maxReachedStep={draft.maxReachedStep}
@@ -666,25 +652,22 @@ export function CreateShiftSchedulePage({
         turnaroundLimitSeconds={turnaroundLimitSeconds}
         isScheduleInvalidated={isScheduleInvalidated}
         onBack={handleBack}
-        onDiscard={() => void handleDiscard()}
         onStepClick={(step) => {
           if (step <= draft.maxReachedStep) goToStep(step);
         }}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="border-b border-zinc-800/60 px-8 py-3 text-center text-xs text-zinc-500">
-          {t('shiftList.createWizard.stepHint')}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto p-8">
+        <div className="min-h-0 flex-1 overflow-auto rounded-2xl bg-[#1b1b1f]">
           <div
-            className={`relative flex min-h-full flex-col rounded-2xl bg-[#111113] p-8 pt-14 ${
-              showInvalidationChrome
-                ? 'border-2 border-amber-400'
-                : 'border border-zinc-800/80'
+            className={`relative flex min-h-full flex-col rounded-2xl px-7 pb-6 pt-4 ${
+              showInvalidationChrome ? 'border-2 border-amber-400' : ''
             }`}
           >
+            <p className="mb-3 flex items-center justify-center gap-1.5 text-sm text-zinc-400">
+              <Lightbulb className="size-4 text-zinc-400" aria-hidden />
+              {t('shiftList.createWizard.stepHint')}
+            </p>
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
             {showInvalidationChrome && (
               <div className="mb-6 flex shrink-0 items-center justify-center gap-2 px-4 py-1 text-sm font-medium text-amber-400">
@@ -739,6 +722,7 @@ export function CreateShiftSchedulePage({
                     maintenanceSkipped={draft.maintenanceTask.skipped}
                     maintenanceSectionCodes={draft.maintenanceTask.sectionCodeBySection}
                     maintenanceSectionEnabled={draft.maintenanceTask.sectionEnabled}
+                    checkSignal={routeCheckSignal}
                     onChange={(routeGroups) =>
                       updateDraft((prev) => {
                         const nextRouteGroups =
@@ -759,17 +743,16 @@ export function CreateShiftSchedulePage({
                     }
                   />
                 )}
-                {draft.currentStep === 4 && draft.creationMode === 'parametric' ? (
-                  <div className="mt-4 shrink-0">
-                    <ScheduleDataCheckPanel {...dataCheck} />
-                  </div>
-                ) : null}
-                {draft.currentStep === 4 && draft.creationMode === 'parametric' && !draft.maintenanceTask.skipped && draft.maintenanceTask.taskId ? (
+                {draft.currentStep === 4 && draft.creationMode === 'parametric' && (routeChecked || canGoNext) ? (
                   <div className="mt-4 shrink-0">
                     <YardEntryAllowancePanel
+                      appearance="report"
                       templateId={draft.timeTemplate.templateId}
                       maintenance={draft.maintenanceTask}
                       lockedRotationSeconds={lockedRotationSeconds}
+                      skipAllowance={draft.maintenanceTask.skipped || !draft.maintenanceTask.taskId}
+                      extra={<ScheduleDataCheckPanel {...dataCheck} embedded />}
+                      extraOk={dataCheck.passed && canGoNext}
                     />
                   </div>
                 ) : null}
@@ -802,14 +785,26 @@ export function CreateShiftSchedulePage({
           </div>
         </div>
 
-        <footer className="flex shrink-0 flex-col gap-1 border-t border-zinc-800/80 px-8 py-4">
-          {saveError && <p className="text-xs text-red-400">{saveError}</p>}
-          <div className="flex items-center justify-end gap-4">
+      </div>
+      </div>
+
+        <footer className="flex shrink-0 flex-col gap-1 px-2">
+          {saveError && <p className="text-right text-xs text-red-400">{saveError}</p>}
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => void handleDiscard()}
+              disabled={!savedShiftId || loading}
+              className="mr-auto inline-flex items-center gap-2 rounded-lg border border-red-500/80 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-500 disabled:hover:bg-transparent"
+            >
+              <Trash2 className="size-4" />
+              {t('shiftList.createWizard.discardDraft')}
+            </button>
             <button
               type="button"
               onClick={handlePrevious}
               disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}
-              className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
+              className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:text-zinc-500"
             >
               {t('shiftList.createWizard.previous')}
             </button>
@@ -823,12 +818,30 @@ export function CreateShiftSchedulePage({
                 <RefreshCw className="size-4" aria-hidden />
                 {t('shiftList.createWizard.rebuildSchedule')}
               </button>
+            ) : draft.currentStep === 4 && draft.creationMode === 'parametric' && !canGoNext ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setRouteCheckSignal((value) => value + 1);
+                  dataCheck.recheck();
+                  setRouteChecked(true);
+                }}
+                disabled={
+                  loading
+                  || Boolean(loadError)
+                  || !draft.routeGroups.mapId.trim()
+                  || draft.routeGroups.selectedRoutes.length === 0
+                }
+                className="rounded-lg bg-[#2B7FFF] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
+              >
+                檢查
+              </button>
             ) : (
               <button
                 type="button"
                 onClick={draft.currentStep === 7 ? handleFinish : handleNext}
                 disabled={!canGoNext || loading || Boolean(loadError)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
                   canGoNext && !loading && !loadError
                     ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
                     : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
@@ -836,12 +849,13 @@ export function CreateShiftSchedulePage({
               >
                 {draft.currentStep === 7
                   ? t('shiftList.createWizard.saveCreate')
-                  : t('shiftList.createWizard.next')}
+                  : draft.currentStep === 6
+                    ? t('shiftList.createWizard.saveAndPreview')
+                    : t('shiftList.createWizard.next')}
               </button>
             )}
           </div>
         </footer>
-      </div>
     </div>
   );
 }

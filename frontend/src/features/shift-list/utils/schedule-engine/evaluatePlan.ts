@@ -10,6 +10,7 @@ import type { FeasibilityIssue, GeneratedSchedulePlan } from './types';
 import {
   validateFacilityOccupancy,
   validateMoveJunctionConflicts,
+  validateMovePathConflicts,
   validatePassengerHeadway,
   validateRotationCyclesComplete,
   validateRouteSwitchBuffers,
@@ -64,6 +65,12 @@ export type PlanEvaluationContext = {
   topology?: PointTopology | null;
   /** 整備類型 → 車可能停的出場站；給了才檢查整備出場站接續 */
   yardExitStationOptionsByTaskType?: Partial<Record<string, string[]>>;
+  /**
+   * 比對時是否包含移動卡整條路徑檢查（MOVE_PATH_CONFLICT）。只有路徑修復本身要開：
+   * 它要展開整份班表的軌跡，放進搜尋每一步的評估會吃光搜尋預算、改變搜尋結果
+   * （2026-11-08 實測：90 秒 1188 班 → 262 秒 1184 班）。最終驗證另外照常檢查。
+   */
+  includeMovePath?: boolean;
 };
 
 const SAFETY_CODES = new Set(['FACILITY_HANDOVER_GAP', 'MOVE_JUNCTION_CONFLICT']);
@@ -130,6 +137,15 @@ export function collectPlanViolations(
     collisionProtectionSeconds: ctx.collisionProtectionSeconds,
     warnings,
   });
+  if (ctx.includeMovePath) {
+    validateMovePathConflicts({
+      timelines,
+      selectedRoutes: ctx.selectedRoutes,
+      topology: ctx.topology,
+      collisionProtectionSeconds: ctx.collisionProtectionSeconds,
+      errors,
+    });
+  }
   validateRouteSwitchBuffers(
     timelines,
     ctx.routeById,

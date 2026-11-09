@@ -1,3 +1,4 @@
+import { Lightbulb } from 'lucide-react';
 import type { MaintenanceSectionCodeBySection, MaintenanceSectionCodeKey } from '../utils/maintenanceSectionCode';
 import {
   TRANSITION_CARD_CODE_KEYS,
@@ -66,24 +67,29 @@ export function TransitionCardCodesBar({
   const issuesFor = (key: TransitionCardCodeKey) => issues.filter((issue) => issue.key === key);
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3" data-transition-card-codes="set">
-      <div className="mb-2 text-sm text-zinc-300">
-        過渡卡代號
-        <span className="ml-2 text-xs text-zinc-500">
-          1～2 個大寫英文字母；班次代號＝代號＋列號（兩位數）＋計畫開始時間 HHMM。待命用整備任務的代號。
-        </span>
+    <div className="rounded-xl bg-[#232329] px-5 py-4" data-transition-card-codes="set">
+      <h3 className="text-base font-medium text-zinc-100">過渡卡代號</h3>
+      <div className="mt-4 grid gap-2 rounded-lg bg-[#1b1b1f] px-4 py-2.5 text-sm text-zinc-300 md:grid-cols-2" title="待命用整備任務的代號">
+        <p className="flex items-center gap-1.5">
+          <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
+          輸入代號<span className="text-zinc-600" aria-hidden>｜</span>1～2 個大寫英文字母
+        </p>
+        <p className="flex items-center gap-1.5">
+          <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
+          班次代號<span className="text-zinc-600" aria-hidden>｜</span>代號 + 列號 + 計畫開始時間 (HHMM)
+        </p>
       </div>
-      <div className="flex flex-wrap items-start gap-6">
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
         {TRANSITION_CARD_CODE_KEYS.map((key) => {
           const meta = TRANSITION_CARD_CODE_META[key];
           const value = codes[key];
           const required = isTransitionCardCodeRequired(key, maintenanceSkipped);
           const fieldIssues = issuesFor(key);
           return (
-            <label key={key} className="block w-[180px]">
-              <span className="mb-1.5 flex items-center gap-1 text-sm text-zinc-300" title={meta.description}>
+            <label key={key} className="block min-w-0">
+              <span className="mb-2 flex items-center px-1 text-sm text-zinc-300" title={meta.description}>
                 {required ? <span className="text-red-400">*</span> : null}
-                {meta.label}
+                {meta.label === '暫停 / 停留' || meta.label === '暫停／停留' ? '停留' : meta.label}
               </span>
               <input
                 type="text"
@@ -91,18 +97,18 @@ export function TransitionCardCodesBar({
                 maxLength={4}
                 onChange={(e) => onChange({ ...codes, [key]: e.target.value.toUpperCase() })}
                 onBlur={() => onChange({ ...codes, [key]: normalizeCardCode(value) })}
-                placeholder="例 IN"
+                placeholder="請輸入"
                 aria-label={`${meta.label}代號`}
                 aria-invalid={fieldIssues.length > 0}
                 data-transition-code={key}
-                className={`h-[36px] w-[100px] rounded-lg border bg-zinc-950 px-3 text-sm tracking-wider text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 ${
+                className={`h-9 w-full rounded-lg border bg-[#2a2e37] px-3 text-sm tracking-wider text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 ${
                   fieldIssues.length > 0
                     ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500'
-                    : 'border-zinc-700 focus:border-[#2B7FFF] focus:ring-[#2B7FFF]'
+                    : 'border-transparent focus:border-[#2B7FFF] focus:ring-[#2B7FFF]'
                 }`}
               />
-              <span className="mt-1 block text-xs text-zinc-500">
-                例：第 2 列 08:30 → {isValidCardCode(normalizeCardCode(value)) ? normalizeCardCode(value) : '代號'}020830
+              <span className="mt-1.5 block px-1 text-xs text-zinc-400">
+                預覽：{isValidCardCode(normalizeCardCode(value)) ? `${normalizeCardCode(value)}011030` : '尚未填入代號'}
               </span>
               {fieldIssues.map((issue) => (
                 <span key={issue.message} className="mt-1 block text-xs text-red-400" data-transition-code-issue={key}>

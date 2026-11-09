@@ -15,6 +15,7 @@ import {
   collectMoveJunctionPasses,
   findJunctionConflictsForBlocks,
 } from './moveJunctionPasses';
+import { collectTrajectories, conflictsForTrajectory } from './pathOccupancy';
 import { validateVehicleLocationContinuity } from './schedule-engine/validate';
 import type {
   FeasibilityIssue,
@@ -352,7 +353,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
     ok: boolean;
     junctionConflicts: ReturnType<typeof findJunctionConflictsForBlocks>;
     /** 沒過時是哪一關（追蹤用） */
-    failed?: 'facility' | 'continuity' | 'junction';
+    failed?: 'facility' | 'continuity' | 'junction' | 'path';
   } => {
     if (!compareViolations(facilityBefore, facilityViolations(timelines, collisionProtectionSeconds)).safeToAdopt) {
       return { ok: false, junctionConflicts: [], failed: 'facility' };
@@ -362,9 +363,19 @@ export function relievePlatformIdleWithFacilityPark(args: {
     }
     const passes = collectMoveJunctionPasses(timelines, topology);
     const junctionConflicts = findJunctionConflictsForBlocks(passes, touchedBlockIds, handoverSeconds);
-    return junctionConflicts.length === 0
-      ? { ok: true, junctionConflicts }
-      : { ok: false, junctionConflicts, failed: 'junction' };
+    if (junctionConflicts.length > 0) return { ok: false, junctionConflicts, failed: 'junction' };
+    /*
+     * 載客車也要看：讓站卡穿過別列車正在停靠的月台、或從正在折返的車身上擠過去，
+     * 轉折點檢查（只比移動卡之間）看不到。跟排卡與最終驗證同一份路徑佔用（pathOccupancy）。
+     */
+    if (topology) {
+      const trajectories = collectTrajectories(timelines, selectedRoutes, topology);
+      const touched = trajectories.filter((trajectory) => touchedBlockIds.has(trajectory.blockId));
+      if (touched.some((trajectory) => conflictsForTrajectory(trajectory, trajectories, handoverSeconds).length > 0)) {
+        return { ok: false, junctionConflicts, failed: 'path' };
+      }
+    }
+    return { ok: true, junctionConflicts };
   };
 
   for (let round = 0; round < maxRelief; round += 1) {

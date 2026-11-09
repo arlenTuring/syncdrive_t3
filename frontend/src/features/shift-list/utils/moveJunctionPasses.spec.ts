@@ -44,7 +44,8 @@ describe('moveJunctionPasses', () => {
     const passes = collectMoveJunctionPasses(timelines, topology);
     assert.deepEqual(
       passes.map((pass) => [pass.blockId, pass.nodeId, pass.instant]).sort(),
-      [['in-2', 'gate', 970], ['out-1', 'gate', 1010]],
+      // 站點端（不是設施格）也是別列車會經過的地方，一起列出
+      [['in-2', 'gate', 970], ['in-2', 'st', 950], ['out-1', 'gate', 1010], ['out-1', 'st', 1030]],
     );
     const conflicts = findJunctionConflictsForBlocks(passes, new Set(['in-2']), 60);
     assert.equal(conflicts.length, 1);

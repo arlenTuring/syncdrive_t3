@@ -350,12 +350,27 @@ const STEP_WORD: Partial<Record<StepStatus, { text: string; className: string }>
   running: { text: '進行中', className: 'text-sky-300' },
   done: { text: '已完成', className: 'text-emerald-300' },
   fault: { text: '異常', className: 'text-rose-300' },
+  warn: { text: '未完成', className: 'text-amber-300' },
 };
+
+const RECOVERY_WORD: Record<string, { text: string; className: string }> = {
+  running: { text: '系統補救中', className: 'text-amber-300' },
+  done: { text: '補救完成', className: 'text-emerald-300' },
+  incomplete: { text: '補救未全部完成', className: 'text-rose-300' },
+};
+
+const LEG_WORD = (leg: { phase: string; order_status: string | null; result: string | null }) =>
+  leg.result === 'done' ? '完成'
+    : leg.result === 'failed' ? '未完成'
+      : leg.phase === 'queued' ? '等前一張單取消確認'
+        : leg.order_status === 'PROCESSING' ? '執行中'
+          : leg.order_status === 'PENDING' ? '待發車' : '已下單';
 
 function StepIcon({ status }: { status: StepStatus }) {
   if (status === 'done') return <Check className="size-4 text-emerald-400" aria-hidden />;
   if (status === 'fault') return <AlertTriangle className="size-4 text-rose-400" aria-hidden />;
   if (status === 'running') return <CircleDot className="size-4 text-sky-400" aria-hidden />;
+  if (status === 'warn') return <AlertTriangle className="size-4 text-amber-400" aria-hidden />;
   return <Circle className="size-4 text-zinc-600" aria-hidden />;
 }
 
@@ -374,7 +389,8 @@ function MonitorPanel({ item }: { item: RotationItem }) {
                   {word ? <span className={`ml-2 text-xs ${word.className}`}>{word.text}</span> : null}
                 </span>
                 <span className="block text-xs text-zinc-500">
-                  {step.at == null ? '' : `${clock(step.at)} `}
+                  {step.at == null ? '' : `${step.timeKind === 'planned' ? '計畫 ' : ''}${clock(step.at)} `}
+                  {step.timeKind === 'planned' || step.timeKind === 'none' ? (step.status === 'done' ? '' : '（未回報）') : ''}
                   {step.detail}
                 </span>
               </span>
@@ -382,7 +398,26 @@ function MonitorPanel({ item }: { item: RotationItem }) {
           );
         })}
       </ol>
-      {item.fault ? <p className="mt-3 border-t border-zinc-800 pt-3 text-sm text-rose-300">{item.fault}</p> : null}
+      {item.fault ? (
+        <p className={`mt-3 border-t border-zinc-800 pt-3 text-sm ${item.status === 'aborted' ? 'text-rose-300' : 'text-amber-300'}`}>{item.fault}</p>
+      ) : null}
+      {item.recovery ? (
+        <div className="mt-3 border-t border-zinc-800 pt-3 text-sm">
+          <p className={RECOVERY_WORD[item.recovery.state]?.className ?? 'text-zinc-300'}>
+            {RECOVERY_WORD[item.recovery.state]?.text ?? item.recovery.state}
+          </p>
+          {item.recovery.legs.length ? (
+            <ul className="mt-1.5 space-y-1 text-xs text-zinc-400">
+              {item.recovery.legs.map((leg) => (
+                <li key={`${leg.trip_code}-${leg.vehicle}`}>
+                  {leg.vehicle} {leg.role === 'return' ? '開回格位' : `補發 ${leg.trip_code}`}：{LEG_WORD(leg)}
+                  {leg.failure ? `（${leg.failure}）` : ''}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -391,8 +426,9 @@ function ReportCard(props: { item: RotationItem; now: number; busy: boolean; onC
   const { item } = props;
   const { order } = item;
   const { window } = order;
+  // 調車失敗都由系統重發或中止，畫面只說明系統正在怎麼處理
   const status = item.fault && item.status === 'confirmed'
-    ? { label: '異常', className: 'bg-rose-500/15 text-rose-300' }
+    ? { label: '系統處理中', className: 'bg-amber-500/15 text-amber-300' }
     : STATUS_STYLE[item.status];
   return (
     <section className={PANEL}>
@@ -558,7 +594,14 @@ function RecordsTab({ records }: { records: RotationRecord[] }) {
               <td className="py-2 pr-3 text-zinc-300">{record.outgoing}</td>
               <td className="py-2 pr-3 text-zinc-300">{record.incoming}</td>
               <td className="py-2 pr-3 tabular-nums text-zinc-400">{record.location}</td>
-              <td className={`py-2 pr-3 ${RESULT_VIEW[record.result].className}`} title={record.fault ?? undefined}>{RESULT_VIEW[record.result].label}</td>
+              <td
+                className={`py-2 pr-3 ${record.result === 'aborted' && record.recovery_state === 'incomplete' ? 'text-rose-300' : RESULT_VIEW[record.result].className}`}
+                title={[record.fault, ...(record.history ?? []).map((entry) => `${dateTime(entry.at)} ${entry.text}`)].filter(Boolean).join('\n') || undefined}
+              >
+                {RESULT_VIEW[record.result].label}
+                {record.result === 'aborted' && record.recovery_state === 'incomplete' ? '（補救未全部完成）' : ''}
+                {record.result === 'done' && record.fault ? '（原地待命）' : ''}
+              </td>
               <td className="py-2 pr-5 text-zinc-400">{record.by ?? ''}</td>
             </tr>
           ))}

@@ -2,6 +2,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Check,
+  ChevronDown,
   Loader2,
   Pencil,
 } from 'lucide-react';
@@ -156,12 +157,15 @@ function ReviewSection({
   title,
   onNavigate,
   unstyled = false,
+  wizard = false,
   children,
 }: {
   step: CreateShiftScheduleStep;
   title: string;
   onNavigate?: (step: CreateShiftScheduleStep) => void;
   unstyled?: boolean;
+  /** 建立班表精靈：灰底卡片、標題前加步驟編號 */
+  wizard?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -170,12 +174,23 @@ function ReviewSection({
       className={
         unstyled
           ? 'flex min-h-0 flex-1 flex-col'
-          : 'rounded-xl border border-zinc-800/80 bg-[#0c0c0e] px-5 py-4'
+          : wizard
+            ? 'rounded-xl bg-[#232329] px-6 py-5'
+            : 'rounded-xl border border-zinc-800/80 bg-[#0c0c0e] px-5 py-4'
       }
     >
       {title ? (
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+        <div className={`flex items-center justify-between gap-3 ${wizard ? 'mb-4' : 'mb-3'}`}>
+          {wizard ? (
+            <h3 className="flex items-center gap-3 text-base font-medium text-zinc-100">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-[#1b1b1f] text-sm tabular-nums text-zinc-300">
+                {step}
+              </span>
+              {title}
+            </h3>
+          ) : (
+            <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+          )}
           {onNavigate ? (
             <button
               type="button"
@@ -213,9 +228,41 @@ function MetaGrid({
   );
 }
 
-function SimpleNameLine({ label, value }: { label?: string; value: string }) {
+/** 精靈：名稱在左、值在右的一欄清單 */
+function MetaRows({ items }: { items: Array<{ label: string; value: string }> }) {
   return (
-    <p className="text-sm text-zinc-200">
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-8 gap-y-3 text-sm">
+      {items.map((item) => (
+        <div key={item.label} className="contents">
+          <dt className="text-zinc-400">{item.label}</dt>
+          <dd className="min-w-0 truncate text-zinc-100">{item.value.trim() ? item.value : ''}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** 各路線要停靠的站（不含首站、通過、換線停靠）實際用的停靠秒數；全部一樣就只寫一個數字 */
+function describeStationDwellSeconds(routes: ShiftScheduleSelectedRoute[]): string {
+  const values = new Set<number>();
+  for (const route of routes) {
+    route.stationDwells.forEach((dwell, index) => {
+      if (resolveStationDwellListRole(dwell, index) !== 'editable') return;
+      if (resolveStationDwellMode(dwell) !== 'seconds') return;
+      if (typeof dwell.dwellSeconds === 'number' && Number.isFinite(dwell.dwellSeconds)) {
+        values.add(Math.max(0, dwell.dwellSeconds));
+      }
+    });
+  }
+  if (values.size === 0) return '—';
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length === 1) return `${sorted[0]} 秒`;
+  return `${sorted[0]}～${sorted[sorted.length - 1]} 秒（依站點不同）`;
+}
+
+function SimpleNameLine({ label, value, wizard = false }: { label?: string; value: string; wizard?: boolean }) {
+  return (
+    <p className={`text-sm ${wizard ? 'text-zinc-100' : 'text-zinc-200'}`}>
       {label ? <span className="text-zinc-500">{label}：</span> : null}
       {value.trim() ? value : '—'}
     </p>
@@ -249,13 +296,15 @@ function RouteGroupsCycleSummaryPanel({
           className={`rounded-lg border p-4 ${
             isOver
               ? 'border-red-500/30 bg-red-500/5'
-              : 'border-emerald-500/20 bg-emerald-500/5'
+              : hasLimit
+                ? 'border-emerald-500/20 bg-emerald-500/5'
+                : 'border-zinc-800 bg-zinc-900/30'
           }`}
         >
           <div className="text-xs font-medium text-zinc-400">{t('shiftList.schedulePreview.cycleFastest')}</div>
           <div
             className={`mt-2 text-2xl font-bold tabular-nums ${
-              isOver ? 'text-red-400' : 'text-emerald-400'
+              isOver ? 'text-red-400' : hasLimit ? 'text-emerald-400' : 'text-zinc-200'
             }`}
           >
             {formatSeconds(summary.totalMinCycleSeconds)}
@@ -454,6 +503,9 @@ export function StepShiftSchedulePreview({
   const output = draft.scheduleOutput;
   const [activeTab, setActiveTab] = useState<PreviewTab>('schedule');
   const [gridZoom, setGridZoom] = useState(1);
+  /** 建立班表精靈（不是清單的結果頁、也不是嵌入的預覽板） */
+  const wizard = !resultView && !previewBoardOnly;
+  const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [intervals, setIntervals] = useState<TimeSlotInterval[]>([]);
   const [attributes, setAttributes] = useState<TimeSlotAttribute[]>([]);
   const [templateTasks, setTemplateTasks] = useState<ScheduleTask[]>([]);
@@ -578,7 +630,7 @@ export function StepShiftSchedulePreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {!previewBoardOnly && !resultView ? (
-        <h2 className="mb-5 shrink-0 text-base font-medium text-zinc-100">
+        <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
           {t('shiftList.schedulePreview.confirmTitle')}
         </h2>
       ) : null}
@@ -586,7 +638,17 @@ export function StepShiftSchedulePreview({
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {!previewBoardOnly ? (
         <>
-        <ReviewSection step={1} title={t('shiftList.schedulePreview.basic')} onNavigate={onNavigateToStep}>
+        <ReviewSection step={1} title={t('shiftList.schedulePreview.basic')} onNavigate={onNavigateToStep} wizard={wizard}>
+          {wizard ? (
+            <MetaRows
+              items={[
+                { label: t('shiftList.schedulePreview.name'), value: draft.basic.name },
+                { label: '靠站時間', value: describeStationDwellSeconds(orderedRoutes) },
+                { label: t('shiftList.schedulePreview.version'), value: draft.basic.version },
+                { label: t('shiftList.schedulePreview.remarks'), value: draft.basic.remarks },
+              ]}
+            />
+          ) : (
           <MetaGrid
             items={[
               { label: t('shiftList.schedulePreview.name'), value: draft.basic.name },
@@ -594,21 +656,51 @@ export function StepShiftSchedulePreview({
               { label: t('shiftList.schedulePreview.remarks'), value: draft.basic.remarks },
             ]}
           />
+          )}
         </ReviewSection>
 
-        <ReviewSection step={2} title={t('shiftList.schedulePreview.timeTemplate')} onNavigate={onNavigateToStep}>
-          <SimpleNameLine value={templateDisplayName} />
+        <ReviewSection step={2} title={t('shiftList.schedulePreview.timeTemplate')} onNavigate={onNavigateToStep} wizard={wizard}>
+          <SimpleNameLine value={templateDisplayName} wizard={wizard} />
         </ReviewSection>
 
-        <ReviewSection step={3} title={t('shiftList.schedulePreview.maintenance')} onNavigate={onNavigateToStep}>
-          <SimpleNameLine value={maintenanceDisplayName} />
+        <ReviewSection step={3} title={t('shiftList.schedulePreview.maintenance')} onNavigate={onNavigateToStep} wizard={wizard}>
+          <SimpleNameLine value={maintenanceDisplayName} wizard={wizard} />
         </ReviewSection>
 
-        <ReviewSection step={4} title={t('shiftList.schedulePreview.routeGroups')} onNavigate={onNavigateToStep}>
+        <ReviewSection step={4} title={t('shiftList.schedulePreview.routeGroups')} onNavigate={onNavigateToStep} wizard={wizard}>
           {orderedRoutes.length === 0 ? (
             <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noRoutes')}</p>
+          ) : wizard && !routeDetailsOpen ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <p className="min-w-0 text-sm text-zinc-100">
+                {orderedRoutes.map((route) => route.routeName).join('、')}
+              </p>
+              <button
+                type="button"
+                onClick={() => setRouteDetailsOpen(true)}
+                className="inline-flex items-center gap-1 text-sm text-[#2B7FFF] transition hover:text-[#5a9aff]"
+              >
+                展開明細
+                <ChevronDown className="size-4" aria-hidden />
+              </button>
+            </div>
           ) : (
             <div className="space-y-3">
+              {wizard ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <p className="min-w-0 text-sm text-zinc-100">
+                    {orderedRoutes.map((route) => route.routeName).join('、')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRouteDetailsOpen(false)}
+                    className="inline-flex items-center gap-1 text-sm text-[#2B7FFF] transition hover:text-[#5a9aff]"
+                  >
+                    收起明細
+                    <ChevronDown className="size-4 rotate-180" aria-hidden />
+                  </button>
+                </div>
+              ) : null}
               <div className="rounded-lg border border-zinc-800/60 bg-zinc-950/30 px-3 py-2 text-xs text-zinc-400">
                 {draft.creationMode !== 'manual' ? (
                   <>
@@ -640,7 +732,8 @@ export function StepShiftSchedulePreview({
               {draft.creationMode !== 'manual' ? (
                 <RouteGroupsCycleSummaryPanel
                   summary={routeCycleSummary}
-                  turnaroundLimitSeconds={turnaroundLimitSeconds}
+                  // 精靈畫面不再呈現折返時限（使用者裁決：介面上取消）
+                  turnaroundLimitSeconds={wizard ? null : turnaroundLimitSeconds}
                 />
               ) : null}
 
@@ -656,7 +749,7 @@ export function StepShiftSchedulePreview({
           )}
         </ReviewSection>
 
-        <ReviewSection step={5} title={t('shiftList.schedulePreview.actionSettings')} onNavigate={onNavigateToStep}>
+        <ReviewSection step={5} title={t('shiftList.schedulePreview.actionSettings')} onNavigate={onNavigateToStep} wizard={wizard}>
             {draft.actionSettings.routes.every((route) => {
               const stationCount = (route.stations ?? []).reduce(
                 (sum, station) =>
@@ -669,7 +762,11 @@ export function StepShiftSchedulePreview({
               );
               return stationCount + movingCount === 0;
             }) ? (
-              <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noActions')}</p>
+              wizard ? (
+                <p className="text-sm text-zinc-100">暫時不做</p>
+              ) : (
+                <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noActions')}</p>
+              )
             ) : (
               <div className="space-y-4">
                 {draft.actionSettings.routes.map((route) => {
@@ -763,6 +860,7 @@ export function StepShiftSchedulePreview({
           title={previewBoardOnly ? '' : t('shiftList.schedulePreview.adjustSchedule')}
           onNavigate={previewBoardOnly ? undefined : onNavigateToStep}
           unstyled={previewBoardOnly}
+          wizard={wizard}
         >
           {!output ? (
             <PanelNoData
@@ -772,7 +870,10 @@ export function StepShiftSchedulePreview({
           ) : (
             <div className="flex min-h-0 flex-col">
               {!output.feasibilityReport.ok && draft.creationMode !== 'manual' && (
-                <div className="mb-3 space-y-2">
+                <div className={wizard ? 'mb-4 space-y-2 rounded-lg bg-[#1b1b1f] px-4 py-3' : 'mb-3 space-y-2'}>
+                  {wizard ? (
+                    <p className="mb-1 text-sm font-medium text-zinc-100">系統可行性檢驗</p>
+                  ) : null}
                   {output.feasibilityReport.errors.map((issue) => (
                     <div
                       key={`${issue.code}-${issue.message}`}
@@ -827,9 +928,13 @@ export function StepShiftSchedulePreview({
                 </div>
 
                 <div className="flex min-w-0 flex-1 items-center gap-2 pb-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                  <div className={`flex min-w-0 flex-1 items-center gap-2 ${wizard ? 'flex-wrap justify-end' : 'overflow-x-auto'}`}>
                     {periodLegends.map((item) => (
-                      <AttributeLegendBadgeChip key={item.attributeId} item={item} />
+                      <AttributeLegendBadgeChip
+                        key={item.attributeId}
+                        item={item}
+                        className={wizard ? 'inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm' : undefined}
+                      />
                     ))}
                   </div>
                   {activeTab === 'schedule' ? (
@@ -861,6 +966,7 @@ export function StepShiftSchedulePreview({
                     sectionCodes={draft.maintenanceTask.skipped ? null : draft.maintenanceTask.sectionCodeBySection}
                     transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
                     zoom={gridZoom}
+                    appearance={wizard ? 'wizard' : 'default'}
                   />
                 ) : (
                   <PanelNoData message={t('shiftList.schedulePreview.missingTrips')} className="min-h-[240px]" />

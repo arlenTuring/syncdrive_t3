@@ -3,7 +3,8 @@ import { resolveBrowserApiBaseUrl } from '../../lib/browserApiBase';
 export type RotationMode = 'confirm' | 'auto';
 export type HoldState = 'available' | 'reserved' | 'overhaul';
 export type ItemStatus = 'pending' | 'confirmed' | 'skipped' | 'done' | 'aborted';
-export type StepStatus = 'waiting' | 'running' | 'done' | 'fault';
+export type StepStatus = 'waiting' | 'running' | 'done' | 'fault' | 'warn';
+export type RecoveryState = 'none' | 'running' | 'done' | 'incomplete';
 export type ChangeKind = 'add' | 'cancel' | 'reassign';
 export type PlanTaskKind = 'passenger' | 'movement' | 'maintenance';
 
@@ -64,8 +65,25 @@ export type MonitorStep = {
   label: string;
   detail: string;
   at: number | null;
+  /** actual＝車端回報的實際時刻；planned＝計畫時刻（還沒回報） */
+  timeKind?: 'actual' | 'planned' | 'none';
   status: StepStatus;
 };
+
+export type RecoveryView = {
+  state: RecoveryState;
+  legs: Array<{
+    vehicle: string;
+    trip_code: string;
+    role: 'fallback' | 'return';
+    phase: string;
+    order_status: string | null;
+    result: 'done' | 'failed' | null;
+    failure: string | null;
+  }>;
+};
+
+export type HistoryEntry = { at: number; kind: string; text: string };
 
 export type RotationItem = {
   id: string;
@@ -77,6 +95,9 @@ export type RotationItem = {
   confirmed_by: string | null;
   incoming_status: CarView | null;
   steps: MonitorStep[];
+  recovery_state?: RecoveryState;
+  recovery?: RecoveryView | null;
+  history?: HistoryEntry[];
 };
 
 export type RotationToday = {
@@ -98,8 +119,10 @@ export type RotationRecord = {
   incoming: string;
   location: string;
   result: 'done' | 'skipped' | 'aborted';
+  recovery_state?: RecoveryState;
   fault: string | null;
   by: string | null;
+  history?: HistoryEntry[];
 };
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

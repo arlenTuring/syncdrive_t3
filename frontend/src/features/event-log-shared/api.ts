@@ -18,6 +18,11 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   return parse<T>(response);
 }
 
+export async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${apiBase()}${path}`, { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
+  return parse<T>(response);
+}
+
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

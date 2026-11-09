@@ -400,4 +400,17 @@ describe('靠站緩衝：站點與緩衝分開解析、系統增加量不丟', (
     expect(stops[1]!.dwellSeconds).toBe(30 + 65);
     expect(stops[0]!.dwellSeconds).toBe(0);
   });
+
+  it('系統增加量指定站序時只加在那一站（換班先出後進：回去的車在終點前一站多停）', () => {
+    const stops = buildTimetableStationStops(
+      {
+        ...base,
+        plannedEndMinute: 600 + (200 + 30 + 20 + 10 + 120) / 60,
+        dwellSlackAdjustment: { addedSeconds: 120, stationIndex: 1 },
+      },
+      route,
+    );
+    expect(stops[1]!.dwellSeconds).toBe(30 + 5 + 120);
+    expect(stops[2]!.dwellSeconds).toBeLessThan(20 + 5 + 120);
+  });
 });

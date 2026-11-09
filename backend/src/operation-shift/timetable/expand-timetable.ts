@@ -336,7 +336,12 @@ export function extractPlanBlocks(body: Record<string, unknown>): TimetableBlock
         dwellSlackAdjustment: (() => {
           const adjustment = asRecord(row.dwellSlackAdjustment);
           const added = adjustment?.addedSeconds;
-          return typeof added === 'number' && Number.isFinite(added) ? { addedSeconds: added } : undefined;
+          if (typeof added !== 'number' || !Number.isFinite(added)) return undefined;
+          // 只加在指定站的等待要帶著站序，不然會被當成每站都加（模擬器到站離站時刻跟畫面對不上）
+          const stationIndex = adjustment?.stationIndex;
+          return typeof stationIndex === 'number' && Number.isInteger(stationIndex)
+            ? { addedSeconds: added, stationIndex }
+            : { addedSeconds: added };
         })(),
       });
     }

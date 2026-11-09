@@ -1,6 +1,9 @@
 import {
   buildDailyReport,
   buildShuntOrder,
+  orderSpan,
+  rowPositionAt,
+  ROTATION_RESOURCE_BUFFER_MS,
   DEFAULT_ROTATION_RULES,
   findSwapWindows,
   inTimeRange,
@@ -178,6 +181,28 @@ describe('換手窗口與調車單', () => {
     expect(windows[0]).toMatchObject({ id: 'OT2', endOfDay: true, meetAt: 'NW', skippedService: [] })
     const order = buildShuntOrder({ tasks: night, outgoing: car({}), incoming: spare({}), window: windows[0] })
     expect(order.counts).toMatchObject({ reassign: 0, passenger: 0, cancel: 1 })
+  })
+
+  it('一組輪替占用到換下的車回場結束（再加緩衝），不是只到接班', () => {
+    const night = [
+      ...plan,
+      task({ trip_code: 'IN2', kind: 'movement', depart_at: 10 * HOUR + 20 * MIN, arrive_at: 10 * HOUR + 21 * MIN, origin: 'NW', destination: 'D1' }),
+      task({ trip_code: 'S2', kind: 'maintenance', depart_at: 10 * HOUR + 21 * MIN, arrive_at: 23 * HOUR, origin: 'D1', destination: 'D1', maintenance: { maintenance_task_type: 'standby' } }),
+      task({ trip_code: 'OT2', kind: 'movement', depart_at: 23 * HOUR, arrive_at: 23 * HOUR + MIN, origin: 'D1', destination: 'NW' }),
+    ]
+    const windows = findSwapWindows({ tasks: night, row: 1, takeoverRow: 10, dayStart, notBefore: now })
+    const order = buildShuntOrder({ tasks: night, outgoing: car({}), incoming: spare({}), window: windows[0] })
+    const out = order.changes.find((change) => change.key === 'add-outgoing')!
+    const [from, to] = orderSpan(order)
+    expect(from).toBe(windows[0].takeoverDepartAt)
+    expect(to).toBe(Math.max(out.at + out.durationMs!, windows[0].next.arrive_at!) + ROTATION_RESOURCE_BUFFER_MS)
+    expect(to).toBeGreaterThan(windows[0].next.arrive_at!)
+  })
+
+  it('計畫上還在移動中的車不當成已在終點', () => {
+    const moving = [task({ trip_code: 'MV', kind: 'movement', depart_at: 10 * HOUR, arrive_at: 10 * HOUR + 10 * MIN, origin: 'D1', destination: 'NW' })]
+    expect(rowPositionAt(moving, 1, 10 * HOUR + 5 * MIN)).toEqual({ location: null, moving: true, headingTo: 'NW' })
+    expect(rowPositionAt(moving, 1, 10 * HOUR + 11 * MIN)).toEqual({ location: 'NW', moving: false, headingTo: null })
   })
 
   it('會略過行檢的窗口排最後並標出來', () => {

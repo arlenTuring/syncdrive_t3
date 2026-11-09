@@ -4,9 +4,9 @@ import { Dialog, ErrorLine, GhostButton, Toast } from '../media-groups/dialogs';
 import { Badge, DetailRow, JsonBlock } from '../event-log-shared/ui';
 import { formatDateTime } from '../event-log-shared/time';
 import { fetchEvent, type EventDetail } from './api';
+import { SEVERITY_LABEL } from './eventSeverity';
 
 const SOURCE_LABEL = { VEHICLE: '載具', FACILITY: '設施', SYSTEM: '系統' } as const;
-const SEVERITY_LABEL: Record<string, string> = { INFO: '資訊', WARNING: '警告', CRITICAL: '嚴重' };
 
 async function copyText(text: string) {
   try {
@@ -29,8 +29,8 @@ async function copyText(text: string) {
 }
 
 /**
- * 事件詳情（即時頁與紀錄頁共用，唯讀）。人工確認只在即時事件管理的待確認列進行；
- * 這裡開啟、查看或開回放都不會寫入確認或標記已讀。最上方先顯示處理紀錄摘要，再顯示事件原始資料。
+ * 事件詳情（即時頁與紀錄頁共用，唯讀）。回報只在即時事件清單的「回報」進行；
+ * 這裡開啟、查看或開回放都不會寫入回報或標記已讀。最上方先顯示處理紀錄摘要，再顯示事件原始資料。
  */
 export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, onReplay }: { id: string; timeZone: string; refreshSignal?: number; onClose: () => void; onReplay: (id: string) => void }) {
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -81,18 +81,18 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
             {event.acknowledged ? (
               <div className="mt-2 space-y-1 text-sm">
                 <div>
-                  <Badge tone="sky">已確認</Badge>
-                  <span className="ml-2">{event.acknowledgedByName ?? '—'}・{event.acknowledgedAt ? t(event.acknowledgedAt) : '確認時間未記錄（舊資料）'}</span>
+                  <Badge tone="zinc">已回報</Badge>
+                  <span className="ml-2">{event.acknowledgedByName ?? '—'}・{event.acknowledgedAt ? t(event.acknowledgedAt) : '回報時間未記錄（舊資料）'}</span>
                 </div>
-                <div className="text-zinc-300">確認緣由：{event.acknowledgementNote || '舊資料未記錄'}</div>
+                <div className="text-zinc-300">回報內容：{event.acknowledgementNote || '舊資料未記錄'}</div>
               </div>
             ) : (
               <div className="mt-2 text-sm">
-                <Badge tone="amber">待確認</Badge>
-                <span className="ml-2 text-xs text-zinc-400">請至「即時事件管理」的待確認標籤填寫確認緣由</span>
+                <Badge tone="sky">尚未回報</Badge>
+                <span className="ml-2 text-xs text-zinc-400">請在「即時事件清單」按該筆的「回報」</span>
               </div>
             )}
-            <p className="mt-2 text-xs text-zinc-500">確認只代表中心端已確認，不下發車控，也不代表設備已恢復。</p>
+            <p className="mt-2 text-xs text-zinc-500">回報只記錄中心端的處理說明，不下發車控，也不代表設備已恢復。</p>
           </section>
           <dl>
             <DetailRow label="事件 ID">
@@ -113,6 +113,14 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
             </DetailRow>
             <DetailRow label="載具 ID">{event.vehicleCode ?? <span className="text-zinc-500">不適用</span>}</DetailRow>
             <DetailRow label="事件類型">{event.eventLabel}（{event.eventCode}）</DetailRow>
+            <DetailRow label="建議處置SOP">
+              {event.sop ? (
+                <span className="space-y-1">
+                  {event.sop.text ? <span className="block">{event.sop.text}</span> : null}
+                  {event.sop.url ? <a href={event.sop.url} target="_blank" rel="noreferrer noopener" className="block break-all text-sky-400 hover:underline">{event.sop.url}</a> : null}
+                </span>
+              ) : <span className="text-zinc-500">尚未設定（可在「事件類型管理」設定）</span>}
+            </DetailRow>
             <DetailRow label="嚴重度">{SEVERITY_LABEL[event.severity] ?? event.severity}</DetailRow>
             <DetailRow label="摘要">{event.summary || '—'}</DetailRow>
             <DetailRow label="事件內容">{event.detail || '—'}</DetailRow>
@@ -127,8 +135,8 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
               <ul className="space-y-1 text-sm">
                 {event.trail.map((item) => (
                   <li key={item.id} className="text-zinc-300">
-                    {t(item.at)}・{item.operatorName ?? '未知使用者'}・{item.action === 'EVENT_ACKNOWLEDGE' ? '人工確認' : item.action}・{item.result}
-                    {item.note ? `・確認緣由：${item.note}` : ''}
+                    {t(item.at)}・{item.operatorName ?? '未知使用者'}・{item.action === 'EVENT_ACKNOWLEDGE' ? '回報事件' : item.action}・{item.result}
+                    {item.note ? `・回報內容：${item.note}` : ''}
                     {item.sourceIp ? <span className="text-zinc-500">（{item.sourceIp}）</span> : null}
                   </li>
                 ))}

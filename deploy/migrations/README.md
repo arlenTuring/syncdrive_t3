@@ -25,6 +25,7 @@ schema 提供，部署前由 `migrate.sh --plan` 唯讀檢查。
 | `20261023-video-monitoring` | 前述 `uuid-ossp` | 影像來源與版本、監控標籤與格子、全域預設、儲存政策、錄影片段索引、背景工作（具名約束，可重跑） | runner 單一交易 |
 | `20261024-video-resources-and-layout` | 前述 `20261023-video-monitoring` | 錄影改以來源為準（`recording_enabled`，舊來源依原格子錄影意圖回填，無有效格子為 false）、來源分類標籤、一鍵複製冪等鍵、監控版面正規化座標（依舊固定欄數回填）、格子位置唯一改為可延後檢查（可重跑） | runner 單一交易 |
 | `20261025-live-event-indexes` | 前述 `20261020-event-and-log-management` | 事件管理清單兩集合的部分索引（待確認依發生時間、已確認依確認時間且包含 legacy NULL）；不改欄位與資料（可重跑） | runner 單一交易 |
+| `20261109-vendor-role-monitor-only` | `roles`、`permissions`、`role_permissions` | 廠商角色（VENDOR）只保留 `dashboard.monitor.view`、`dashboard.dashboard.view`，其他權限收回；無此角色時不做事（可重跑） | runner 單一交易 |
 
 runner 單一交易表示 SQL 與 ledger 成功紀錄一起提交；SQL 自管交易則保留已發布檔案的
 `BEGIN/COMMIT`，成功後才另記 ledger，失敗不記錄。

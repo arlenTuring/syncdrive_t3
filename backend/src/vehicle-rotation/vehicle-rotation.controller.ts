@@ -24,6 +24,12 @@ export class VehicleRotationController {
     return this.service.vehicles();
   }
 
+  @Get('timings')
+  @ApiOperation({ summary: '效能定位：輪替檢查各段耗時與後端事件迴圈延遲（讀一次重設一次）' })
+  timings() {
+    return this.service.timings();
+  }
+
   @Get('records')
   @ApiOperation({ summary: '輪替紀錄' })
   records() {

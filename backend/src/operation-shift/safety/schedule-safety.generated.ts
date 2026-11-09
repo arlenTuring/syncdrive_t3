@@ -51,6 +51,8 @@ var GROUP_TITLE = {
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: "\u5FC5\u8981\u7684\u6574\u5099\u8F49\u5834\u6392\u4E0D\u51FA\u4F86\uFF0C\u8ECA\u5230\u4E0D\u4E86\u4E0B\u4E00\u6BB5",
   VEHICLE_LOCATION_DISCONTINUITY: "\u8ECA\u7684\u4F4D\u7F6E\u63A5\u4E0D\u8D77\u4F86\uFF08\u7F3A\u79FB\u52D5\uFF09",
   MOVE_JUNCTION_CONFLICT: "\u8ECA\u8F1B\u901A\u904E\u8DEF\u53E3\u7684\u9593\u9694\u4E0D\u8DB3",
+  MOVE_PATH_CONFLICT: "\u79FB\u52D5\u5361\u9014\u7D93\u7684\u6708\u53F0\u6216\u8DEF\u6BB5\u6709\u5225\u5217\u8ECA",
+  MOVE_PATH_SHIFTED: "\u5DF2\u632A\u52D5\u79FB\u52D5\u5361\u6642\u523B\uFF0C\u907F\u958B\u9014\u7D93\u7684\u5225\u5217\u8ECA",
   MAINTENANCE_FACILITY_UNAVAILABLE: "\u672A\u627E\u5230\u53EF\u7528\u6574\u5099\u4F4D\u7F6E",
   MAINTENANCE_FACILITY_YIELDED: "\u5DF2\u8ABF\u6574\u505C\u653E\u4F4D\u7F6E",
   MAINTENANCE_ENTRY_EARLY_BLOCKED: "\u63D0\u65E9\u9032\u5EE0\u88AB\u64CB\uFF0C\u8ECA\u5728\u7AD9\u4F4D\u4E0A\u591A\u7B49",
@@ -107,6 +109,8 @@ var DOC_ANCHOR = {
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   VEHICLE_LOCATION_DISCONTINUITY: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MOVE_JUNCTION_CONFLICT: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
+  MOVE_PATH_CONFLICT: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
+  MOVE_PATH_SHIFTED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_FACILITY_YIELDED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
@@ -326,6 +330,14 @@ var DEFAULT_META = {
     kind: "limit",
     guidance: "\u9019\u662F\u5C0D\u73ED\u8868\u672C\u8EAB\u7684\u9023\u7E8C\u6027\u6AA2\u67E5\uFF08\u624B\u6539\u904E\u7684\u73ED\u8868\u4E5F\u6703\u91CD\u9A57\uFF09\uFF1A\u524D\u4E00\u5F35\u5361\u7D50\u675F\u6642\u8ECA\u5728\u67D0\u4E00\u683C\u6216\u67D0\u4E00\u7AD9\uFF0C\u4E0B\u4E00\u5F35\u5361\u537B\u8981\u5B83\u5728\u53E6\u4E00\u500B\u5730\u65B9\uFF0C\u4E2D\u9593\u6C92\u6709\u4EFB\u4F55\u79FB\u52D5\u5361\u3002\u88DC\u4E00\u5F35\u79FB\u52D5\u5361\uFF0C\u6216\u628A\u524D\u5F8C\u5169\u6BB5\u6539\u6210\u540C\u4E00\u500B\u5730\u9EDE\u3002"
   },
+  MOVE_PATH_CONFLICT: {
+    kind: "limit",
+    guidance: "\u79FB\u52D5\u5361\uFF08\u51FA\u5165\u5834\u3001\u6574\u5099\u8F49\u5834\uFF09\u662F\u8ECA\u771F\u7684\u958B\u5728\u8DEF\u7DB2\u4E0A\uFF0C\u6574\u689D\u8DEF\u5F91\u90FD\u8981\u6AA2\u67E5\uFF1A\u9014\u7D93\u7684\u8F49\u6298\u9EDE\u8DDF\u5225\u5217\u8ECA\u81F3\u5C11\u5DEE\u958B 1 \xD7 \u78B0\u649E\u4FDD\u8B77\u6642\u9593\uFF08\u6708\u53F0\u7AD9\u4F4D\u53E6\u7167 \xA78\uFF1A\u5F8C\u8ECA\u9032\u7AD9\u8981\u5728\u524D\u8ECA\u96E2\u7AD9 2 \xD7 \u78B0\u649E\u4FDD\u8B77\u6642\u9593\u4E4B\u5F8C\uFF09\uFF1B\u540C\u4E00\u6BB5\u8DEF\u540C\u5411\u884C\u99DB\uFF0C\u5148\u9032\u7684\u8ECA\u8981\u5148\u51FA\uFF08\u4E0D\u80FD\u8981\u6C42\u5F8C\u8ECA\u7A7F\u904E\u524D\u8ECA\uFF09\uFF1B\u5834\u5340\u806F\u7D61\u7DDA\u5169\u500B\u65B9\u5411\u4E0D\u80FD\u540C\u6642\u6709\u8ECA\u3002\u6392\u73ED\u6642\u6703\u5148\u81EA\u52D5\u632A\u79FB\u52D5\u5361\u7684\u6642\u523B\u89E3\u6389\uFF0C\u9019\u4E00\u5247\u4EE3\u8868\u5728\u53EF\u632A\u7BC4\u570D\u5167\u627E\u4E0D\u5230\u89E3\u3002"
+  },
+  MOVE_PATH_SHIFTED: {
+    kind: "policy",
+    guidance: "\u79FB\u52D5\u5361\u9014\u7D93\u7684\u6708\u53F0\u6216\u8DEF\u6BB5\u539F\u672C\u6703\u78B0\u4E0A\u5225\u5217\u8ECA\uFF0C\u5DF2\u81EA\u52D5\u63D0\u65E9\u51FA\u5EE0\uFF08\u5230\u7AD9\u7B49\u5019\uFF09\u6216\u5728\u6708\u53F0\u591A\u7B49\u4E00\u4E0B\u518D\u5165\u5EE0\uFF0C\u8F09\u5BA2\u73ED\u6B21\u6642\u523B\u4E0D\u8B8A\u3002"
+  },
   MOVE_JUNCTION_CONFLICT: {
     kind: "limit",
     guidance: "\u79FB\u52D5\u5361\u662F\u8ECA\u771F\u7684\u958B\u5728\u8DEF\u7DB2\u4E0A\uFF1A\u4E0D\u540C\u5217\u8ECA\u7D93\u904E\u540C\u4E00\u500B\u4E2D\u9014\u7BC0\u9EDE\uFF08\u4F8B\u5982\u591A\u5EA7\u8A2D\u65BD\u5171\u7528\u7684\u5165\u53E3\u9EDE\uFF09\u81F3\u5C11\u8981\u5DEE\u958B 2 \xD7 \u78B0\u649E\u4FDD\u8B77\u6642\u9593\u3002\u9019\u4E00\u5247\u662F\u5C0D\u73ED\u8868\u672C\u8EAB\u7684\u6AA2\u67E5\uFF0C\u6642\u523B\u7531\u5361\u7247\u9014\u7D93\u7BC0\u9EDE\u6CBF\u62D3\u6A38\u884C\u99DB\u79D2\u6578\u63A8\u7B97\u3002\u8981\u6D88\u6389\u5B83\uFF1A\u8B93\u5176\u4E2D\u4E00\u5F35\u79FB\u52D5\u5361\u65E9\u4E00\u9EDE\u6216\u665A\u4E00\u9EDE\u51FA\u767C\uFF0C\u6216\u6539\u8D70\u4E0D\u7D93\u904E\u540C\u4E00\u9EDE\u7684\u8DEF\u5F91\u3002"
@@ -373,6 +385,8 @@ var PUBLISH_BLOCKING_CODES = /* @__PURE__ */ new Set([
   "VEHICLE_LOCATION_DISCONTINUITY",
   // 移動卡在同一個轉折點貼太近：兩台車實際在路網上交會
   "MOVE_JUNCTION_CONFLICT",
+  // 移動卡整條路徑跟別列車撞上（穿過有車停的月台、同向超車、聯絡線對開）
+  "MOVE_PATH_CONFLICT",
   // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
   "SCHEDULE_SEARCH_INCOMPLETE",
   // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表
@@ -525,6 +539,70 @@ function edgeSeconds(edge, prefer) {
   }
   return Number.NaN;
 }
+function findTopologyPath(topology, fromNodeId, toNodeId, options) {
+  if (!topology || !fromNodeId || !toNodeId) return null;
+  if (fromNodeId === toNodeId) {
+    return { nodeIds: [fromNodeId], edges: [], minSeconds: 0, avgSeconds: 0 };
+  }
+  const blocked = options?.blockedNodeIds;
+  const maxHops = options?.maxHops ?? Number.POSITIVE_INFINITY;
+  const facilityNodeIds = /* @__PURE__ */ new Set();
+  for (const node of topology.nodes) {
+    if (node.kind === "facility") facilityNodeIds.add(node.id);
+  }
+  const outgoing = /* @__PURE__ */ new Map();
+  for (const edge of topology.edges) {
+    const list = outgoing.get(edge.fromNodeId) ?? [];
+    list.push(edge);
+    outgoing.set(edge.fromNodeId, list);
+  }
+  const best = /* @__PURE__ */ new Map([[fromNodeId, 0]]);
+  const queue = [
+    { nodeId: fromNodeId, cost: 0, hops: 0, nodeIds: [fromNodeId], edges: [] }
+  ];
+  while (queue.length > 0) {
+    let pickIndex = 0;
+    for (let i = 1; i < queue.length; i += 1) {
+      if (queue[i].cost < queue[pickIndex].cost) pickIndex = i;
+    }
+    const current = queue.splice(pickIndex, 1)[0];
+    if (current.nodeId === toNodeId) {
+      let minTotal = 0;
+      let avgTotal = 0;
+      for (const edge of current.edges) {
+        minTotal += edgeSeconds(edge, "min");
+        avgTotal += edgeSeconds(edge, "avg");
+      }
+      return {
+        nodeIds: current.nodeIds,
+        edges: current.edges,
+        minSeconds: snapUpToClockAlignSeconds(minTotal),
+        avgSeconds: snapUpToClockAlignSeconds(avgTotal)
+      };
+    }
+    if (current.hops >= maxHops) continue;
+    if ((best.get(current.nodeId) ?? Infinity) < current.cost) continue;
+    for (const edge of outgoing.get(current.nodeId) ?? []) {
+      const nextId = edge.toNodeId;
+      if (blocked?.has(nextId) && nextId !== toNodeId) continue;
+      if (nextId !== toNodeId && facilityNodeIds.has(nextId)) continue;
+      if (current.nodeIds.includes(nextId)) continue;
+      const hasTime = edgeHasTravelTime(edge);
+      if (!hasTime && !options?.allowMissingTime) continue;
+      const nextCost = current.cost + (hasTime ? edgeSeconds(edge, "avg") : 0);
+      if ((best.get(nextId) ?? Infinity) <= nextCost) continue;
+      best.set(nextId, nextCost);
+      queue.push({
+        nodeId: nextId,
+        cost: nextCost,
+        hops: current.hops + 1,
+        nodeIds: [...current.nodeIds, nextId],
+        edges: [...current.edges, edge]
+      });
+    }
+  }
+  return null;
+}
 
 // src/features/shift-list/utils/schedule-engine/types.ts
 function minuteToSecond(minute) {
@@ -532,90 +610,6 @@ function minuteToSecond(minute) {
 }
 function secondToMinute(second) {
   return second / 60;
-}
-
-// src/features/shift-list/utils/moveJunctionPasses.ts
-var DAY_SECONDS = 24 * 60 * 60;
-function cyclicGapSeconds(a, b) {
-  const raw = Math.abs(a - b) % DAY_SECONDS;
-  return Math.min(raw, DAY_SECONDS - raw);
-}
-function collectMoveJunctionPasses(timelines, topology, onMissingTravelTime) {
-  if (!topology) return [];
-  const nodeIdByLabel = /* @__PURE__ */ new Map();
-  const ambiguousLabels = /* @__PURE__ */ new Set();
-  for (const node of topology.nodes) {
-    const label = (node.label ?? "").trim();
-    if (!label) continue;
-    if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
-    else nodeIdByLabel.set(label, node.id);
-  }
-  const edgeByPair = /* @__PURE__ */ new Map();
-  for (const edge of topology.edges) {
-    edgeByPair.set(`${edge.fromNodeId}>${edge.toNodeId}`, edge);
-    if (!edgeByPair.has(`${edge.toNodeId}>${edge.fromNodeId}`)) {
-      edgeByPair.set(`${edge.toNodeId}>${edge.fromNodeId}`, edge);
-    }
-  }
-  const passes = [];
-  for (const timeline of timelines) {
-    for (const block of timeline.blocks) {
-      if (block.taskType !== "dispatch") continue;
-      if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
-      const labels = block.yardMoveViaLabels ?? [];
-      if (labels.length < 3) continue;
-      const ids = labels.map((label) => ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
-      const unresolved = ids.findIndex((id) => id == null);
-      if (unresolved >= 0) {
-        onMissingTravelTime?.({
-          blockId: block.id,
-          timelineRow: timeline.row,
-          fromLabel: labels[unresolved],
-          toLabel: labels[unresolved],
-          reason: ambiguousLabels.has(labels[unresolved].trim()) ? "ambiguous-node" : "unknown-node"
-        });
-        continue;
-      }
-      let instant = minuteToSecond(block.plannedStartMinute);
-      for (let index = 1; index < ids.length; index += 1) {
-        const edge = edgeByPair.get(`${ids[index - 1]}>${ids[index]}`);
-        if (!edge || !edgeHasTravelTime(edge)) {
-          onMissingTravelTime?.({
-            blockId: block.id,
-            timelineRow: timeline.row,
-            fromLabel: labels[index - 1],
-            toLabel: labels[index],
-            reason: edge ? "missing-time" : "no-edge"
-          });
-          break;
-        }
-        instant += edgeSeconds(edge, "avg");
-        if (index === ids.length - 1) break;
-        passes.push({
-          nodeId: ids[index],
-          nodeLabel: labels[index],
-          instant,
-          timelineRow: timeline.row,
-          blockId: block.id
-        });
-      }
-    }
-  }
-  return passes;
-}
-function findJunctionConflictsForBlocks(passes, blockIds, bufferSeconds) {
-  if (bufferSeconds <= 0) return [];
-  const out = [];
-  for (const mine of passes) {
-    if (!blockIds.has(mine.blockId)) continue;
-    for (const other of passes) {
-      if (other.timelineRow === mine.timelineRow) continue;
-      if (other.nodeId !== mine.nodeId) continue;
-      const gapSeconds = cyclicGapSeconds(mine.instant, other.instant);
-      if (gapSeconds < bufferSeconds - 1e-9) out.push({ mine, other, gapSeconds });
-    }
-  }
-  return out;
 }
 
 // src/features/shift-list/utils/cardCode.ts
@@ -881,15 +875,15 @@ function blocksConflictOnDayCycle(aStartMinute, aEndMinute, bStartMinute, bEndMi
 }
 
 // src/features/shift-list/utils/moveCardShared.ts
-var DAY_SECONDS2 = SCHEDULE_DAY_MINUTES * 60;
+var DAY_SECONDS = SCHEDULE_DAY_MINUTES * 60;
 function daySegmentsOf(startSecond, endSecond) {
-  const span = endSecond - startSecond;
-  if (span <= 0) return [];
-  if (span >= DAY_SECONDS2) return [[0, DAY_SECONDS2]];
-  const start = (startSecond % DAY_SECONDS2 + DAY_SECONDS2) % DAY_SECONDS2;
-  const end = start + span;
-  if (end <= DAY_SECONDS2) return [[start, end]];
-  return [[start, DAY_SECONDS2], [0, end - DAY_SECONDS2]];
+  const span2 = endSecond - startSecond;
+  if (span2 <= 0) return [];
+  if (span2 >= DAY_SECONDS) return [[0, DAY_SECONDS]];
+  const start = (startSecond % DAY_SECONDS + DAY_SECONDS) % DAY_SECONDS;
+  const end = start + span2;
+  if (end <= DAY_SECONDS) return [[start, end]];
+  return [[start, DAY_SECONDS], [0, end - DAY_SECONDS]];
 }
 function daySegmentOverlapSeconds(aStartSecond, aEndSecond, bStartSecond, bEndSecond) {
   const segA = daySegmentsOf(aStartSecond, aEndSecond);
@@ -955,241 +949,6 @@ function routeForJoinedBlock(block, route) {
   const index = route.stationIds.findIndex((id) => id.trim() === stationId);
   if (index <= 0) return route;
   return buildJoinedRouteSegment(route, index) ?? route;
-}
-
-// src/features/shift-list/utils/buildBlockStationDepartures.ts
-function resolveLegBounds(legs, legIndex, preferredTravel, fallbackMinTravel) {
-  const leg = legs?.[legIndex];
-  const avgTravel = leg != null && Number.isFinite(leg.avgTravelTimeSeconds) && leg.avgTravelTimeSeconds > 0 ? leg.avgTravelTimeSeconds : Math.max(0, preferredTravel);
-  const minTravel = leg != null && Number.isFinite(leg.minTravelTimeSeconds) && leg.minTravelTimeSeconds >= 0 ? leg.minTravelTimeSeconds : Math.max(0, fallbackMinTravel);
-  const maxTravel = Math.max(
-    avgTravel,
-    avgTravel * STATION_ARRIVAL_MAX_AVG_STRETCH,
-    avgTravel + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
-    preferredTravel
-  );
-  return { minTravel, avgTravel, maxTravel };
-}
-function resolveBlockStationTimingPlan(block, route) {
-  route = routeForJoinedBlock(block, route);
-  const dwellInputs = resolveBlockStationDwellInputs(block, route);
-  if (!dwellInputs) return null;
-  const { stations, dwellSlackSeconds: slackSeconds } = dwellInputs;
-  const baseDwells = stations.map((station) => {
-    const mode = resolveStationDwellMode(station);
-    if (mode === "no_stop" || mode === "line_change") return 0;
-    return Math.max(0, station.dwellSeconds ?? 0);
-  });
-  const extraDwells = resolveBlockStationExtraDwellSeconds(block, stations);
-  const dwells = stations.map(
-    (station, index) => applyStationDwellWithSlack(station, slackSeconds, index) + (extraDwells[index] ?? 0)
-  );
-  const dwellTotal = dwells.reduce((sum, value) => sum + value, 0);
-  const startSecond = snapUpToClockAlignSeconds(minuteToSecond(block.plannedStartMinute));
-  const endSecond = minuteToSecond(block.plannedEndMinute);
-  const availableTravelSeconds = endSecond - startSecond - dwellTotal;
-  const legCount = Math.max(0, stations.length - 1);
-  const stationIds = stations.map((station) => station.stationId);
-  const preferredLegs = resolveLegTravelSecondsForBudget({
-    stationIds,
-    legs: route?.stationLegTravels,
-    travelBudgetSeconds: Math.max(0, availableTravelSeconds)
-  });
-  const fallbackMinLegs = resolveLegTravelSecondsForBudget({
-    stationIds,
-    legs: route?.stationLegTravels,
-    travelBudgetSeconds: Math.max(0, route?.minTravelTimeSeconds ?? 0)
-  });
-  const bounds = Array.from({ length: legCount }, (_, index) => {
-    const preferred = preferredLegs[index] ?? 0;
-    const { minTravel, maxTravel } = resolveLegBounds(
-      route?.stationLegTravels,
-      index,
-      preferred,
-      fallbackMinLegs[index] ?? 0
-    );
-    const departureOffset = dwells[index] ?? 0;
-    const minAligned = snapUpToClockAlignSeconds(departureOffset + minTravel) - departureOffset;
-    const maxAligned = snapDownToClockAlignSeconds(departureOffset + Math.max(minTravel, maxTravel)) - departureOffset;
-    return {
-      preferred,
-      minTravel: minAligned,
-      maxTravel: Math.max(minAligned, maxAligned)
-    };
-  });
-  const minRequiredTravelSeconds = bounds.reduce(
-    (sum, bound) => sum + bound.minTravel,
-    0
-  );
-  const maxTravelSeconds = bounds.reduce((sum, bound) => sum + bound.maxTravel, 0);
-  if (endSecond < startSecond) {
-    return {
-      feasibility: {
-        feasible: false,
-        reason: "block_ends_before_aligned_start",
-        availableTravelSeconds,
-        minRequiredTravelSeconds,
-        shortfallSeconds: startSecond - endSecond
-      },
-      stations,
-      baseDwells,
-      dwells,
-      startSecond,
-      legTravelSeconds: [],
-      maxTravelSeconds
-    };
-  }
-  if (availableTravelSeconds < minRequiredTravelSeconds) {
-    return {
-      feasibility: {
-        feasible: false,
-        reason: "insufficient_travel_budget",
-        availableTravelSeconds,
-        minRequiredTravelSeconds,
-        shortfallSeconds: minRequiredTravelSeconds - availableTravelSeconds
-      },
-      stations,
-      baseDwells,
-      dwells,
-      startSecond,
-      legTravelSeconds: [],
-      maxTravelSeconds
-    };
-  }
-  const legTravelSeconds = bounds.map((bound) => bound.minTravel);
-  const targetTravelSeconds = minRequiredTravelSeconds + Math.floor(
-    (Math.min(availableTravelSeconds, maxTravelSeconds) - minRequiredTravelSeconds) / SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS
-  ) * SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
-  let remaining = targetTravelSeconds - minRequiredTravelSeconds;
-  while (remaining >= SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS) {
-    let bestIndex = -1;
-    let bestImprovement = Number.NEGATIVE_INFINITY;
-    for (const [index, bound] of bounds.entries()) {
-      const current = legTravelSeconds[index];
-      if (current + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS > bound.maxTravel) continue;
-      const improvement = Math.abs(current - bound.preferred) - Math.abs(current + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS - bound.preferred);
-      if (improvement > bestImprovement) {
-        bestImprovement = improvement;
-        bestIndex = index;
-      }
-    }
-    if (bestIndex < 0) break;
-    legTravelSeconds[bestIndex] = legTravelSeconds[bestIndex] + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
-    remaining -= SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
-  }
-  const allocatedTravelSeconds = legTravelSeconds.reduce((sum, value) => sum + value, 0);
-  return {
-    feasibility: {
-      feasible: true,
-      availableTravelSeconds,
-      minRequiredTravelSeconds,
-      allocatedTravelSeconds
-    },
-    stations,
-    baseDwells,
-    dwells,
-    startSecond,
-    legTravelSeconds,
-    maxTravelSeconds
-  };
-}
-function resolveBlockStationDepartureFeasibility(block, route) {
-  return resolveBlockStationTimingPlan(block, route)?.feasibility ?? null;
-}
-function resolveBlockDwellSlackBreakdown(block, route) {
-  const hasStationOverride = Boolean(block.stationDwells && block.stationDwells.length > 0);
-  const explicit = typeof block.dwellSlackSeconds === "number" && Number.isFinite(block.dwellSlackSeconds);
-  const baseSlackSeconds = explicit ? normalizeDwellSlackSeconds(block.dwellSlackSeconds) : hasStationOverride ? 0 : normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
-  const addedSeconds = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
-  const perStationAdded = block.dwellSlackAdjustment?.stationIndex != null ? 0 : addedSeconds;
-  return {
-    baseSlackSeconds,
-    addedSeconds,
-    effectiveSlackSeconds: baseSlackSeconds + perStationAdded,
-    source: explicit || hasStationOverride ? "block" : "route"
-  };
-}
-function resolveBlockStationExtraDwellSeconds(block, stations) {
-  const extra = stations.map(() => 0);
-  const adjustment = block.dwellSlackAdjustment;
-  const index = adjustment?.stationIndex;
-  if (adjustment == null || index == null || index < 0 || index >= stations.length) return extra;
-  if (applyStationDwellWithSlack(stations[index], 1, index) <= 0) return extra;
-  extra[index] = Math.max(0, Math.round(adjustment.addedSeconds));
-  return extra;
-}
-function resolveBlockStationDwellInputs(block, route) {
-  route = routeForJoinedBlock(block, route);
-  const stationSource = block.stationDwells && block.stationDwells.length > 0 ? block.stationDwells : route?.stationDwells;
-  if (!stationSource || stationSource.length === 0) return null;
-  return {
-    stations: stationSource.map((station) => ({ ...station })),
-    dwellSlackSeconds: resolveBlockDwellSlackBreakdown(block, route).effectiveSlackSeconds
-  };
-}
-function buildBlockStationDepartures(block, route, _options) {
-  const plan = resolveBlockStationTimingPlan(block, route);
-  if (!plan || !plan.feasibility.feasible) return [];
-  const { stations, baseDwells, dwells, startSecond, legTravelSeconds } = plan;
-  const endSecond = minuteToSecond(block.plannedEndMinute);
-  const legCount = Math.max(0, stations.length - 1);
-  const draft = [];
-  let nextArrivalSecond = startSecond;
-  for (const [index, station] of stations.entries()) {
-    const baseDwellSeconds = baseDwells[index] ?? 0;
-    const dwellSeconds = dwells[index] ?? 0;
-    const arrivalSecond = nextArrivalSecond;
-    const departureSecond = arrivalSecond + dwellSeconds;
-    draft.push({
-      order: index + 1,
-      stationId: station.stationId,
-      stationName: station.stationName || station.stationId,
-      baseDwellSeconds,
-      dwellSeconds,
-      arrivalSecond,
-      departureSecond
-    });
-    if (index < legCount) {
-      nextArrivalSecond = departureSecond + legTravelSeconds[index];
-    }
-  }
-  const last = draft[draft.length - 1];
-  if (last && last.departureSecond < endSecond) {
-    last.departureSecond = endSecond;
-    last.dwellSeconds = Math.max(0, endSecond - last.arrivalSecond);
-  }
-  return draft.map((stop, index) => {
-    const travelToNextSeconds = index < draft.length - 1 ? Math.max(0, draft[index + 1].arrivalSecond - stop.departureSecond) : null;
-    return {
-      order: stop.order,
-      stationId: stop.stationId,
-      stationName: stop.stationName,
-      baseDwellSeconds: stop.baseDwellSeconds,
-      dwellSeconds: stop.dwellSeconds,
-      arrivalMinute: secondToMinute(stop.arrivalSecond),
-      departureMinute: secondToMinute(stop.departureSecond),
-      travelToNextSeconds
-    };
-  });
-}
-function resolveRouteForBlock(block, selectedRoutes) {
-  if (!selectedRoutes?.length) return null;
-  if (block.routeInstanceId?.trim()) {
-    const instanceId = block.routeInstanceId.trim();
-    const byInstance = selectedRoutes.find(
-      (route) => resolveSelectedRouteInstanceId(route) === instanceId
-    );
-    if (byInstance) return routeForJoinedBlock(block, byInstance);
-  }
-  if (block.routeId) {
-    const byId = selectedRoutes.find((route) => route.routeId === block.routeId);
-    if (byId) return routeForJoinedBlock(block, byId);
-  }
-  if (block.routeName) {
-    const byName = selectedRoutes.find((route) => route.routeName === block.routeName);
-    if (byName) return byName;
-  }
-  return null;
 }
 
 // src/features/shift-list/utils/stationClearanceInsert.ts
@@ -1485,7 +1244,7 @@ function findStationBerthCollisions(occupancies, selectedRoutes) {
   return collisions;
 }
 var FACILITY_STAY_TASK_TYPES = /* @__PURE__ */ new Set(["charging", "servicing", "inspection", "standby", "washing"]);
-var DAY_SECONDS3 = 24 * 60 * 60;
+var DAY_SECONDS2 = 24 * 60 * 60;
 function facilityPresenceNodeId(block) {
   const nodeId = block.yardFacilityNodeId?.trim();
   if (!nodeId) return null;
@@ -1550,7 +1309,7 @@ function collectFacilityOccupancies(timelines) {
   return out;
 }
 function cyclicForwardSeconds(fromSecond, toSecond) {
-  return ((toSecond - fromSecond) % DAY_SECONDS3 + DAY_SECONDS3) % DAY_SECONDS3;
+  return ((toSecond - fromSecond) % DAY_SECONDS2 + DAY_SECONDS2) % DAY_SECONDS2;
 }
 function findFacilityOccupancyCollisions(occupancies, protectionSeconds) {
   const byFacility = /* @__PURE__ */ new Map();
@@ -1584,7 +1343,7 @@ function findFacilityOccupancyCollisions(occupancies, protectionSeconds) {
           continue;
         }
         if (requiredSeconds <= 0) continue;
-        if (aLeave - aStart >= DAY_SECONDS3 || bLeave - bStart >= DAY_SECONDS3) continue;
+        if (aLeave - aStart >= DAY_SECONDS2 || bLeave - bStart >= DAY_SECONDS2) continue;
         const aThenB = cyclicForwardSeconds(aLeave, bStart);
         const bThenA = cyclicForwardSeconds(bLeave, aStart);
         const aFirst = aThenB <= bThenA;
@@ -1609,6 +1368,674 @@ function findFacilityOccupancyCollisions(occupancies, protectionSeconds) {
 function resolveSelectedRouteInstanceId(route) {
   const id = route.instanceId?.trim();
   return id || route.routeId;
+}
+
+// src/features/shift-list/utils/buildBlockStationDepartures.ts
+function resolveLegBounds(legs, legIndex, preferredTravel, fallbackMinTravel) {
+  const leg = legs?.[legIndex];
+  const avgTravel = leg != null && Number.isFinite(leg.avgTravelTimeSeconds) && leg.avgTravelTimeSeconds > 0 ? leg.avgTravelTimeSeconds : Math.max(0, preferredTravel);
+  const minTravel = leg != null && Number.isFinite(leg.minTravelTimeSeconds) && leg.minTravelTimeSeconds >= 0 ? leg.minTravelTimeSeconds : Math.max(0, fallbackMinTravel);
+  const maxTravel = Math.max(
+    avgTravel,
+    avgTravel * STATION_ARRIVAL_MAX_AVG_STRETCH,
+    avgTravel + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
+    preferredTravel
+  );
+  return { minTravel, avgTravel, maxTravel };
+}
+function resolveBlockStationTimingPlan(block, route) {
+  route = routeForJoinedBlock(block, route);
+  const dwellInputs = resolveBlockStationDwellInputs(block, route);
+  if (!dwellInputs) return null;
+  const { stations, dwellSlackSeconds: slackSeconds } = dwellInputs;
+  const baseDwells = stations.map((station) => {
+    const mode = resolveStationDwellMode(station);
+    if (mode === "no_stop" || mode === "line_change") return 0;
+    return Math.max(0, station.dwellSeconds ?? 0);
+  });
+  const extraDwells = resolveBlockStationExtraDwellSeconds(block, stations);
+  const dwells = stations.map(
+    (station, index) => applyStationDwellWithSlack(station, slackSeconds, index) + (extraDwells[index] ?? 0)
+  );
+  const dwellTotal = dwells.reduce((sum, value) => sum + value, 0);
+  const startSecond = snapUpToClockAlignSeconds(minuteToSecond(block.plannedStartMinute));
+  const endSecond = minuteToSecond(block.plannedEndMinute);
+  const availableTravelSeconds = endSecond - startSecond - dwellTotal;
+  const legCount = Math.max(0, stations.length - 1);
+  const stationIds = stations.map((station) => station.stationId);
+  const preferredLegs = resolveLegTravelSecondsForBudget({
+    stationIds,
+    legs: route?.stationLegTravels,
+    travelBudgetSeconds: Math.max(0, availableTravelSeconds)
+  });
+  const fallbackMinLegs = resolveLegTravelSecondsForBudget({
+    stationIds,
+    legs: route?.stationLegTravels,
+    travelBudgetSeconds: Math.max(0, route?.minTravelTimeSeconds ?? 0)
+  });
+  const bounds = Array.from({ length: legCount }, (_, index) => {
+    const preferred = preferredLegs[index] ?? 0;
+    const { minTravel, maxTravel } = resolveLegBounds(
+      route?.stationLegTravels,
+      index,
+      preferred,
+      fallbackMinLegs[index] ?? 0
+    );
+    const departureOffset = dwells[index] ?? 0;
+    const minAligned = snapUpToClockAlignSeconds(departureOffset + minTravel) - departureOffset;
+    const maxAligned = snapDownToClockAlignSeconds(departureOffset + Math.max(minTravel, maxTravel)) - departureOffset;
+    return {
+      preferred,
+      minTravel: minAligned,
+      maxTravel: Math.max(minAligned, maxAligned)
+    };
+  });
+  const minRequiredTravelSeconds = bounds.reduce(
+    (sum, bound) => sum + bound.minTravel,
+    0
+  );
+  const maxTravelSeconds = bounds.reduce((sum, bound) => sum + bound.maxTravel, 0);
+  if (endSecond < startSecond) {
+    return {
+      feasibility: {
+        feasible: false,
+        reason: "block_ends_before_aligned_start",
+        availableTravelSeconds,
+        minRequiredTravelSeconds,
+        shortfallSeconds: startSecond - endSecond
+      },
+      stations,
+      baseDwells,
+      dwells,
+      startSecond,
+      legTravelSeconds: [],
+      maxTravelSeconds
+    };
+  }
+  if (availableTravelSeconds < minRequiredTravelSeconds) {
+    return {
+      feasibility: {
+        feasible: false,
+        reason: "insufficient_travel_budget",
+        availableTravelSeconds,
+        minRequiredTravelSeconds,
+        shortfallSeconds: minRequiredTravelSeconds - availableTravelSeconds
+      },
+      stations,
+      baseDwells,
+      dwells,
+      startSecond,
+      legTravelSeconds: [],
+      maxTravelSeconds
+    };
+  }
+  const legTravelSeconds = bounds.map((bound) => bound.minTravel);
+  const targetTravelSeconds = minRequiredTravelSeconds + Math.floor(
+    (Math.min(availableTravelSeconds, maxTravelSeconds) - minRequiredTravelSeconds) / SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS
+  ) * SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
+  let remaining = targetTravelSeconds - minRequiredTravelSeconds;
+  while (remaining >= SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS) {
+    let bestIndex = -1;
+    let bestImprovement = Number.NEGATIVE_INFINITY;
+    for (const [index, bound] of bounds.entries()) {
+      const current = legTravelSeconds[index];
+      if (current + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS > bound.maxTravel) continue;
+      const improvement = Math.abs(current - bound.preferred) - Math.abs(current + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS - bound.preferred);
+      if (improvement > bestImprovement) {
+        bestImprovement = improvement;
+        bestIndex = index;
+      }
+    }
+    if (bestIndex < 0) break;
+    legTravelSeconds[bestIndex] = legTravelSeconds[bestIndex] + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
+    remaining -= SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
+  }
+  const allocatedTravelSeconds = legTravelSeconds.reduce((sum, value) => sum + value, 0);
+  return {
+    feasibility: {
+      feasible: true,
+      availableTravelSeconds,
+      minRequiredTravelSeconds,
+      allocatedTravelSeconds
+    },
+    stations,
+    baseDwells,
+    dwells,
+    startSecond,
+    legTravelSeconds,
+    maxTravelSeconds
+  };
+}
+function resolveBlockStationDepartureFeasibility(block, route) {
+  return resolveBlockStationTimingPlan(block, route)?.feasibility ?? null;
+}
+function resolveBlockDwellSlackBreakdown(block, route) {
+  const hasStationOverride = Boolean(block.stationDwells && block.stationDwells.length > 0);
+  const explicit = typeof block.dwellSlackSeconds === "number" && Number.isFinite(block.dwellSlackSeconds);
+  const baseSlackSeconds = explicit ? normalizeDwellSlackSeconds(block.dwellSlackSeconds) : hasStationOverride ? 0 : normalizeDwellSlackSeconds(route?.dwellSlackSeconds);
+  const addedSeconds = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
+  const perStationAdded = block.dwellSlackAdjustment?.stationIndex != null ? 0 : addedSeconds;
+  return {
+    baseSlackSeconds,
+    addedSeconds,
+    effectiveSlackSeconds: baseSlackSeconds + perStationAdded,
+    source: explicit || hasStationOverride ? "block" : "route"
+  };
+}
+function resolveBlockStationExtraDwellSeconds(block, stations) {
+  const extra = stations.map(() => 0);
+  const adjustment = block.dwellSlackAdjustment;
+  const index = adjustment?.stationIndex;
+  if (adjustment == null || index == null || index < 0 || index >= stations.length) return extra;
+  if (applyStationDwellWithSlack(stations[index], 1, index) <= 0) return extra;
+  extra[index] = Math.max(0, Math.round(adjustment.addedSeconds));
+  return extra;
+}
+function resolveBlockStationDwellInputs(block, route) {
+  route = routeForJoinedBlock(block, route);
+  const stationSource = block.stationDwells && block.stationDwells.length > 0 ? block.stationDwells : route?.stationDwells;
+  if (!stationSource || stationSource.length === 0) return null;
+  return {
+    stations: stationSource.map((station) => ({ ...station })),
+    dwellSlackSeconds: resolveBlockDwellSlackBreakdown(block, route).effectiveSlackSeconds
+  };
+}
+function buildBlockStationDepartures(block, route, _options) {
+  const plan = resolveBlockStationTimingPlan(block, route);
+  if (!plan || !plan.feasibility.feasible) return [];
+  const { stations, baseDwells, dwells, startSecond, legTravelSeconds } = plan;
+  const endSecond = minuteToSecond(block.plannedEndMinute);
+  const legCount = Math.max(0, stations.length - 1);
+  const draft = [];
+  let nextArrivalSecond = startSecond;
+  for (const [index, station] of stations.entries()) {
+    const baseDwellSeconds = baseDwells[index] ?? 0;
+    const dwellSeconds = dwells[index] ?? 0;
+    const arrivalSecond = nextArrivalSecond;
+    const departureSecond = arrivalSecond + dwellSeconds;
+    draft.push({
+      order: index + 1,
+      stationId: station.stationId,
+      stationName: station.stationName || station.stationId,
+      baseDwellSeconds,
+      dwellSeconds,
+      arrivalSecond,
+      departureSecond
+    });
+    if (index < legCount) {
+      nextArrivalSecond = departureSecond + legTravelSeconds[index];
+    }
+  }
+  const last = draft[draft.length - 1];
+  if (last && last.departureSecond < endSecond) {
+    last.departureSecond = endSecond;
+    last.dwellSeconds = Math.max(0, endSecond - last.arrivalSecond);
+  }
+  return draft.map((stop, index) => {
+    const travelToNextSeconds = index < draft.length - 1 ? Math.max(0, draft[index + 1].arrivalSecond - stop.departureSecond) : null;
+    return {
+      order: stop.order,
+      stationId: stop.stationId,
+      stationName: stop.stationName,
+      baseDwellSeconds: stop.baseDwellSeconds,
+      dwellSeconds: stop.dwellSeconds,
+      arrivalMinute: secondToMinute(stop.arrivalSecond),
+      departureMinute: secondToMinute(stop.departureSecond),
+      travelToNextSeconds
+    };
+  });
+}
+function resolveRouteForBlock(block, selectedRoutes) {
+  if (!selectedRoutes?.length) return null;
+  if (block.routeInstanceId?.trim()) {
+    const instanceId = block.routeInstanceId.trim();
+    const byInstance = selectedRoutes.find(
+      (route) => resolveSelectedRouteInstanceId(route) === instanceId
+    );
+    if (byInstance) return routeForJoinedBlock(block, byInstance);
+  }
+  if (block.routeId) {
+    const byId = selectedRoutes.find((route) => route.routeId === block.routeId);
+    if (byId) return routeForJoinedBlock(block, byId);
+  }
+  if (block.routeName) {
+    const byName = selectedRoutes.find((route) => route.routeName === block.routeName);
+    if (byName) return byName;
+  }
+  return null;
+}
+
+// src/features/shift-list/utils/pathOccupancy.ts
+var DAY_SECONDS3 = 24 * 60 * 60;
+var indexCache = /* @__PURE__ */ new WeakMap();
+function indexTopology(topology) {
+  const cached = indexCache.get(topology);
+  if (cached) return cached;
+  const labelById = /* @__PURE__ */ new Map();
+  const nodeIdByLabel = /* @__PURE__ */ new Map();
+  const ambiguousLabels = /* @__PURE__ */ new Set();
+  const nodeIdByStationId = /* @__PURE__ */ new Map();
+  for (const node of topology.nodes) {
+    const label = (node.label ?? "").trim();
+    labelById.set(node.id, label || node.id);
+    if (label) {
+      if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
+      else nodeIdByLabel.set(label, node.id);
+    }
+    const stationId = node.stationId?.trim();
+    if (stationId) nodeIdByStationId.set(stationId, node.id);
+  }
+  const edgeByPair = /* @__PURE__ */ new Map();
+  for (const edge of topology.edges) edgeByPair.set(`${edge.fromNodeId}>${edge.toNodeId}`, edge);
+  const zeroLinked = /* @__PURE__ */ new Set();
+  for (const edge of topology.edges) {
+    const zero = edgeHasTravelTime(edge) && edgeSeconds(edge, "avg") <= 0 && edgeSeconds(edge, "min") <= 0;
+    if (!zero) continue;
+    zeroLinked.add(`${edge.fromNodeId}>${edge.toNodeId}`);
+    zeroLinked.add(`${edge.toNodeId}>${edge.fromNodeId}`);
+  }
+  const resourceOf = new Map(topology.nodes.map((node) => [node.id, node.id]));
+  const resourceLabel = new Map(
+    topology.nodes.map((node) => [node.id, labelById.get(node.id) ?? node.id])
+  );
+  const index = {
+    labelById,
+    nodeIdByLabel,
+    ambiguousLabels,
+    nodeIdByStationId,
+    edgeByPair,
+    resourceOf,
+    resourceLabel,
+    zeroLinked
+  };
+  indexCache.set(topology, index);
+  return index;
+}
+function edgeBetween(index, from, to) {
+  return index.edgeByPair.get(`${from}>${to}`) ?? index.edgeByPair.get(`${to}>${from}`) ?? null;
+}
+function toResources(visits, index) {
+  const out = [];
+  for (const visit of visits) {
+    const resource = index.resourceOf.get(visit.nodeId) ?? visit.nodeId;
+    const label = index.resourceLabel.get(resource) ?? visit.nodeLabel;
+    const last = out[out.length - 1];
+    if (last && last.nodeId === resource) {
+      last.departSecond = Math.max(last.departSecond, visit.departSecond);
+      continue;
+    }
+    out.push({ ...visit, nodeId: resource, nodeLabel: label });
+  }
+  return out;
+}
+function moveCardOwnSegment(block, ids, topology) {
+  const index = indexTopology(topology);
+  const outbound = block.source !== "yard_entry_move";
+  const facilityId = block.yardExitFacilityNodeId ?? block.yardEntryFacilityNodeId ?? null;
+  const stationRaw = block.yardExitStationId ?? null;
+  const stationNode = stationRaw ? index.nodeIdByStationId.get(stationRaw) ?? (index.labelById.has(stationRaw) ? stationRaw : null) : null;
+  const ownStart = outbound ? facilityId : stationNode;
+  const ownEnd = outbound ? stationNode : facilityId;
+  let from = 0;
+  let to = ids.length - 1;
+  if (ownStart) {
+    const at = ids.indexOf(ownStart);
+    if (at >= 0) from = at;
+  }
+  if (ownEnd) {
+    const at = ids.lastIndexOf(ownEnd);
+    if (at > from) to = at;
+  }
+  return [from, to];
+}
+function moveTrajectory(block, timelineRow, topology, startSecondOverride, aliases) {
+  if (block.taskType !== "dispatch") return null;
+  let labels = block.yardMoveViaLabels ?? [];
+  if (labels.length < 2) return null;
+  const index = indexTopology(topology);
+  const ids = [];
+  for (const [position, raw] of labels.entries()) {
+    const label = raw.trim();
+    let id = index.ambiguousLabels.has(label) ? void 0 : index.nodeIdByLabel.get(label);
+    if (!id && position === 0 && block.yardExitFacilityNodeId && index.labelById.has(block.yardExitFacilityNodeId)) {
+      id = block.yardExitFacilityNodeId;
+    }
+    if (!id) {
+      const aliasId = aliases?.get(label);
+      if (aliasId && index.labelById.has(aliasId)) id = aliasId;
+    }
+    if (!id) return null;
+    ids.push(id);
+  }
+  {
+    const [from, to] = moveCardOwnSegment(block, ids, topology);
+    if (from > 0 || to < ids.length - 1) {
+      ids.splice(to + 1);
+      ids.splice(0, from);
+      labels = labels.slice(from, to + 1);
+    }
+  }
+  if (ids.length < 2) return null;
+  const shift = startSecondOverride == null ? 0 : startSecondOverride - minuteToSecond(block.plannedStartMinute);
+  const startSecond = minuteToSecond(block.plannedStartMinute) + shift;
+  const endSecond = minuteToSecond(block.plannedEndMinute) + shift;
+  const visits = [];
+  let instant = startSecond;
+  visits.push({ nodeId: ids[0], nodeLabel: labels[0].trim(), arriveSecond: instant, departSecond: instant });
+  for (let i = 1; i < ids.length; i += 1) {
+    const edge = edgeBetween(index, ids[i - 1], ids[i]);
+    if (!edge || !edgeHasTravelTime(edge)) return null;
+    instant += edgeSeconds(edge, "avg");
+    visits.push({ nodeId: ids[i], nodeLabel: labels[i].trim(), arriveSecond: instant, departSecond: instant });
+  }
+  const last = visits[visits.length - 1];
+  if (endSecond > last.arriveSecond) last.departSecond = endSecond;
+  return {
+    blockId: block.id,
+    timelineRow,
+    kind: "move",
+    label: block.label ?? block.id,
+    visits: toResources(visits, index)
+  };
+}
+function passengerTrajectory(block, timelineRow, selectedRoutes, topology) {
+  if (block.taskType !== "passenger") return null;
+  const route = resolveRouteForBlock(block, selectedRoutes);
+  if (!route) return null;
+  const stops = buildBlockStationDepartures(block, route);
+  if (stops.length === 0) return null;
+  const index = indexTopology(topology);
+  const visits = [];
+  for (let i = 0; i < stops.length; i += 1) {
+    const stop = stops[i];
+    const nodeId = index.nodeIdByStationId.get(stop.stationId);
+    if (!nodeId) return null;
+    const arrive = minuteToSecond(stop.arrivalMinute);
+    const depart = minuteToSecond(stop.departureMinute);
+    if (i > 0) {
+      const prev = stops[i - 1];
+      const prevNode = index.nodeIdByStationId.get(prev.stationId);
+      const path = findTopologyPath(topology, prevNode, nodeId);
+      if (path && path.edges.length > 1) {
+        const leaveSecond = minuteToSecond(prev.departureMinute);
+        const legSeconds = arrive - leaveSecond;
+        const weights = path.edges.map((edge) => edgeHasTravelTime(edge) ? edgeSeconds(edge, "avg") : 0);
+        const total = weights.reduce((sum, value) => sum + value, 0);
+        let instant = leaveSecond;
+        for (let e = 0; e < path.edges.length - 1; e += 1) {
+          instant += total > 0 ? legSeconds * weights[e] / total : legSeconds / path.edges.length;
+          const mid = path.edges[e].toNodeId;
+          visits.push({ nodeId: mid, nodeLabel: index.labelById.get(mid) ?? mid, arriveSecond: instant, departSecond: instant });
+        }
+      }
+    }
+    visits.push({
+      nodeId,
+      nodeLabel: index.labelById.get(nodeId) ?? stop.stationName,
+      arriveSecond: arrive,
+      departSecond: Math.max(arrive, depart)
+    });
+  }
+  return {
+    blockId: block.id,
+    timelineRow,
+    kind: "passenger",
+    label: block.label ?? block.id,
+    visits: toResources(visits, index)
+  };
+}
+function facilityAliases(timelines) {
+  const out = /* @__PURE__ */ new Map();
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.yardFacilityLabel && block.yardFacilityNodeId) out.set(block.yardFacilityLabel.trim(), block.yardFacilityNodeId);
+      if (block.yardExitFacilityLabel && block.yardExitFacilityNodeId) {
+        out.set(block.yardExitFacilityLabel.trim(), block.yardExitFacilityNodeId);
+      }
+    }
+  }
+  return out;
+}
+function collectTrajectories(timelines, selectedRoutes, topology) {
+  if (!topology) return [];
+  const aliases = facilityAliases(timelines);
+  const index = indexTopology(topology);
+  const out = [];
+  for (const timeline of timelines) {
+    const ordered = timeline.blocks.filter((block) => block.source !== "hold").sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    let previous = null;
+    for (const block of ordered) {
+      if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
+      const trajectory = block.taskType === "passenger" ? passengerTrajectory(block, timeline.row, selectedRoutes, topology) : block.taskType === "dispatch" ? moveTrajectory(block, timeline.row, topology, void 0, aliases) : null;
+      if (!trajectory || trajectory.visits.length === 0) {
+        if (block.taskType !== "dispatch") previous = null;
+        continue;
+      }
+      const tail = previous?.visits[previous.visits.length - 1];
+      const head = trajectory.visits[0];
+      const sameSpot = tail && (tail.nodeId === head.nodeId || index.zeroLinked.has(`${tail.nodeId}>${head.nodeId}`));
+      if (tail && sameSpot && head.arriveSecond >= tail.departSecond) {
+        tail.departSecond = head.arriveSecond;
+      }
+      out.push(trajectory);
+      previous = trajectory;
+    }
+  }
+  return out;
+}
+function alignDay(aSecond, bSecond) {
+  const days = Math.round((aSecond - bSecond) / DAY_SECONDS3);
+  return days * DAY_SECONDS3;
+}
+function traversals(trajectory) {
+  const out = [];
+  for (let i = 1; i < trajectory.visits.length; i += 1) {
+    const a = trajectory.visits[i - 1];
+    const b = trajectory.visits[i];
+    if (a.nodeId === b.nodeId) continue;
+    out.push({ from: a.nodeId, to: b.nodeId, enter: a.departSecond, exit: b.arriveSecond });
+  }
+  return out;
+}
+function span(trajectory) {
+  const visits = trajectory.visits;
+  return [visits[0].arriveSecond, visits[visits.length - 1].departSecond];
+}
+function movePassBufferSeconds(collisionProtectionSeconds) {
+  return Math.max(0, collisionProtectionSeconds ?? 0);
+}
+function conflictsBetween(mine, other, bufferSeconds) {
+  if (mine.timelineRow === other.timelineRow) return [];
+  if (mine.kind !== "move" && other.kind !== "move") return [];
+  const [mStart, mEnd] = span(mine);
+  const [oStart0, oEnd0] = span(other);
+  const shift = alignDay((mStart + mEnd) / 2, (oStart0 + oEnd0) / 2);
+  const oStart = oStart0 + shift;
+  const oEnd = oEnd0 + shift;
+  if (oStart - mEnd >= bufferSeconds || mStart - oEnd >= bufferSeconds) return [];
+  const out = [];
+  for (const a of mine.visits) {
+    for (const raw of other.visits) {
+      if (raw.nodeId !== a.nodeId) continue;
+      const bArrive = raw.arriveSecond + shift;
+      const bDepart = raw.departSecond + shift;
+      const gap = Math.max(bArrive - a.departSecond, a.arriveSecond - bDepart);
+      if (gap < bufferSeconds - 1e-9) {
+        out.push({
+          kind: "node",
+          mine,
+          other,
+          nodeId: a.nodeId,
+          nodeLabel: a.nodeLabel,
+          mineSecond: a.arriveSecond,
+          otherSecond: bArrive,
+          gapSeconds: gap
+        });
+      }
+    }
+  }
+  const mineEdges = traversals(mine);
+  const otherEdges = traversals(other).map((t) => ({ ...t, enter: t.enter + shift, exit: t.exit + shift }));
+  const labelOf = (id) => mine.visits.find((v) => v.nodeId === id)?.nodeLabel ?? other.visits.find((v) => v.nodeId === id)?.nodeLabel ?? id;
+  for (const a of mineEdges) {
+    for (const b of otherEdges) {
+      if (a.from === b.from && a.to === b.to) {
+        const enterOrder = Math.sign(a.enter - b.enter);
+        const exitOrder = Math.sign(a.exit - b.exit);
+        if (enterOrder !== 0 && exitOrder !== 0 && enterOrder !== exitOrder) {
+          out.push({
+            kind: "overtake",
+            mine,
+            other,
+            nodeId: a.from,
+            nodeLabel: labelOf(a.from),
+            toNodeId: a.to,
+            toNodeLabel: labelOf(a.to),
+            mineSecond: a.enter,
+            otherSecond: b.enter
+          });
+        }
+      } else if (a.from === b.to && a.to === b.from) {
+        if (a.enter < b.exit + bufferSeconds && b.enter < a.exit + bufferSeconds) {
+          out.push({
+            kind: "head-on",
+            mine,
+            other,
+            nodeId: a.from,
+            nodeLabel: labelOf(a.from),
+            toNodeId: a.to,
+            toNodeLabel: labelOf(a.to),
+            mineSecond: a.enter,
+            otherSecond: b.enter
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+function findPathConflicts(trajectories, bufferSeconds) {
+  const moves = trajectories.filter((t) => t.kind === "move");
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const mine of moves) {
+    for (const other of trajectories) {
+      if (other.blockId === mine.blockId) continue;
+      if (other.kind === "move") {
+        const key = [mine.blockId, other.blockId].sort().join("|");
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      out.push(...conflictsBetween(mine, other, bufferSeconds));
+    }
+  }
+  return out;
+}
+function describePathConflict(conflict, formatSecond) {
+  const who = (t) => `\u6642\u9593\u7DDA ${t.timelineRow}\u300C${t.label}\u300D`;
+  if (conflict.kind === "node") {
+    return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} \u7D93\u904E\u300C${conflict.nodeLabel}\u300D\uFF0C${who(conflict.other)} ${formatSecond(conflict.otherSecond)} \u4E5F\u5728\u90A3\u88E1\uFF08\u9593\u9694 ${Math.round(conflict.gapSeconds ?? 0)} \u79D2\uFF09`;
+  }
+  if (conflict.kind === "overtake") {
+    return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u540C\u5411\u8D70\u300C${conflict.nodeLabel}\u300D\u2192\u300C${conflict.toNodeLabel}\u300D\uFF0C\u5F8C\u9032\u7684\u8ECA\u8981\u5148\u51FA\uFF0C\u7B49\u65BC\u8981\u7A7F\u904E\u524D\u8ECA`;
+  }
+  return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u5728\u300C${conflict.nodeLabel}\u300D\u2014\u300C${conflict.toNodeLabel}\u300D\u5C0D\u5411\u540C\u6642\u901A\u904E`;
+}
+
+// src/features/shift-list/utils/moveJunctionPasses.ts
+var DAY_SECONDS4 = 24 * 60 * 60;
+function cyclicGapSeconds(a, b) {
+  const raw = Math.abs(a - b) % DAY_SECONDS4;
+  return Math.min(raw, DAY_SECONDS4 - raw);
+}
+function collectMoveJunctionPasses(timelines, topology, onMissingTravelTime) {
+  if (!topology) return [];
+  const nodeIdByLabel = /* @__PURE__ */ new Map();
+  const ambiguousLabels = /* @__PURE__ */ new Set();
+  for (const node of topology.nodes) {
+    const label = (node.label ?? "").trim();
+    if (!label) continue;
+    if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
+    else nodeIdByLabel.set(label, node.id);
+  }
+  const kindById = new Map(topology.nodes.map((node) => [node.id, node.kind]));
+  const edgeByPair = /* @__PURE__ */ new Map();
+  for (const edge of topology.edges) {
+    edgeByPair.set(`${edge.fromNodeId}>${edge.toNodeId}`, edge);
+    if (!edgeByPair.has(`${edge.toNodeId}>${edge.fromNodeId}`)) {
+      edgeByPair.set(`${edge.toNodeId}>${edge.fromNodeId}`, edge);
+    }
+  }
+  const passes = [];
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.taskType !== "dispatch") continue;
+      if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
+      const labels = block.yardMoveViaLabels ?? [];
+      if (labels.length < 2) continue;
+      const ids = labels.map((label) => ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
+      const unresolved = ids.findIndex((id) => id == null);
+      if (unresolved >= 0) {
+        onMissingTravelTime?.({
+          blockId: block.id,
+          timelineRow: timeline.row,
+          fromLabel: labels[unresolved],
+          toLabel: labels[unresolved],
+          reason: ambiguousLabels.has(labels[unresolved].trim()) ? "ambiguous-node" : "unknown-node"
+        });
+        continue;
+      }
+      const [from, to] = moveCardOwnSegment(block, ids, topology);
+      let instant = minuteToSecond(block.plannedStartMinute);
+      const isSharedPoint = (id) => kindById.get(id) !== "facility";
+      if (to > from && isSharedPoint(ids[from])) {
+        passes.push({
+          nodeId: ids[from],
+          nodeLabel: labels[from],
+          instant,
+          timelineRow: timeline.row,
+          blockId: block.id
+        });
+      }
+      for (let index = from + 1; index <= to; index += 1) {
+        const edge = edgeByPair.get(`${ids[index - 1]}>${ids[index]}`);
+        if (!edge || !edgeHasTravelTime(edge)) {
+          onMissingTravelTime?.({
+            blockId: block.id,
+            timelineRow: timeline.row,
+            fromLabel: labels[index - 1],
+            toLabel: labels[index],
+            reason: edge ? "missing-time" : "no-edge"
+          });
+          break;
+        }
+        instant += edgeSeconds(edge, "avg");
+        if (index === to && !isSharedPoint(ids[index])) break;
+        passes.push({
+          nodeId: ids[index],
+          nodeLabel: labels[index],
+          instant,
+          timelineRow: timeline.row,
+          blockId: block.id
+        });
+      }
+    }
+  }
+  return passes;
+}
+function findJunctionConflictsForBlocks(passes, blockIds, bufferSeconds) {
+  if (bufferSeconds <= 0) return [];
+  const out = [];
+  for (const mine of passes) {
+    if (!blockIds.has(mine.blockId)) continue;
+    for (const other of passes) {
+      if (other.timelineRow === mine.timelineRow) continue;
+      if (other.nodeId !== mine.nodeId) continue;
+      const gapSeconds = cyclicGapSeconds(mine.instant, other.instant);
+      if (gapSeconds < bufferSeconds - 1e-9) out.push({ mine, other, gapSeconds });
+    }
+  }
+  return out;
 }
 
 // src/features/shift-list/utils/schedule-engine/validate.ts
@@ -1757,16 +2184,16 @@ function validateStationBerthCollisions(timelines, selectedRoutes, errors, optio
     for (const list of byRow.values()) {
       list.sort((a, b) => a.start - b.start || a.end - b.end);
       let merged = null;
-      for (const span of list) {
-        if (merged && span.start <= merged.end + 1e-9) {
-          merged.end = Math.max(merged.end, span.end);
+      for (const span2 of list) {
+        if (merged && span2.start <= merged.end + 1e-9) {
+          merged.end = Math.max(merged.end, span2.end);
           continue;
         }
         if (merged) {
           events.push({ minute: merged.start, delta: 1 });
           events.push({ minute: merged.end, delta: -1 });
         }
-        merged = { ...span };
+        merged = { ...span2 };
       }
       if (merged) {
         events.push({ minute: merged.start, delta: 1 });
@@ -1905,8 +2332,17 @@ function validateFacilityOccupancy(timelines, errors, options = {}) {
   const protectionSeconds = Math.max(0, options.collisionProtectionSeconds ?? 0);
   const occupancies = collectFacilityOccupancies(timelines);
   const collisions = findFacilityOccupancyCollisions(occupancies, protectionSeconds);
+  const zoneByBlockId = /* @__PURE__ */ new Map();
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      if (block.yardZoneId) zoneByBlockId.set(block.id, block.yardZoneId);
+    }
+  }
   for (const collision of collisions) {
     const { earlier, later } = collision;
+    if (collision.kind !== "overlap" && zoneByBlockId.has(earlier.blockId) && zoneByBlockId.get(earlier.blockId) === zoneByBlockId.get(later.blockId)) {
+      continue;
+    }
     const detail = {
       facilityNodeId: collision.facilityNodeId,
       facilityLabel: collision.facilityLabel,
@@ -2031,8 +2467,37 @@ function validateVehicleLocationContinuity(args) {
     }
   }
 }
+function validateMovePathConflicts(args) {
+  const bufferSeconds = movePassBufferSeconds(args.collisionProtectionSeconds);
+  if (!args.topology) return;
+  const trajectories = collectTrajectories(args.timelines, args.selectedRoutes, args.topology);
+  const seen = /* @__PURE__ */ new Set();
+  for (const conflict of findPathConflicts(trajectories, bufferSeconds)) {
+    const key = `${conflict.kind}|${conflict.mine.blockId}|${conflict.other.blockId}|${conflict.nodeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pushIssue(args.errors, {
+      code: "MOVE_PATH_CONFLICT",
+      severity: "error",
+      kind: "limit",
+      message: describePathConflict(conflict, (second) => formatMinuteHms(secondToMinute(second))) + "\u3002\u79FB\u52D5\u5361\u8981\u932F\u958B\u6642\u523B\u6216\u6539\u8D70\u5225\u689D\u8DEF\u3002",
+      detail: {
+        conflictKind: conflict.kind,
+        nodeId: conflict.nodeId,
+        nodeLabel: conflict.nodeLabel,
+        toNodeId: conflict.toNodeId,
+        blockId: conflict.other.blockId,
+        earlierBlockId: conflict.mine.blockId,
+        timelineRow: conflict.mine.timelineRow,
+        otherTimelineRow: conflict.other.timelineRow,
+        gapSeconds: conflict.gapSeconds != null ? Math.round(conflict.gapSeconds) : void 0,
+        shortfallSeconds: conflict.gapSeconds != null ? Math.max(0, bufferSeconds - conflict.gapSeconds) : bufferSeconds
+      }
+    });
+  }
+}
 function validateMoveJunctionConflicts(args) {
-  const bufferSeconds = Math.max(0, args.collisionProtectionSeconds) * 2;
+  const bufferSeconds = movePassBufferSeconds(args.collisionProtectionSeconds);
   if (!args.topology) return;
   const missing = /* @__PURE__ */ new Set();
   const passes = collectMoveJunctionPasses(args.timelines, args.topology, (gap) => {
@@ -2180,6 +2645,13 @@ function runSchedulePublishCheck(args) {
     topology,
     collisionProtectionSeconds,
     warnings
+  });
+  validateMovePathConflicts({
+    timelines: plan.timelines,
+    selectedRoutes,
+    topology,
+    collisionProtectionSeconds,
+    errors
   });
   const blockingIssues = [...errors, ...warnings].filter(
     (issue) => issue.severity === "error" || PUBLISH_BLOCKING_CODES.has(issue.code)

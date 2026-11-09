@@ -6,7 +6,7 @@ import {
   type ScheduleEngineProgress,
 } from '../utils/schedule-engine/worker/runScheduleEngineInBackground';
 import i18n from '../../../i18n';
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, Filter, ClipboardList, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, Loader2, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -51,7 +51,6 @@ import type {
 } from '../utils/shiftScheduleEngine.types';
 import {
   resolveFeasibilityIssueMeta,
-  type FeasibilityIssueKind,
 } from '../utils/schedule-engine/feasibilityIssueMeta';
 import {
   computeScheduleGateOk,
@@ -122,22 +121,6 @@ function resolveHistoryFromOutput(
     };
   }
   return { history: [], historyIndex: -1 };
-}
-
-function kindBadgeClass(kind: FeasibilityIssueKind, severity: 'error' | 'warning'): string {
-  if (kind === 'policy') {
-    return severity === 'error'
-      ? 'border-sky-500/40 bg-sky-500/15 text-sky-200'
-      : 'border-sky-500/40 bg-sky-500/10 text-sky-200';
-  }
-  if (kind === 'limit') {
-    return severity === 'error'
-      ? 'border-violet-500/40 bg-violet-500/15 text-violet-200'
-      : 'border-violet-500/40 bg-violet-500/10 text-violet-200';
-  }
-  return severity === 'error'
-    ? 'border-amber-500/40 bg-amber-500/15 text-amber-100'
-    : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
 }
 
 /** 能對到班次卡才算可跳轉；參數／整輪類議題通常沒有目標。 */
@@ -380,63 +363,6 @@ function resolveRootCause(code: string): RootCauseDefinition {
   return ROOT_CAUSES.find((cause) => cause.codes.has(code)) ?? OTHER_ROOT_CAUSE;
 }
 
-function RootCauseSection({
-  cause,
-  issueCount,
-  upstreamTitles,
-  isSource,
-  tensionNote,
-  children,
-}: {
-  cause: RootCauseDefinition;
-  issueCount: number;
-  /** 上游根因也在畫面上時，標出「這多半是它們的後果」 */
-  upstreamTitles?: string[];
-  /** 這一項沒有任何上游在畫面上——它就是源頭，先動它 */
-  isSource?: boolean;
-  /** 這一項跟上游互相拉扯時要講的話——照建議改會來回改不動 */
-  tensionNote?: string;
-  children: React.ReactNode;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-2">
-      <div className="mb-1 flex flex-wrap items-baseline gap-2">
-        <span className="text-[12px] font-semibold text-zinc-100">{cause.title}</span>
-        <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
-          {t('shiftList.scheduleAdjust.linkedIssues', { count: issueCount })}
-        </span>
-        {isSource ? (
-          <span className="rounded border border-emerald-600/50 bg-emerald-950/30 px-1.5 py-0.5 text-[10px] text-emerald-300">
-            {t('shiftList.scheduleAdjust.fixFromHere')}
-          </span>
-        ) : null}
-        {upstreamTitles && upstreamTitles.length > 0 ? (
-          <span className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            {t('shiftList.scheduleAdjust.mostlyConsequence', { titles: upstreamTitles.join('」「') })}
-          </span>
-        ) : null}
-      </div>
-      <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">{cause.hint}</p>
-      {/*
-        {t('shiftList.scheduleAdjust.deferBody')}
-      */}
-      {!isSource && cause.deferHint ? (
-        <p className="mb-1.5 text-[10px] leading-4 text-zinc-500">
-          <span className="text-zinc-400">{t('shiftList.scheduleAdjust.deferDontTouch')}</span>
-          {cause.deferHint}
-        </p>
-      ) : null}
-      {tensionNote ? (
-        <p className="mb-1.5 rounded border border-amber-600/40 bg-amber-950/30 px-2 py-1 text-[10px] leading-4 text-amber-200">
-          {tensionNote}
-        </p>
-      ) : null}
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  );
-}
-
 /**
  * 生成中的骨架。
  *
@@ -548,12 +474,129 @@ function IssueSearchLog({ lines }: { lines: string[] }) {
   );
 }
 
-function IssueGroupCard({
+
+/**
+ * 第 6 步的檢查報告（依設計稿）：頂端色條、安全／品質兩條結論、每一類問題一張可收合的卡。
+ *
+ * 根因（2026-08-10／11 使用者要求：同一件事的警告要收在一起、要講先從哪裡改、
+ * 上下游互相拉扯時要明講）不再用外框分組，改成卡片展開後的一行說明，資訊不丟。
+ * 策略類警告預設不列，底部一行可以展開。
+ */
+function CheckReport({
+  report,
+  plan,
+  sectionCodes,
+  transitionCodes,
+  onIssueClick,
+  onRecheck,
+  checking,
+}: {
+  report: ShiftScheduleFeasibilityReport;
+  plan: GeneratedSchedulePlan | null;
+  sectionCodes?: MaintenanceSectionCodeBySection | null;
+  transitionCodes?: TransitionCardCodes | null;
+  onIssueClick: (issue: FeasibilityIssue) => void;
+  onRecheck: () => void;
+  checking: boolean;
+}) {
+  const { t } = useTranslation();
+  const [showPolicy, setShowPolicy] = useState(false);
+  const acceptance = useMemo(() => evaluateScheduleAcceptance(report), [report]);
+  const groups = useMemo(() => groupFeasibilityIssues(report.errors, report.warnings), [report.errors, report.warnings]);
+  const layerOf = (group: IssueGroupModel) =>
+    resolveIssueDisplayLayerFromIssue({ code: group.code, severity: group.severity, kind: group.issues[0]?.kind });
+  const policyGroups = groups.filter((group) => layerOf(group) === 'policy');
+  const policyCount = policyGroups.reduce((sum, group) => sum + group.issues.length, 0);
+  const shown = groups.filter((group) => showPolicy || layerOf(group) !== 'policy');
+  // 根因：上游先排；畫面上沒有任何上游的就是源頭（先從這裡改）
+  const present = new Set(shown.map((group) => resolveRootCause(group.code).id));
+  const causeNote = (code: string): string | null => {
+    const cause = resolveRootCause(code);
+    if (cause.id === 'other') return null;
+    const upstream = (cause.consequenceOf ?? []).filter((id) => present.has(id));
+    const upstreamTitles = upstream.map((id) => ROOT_CAUSES.find((item) => item.id === id)?.title).filter(Boolean);
+    const lead = `${t('shiftList.scheduleAdjust.rootCauseLabel')}${cause.title}`;
+    if (upstreamTitles.length === 0) return `${lead}（${t('shiftList.scheduleAdjust.fixFromHere')}）：${cause.hint}`;
+    const tension = upstream.includes('fleet') ? ` ${t('shiftList.scheduleAdjust.tugOfWar')}` : '';
+    return `${lead}：${t('shiftList.scheduleAdjust.mostlyConsequence', { titles: upstreamTitles.join('」「') })}。${cause.deferHint ?? cause.hint}${tension}`;
+  };
+  const allPassed = acceptance.gatePassed && acceptance.qualityPassed;
+  const blocking = Math.max(report.errors.length, acceptance.publishBlockingCount);
+
+  return (
+    <div className={`overflow-hidden rounded-xl bg-[#232329] ${allPassed ? 'border-t-2 border-emerald-500' : 'border-t-2 border-red-500'}`}>
+      <div className="flex items-center gap-2 px-5 pb-3 pt-4">
+        <ClipboardList className="size-5 text-zinc-300" aria-hidden />
+        <h3 className="text-base font-medium text-zinc-100">{t('shiftList.scheduleAdjust.checkReport')}</h3>
+        <span className="text-xs text-zinc-500">{formatGeneratedClock(plan?.generatedAt)}</span>
+        <button
+          type="button"
+          onClick={onRecheck}
+          disabled={checking}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 px-3.5 py-1.5 text-sm text-zinc-200 transition hover:border-zinc-400 disabled:opacity-50"
+        >
+          {checking ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+          {t('shiftList.scheduleAdjust.recheck')}
+        </button>
+      </div>
+      <div className="space-y-3 px-5 pb-5">
+        {acceptance.gatePassed ? (
+          <p className="flex items-center gap-2 rounded-lg bg-emerald-500/15 px-4 py-2.5 text-sm text-emerald-300">
+            <Check className="size-4 shrink-0" aria-hidden />
+            {t('shiftList.scheduleAdjust.safetyPassed')}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+            <X className="size-4 shrink-0" aria-hidden />
+            {t('shiftList.scheduleAdjust.safetyFailed', { count: blocking })}
+          </p>
+        )}
+        {acceptance.qualityPassed ? (
+          <p className="flex items-center gap-2 rounded-lg bg-emerald-500/15 px-4 py-2.5 text-sm text-emerald-300">
+            <Check className="size-4 shrink-0" aria-hidden />
+            {t('shiftList.scheduleAdjust.qualityPassed')}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+            <X className="size-4 shrink-0" aria-hidden />
+            {t('shiftList.scheduleAdjust.qualityFailed')}
+          </p>
+        )}
+        {shown.map((group) => (
+          <CheckGroupCard
+            key={group.key}
+            group={group}
+            plan={plan}
+            sectionCodes={sectionCodes}
+            transitionCodes={transitionCodes}
+            defaultExpanded={layerOf(group) === 'hard' || group.issues.length <= 3}
+            causeNote={causeNote(group.code)}
+            onIssueClick={onIssueClick}
+          />
+        ))}
+        {policyCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowPolicy((value) => !value)}
+            className="text-xs text-zinc-500 transition hover:text-zinc-300"
+          >
+            {showPolicy
+              ? t('shiftList.scheduleAdjust.hidePolicyWarnings')
+              : t('shiftList.scheduleAdjust.showPolicyWarnings', { count: policyCount })}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CheckGroupCard({
   group,
   plan,
   sectionCodes,
   transitionCodes,
   defaultExpanded,
+  causeNote,
   onIssueClick,
 }: {
   group: IssueGroupModel;
@@ -561,115 +604,65 @@ function IssueGroupCard({
   sectionCodes?: MaintenanceSectionCodeBySection | null;
   transitionCodes?: TransitionCardCodes | null;
   defaultExpanded: boolean;
+  causeNote: string | null;
   onIssueClick: (issue: FeasibilityIssue) => void;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const sample = group.issues[0]!;
-  const meta = resolveFeasibilityIssueMeta(sample);
-  const shellBase =
-    group.severity === 'error'
-      ? 'border-red-500/30 bg-red-500/10 text-red-300'
-      : meta.kind === 'policy'
-        ? 'border-sky-500/30 bg-sky-500/10 text-sky-100'
-        : meta.kind === 'limit'
-          ? 'border-violet-500/30 bg-violet-500/10 text-violet-100'
-          : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
-  const icon =
-    group.severity === 'error'
-      ? 'text-red-400'
-      : meta.kind === 'policy'
-        ? 'text-sky-300'
-        : meta.kind === 'limit'
-          ? 'text-violet-300'
-          : 'text-amber-400';
-  const jumpHint =
-    group.severity === 'error' ? 'text-red-400/90' : meta.kind === 'policy'
-      ? 'text-sky-300/90'
-      : meta.kind === 'limit'
-        ? 'text-violet-300/90'
-        : 'text-amber-400/90';
-
+  const meta = resolveFeasibilityIssueMeta(group.issues[0]!);
+  const isError = group.severity === 'error';
   return (
-    <div className={`rounded-lg border ${shellBase}`}>
+    <div className={`rounded-xl border ${isError ? 'border-red-500/60' : 'border-amber-500/50'} bg-[#26262b]`}>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition hover:bg-white/[0.03]"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
         aria-expanded={expanded}
       >
-        <AlertCircle className={`mt-0.5 size-4 shrink-0 ${icon}`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${kindBadgeClass(meta.kind, group.severity)}`}
-            >
-              {meta.kindLabel}
-            </span>
-            <span className="text-sm font-medium text-zinc-100">{meta.groupTitle}</span>
-            <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
-              {t('shiftList.scheduleAdjust.issueCount', { count: group.issues.length })}
-            </span>
-        </div>
-          {!expanded ? (
-            <div className="mt-1 truncate text-[11px] opacity-70">
-              {group.issues
-                .slice(0, 3)
-                .map((issue) => resolveFeasibilityIssueTripCode(issue, plan, sectionCodes, transitionCodes))
-                .join(' · ')}
-              {group.issues.length > 3 ? t('shiftList.scheduleAdjust.moreIssues', { count: group.issues.length - 3 }) : ''}
-            </div>
-          ) : null}
-        </div>
-        {expanded ? (
-          <ChevronDown className="mt-0.5 size-4 shrink-0 opacity-70" />
-        ) : (
-          <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-70" />
-        )}
+        <Info className={`size-5 shrink-0 ${isError ? 'text-red-400' : 'text-amber-400'}`} aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-base text-zinc-100">{meta.groupTitle}</span>
+        <span className={`shrink-0 rounded-md px-2.5 py-1 text-sm ${isError ? 'bg-red-500/20 text-red-300' : 'bg-amber-900/50 text-amber-200'}`}>
+          {isError ? t('shiftList.scheduleAdjust.blocksPublish') : t('shiftList.scheduleAdjust.unresolved')}
+        </span>
+        <span className="shrink-0 text-sm tabular-nums text-zinc-400">
+          {t('shiftList.scheduleAdjust.itemCount', { count: group.issues.length })}
+        </span>
+        <ChevronDown className={`size-5 shrink-0 text-zinc-400 transition ${expanded ? 'rotate-180' : ''}`} aria-hidden />
       </button>
-
       {expanded ? (
-        <div className="space-y-2 border-t border-white/10 px-3 py-2">
-          <p className="text-[11px] leading-relaxed opacity-80">{meta.guidance}</p>
-          <ul className="space-y-1.5">
+        <div className="space-y-1 px-5 pb-4">
+          {causeNote || meta.guidance ? (
+            <p className="pb-2 text-xs leading-relaxed text-zinc-500">
+              {[meta.guidance, causeNote].filter(Boolean).join(' ')}
+            </p>
+          ) : null}
+          <ul className="space-y-1">
             {group.issues.map((issue, index) => {
               const tripCode = resolveFeasibilityIssueTripCode(issue, plan, sectionCodes, transitionCodes);
-              const jumpable =
-                plan != null && resolveFeasibilityIssueJumpBlockId(issue, plan) != null;
-              const rowKey = `${group.key}-${index}-${tripCode}-${issue.message}`;
+              const jumpable = plan != null && resolveFeasibilityIssueJumpBlockId(issue, plan) != null;
               const searchLog = issueSearchLog(issue);
-              if (jumpable) {
-                return (
-                  <li key={rowKey} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => onIssueClick(issue)}
-                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-left transition hover:border-white/25 hover:bg-black/30"
-                    >
-                      <span className="shrink-0 rounded border border-white/15 bg-black/30 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-zinc-100">
-                        {tripCode}
-                      </span>
-                      <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
-                        {issue.message}
-                      </span>
-                      <span className={`shrink-0 text-[10px] ${jumpHint}`}>{t('shiftList.scheduleAdjust.jump')}</span>
-                    </button>
-                    <IssueSearchLog lines={searchLog} />
-                  </li>
-                );
-              }
               return (
-                <li
-                  key={rowKey}
-                  className="flex items-start gap-2 rounded-md border border-white/10 bg-black/20 px-2.5 py-2"
-                >
-                  <span className="shrink-0 rounded border border-white/15 bg-black/30 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-zinc-100">
-                    {tripCode}
-                  </span>
-                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">
-                    {issue.message}
-                    <IssueSearchLog lines={searchLog} />
-                  </span>
+                <li key={`${group.key}-${index}-${issue.message}`}>
+                  <div className="flex items-start gap-4 py-2">
+                    <span className="mt-0.5 inline-flex min-w-[6.5rem] shrink-0 justify-center rounded-lg border border-[#2B7FFF]/80 px-2.5 py-1 font-mono text-sm tabular-nums text-[#5a9aff]">
+                      {tripCode === '----' ? '--' : tripCode}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm leading-6 text-zinc-200">{issue.message}</span>
+                    {jumpable ? (
+                      <button
+                        type="button"
+                        onClick={() => onIssueClick(issue)}
+                        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-zinc-100"
+                        title={t('shiftList.scheduleAdjust.jump')}
+                        aria-label={`${t('shiftList.scheduleAdjust.jump')} ${tripCode}`}
+                      >
+                        <ArrowRight className="size-4" aria-hidden />
+                      </button>
+                    ) : (
+                      <span className="size-7 shrink-0" aria-hidden />
+                    )}
+                  </div>
+                  <IssueSearchLog lines={searchLog} />
                 </li>
               );
             })}
@@ -679,214 +672,6 @@ function IssueGroupCard({
     </div>
   );
 }
-
-function FeasibilityMessages({
-  report,
-  plan,
-  sectionCodes,
-  transitionCodes,
-  onIssueClick,
-}: {
-  report: ShiftScheduleFeasibilityReport;
-  plan: GeneratedSchedulePlan | null;
-  sectionCodes?: MaintenanceSectionCodeBySection | null;
-  transitionCodes?: TransitionCardCodes | null;
-  onIssueClick: (issue: FeasibilityIssue) => void;
-}) {
-  const { t } = useTranslation();
-  const [viewMode, setViewMode] = useState<'all' | 'hard' | 'hidePolicy'>('hidePolicy');
-
-  const acceptance = useMemo(() => evaluateScheduleAcceptance(report), [report]);
-
-  const groups = useMemo(
-    () => groupFeasibilityIssues(report.errors, report.warnings),
-    [report.errors, report.warnings],
-  );
-
-  const errorCount = report.errors.length;
-  const warningCount = report.warnings.length;
-  const visibleGroups = groups.filter((g) => {
-    if (viewMode === 'hard') return resolveIssueDisplayLayerFromIssue({ code: g.code, severity: g.severity, kind: g.issues[0]?.kind }) === 'hard';
-    if (viewMode === 'hidePolicy') {
-      const layer = resolveIssueDisplayLayerFromIssue({
-        code: g.code,
-        severity: g.severity,
-        kind: g.issues[0]?.kind,
-      });
-      return layer !== 'policy';
-    }
-    return true;
-  });
-
-  if (groups.length === 0) return null;
-  const unresolvedCount = Math.max(errorCount, acceptance.publishBlockingCount);
-
-  return (
-    <div className="mb-4 space-y-2">
-      <div className="mb-2 space-y-1.5 px-1">
-        {/* 計算已經結束：講清楚是「算完了、還有問題」，不是還在算 */}
-        <div className="text-[11px] text-zinc-400" role="status">
-          {acceptance.gatePassed
-            ? t('shiftList.scheduleAdjust.calcDonePassed', { time: formatGeneratedClock(plan?.generatedAt) })
-            : t('shiftList.scheduleAdjust.calcDoneWithIssues', {
-              count: unresolvedCount,
-              time: formatGeneratedClock(plan?.generatedAt),
-            })}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {!acceptance.gatePassed ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-400 ring-1 ring-red-500/30">
-              <AlertCircle className="size-3 shrink-0" />
-              {t('shiftList.scheduleAdjust.hardErrors', { count: Math.max(errorCount, acceptance.publishBlockingCount) })}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-500/25">
-              {t('shiftList.scheduleAdjust.hardPass')}
-            </span>
-          )}
-          {acceptance.qualityPassed ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300/90 ring-1 ring-emerald-500/20">
-              {t('shiftList.scheduleAdjust.qualityPass')}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300 ring-1 ring-amber-500/25">
-              {t('shiftList.scheduleAdjust.qualityFail')}
-            </span>
-          )}
-          {warningCount > 0 && (
-            <span className="text-[11px] text-zinc-500">
-              {t('shiftList.scheduleAdjust.warnings', { count: warningCount })}
-              {acceptance.policyNoiseCount > 0
-                ? t('shiftList.scheduleAdjust.policyNoise', { count: acceptance.policyNoiseCount })
-                : ''}
-            </span>
-          )}
-          <div className="flex-1" />
-          <div className="inline-flex rounded-full bg-zinc-900/80 p-0.5 ring-1 ring-zinc-700/80">
-            {(
-              [
-                ['hidePolicy', t('shiftList.scheduleAdjust.filterHidePolicy')],
-                ['hard', t('shiftList.scheduleAdjust.filterHard')],
-                ['all', t('shiftList.scheduleAdjust.filterAll')],
-              ] as const
-            ).map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setViewMode(mode)}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
-                  viewMode === mode
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {mode === 'hidePolicy' ? <Filter className="size-3 shrink-0" /> : null}
-                {label}
-              </button>
-      ))}
-    </div>
-        </div>
-        <p className="text-[10px] leading-4 text-zinc-500">
-          {t('shiftList.scheduleAdjust.gateHint')}
-        </p>
-      </div>
-      {/*
-        先照根因收攏，再放原本的 code 分組卡。visibleGroups 已經排好序
-        （硬錯誤 → 極限 → 可調 → 策略），這裡照它第一次出現的順序決定根因順序，
-        所以最嚴重的根因仍然排在最前面。
-      */}
-      {[...ROOT_CAUSES, OTHER_ROOT_CAUSE]
-        .map((cause) => ({
-          cause,
-          groups: visibleGroups.filter((group) => resolveRootCause(group.code) === cause),
-        }))
-        .filter((entry) => entry.groups.length > 0)
-        /*
-          上游一定要排在下游前面。
-          原本只照嚴重度排（visibleGroups 的順序），而下游的症狀往往比上游更嚴重
-          ——站位碰撞是硬錯誤、車不夠只是警告——於是「從這裡改」會出現在畫面下方，
-          使用者照順序看，第一眼看到的正好是最不該先動的那一項。
-          先照因果深度排，同深度才回頭照嚴重度。
-        */
-        .sort((a, b) => {
-          const depthOf = (
-            cause: RootCauseDefinition,
-            present: Set<string>,
-            seen: Set<string> = new Set(),
-          ): number => {
-            if (seen.has(cause.id)) return 0;
-            seen.add(cause.id);
-            const upstream = (cause.consequenceOf ?? [])
-              .filter((id) => present.has(id))
-              .map((id) => ROOT_CAUSES.find((item) => item.id === id))
-              .filter((item): item is RootCauseDefinition => Boolean(item));
-            if (upstream.length === 0) return 0;
-            return 1 + Math.max(...upstream.map((item) => depthOf(item, present, seen)));
-          };
-          const present = new Set(
-            [...ROOT_CAUSES, OTHER_ROOT_CAUSE]
-              .filter((cause) =>
-                visibleGroups.some((group) => resolveRootCause(group.code) === cause))
-              .map((cause) => cause.id),
-          );
-          const depthDiff = depthOf(a.cause, present) - depthOf(b.cause, present);
-          if (depthDiff !== 0) return depthDiff;
-          return visibleGroups.indexOf(a.groups[0]!) - visibleGroups.indexOf(b.groups[0]!);
-        })
-        .map(({ cause, groups }, _index, entries) => {
-          /**
-           * 只列<strong>畫面上真的有</strong>的上游。因果圖是靜態的，但這一次生成
-           * 未必每個節點都出問題——標一個沒出現的上游只會讓人去找不存在的東西。
-           */
-          const upstreams = (cause.consequenceOf ?? [])
-            .map((id) => entries.find((entry) => entry.cause.id === id)?.cause)
-            .filter((item): item is RootCauseDefinition => Boolean(item));
-          /**
-           * 「車不夠」與下游同時出現＝互相拉扯：加車讓站位與設施更擠、減車讓班距更差。
-           * 照單項建議改會在兩者之間來回，永遠改不動（使用者原話：「多車不是、少車也
-           * 不是……這樣會進入死迴圈改不動」）。這時必須明講，並指出<strong>不衝突</strong>
-           * 的第三個方向。
-           */
-          const tensionNote = upstreams.some((item) => item.id === 'fleet')
-            ? t('shiftList.scheduleAdjust.tugOfWar')
-            : undefined;
-          return (
-          <RootCauseSection
-            key={cause.id}
-            cause={cause}
-            issueCount={groups.reduce((sum, group) => sum + group.issues.length, 0)}
-            upstreamTitles={upstreams.map((item) => item.title)}
-            /** 沒有任何上游在畫面上＝它就是源頭，動這裡才有槓桿 */
-            isSource={upstreams.length === 0}
-            tensionNote={tensionNote}
-          >
-            {groups.map((group) => {
-              const layer = resolveIssueDisplayLayerFromIssue({
-                code: group.code,
-                severity: group.severity,
-                kind: group.issues[0]?.kind,
-              });
-              return (
-                <IssueGroupCard
-                  key={group.key}
-                  group={group}
-                  plan={plan}
-                  sectionCodes={sectionCodes}
-                  transitionCodes={transitionCodes}
-                  defaultExpanded={
-                    layer === 'hard' || (layer !== 'policy' && group.issues.length === 1)
-                  }
-                  onIssueClick={onIssueClick}
-                />
-              );
-            })}
-          </RootCauseSection>
-          );
-        })}
-    </div>
-  );
-}
-
 
 
 function revalidatePlan(
@@ -1007,7 +792,6 @@ export function StepShiftScheduleAdjust({
   const [gridZoom, setGridZoom] = useState(1);
   const [activeTab, setActiveTab] = useState<AdjustTab>('schedule');
   const [vehicleCapacity, setVehicleCapacity] = useState(50);
-  const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1055,18 +839,6 @@ export function StepShiftScheduleAdjust({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isManual]);
-
-  // 重生成確認 modal：Enter 預設取消（不會誤重算）
-  useEffect(() => {
-    if (!showRebuildConfirm) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Enter') {
-        setShowRebuildConfirm(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [showRebuildConfirm]);
 
   useEffect(() => {
     if (!duplicateWarning) return;
@@ -1183,7 +955,7 @@ export function StepShiftScheduleAdjust({
         if (!cancelled) {
           setError(
             e instanceof ScheduleEngineCancelledError
-              ? '已取消生成。設定沒有改變；按「重新生成」可以再跑一次。'
+              ? '已取消生成。設定沒有改變；回到上一步再進來就會重新生成。'
               : e instanceof Error ? e.message : String(e),
           );
           setPlan(null);
@@ -1250,62 +1022,6 @@ export function StepShiftScheduleAdjust({
       );
     }
   };
-
-  const performRebuild = async () => {
-    const snapshotHistory = history;
-    const snapshotIndex = historyIndex;
-
-    setLoading(true);
-    setError(null);
-    const controller = startGeneration();
-    try {
-      const storedOutput = await buildShiftScheduleStoredOutput(draft, {
-        shiftId,
-        signal: controller.signal,
-        onProgress: (progress) => { if (generationAbortRef.current === controller) setGenerationProgress(progress); },
-      });
-      // 期間又開始了更新的一次：這個結果已過期，丟掉
-      if (generationAbortRef.current !== controller) return;
-
-      if (!storedOutput.plan) {
-        throw new Error(describeGenerationFailure(i18n.t('shiftList.scheduleAdjust.regenFailed'), storedOutput.feasibilityReport));
-      }
-
-      const newEntry: PlanAdjustHistoryEntry = {
-        plan: storedOutput.plan,
-        feasibilityReport: storedOutput.feasibilityReport,
-      };
-
-      // 重新生成視為「新增一個版本」：讓 Undo 可以回到重生成前。
-      const nextHistory = snapshotHistory.slice(0, snapshotIndex + 1);
-      nextHistory.push(newEntry);
-      const nextIndex = nextHistory.length - 1;
-
-      setHistory(nextHistory);
-      setHistoryIndex(nextIndex);
-      setPlan(newEntry.plan);
-      setReport(newEntry.feasibilityReport);
-      setSelectedBlockId(null);
-
-      void onScheduleOutputReady(
-        applyHistoryToOutput(storedOutput, nextHistory, nextIndex),
-        { flush: true },
-      );
-    } catch (e) {
-      if (generationAbortRef.current !== controller && !(e instanceof ScheduleEngineCancelledError)) return;
-      setError(
-        e instanceof ScheduleEngineCancelledError
-          ? '已取消重新生成，畫面保留原本的班表。'
-          : e instanceof Error ? e.message : String(e),
-      );
-    } finally {
-      if (generationAbortRef.current === controller) setLoading(false);
-    }
-  };
-
-  const requestRebuild = () => setShowRebuildConfirm(true);
-
-
 
   const handleDeleteBlock = (blockId?: string) => {
     const targetId = blockId ?? selectedBlockId;
@@ -1695,7 +1411,7 @@ export function StepShiftScheduleAdjust({
 
   const renderToolbar = () => {
   return (
-      <div className="flex shrink-0 select-none items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-2 py-1">
+      <div className="ml-auto flex shrink-0 select-none items-center gap-1.5">
         <button
           type="button"
           disabled={!selectedBlockId}
@@ -1726,7 +1442,7 @@ export function StepShiftScheduleAdjust({
           </button>
         ) : null}
 
-        <div className="h-4 w-px bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-700" />
 
         <button
           type="button"
@@ -1756,28 +1472,7 @@ export function StepShiftScheduleAdjust({
           <Redo className="size-4" />
         </button>
 
-        {!isManual ? (
-          <>
-            <div className="h-4 w-px bg-zinc-800" />
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => {
-                requestRebuild();
-              }}
-              className={`rounded p-1.5 transition ${
-                loading
-                  ? 'cursor-not-allowed text-zinc-600 opacity-40'
-                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-              }`}
-              title={t('shiftList.scheduleAdjust.regenerate')}
-            >
-              <RefreshCw className="size-4" />
-            </button>
-          </>
-        ) : null}
-
-        <div className="h-4 w-px bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-700" />
 
         <button
           type="button"
@@ -1825,11 +1520,11 @@ export function StepShiftScheduleAdjust({
           <ClipboardList className="size-4" />
         </button>
 
-        <div className="h-4 w-px bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-700" />
 
         <ScheduleTimeZoomToolbar zoom={gridZoom} onChange={setGridZoom} />
 
-        <div className="h-4 w-px bg-zinc-800" />
+        <div className="h-4 w-px bg-zinc-700" />
 
         <button
           type="button"
@@ -1844,71 +1539,12 @@ export function StepShiftScheduleAdjust({
   };
 
   return (
-    <div className={isMaximized ? "fixed inset-0 z-50 bg-[#0c1017] p-6 flex flex-col overflow-y-auto" : "flex min-h-0 flex-1 flex-col"}>
+    <div className={isMaximized ? "fixed inset-0 z-50 bg-[#1b1b1f] p-6 flex flex-col overflow-hidden" : "flex min-h-0 flex-1 flex-col"}>
       {error && plan ? (
         <div className="mb-3 max-h-60 shrink-0 overflow-y-auto whitespace-pre-line rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm leading-relaxed text-amber-200">
           {error}
         </div>
       ) : null}
-      {showRebuildConfirm && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
-          onClick={() => setShowRebuildConfirm(false)}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rebuild-schedule-title"
-            className="w-full max-w-[520px] rounded-2xl bg-[#222225] px-8 py-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <h2
-                id="rebuild-schedule-title"
-                className="text-lg font-semibold leading-7 text-[#F3F4F6]"
-              >
-                {t('shiftList.scheduleAdjust.confirmRegenTitle')}
-      </h2>
-              <button
-                type="button"
-                onClick={() => setShowRebuildConfirm(false)}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-                aria-label={t('shiftList.scheduleAdjust.close')}
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-zinc-400">
-              {t('shiftList.scheduleAdjust.confirmRegenBody')}
-            </p>
-
-            <div className="mt-8 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowRebuildConfirm(false)}
-                autoFocus
-                className="inline-flex h-[38px] items-center justify-center rounded-lg px-5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
-              >
-                {t('shiftList.scheduleAdjust.cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={async () => {
-                  setShowRebuildConfirm(false);
-                  await performRebuild();
-                }}
-                className="inline-flex h-[38px] items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:opacity-50"
-              >
-                {t('shiftList.scheduleAdjust.confirmRegen')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {duplicateWarning ? (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
@@ -1947,8 +1583,14 @@ export function StepShiftScheduleAdjust({
           </div>
         </div>
       ) : null}
-      <div className="mb-3 flex shrink-0 items-center gap-4">
-        <div className="flex shrink-0 items-center gap-5 border-b border-zinc-800/80">
+      {!isMaximized ? (
+        <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
+          {isManual ? '編排班表細節' : '調整自動生成的班表細節'}
+        </h2>
+      ) : null}
+      <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-[#2B7FFF]/60 bg-[#232329] p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-4">
+        <div className="flex shrink-0 items-center gap-5">
           <button
             type="button"
             onClick={() => setActiveTab('schedule')}
@@ -1979,9 +1621,13 @@ export function StepShiftScheduleAdjust({
           </button>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {periodLegends.map((item) => (
-            <AttributeLegendBadgeChip key={item.attributeId} item={item} />
+            <AttributeLegendBadgeChip
+              key={item.attributeId}
+              item={item}
+              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm"
+            />
           ))}
           {renderToolbar()}
         </div>
@@ -2033,6 +1679,7 @@ export function StepShiftScheduleAdjust({
                   onDeleteBlock={isManual ? handleDeleteBlock : undefined}
                   onDuplicateBlock={isManual ? handleDuplicateBlock : undefined}
                   zoom={gridZoom}
+                  appearance="wizard"
         />
       ) : (
                 <PanelNoData message={t('shiftList.scheduleAdjust.cannotGenerate')} className="min-h-[240px]" />
@@ -2049,37 +1696,6 @@ export function StepShiftScheduleAdjust({
               />
             ) : null}
           </div>
-
-          {cardCodeCheck.lines.length > 0 ? (
-            <div
-              className="shrink-0 rounded-xl border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-200"
-              data-card-code-issues={cardCodeCheck.lines.length}
-            >
-              <div className="mb-1 font-semibold text-red-300">
-                班次代號檢查未通過（禁止發布／採用；草稿可保存）：請調整代號或計畫安排
-              </div>
-              <ul className="list-disc space-y-0.5 pl-4">
-                {cardCodeCheck.lines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {report && !isManual ? (
-            <div className="max-h-[300px] shrink-0 overflow-y-auto rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-2">
-              <div className="mb-2 px-1 text-xs font-semibold text-zinc-400">
-                {t('shiftList.scheduleAdjust.feasibilityReport')}
-              </div>
-              <FeasibilityMessages
-                report={report}
-                plan={plan}
-                sectionCodes={draft.maintenanceTask.sectionCodeBySection}
-                transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
-                onIssueClick={handleIssueClick}
-              />
-            </div>
-          ) : null}
         </div>
 
         {activeTab === 'capacity' ? (
@@ -2097,6 +1713,37 @@ export function StepShiftScheduleAdjust({
             <PanelNoData message={t('shiftList.scheduleAdjust.cannotCapacity')} className="min-h-[240px]" />
           )
         ) : null}
+      </div>
+      </div>
+
+      <div className={`mt-4 flex shrink-0 flex-col gap-4 ${activeTab === 'schedule' && !isMaximized ? '' : 'hidden'}`}>
+          {cardCodeCheck.lines.length > 0 ? (
+            <div
+              className="shrink-0 rounded-xl border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-200"
+              data-card-code-issues={cardCodeCheck.lines.length}
+            >
+              <div className="mb-1 font-semibold text-red-300">
+                班次代號檢查未通過（禁止發布／採用；草稿可保存）：請調整代號或計畫安排
+              </div>
+              <ul className="list-disc space-y-0.5 pl-4">
+                {cardCodeCheck.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {report && !isManual ? (
+            <CheckReport
+              report={report}
+              plan={plan}
+              sectionCodes={draft.maintenanceTask.sectionCodeBySection}
+              transitionCodes={draft.routeGroups.transitionCardCodes ?? null}
+              onIssueClick={handleIssueClick}
+              onRecheck={() => void handleRunPublishCheck()}
+              checking={checkingPublish}
+            />
+          ) : null}
       </div>
     </div>
   );

@@ -197,6 +197,11 @@ export type GeneratedScheduleBlock = {
    * 所以哪一側先解出來，另一側就要沿用同一台，不能各自獨立再挑一次。
    */
   yardFacilityNodeId?: string;
+  /**
+   * 整備任務區塊本身：停留設施所屬的場區（分區入口 id）。場區內的格位由車在區內自己
+   * 移動，前後兩台車交接同一格只要求不重疊，不另外要求隔兩倍碰撞保護。
+   */
+  yardZoneId?: string;
   /** 整備任務區塊本身：實際停留設施的顯示名／代號（例 M2） */
   yardFacilityLabel?: string;
   /**
@@ -283,6 +288,8 @@ export type FeasibilityViolationCode =
    * 2 × 碰撞保護（警告、擋發布）。
    */
   | 'MOVE_JUNCTION_CONFLICT'
+  | 'MOVE_PATH_CONFLICT'
+  | 'MOVE_PATH_SHIFTED'
   /**
    * 整備設施不足：這一段整備的<strong>整段時間內，該類設施沒有任何一台是空的</strong>
    * ——車沒地方停。這跟轉場卡排不出來（路徑問題）是兩回事，處置也不同：

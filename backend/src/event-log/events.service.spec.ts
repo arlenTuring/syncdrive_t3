@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { EventsService } from './events.service';
 
-describe('EventsService 事件管理集合與確認緣由', () => {
+describe('EventsService 即時事件清單與回報內容', () => {
   const service = new EventsService({ query: jest.fn(), transaction: jest.fn() } as never, {} as never);
   const actor = { id: 'u1', display_name: '測試員', roles: [], permissions: [] };
 
@@ -12,34 +12,58 @@ describe('EventsService 事件管理集合與確認緣由', () => {
     [' \n ', '請填寫'],
     [[], '必須是文字'],
     [{}, '必須是文字'],
-    ['x'.repeat(501), '最多 500 字'],
-  ])('在寫入前拒絕無效確認緣由 %#', async (note, message) => {
+    ['x'.repeat(51), '最多 50 字'],
+  ])('在寫入前拒絕無效回報內容 %#', async (note, message) => {
     await expect(service.acknowledge('1', note, actor, {})).rejects.toThrow(message);
   });
 
-  it('live bucket 為必填且只接受 pending／confirmed', async () => {
-    await expect(service.live({})).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.live({ bucket: 'recent' })).rejects.toThrow('事件集合');
+  it('live 拒絕不支援的條件與排序', async () => {
+    await expect(service.live({ bucket: 'pending' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.live({ sortBy: 'vehicle_code' })).rejects.toThrow('排序欄位');
   });
 
-  it('live 以兩個部分索引條件取得精確計數，並保留歷史確認時間為空的資料', async () => {
+  it('live 不加條件時用兩個部分索引計數當總數，預設發生時間新到舊', async () => {
     const dataSource = {
       query: jest.fn((sql: string) => {
-        if (sql.includes('AS rank')) return Promise.resolve([]);
-        if (sql.includes('SELECT count(*)::int')) return Promise.resolve([{ pending: 11, confirmed: 4, max_id: '15', max_ack: '0' }]);
+        if (sql.includes('ORDER BY')) return Promise.resolve([]);
+        if (sql.includes('AS pending')) return Promise.resolve([{ pending: 11, confirmed: 4 }]);
         throw new Error(`未預期 SQL: ${sql}`);
       }),
     };
     const target = new EventsService(dataSource as never, {} as never);
     jest.spyOn(target, 'timeZone').mockResolvedValue('Asia/Taipei');
 
-    await expect(target.live({ bucket: 'confirmed', limit: '20' })).resolves.toMatchObject({
-      items: [], total: 4, pendingTotal: 11, confirmedTotal: 4, timeZone: 'Asia/Taipei',
+    await expect(target.live({ page: '2' })).resolves.toMatchObject({
+      items: [], total: 15, page: 2, pageSize: 10, pendingTotal: 11, confirmedTotal: 4, timeZone: 'Asia/Taipei',
     });
-    const countsSql = dataSource.query.mock.calls.map(([sql]) => sql).find((sql) => sql.includes('SELECT count(*)::int')) as string;
-    expect(countsSql).toContain('WHERE is_acknowledged = false');
-    expect(countsSql).toContain('WHERE is_acknowledged = true');
-    expect(countsSql).not.toContain('FILTER (WHERE');
+    const sqls = dataSource.query.mock.calls.map(([sql]) => sql as string);
+    const rows = sqls.find((sql) => sql.includes('ORDER BY'))!;
+    expect(rows).toContain('ORDER BY e.created_at DESC, e.id DESC LIMIT 10 OFFSET 10');
+    const counts = sqls.find((sql) => sql.includes('AS pending'))!;
+    expect(counts).toContain('WHERE is_acknowledged = false');
+    expect(counts).toContain('WHERE is_acknowledged = true');
+    expect(sqls.some((sql) => sql.includes('AS total'))).toBe(false);
+  });
+
+  it('live 關鍵字比對車號、代碼、摘要、事件編號與類型名稱，條件下另算總數', async () => {
+    const dataSource = {
+      query: jest.fn((sql: string) => {
+        if (sql.includes('AS total')) return Promise.resolve([{ total: 3 }]);
+        if (sql.includes('ORDER BY')) return Promise.resolve([]);
+        return Promise.resolve([{ pending: 11, confirmed: 4 }]);
+      }),
+    };
+    const types = { byCode: jest.fn().mockResolvedValue(new Map([['PATH_BLOCKED', { code: 'PATH_BLOCKED', name: '路徑受阻', severity: 'CRITICAL', sopText: null, sopUrl: null }]])) };
+    const target = new EventsService(dataSource as never, {} as never, types as never);
+    jest.spyOn(target, 'timeZone').mockResolvedValue('Asia/Taipei');
+
+    await expect(target.live({ keyword: '受阻', vehicleCode: 'PMS01', sortBy: 'status', direction: 'asc' })).resolves.toMatchObject({ total: 3 });
+    const [sql, params] = dataSource.query.mock.calls.find(([text]) => (text as string).includes('ORDER BY'))! as [string, unknown[]];
+    expect(sql).toContain('e.vehicle_code = $1');
+    expect(sql).toContain('e.display_message ILIKE $2');
+    expect(sql).toContain('upper(e.event_code::text) = ANY($3::text[])');
+    expect(sql).toContain('ORDER BY e.is_acknowledged ASC, e.created_at DESC');
+    expect(params).toEqual(['PMS01', '%受阻%', ['PATH_BLOCKED']]);
   });
 
   it('事件 ID 精確查詢不需要也不套用時間區間，並以 bigint 字串完整查詢', async () => {
@@ -80,8 +104,8 @@ describe('EventsService 事件管理集合與確認緣由', () => {
 
   it.each([
     ['  已聯絡現場\nEngineer confirmed  ', '已聯絡現場\nEngineer confirmed'],
-    [` ${'界'.repeat(500)} `, '界'.repeat(500)],
-  ])('合法中英、換行與 500 字邊界完整保存 %#', async (input, saved) => {
+    [` ${'界'.repeat(50)} `, '界'.repeat(50)],
+  ])('合法中英、換行與 50 字邊界完整保存 %#', async (input, saved) => {
     const manager = { query: jest.fn().mockResolvedValue([{ id: '1' }]) };
     const audit = { record: jest.fn().mockResolvedValue(undefined) };
     const dataSource = { transaction: jest.fn((work: (value: typeof manager) => unknown) => work(manager)) };

@@ -100,6 +100,9 @@ export function ShellAccountToolbar({
           </span>
           <ChevronDown className="size-3.5 text-zinc-500" />
         </button>
+        {/* 沒有系統基礎模組權限的帳號（例如廠商）看不到齒輪，不是點了才說權限不足 */}
+        {auth.can('system.health.view') ? (
+        <>
         <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
         <button
           type="button"
@@ -113,6 +116,8 @@ export function ShellAccountToolbar({
         >
           <Settings className="size-4" />
         </button>
+        </>
+        ) : null}
 
         {settingsOpen && auth.user ? (
           <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50">

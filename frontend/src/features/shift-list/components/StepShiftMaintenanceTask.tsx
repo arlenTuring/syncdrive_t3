@@ -1,5 +1,5 @@
 import { SiteSelect } from '../../../components/SiteSelect';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Lightbulb, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { fetchMaintenanceTaskDetail, fetchMaintenanceTaskList } from '../../maintenance-tasks/api/maintenanceTasksApi';
 import { MaintenanceTaskPreviewContent } from '../../maintenance-tasks/components/MaintenanceTaskPreviewContent';
@@ -24,15 +24,24 @@ import {
   sanitizeMaintenanceSectionCodeInput,
   type MaintenanceSectionCodeKey,
 } from '../utils/maintenanceSectionCode';
-import { MainlineSlackSecondsField } from './MainlineSlackSecondsField';
+import { sanitizeIntegerInput } from '../../maintenance-tasks/utils/numericInput';
 import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
 import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
 
+/** 設計稿：無外框、灰藍底 */
 const SELECT_CLASS =
-  'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
 
 const CODE_INPUT_CLASS =
-  'h-[42px] w-24 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm uppercase tracking-wider text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm uppercase tracking-wider text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+
+const SECTION_TITLE: Record<MaintenanceSectionCodeKey, string> = {
+  charging: '充電任務',
+  carWash: '洗車任務',
+  maintenance: '保養任務',
+  preTrip: '行檢任務',
+  mobile: '待命任務',
+};
 
 type StepShiftMaintenanceTaskProps = {
   draft: ShiftScheduleMaintenanceTaskDraft;
@@ -220,26 +229,28 @@ export function StepShiftMaintenanceTask({
   };
 
   const cardLabelField = (key: MaintenanceSectionCodeKey) => (
-    <label className="block">
-      <span className="mb-2 block text-sm text-zinc-300">班次卡標籤</span>
-      <input
-        type="text"
-        value={sectionCardLabelBySection[key]}
-        onChange={(e) => patchCardLabel(key, e.target.value)}
-        placeholder="儀表板顯示文字"
-        maxLength={12}
-        className={SELECT_CLASS}
-      />
-      <p className="mt-1.5 text-xs text-zinc-500">顯示在即時數據儀表板的班次卡左上角。</p>
-    </label>
+    <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
+      <label className="block">
+        <span className="mb-2 block px-1 text-sm text-zinc-300">班次卡標籤</span>
+        <input
+          type="text"
+          value={sectionCardLabelBySection[key]}
+          onChange={(e) => patchCardLabel(key, e.target.value)}
+          placeholder="儀表板顯示文字"
+          maxLength={12}
+          className={SELECT_CLASS}
+        />
+      </label>
+      <p className="self-end pb-2.5 text-xs text-zinc-400">顯示在即時數據儀表板的班次卡左上角。</p>
+    </div>
   );
 
   const sectionCodeField = (key: MaintenanceSectionCodeKey) => {
     const issue = codeIssueByKey.get(key);
     return (
-      <div className="space-y-1.5">
+      <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
+          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
             <span className="text-red-500">*</span>
             整備代號
           </span>
@@ -253,22 +264,44 @@ export function StepShiftMaintenanceTask({
             autoComplete="off"
             spellCheck={false}
           />
+          <span className="mt-1.5 block px-1 text-xs text-zinc-500">最長 2 字元，僅限英文字母</span>
+          {issue ? <span className="mt-1 block px-1 text-xs text-red-400">{issue}</span> : null}
         </label>
-        <p className="text-xs text-zinc-500">
-          1–2 個大寫英文字母；班次代號＝整備代號＋列碼（A/B/C…）＋開始時刻
+        <p className="flex items-center gap-1.5 self-start pt-[2.1rem] text-xs text-zinc-400">
+          <Lightbulb className="size-3.5 shrink-0" aria-hidden />
+          預覽班次代號 {'{整備代號}{列碼}{開始時刻}'}
         </p>
-        {issue ? <p className="text-xs text-red-400">{issue}</p> : null}
       </div>
     );
   };
 
   const slackField = (key: MaintenanceEntrySlackSectionKey) => (
-    <MainlineSlackSecondsField
-      label="正線優先讓渡餘裕"
-      value={entrySlackBySection[key]}
-      onChange={(value) => patchEntrySlack(key, value)}
-      prefixText="正線可壓縮整備開頭，最多"
-    />
+    <div>
+      <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
+        <span className="text-red-500">*</span>
+        正線優先讓渡餘裕
+      </span>
+      <div className="grid items-center gap-x-6 gap-y-2 md:grid-cols-2">
+        <label className="flex items-center gap-3 text-sm text-zinc-300">
+          <span className="shrink-0">正線可壓縮整備開頭，最多</span>
+          <span className="relative min-w-0 flex-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={entrySlackBySection[key]}
+              onChange={(e) => patchEntrySlack(key, sanitizeIntegerInput(e.target.value))}
+              aria-label={`${SECTION_TITLE[key]}正線可壓縮整備開頭秒數`}
+              className={`${SELECT_CLASS} pr-10`}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+          </span>
+        </label>
+        <p className="flex items-center gap-1.5 text-xs text-amber-300">
+          <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+          超出此秒數上限時，系統將判定衝突不予排班
+        </p>
+      </div>
+    </div>
   );
 
   const sectionExtras = {
@@ -311,12 +344,12 @@ export function StepShiftMaintenanceTask({
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
-      <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
-        <h2 className="text-base font-medium text-zinc-100">選擇要套用的整備計畫</h2>
+      <div className="mb-5 flex shrink-0 flex-wrap items-center justify-between gap-4">
+        <h2 className="text-lg font-medium text-zinc-100">選擇要套用的整備計畫</h2>
       </div>
 
-      <label className="block max-w-xl shrink-0">
-        <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
+      <label className="block shrink-0">
+        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
           <span className="text-red-500">*</span>
           整備任務
         </span>
@@ -349,18 +382,7 @@ export function StepShiftMaintenanceTask({
         )}
       </label>
 
-      {creationMode === 'parametric' && draft.taskId && !draft.skipped ? (
-        <div className="mt-6 max-w-4xl shrink-0">
-          <YardEntryAllowancePanel
-            templateId={templateId}
-            maintenance={draft}
-            lockedRotationSeconds={lockedRotationSeconds}
-            onBlockingCountChange={onAllowanceBlockingCountChange}
-          />
-        </div>
-      ) : null}
-
-      <div className="mt-8 min-h-[280px] flex-1 overflow-auto rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+      <div className={`mt-6 min-h-[280px] flex-1 ${draft.taskId && !previewLoading && !previewError ? '' : 'overflow-auto rounded-xl border border-zinc-800/80 bg-zinc-950/40'}`}>
         {!draft.taskId ? (
           <ShiftSelectionEmptyState />
         ) : previewLoading ? (
@@ -373,11 +395,28 @@ export function StepShiftMaintenanceTask({
             {previewError}
           </div>
         ) : (
-          <div className="p-5">
+          <div className="space-y-4">
             <MaintenanceTaskPreviewContent
               draft={previewDraft}
               sectionExtras={sectionExtras}
+              appearance="wizard"
             />
+            {creationMode === 'parametric' && !draft.skipped ? (
+              <YardEntryAllowancePanel
+                templateId={templateId}
+                maintenance={draft}
+                lockedRotationSeconds={lockedRotationSeconds}
+                onBlockingCountChange={onAllowanceBlockingCountChange}
+                appearance="report"
+                sections={(Object.keys(SECTION_TITLE) as MaintenanceSectionCodeKey[])
+                  .filter((key) => sectionEnabled[key])
+                  .map((key) => ({
+                    label: SECTION_TITLE[key],
+                    filled: Boolean(sectionCodeBySection[key]) && !codeIssueByKey.has(key)
+                      && (creationMode !== 'parametric' || String(entrySlackBySection[key as MaintenanceEntrySlackSectionKey] ?? '').trim() !== ''),
+                  }))}
+              />
+            ) : null}
           </div>
         )}
       </div>

@@ -760,12 +760,11 @@ export const ADMIN_PERMISSIONS = [
 // shortcut: fixed development administrator, replace with deployment-generated credentials before production.
 /** 部署設定廠商帳號的預設角色：各模組檢視權限，不含權限管理、系統管理與稽核日誌 */
 export const VENDOR_ROLE_CODE = 'VENDOR';
-export const VENDOR_ROLE_PERMISSIONS: readonly string[] =
-  ACCESS_PERMISSIONS.filter(
-    (item) =>
-      item.action === 'view' &&
-      !['access', 'system', 'logs'].includes(item.moduleKey),
-  ).map((item) => item.code);
+/** 廠商只看數據監控模組：其他模組沒有任何權限，側欄與齒輪都不會出現 */
+export const VENDOR_ROLE_PERMISSIONS: readonly string[] = [
+  'dashboard.monitor.view',
+  'dashboard.dashboard.view',
+];
 
 export const FIXED_ADMIN_ACCOUNT = 'syncdrive';
 export const FIXED_ADMIN_PASSWORD = 'LWvG658liN1dZ25Tto';

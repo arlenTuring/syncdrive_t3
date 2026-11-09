@@ -2,6 +2,7 @@ import type { PointTopology } from '../../map-editor/types/pointTopology';
 import { edgeHasTravelTime, edgeSeconds } from './findTopologyPath';
 import type { GeneratedScheduleTimeline } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
+import { moveCardOwnSegment } from './pathOccupancy';
 
 /**
  * 移動卡經過的轉折點
@@ -60,6 +61,7 @@ export function collectMoveJunctionPasses(
     if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
     else nodeIdByLabel.set(label, node.id);
   }
+  const kindById = new Map(topology.nodes.map((node) => [node.id, node.kind] as const));
   const edgeByPair = new Map<string, (typeof topology.edges)[number]>();
   for (const edge of topology.edges) {
     edgeByPair.set(`${edge.fromNodeId}>${edge.toNodeId}`, edge);
@@ -74,7 +76,7 @@ export function collectMoveJunctionPasses(
       if (block.taskType !== 'dispatch') continue;
       if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
       const labels = block.yardMoveViaLabels ?? [];
-      if (labels.length < 3) continue;
+      if (labels.length < 2) continue;
       const ids = labels.map((label) =>
         ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
       // 經過的點對不回路網：經過時刻算不出來，跟缺行駛時間一樣要回報，不能整張略過
@@ -89,8 +91,20 @@ export function collectMoveJunctionPasses(
         });
         continue;
       }
+      // 只算這張卡自己那一段（整備出廠／入廠各開各的，見 moveCardOwnSegment）
+      const [from, to] = moveCardOwnSegment(block, ids as string[], topology);
       let instant = minuteToSecond(block.plannedStartMinute);
-      for (let index = 1; index < ids.length; index += 1) {
+      /*
+       * 起訖若不是設施格（例：入口點、站點）也是別列車會經過的地方：整趟轉場拆成兩張卡後，
+       * 交界的入口點正好是兩張卡的端點，只看中途節點會把它漏掉。設施格由設施佔用管。
+       */
+      const isSharedPoint = (id: string) => kindById.get(id) !== 'facility';
+      if (to > from && isSharedPoint(ids[from]!)) {
+        passes.push({
+          nodeId: ids[from]!, nodeLabel: labels[from]!, instant, timelineRow: timeline.row, blockId: block.id,
+        });
+      }
+      for (let index = from + 1; index <= to; index += 1) {
         const edge = edgeByPair.get(`${ids[index - 1]}>${ids[index]}`);
         if (!edge || !edgeHasTravelTime(edge)) {
           onMissingTravelTime?.({
@@ -103,7 +117,7 @@ export function collectMoveJunctionPasses(
           break;
         }
         instant += edgeSeconds(edge, 'avg');
-        if (index === ids.length - 1) break;
+        if (index === to && !isSharedPoint(ids[index]!)) break;
         passes.push({
           nodeId: ids[index]!,
           nodeLabel: labels[index]!,

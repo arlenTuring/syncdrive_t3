@@ -5,9 +5,9 @@ import type { MaintenanceSectionCodeBySection, MaintenanceSectionCodeKey } from 
 import i18n from '../../../i18n';
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Check,
+  GripVertical,
+  Lightbulb,
   Loader2,
   Pencil,
   Plus,
@@ -39,13 +39,13 @@ import {
   isSelectedRouteDwellReady,
   isStationDwellRequired,
   moveSelectedRouteExecutionOrder,
+  moveSelectedRouteToIndex,
   setSelectedRouteAsHead,
   nextExecutionOrder,
   normalizeMinimumRecoveryTimeSeconds,
   normalizeCollisionProtectionSeconds,
   normalizeSelectedRouteExecutionOrders,
   resolveRouteOrderPosition,
-  resolveNextRouteInExecutionOrder,
   resolveSelectedRouteInstanceId,
   resolveStationDwellListRole,
   formatStationDwellRoleLabel,
@@ -90,13 +90,37 @@ type StepShiftRouteGroupsProps = {
   maintenanceSkipped?: boolean;
   maintenanceSectionCodes?: MaintenanceSectionCodeBySection | null;
   maintenanceSectionEnabled?: Partial<Record<MaintenanceSectionCodeKey, boolean>>;
+  /** 底部「檢查」按鈕每按一次加 1：重新列出路線組合 */
+  checkSignal?: number;
 };
 
+/** 設計稿：無外框、灰藍底 */
+const FIELD_CLASS =
+  'h-9 rounded-lg border border-transparent bg-[#232730] px-3 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+
 const DWELL_INPUT_CLASS =
-  'h-8 w-20 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2 text-center text-xs tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-9 w-full min-w-[7rem] rounded-lg border border-transparent bg-[#2a2e37] pl-3 pr-8 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 disabled:cursor-not-allowed disabled:opacity-60';
 
 const DWELL_STATIC_CLASS =
-  'flex h-8 items-center justify-center rounded-md border border-zinc-800/80 bg-zinc-900/40 px-2.5 text-xs text-zinc-500';
+  'flex h-9 min-w-[6rem] items-center rounded-lg bg-[#2a2e37]/60 px-3 text-sm text-zinc-500';
+
+/** 秒數輸入框：「秒」放在框內右邊 */
+function SecondsInput({ value, onChange, placeholder, ariaLabel }: { value: string; onChange: (value: string) => void; placeholder?: string; ariaLabel: string }) {
+  return (
+    <span className="relative block">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={DWELL_INPUT_CLASS}
+        aria-label={ariaLabel}
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+    </span>
+  );
+}
 
 function formatSecondsLabel(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '—';
@@ -171,21 +195,15 @@ function StationDwellEditor({
   turnaroundLimitSeconds,
   minimumRecoveryTimeSeconds,
   hideRecoveryInSummary = false,
-  showSwitchBuffer = false,
   onUpdateDwellSeconds,
   onUpdateDwellMode,
-  onUpdateDwellSlack,
-  onUpdateSwitchBuffer,
 }: {
   route: ShiftScheduleSelectedRoute;
   turnaroundLimitSeconds: number | null;
   minimumRecoveryTimeSeconds: number | null;
   hideRecoveryInSummary?: boolean;
-  showSwitchBuffer?: boolean;
   onUpdateDwellSeconds: (stationId: string, value: string) => void;
   onUpdateDwellMode: (stationId: string, mode: ShiftStationDwellMode) => void;
-  onUpdateDwellSlack: (value: string) => void;
-  onUpdateSwitchBuffer?: (value: string) => void;
 }) {
   const { t } = useTranslation();
   const dwellsComplete = areStationDwellsComplete(route.stationDwells);
@@ -220,15 +238,15 @@ function StationDwellEditor({
     : i18n.t('shiftList.routeGroups.breakdownWithRecovery', { travel: route.avgTravelTimeSeconds ?? 0, recovery: recoverySeconds, dwell: totalDwellWithSlack });
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-3 py-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         {route.stationDwells.map((dwell, index) => {
           const role = resolveStationDwellListRole(dwell, index);
           if (role !== 'editable') {
             const roleLabel = formatStationDwellRoleLabel(role);
             return (
-              <div key={dwell.stationId} className="block text-center">
-            <span className="mb-1 block text-[11px] text-zinc-500">{dwell.stationName}</span>
+              <div key={dwell.stationId} className="block">
+                <span className="mb-1.5 block px-1 text-sm text-zinc-300">{dwell.stationName}</span>
                 <div
                   className={DWELL_STATIC_CLASS}
                   aria-label={`${dwell.stationName} ${roleLabel}`}
@@ -240,15 +258,14 @@ function StationDwellEditor({
           }
           const mode = resolveStationDwellMode(dwell);
           return (
-            <label key={dwell.stationId} className="block text-center">
-              <span className="mb-1 block text-[11px] text-zinc-500">
+            <label key={dwell.stationId} className="block">
+              <span className="mb-1.5 block px-1 text-sm text-zinc-300">
                 {t('shiftList.routeGroups.station', { name: dwell.stationName })}
               </span>
-              <div className="flex h-8 items-center justify-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <ShiftMenuSelect
                   label={t('shiftList.routeGroups.dwellMode', { name: dwell.stationName })}
                   hideLabel
-                  size="sm"
                   value={mode}
                   options={[
                     { value: 'seconds', label: t('shiftList.routeGroups.dwellSeconds') },
@@ -258,67 +275,34 @@ function StationDwellEditor({
                   onChange={(next) =>
                     onUpdateDwellMode(dwell.stationId, next as ShiftStationDwellMode)
                   }
-                  widthClass="w-[100px] shrink-0"
-                  panelWidth={112}
+                  widthClass="w-[9rem] shrink-0"
+                  panelWidth={144}
+                  triggerClassName="!border-transparent !bg-[#2a2e37]"
                   aria-label={t('shiftList.routeGroups.dwellMode', { name: dwell.stationName })}
                 />
                 {mode === 'seconds' ? (
-              <input
-                type="text"
-                inputMode="numeric"
-                value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
-                    onChange={(e) =>
-                      onUpdateDwellSeconds(dwell.stationId, e.target.value.replace(/\D/g, ''))
-                    }
-                    placeholder={t('shiftList.routeGroups.required')}
-                className={DWELL_INPUT_CLASS}
-                aria-label={t('shiftList.routeGroups.dwellSecondsAria', { name: dwell.stationName })}
-              />
+                  <SecondsInput
+                    value={dwell.dwellSeconds == null ? '' : String(dwell.dwellSeconds)}
+                    onChange={(raw) => onUpdateDwellSeconds(dwell.stationId, raw.replace(/\D/g, ''))}
+                    placeholder="請輸入"
+                    ariaLabel={t('shiftList.routeGroups.dwellSecondsAria', { name: dwell.stationName })}
+                  />
                 ) : null}
             </div>
           </label>
           );
         })}
 
-        <label className="block text-center">
-          <span className="mb-1 block text-[11px] text-zinc-500">{t('shiftList.routeGroups.dwellSlack')}</span>
-          <div className="flex h-8 items-center justify-center gap-1.5">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={String(route.dwellSlackSeconds)}
-              onChange={(e) => onUpdateDwellSlack(e.target.value)}
-              className={DWELL_INPUT_CLASS}
-              aria-label={t('shiftList.routeGroups.dwellSlackAria', { name: route.routeName })}
-            />
-          </div>
-        </label>
-
-        {showSwitchBuffer && onUpdateSwitchBuffer ? (
-          <label className="block text-center">
-            <span className="mb-1 block text-[11px] text-zinc-500">{t('shiftList.routeGroups.switchBuffer')}</span>
-            <div className="flex h-8 items-center justify-center gap-1.5">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={String(route.switchBufferAfterSeconds)}
-                onChange={(e) => onUpdateSwitchBuffer(e.target.value)}
-                className={DWELL_INPUT_CLASS}
-                aria-label={t('shiftList.routeGroups.switchBufferAria', { name: route.routeName })}
-              />
-            </div>
-          </label>
-          ) : null}
       </div>
 
-      <div className="mt-2 space-y-1">
+      <div className="space-y-1">
         {showIncompleteWarning && (
-          <p className="text-[10px] text-zinc-500">
+          <p className="px-1 text-xs text-zinc-500">
             {t('shiftList.routeGroups.dwellIncomplete')}
           </p>
         )}
         {showTurnaroundWarning && (
-          <p className="text-[10px] leading-4 text-red-400">
+          <p className="px-1 text-xs leading-5 text-red-400">
             {t('shiftList.routeGroups.overTurnaroundBefore', { min: formatSecondsLabel(totalMinSum) })}
             （{formatSecondsLabel(turnaroundLimitSeconds)}）
             {turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0
@@ -328,55 +312,88 @@ function StationDwellEditor({
           </p>
         )}
 
-        <div className="flex flex-wrap items-center justify-start gap-x-1.5 gap-y-1 text-[10px] font-medium text-zinc-500">
-          <span className="text-zinc-400">{cycleLabel}：</span>
-          <span className="tabular-nums text-zinc-300">{formatSecondsLabel(totalMinSum)}</span>
-          <span className="text-zinc-600">{breakdownSuffix}</span>
-          <span className="text-zinc-600">·</span>
-          <span className="text-zinc-400">{avgCycleLabel}：</span>
-          <span className="tabular-nums text-zinc-300">{formatSecondsLabel(totalAvgSum)}</span>
-          <span className="text-zinc-600">{avgBreakdownSuffix}</span>
+        <div className="space-y-1.5 rounded-lg bg-[#1b1b1f] px-4 py-3 text-sm">
+          {[
+            [cycleLabel, totalMinSum, breakdownSuffix],
+            [avgCycleLabel, totalAvgSum, avgBreakdownSuffix],
+          ].map(([label, total, breakdown]) => (
+            <p key={String(label)} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
+              <span className="text-zinc-300">{label}</span>
+              <span className="text-zinc-600" aria-hidden>｜</span>
+              <span className="tabular-nums text-zinc-100">{formatSecondsLabel(total as number)}</span>
+              <span className="text-zinc-400">{breakdown}</span>
+            </p>
+          ))}
         </div>
         </div>
     </div>
   );
 }
 
-function RouteOrderControls({
-  showArrows,
-  canMoveUp,
-  canMoveDown,
-  onMove,
+/** 拖拉把手：按住拖動排序；鍵盤可用上下鍵移動 */
+function RouteDragHandle({
+  routeName,
+  onPointerDown,
+  onKeyMove,
 }: {
-  showArrows: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  onMove: (direction: 'up' | 'down') => void;
+  routeName: string;
+  onPointerDown: () => void;
+  onKeyMove: (direction: 'up' | 'down') => void;
 }) {
-  const { t } = useTranslation();
-  if (!showArrows) return null;
-
   return (
-    <div className="flex shrink-0 flex-col">
-          <button
-            type="button"
-            title={t('shiftList.routeGroups.moveEarlier')}
-            disabled={!canMoveUp}
-        onClick={() => onMove('up')}
-            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-          >
-            <ArrowUp className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title={t('shiftList.routeGroups.moveLater')}
-            disabled={!canMoveDown}
-        onClick={() => onMove('down')}
-            className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-          >
-            <ArrowDown className="size-3.5" />
-          </button>
-    </div>
+    <button
+      type="button"
+      aria-label={`拖拉排序 ${routeName}（可用上下鍵移動）`}
+      title="按住拖拉調整順序"
+      onPointerDown={onPointerDown}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          onKeyMove(event.key === 'ArrowUp' ? 'up' : 'down');
+        }
+      }}
+      className="flex w-12 shrink-0 cursor-grab items-center justify-center self-stretch border-r border-zinc-700/60 text-zinc-400 hover:text-zinc-200 active:cursor-grabbing"
+    >
+      <GripVertical className="size-5" />
+    </button>
+  );
+}
+
+/** 全域秒數欄位（套用到所有路線）；各路線值不同時提示，改了就統一 */
+function GlobalSecondsField({
+  label,
+  value,
+  mixed,
+  onChange,
+  ariaLabel,
+  disabled = false,
+}: {
+  label: string;
+  value: number;
+  mixed: boolean;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">{label}</span>
+      <span className="relative block">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={String(value)}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+          disabled={disabled}
+          title={disabled ? '先新增路線後再設定' : undefined}
+          className={`${FIELD_CLASS} w-full pr-10 disabled:cursor-not-allowed disabled:opacity-50`}
+          aria-label={ariaLabel}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+      </span>
+      {mixed ? <span className="mt-1.5 block px-1 text-xs text-amber-300">目前各路線不同，修改後全部統一</span> : null}
+    </label>
   );
 }
 
@@ -388,6 +405,9 @@ function RecoveryAndServiceDirectionBar({
   serviceDirectionTags,
   onAddTag,
   onRemoveTag,
+  dwellSlack,
+  switchBuffer,
+  manual = false,
 }: {
   minimumRecoveryTimeSeconds: number | null;
   onUpdateRecoveryTime: (value: string) => void;
@@ -396,6 +416,11 @@ function RecoveryAndServiceDirectionBar({
   serviceDirectionTags: ShiftScheduleServiceDirectionTag[];
   onAddTag: (name: string) => void;
   onRemoveTag: (id: string) => void;
+  /** 全域靠站緩衝與換線緩衝：寫進每一條路線 */
+  dwellSlack: { value: number; mixed: boolean; onChange: (value: string) => void; disabled?: boolean };
+  switchBuffer: { value: number; mixed: boolean; onChange: (value: string) => void; disabled?: boolean };
+  /** 手動製作：只有靠站緩衝 */
+  manual?: boolean;
 }) {
   const { t } = useTranslation();
   const [drafting, setDrafting] = useState(false);
@@ -418,32 +443,56 @@ function RecoveryAndServiceDirectionBar({
     setDrafting(false);
   };
 
+  const dwellSlackField = (
+    <GlobalSecondsField
+      label={t('shiftList.routeGroups.dwellSlack')}
+      value={dwellSlack.value}
+      mixed={dwellSlack.mixed}
+      onChange={dwellSlack.onChange}
+      disabled={dwellSlack.disabled}
+      ariaLabel="靠站緩衝（全部路線）"
+    />
+  );
+  if (manual) {
+    return (
+      <div className="grid gap-x-4 gap-y-3 rounded-xl bg-[#232329] px-5 py-4 lg:grid-cols-4">
+        {dwellSlackField}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap items-start gap-6 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+    <div className="grid gap-x-4 gap-y-3 rounded-xl bg-[#232329] px-5 py-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.4fr)]">
       <label className="block">
-        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
-          <HelpTip label={t('shiftList.routeGroups.minRecoveryHelp')}>
-            <p>{t('shiftList.routeGroups.minRecoveryHelp1')}</p>
-            <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.minRecoveryHelp2')}</p>
-          </HelpTip>
+        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
+          <span className="text-red-500">*</span>
           {t('shiftList.routeGroups.minRecoveryLabel')}
+          <span className="ml-auto">
+            <HelpTip label={t('shiftList.routeGroups.minRecoveryHelp')}>
+              <p>{t('shiftList.routeGroups.minRecoveryHelp1')}</p>
+              <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.minRecoveryHelp2')}</p>
+            </HelpTip>
+          </span>
         </span>
-        <div className="flex items-center gap-2">
-        <input
+        <span className="relative block">
+          <input
             type="text"
             inputMode="numeric"
             value={minimumRecoveryTimeSeconds ?? ''}
             onChange={(e) => onUpdateRecoveryTime(e.target.value.replace(/\D/g, ''))}
             placeholder={t('shiftList.routeGroups.minRecoveryPlaceholder')}
-            className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
+            className={`${FIELD_CLASS} w-full pr-10`}
             aria-label={t('shiftList.routeGroups.minRecoveryAria')}
           />
-          <span className="text-sm text-zinc-500">{t('shiftList.routeGroups.secondsUnit')}</span>
-        </div>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">{t('shiftList.routeGroups.secondsUnit')}</span>
+        </span>
       </label>
 
       <label className="block">
-        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
+          <span className="text-red-500">*</span>
+          {t('shiftList.routeGroups.collisionLabel')}
+          <span className="ml-auto">
           <HelpTip label={t('shiftList.routeGroups.collisionHelp')} widthClass="w-72">
             <p>
               {t('shiftList.routeGroups.collisionHelp1')}
@@ -455,24 +504,35 @@ function RecoveryAndServiceDirectionBar({
               {t('shiftList.routeGroups.collisionHelp3')}
             </p>
           </HelpTip>
-          {t('shiftList.routeGroups.collisionLabel')}
+          </span>
         </span>
-        <div className="flex items-center gap-2">
+        <span className="relative block">
           <input
             type="text"
             inputMode="numeric"
             value={collisionProtectionSeconds ?? ''}
             onChange={(e) => onUpdateCollisionProtection(e.target.value.replace(/\D/g, ''))}
             placeholder={t('shiftList.routeGroups.collisionPlaceholder')}
-            className="h-[36px] w-[140px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm tabular-nums text-zinc-100 placeholder-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]"
+            className={`${FIELD_CLASS} w-full pr-10`}
             aria-label={t('shiftList.routeGroups.collisionAria')}
           />
-          <span className="text-sm text-zinc-500">{t('shiftList.routeGroups.secondsUnit')}</span>
-    </div>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">{t('shiftList.routeGroups.secondsUnit')}</span>
+        </span>
       </label>
 
-      <div className="min-w-0 flex-1">
-        <span className="mb-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+      {dwellSlackField}
+      <GlobalSecondsField
+        label={t('shiftList.routeGroups.switchBuffer')}
+        value={switchBuffer.value}
+        mixed={switchBuffer.mixed}
+        onChange={switchBuffer.onChange}
+        disabled={switchBuffer.disabled}
+        ariaLabel="換線緩衝（全部路線）"
+      />
+
+      <div className="min-w-0">
+        <span className="mb-2 flex items-center gap-1.5 px-1 text-sm text-zinc-300">
+          {t('shiftList.routeGroups.serviceDir')}
           <HelpTip label={t('shiftList.routeGroups.serviceDirHelp')} widthClass="w-64">
             <p>
               {t('shiftList.routeGroups.serviceDirHelp1')}
@@ -482,13 +542,12 @@ function RecoveryAndServiceDirectionBar({
             </p>
             <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.serviceDirHelp3')}</p>
           </HelpTip>
-          {t('shiftList.routeGroups.serviceDir')}
-            </span>
+        </span>
                     <div className="flex flex-wrap items-center gap-2">
           {serviceDirectionTags.map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex h-9 items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 pl-2.5 pr-1 text-sm text-sky-100"
+              className="inline-flex h-9 items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 pl-3 pr-1 text-sm text-sky-100"
             >
               {tag.name}
               <button
@@ -504,7 +563,7 @@ function RecoveryAndServiceDirectionBar({
           ))}
 
           {drafting ? (
-            <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-950 px-1.5">
+            <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-600 bg-[#1b1b1f] px-1.5">
                   <input
                 ref={inputRef}
                     type="text"
@@ -554,9 +613,9 @@ function RecoveryAndServiceDirectionBar({
               title={t('shiftList.routeGroups.addServiceDir')}
               aria-label={t('shiftList.routeGroups.addServiceDir')}
               onClick={() => setDrafting(true)}
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-dashed border-zinc-600 text-zinc-400 hover:border-sky-500/50 hover:text-sky-200"
+              className="inline-flex size-10 items-center justify-center rounded-lg border border-zinc-500 text-zinc-200 hover:border-sky-500/60 hover:text-sky-200"
             >
-              <Plus className="size-4" />
+              <Plus className="size-5" />
             </button>
           )}
         </div>
@@ -611,9 +670,9 @@ function RoutePickerBar({
         type="button"
         onClick={onExpand}
         disabled={availableGroups.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#2B7FFF]/40 bg-[rgba(43,127,255,0.06)] px-4 py-4 text-sm font-medium text-zinc-200 transition hover:border-[#2B7FFF]/70 hover:bg-[rgba(43,127,255,0.1)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2B7FFF]/70 px-4 py-4 text-base font-medium text-[#5a9aff] transition hover:bg-[rgba(43,127,255,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <Plus className="size-4 text-[#7CB8FF]" />
+        <Plus className="size-4" />
         {title}
       </button>
     );
@@ -696,11 +755,12 @@ export function StepShiftRouteGroups({
   maintenanceSkipped = false,
   maintenanceSectionCodes = null,
   maintenanceSectionEnabled = {},
+  checkSignal = 0,
 }: StepShiftRouteGroupsProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapDisplayName, setMapDisplayName] = useState('');
+  const [, setMapDisplayName] = useState('');
   const [availableMaps, setAvailableMaps] = useState<ShiftRouteGroupMapOption[]>([]);
   const [firstTripOriginsHint, setFirstTripOriginsHint] = useState<string | null>(null);
   /**
@@ -1033,10 +1093,13 @@ export function StepShiftRouteGroups({
       options?.executionOrder
       ?? options?.existing?.executionOrder
       ?? nextExecutionOrder(draft.selectedRoutes),
+    // 全域值：沿用已有路線的設定（換路線時保留原值）
     switchBufferAfterSeconds: normalizeSwitchBufferAfterSeconds(
-      options?.existing?.switchBufferAfterSeconds,
+      options?.existing?.switchBufferAfterSeconds ?? draft.selectedRoutes[0]?.switchBufferAfterSeconds,
     ),
-    dwellSlackSeconds: normalizeDwellSlackSeconds(options?.existing?.dwellSlackSeconds),
+    dwellSlackSeconds: normalizeDwellSlackSeconds(
+      options?.existing?.dwellSlackSeconds ?? draft.selectedRoutes[0]?.dwellSlackSeconds,
+    ),
     backupForInstanceId: null,
     backupForRouteId: null,
   });
@@ -1170,13 +1233,22 @@ export function StepShiftRouteGroups({
     });
   };
 
-  const updateDwellSlack = (instanceId: string, raw: string) => {
+  /** 靠站緩衝、換線緩衝是全域值：一次寫進所有路線（引擎照舊讀每條路線的值） */
+  const patchAllRoutes = (patch: Partial<ShiftScheduleSelectedRoute>) => {
+    onChange((prev) => {
+      const anchors = prev.throughAnchors ?? emptyShiftRouteThroughAnchorsDraft();
+      return {
+        ...prev,
+        selectedRoutes: prev.selectedRoutes.map((route) => ({ ...route, ...patch })),
+        throughAnchors: { ...anchors, verifiedFingerprint: null, verifiedPathCount: 0 },
+      };
+    });
+  };
+
+  const updateDwellSlack = (raw: string) => {
     const digits = raw.replace(/\D/g, '');
     const seconds = digits === '' ? 0 : normalizeDwellSlackSeconds(Number(digits));
-    patchSelectedRoute(instanceId, {
-      dwellSlackSeconds: seconds,
-      stationDwellsConfirmed: false,
-    });
+    patchAllRoutes({ dwellSlackSeconds: seconds, stationDwellsConfirmed: false });
   };
 
   const updateRecoveryTime = (raw: string) => {
@@ -1250,14 +1322,11 @@ export function StepShiftRouteGroups({
     });
   };
 
-  const updateSwitchBuffer = (instanceId: string, raw: string) => {
+  const updateSwitchBuffer = (raw: string) => {
     const digits = sanitizeIntegerInput(raw);
     const switchBufferAfterSeconds =
       digits === '' ? 0 : normalizeSwitchBufferAfterSeconds(Number(digits));
-    patchSelectedRoute(instanceId, {
-      switchBufferAfterSeconds,
-      stationDwellsConfirmed: false,
-    });
+    patchAllRoutes({ switchBufferAfterSeconds, stationDwellsConfirmed: false });
   };
 
   const updateRouteCode = (instanceId: string, val: string) => {
@@ -1609,32 +1678,89 @@ export function StepShiftRouteGroups({
     listedIsStale,
   ]);
 
+  // 底部「檢查」：每按一次重新列出路線組合（讀最新狀態，不因每次重繪重跑）
+  const runThroughVerificationRef = useRef(runThroughVerification);
+  useEffect(() => {
+    runThroughVerificationRef.current = runThroughVerification;
+  });
+  useEffect(() => {
+    if (checkSignal > 0) runThroughVerificationRef.current();
+  }, [checkSignal]);
+
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [armedDragId, setArmedDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
+  const dropRoute = (targetId: string, after: boolean) => {
+    const sourceId = draggingId;
+    setDraggingId(null);
+    setArmedDragId(null);
+    setDropTarget(null);
+    if (!sourceId || sourceId === targetId) return;
+    const sorted = primaryRoutes.map((route) => resolveSelectedRouteInstanceId(route)).filter((id) => id !== sourceId);
+    const targetIndex = sorted.indexOf(targetId);
+    if (targetIndex < 0) return;
+    commitSelectedRoutes(
+      moveSelectedRouteToIndex(
+        draft.selectedRoutes.filter((route) => isPrimarySelectedRoute(route)),
+        sourceId,
+        targetIndex + (after ? 1 : 0),
+      ),
+    );
+  };
+
   const renderConfiguredCard = (route: ShiftScheduleSelectedRoute) => {
     const instanceId = resolveSelectedRouteInstanceId(route);
     const isEditing = editingRouteId === instanceId;
     const orderPosition = resolveRouteOrderPosition(primaryRoutes, instanceId);
-    const nextRoute = !isManual
-      ? resolveNextRouteInExecutionOrder(primaryRoutes, route.routeId)
-      : null;
-    // 多路線才顯示換線緩衝欄；不標「接哪一條」——結合關係在參數／關聯圖確定前未知
-    const showSwitchBuffer = !isManual && primaryRoutes.length > 1 && Boolean(nextRoute);
 
     return (
       <div
         key={instanceId}
-        className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-4 py-3"
+        draggable={armedDragId === instanceId}
+        onDragStart={(event) => {
+          setDraggingId(instanceId);
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', instanceId);
+        }}
+        onDragEnd={() => {
+          setDraggingId(null);
+          setArmedDragId(null);
+          setDropTarget(null);
+        }}
+        onDragOver={(event) => {
+          if (!draggingId || draggingId === instanceId) return;
+          event.preventDefault();
+          const box = event.currentTarget.getBoundingClientRect();
+          const after = event.clientY > box.top + box.height / 2;
+          if (dropTarget?.id !== instanceId || dropTarget.after !== after) setDropTarget({ id: instanceId, after });
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          dropRoute(instanceId, dropTarget?.id === instanceId ? dropTarget.after : false);
+        }}
+        className={`relative overflow-hidden rounded-xl bg-[#232329] transition ${draggingId === instanceId ? 'opacity-50' : ''} ${
+          dropTarget?.id === instanceId ? (dropTarget.after ? 'shadow-[0_3px_0_0_#2B7FFF]' : 'shadow-[0_-3px_0_0_#2B7FFF]') : ''
+        }`}
       >
-        <div className="flex items-start gap-3">
-          {orderPosition ? (
-            <RouteOrderControls
-              showArrows={orderPosition.showControls}
-              canMoveUp={orderPosition.canMoveUp}
-              canMoveDown={orderPosition.canMoveDown}
-              onMove={(direction) => moveRouteOrder(instanceId, direction)}
+        {orderPosition.executionOrder === 1 ? (
+          <span
+            className="pointer-events-none absolute left-0 top-0 size-8 bg-amber-400 [clip-path:polygon(0_0,100%_0,0_100%)]"
+            title={t('shiftList.routeGroups.startBadge')}
+            aria-label={t('shiftList.routeGroups.startBadge')}
+          />
+        ) : null}
+        <div className="flex items-stretch gap-0 py-4 pr-5">
+          {orderPosition?.showControls ? (
+            <RouteDragHandle
+              routeName={route.routeName}
+              onPointerDown={() => setArmedDragId(instanceId)}
+              onKeyMove={(direction) => moveRouteOrder(instanceId, direction)}
             />
-          ) : null}
+          ) : (
+            <span className="w-12 shrink-0 self-stretch border-r border-zinc-700/60" aria-hidden />
+          )}
 
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-3 pl-5">
             {isEditing ? (
               <div className="space-y-2">
                 <RoutePickerBar
@@ -1663,19 +1789,26 @@ export function StepShiftRouteGroups({
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {orderPosition.executionOrder === 1 ? (
-                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                    {t('shiftList.routeGroups.startBadge')}
-                  </span>
-                ) : null}
-                <span className="text-sm font-medium text-zinc-100">{route.routeName}</span>
-                <label className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-900/80 px-1.5 py-0.5">
-                  <span className="text-[10px] font-medium text-zinc-400">
-                    {t('shiftList.routeGroups.code')}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-base font-medium text-zinc-100">{route.routeName}</span>
+                <button
+                  type="button"
+                  title={t('shiftList.routeGroups.editRoute')}
+                  aria-label={t('shiftList.routeGroups.editRoute')}
+                  onClick={() => {
+                    setEditingRouteId(instanceId);
+                    setPendingEditRouteId(route.routeId);
+                  }}
+                  className="rounded-lg p-1.5 text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <label className="flex h-9 w-40 items-center gap-1 rounded-lg bg-[#2a2e37] px-3">
+                  <span className="shrink-0 text-sm text-zinc-400">
                     <span className="text-rose-400" aria-hidden>
                       *
                     </span>
+                    {t('shiftList.routeGroups.code')}
                   </span>
                   <input
                     type="text"
@@ -1688,14 +1821,14 @@ export function StepShiftRouteGroups({
                         e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
                       )
                     }
-                    className="w-8 bg-transparent text-center text-xs font-bold text-[#2B7FFF] focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-1 text-sm font-bold tracking-wider text-[#5a9aff] focus:outline-none"
                     title={t('shiftList.routeGroups.codeTitle')}
                     aria-label={t('shiftList.routeGroups.codeAria', { name: route.routeName })}
                     aria-required
                   />
                 </label>
-                <span className="text-xs text-zinc-500">{route.groupName}</span>
-                <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                <span className="text-sm text-zinc-400">{route.groupName}</span>
+                <label className="inline-flex items-center gap-2 text-sm text-zinc-400">
                   <span className="shrink-0">班次卡標籤</span>
                   <input
                     type="text"
@@ -1703,18 +1836,18 @@ export function StepShiftRouteGroups({
                     maxLength={12}
                     placeholder="例：環線 A"
                     onChange={(e) => updateCardLabel(instanceId, e.target.value)}
-                    className="h-7 w-28 rounded-md border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none"
+                    className="h-9 w-32 rounded-lg border border-transparent bg-[#2a2e37] px-3 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none"
                     aria-label={`${route.routeName} 班次卡標籤`}
                   />
                 </label>
                 {!isManual ? (
-                  <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                  <label className="inline-flex items-center gap-2 text-sm text-zinc-400">
                     <span className="shrink-0">{t('shiftList.routeGroups.serviceDir')}</span>
                     <SiteSelect
                       value={route.serviceDirectionId ?? ''}
                       onChange={(e) => updateServiceDirectionId(instanceId, e.target.value)}
                       disabled={serviceDirectionTags.length === 0}
-                      className="h-7 max-w-[140px] rounded-md border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200 focus:border-[#2B7FFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      className="h-9 max-w-[160px] rounded-lg border border-transparent bg-[#2a2e37] px-3 text-sm text-zinc-200 focus:border-[#2B7FFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label={`${route.routeName} ${t('shiftList.routeGroups.serviceDir')}`}
                       title={
                         serviceDirectionTags.length === 0
@@ -1735,7 +1868,7 @@ export function StepShiftRouteGroups({
             )}
 
             {!isEditing && !route.routeCode?.trim() ? (
-              <p className="text-[11px] text-amber-400/90">
+              <p className="text-xs text-amber-400/90">
                 {isManual
                   ? t('shiftList.routeGroups.codeRequiredManual')
                   : t('shiftList.routeGroups.codeRequired')}
@@ -1748,39 +1881,26 @@ export function StepShiftRouteGroups({
                 turnaroundLimitSeconds={turnaroundLimitSeconds}
                 minimumRecoveryTimeSeconds={isManual ? 0 : draft.minimumRecoveryTimeSeconds}
                 hideRecoveryInSummary={isManual}
-                showSwitchBuffer={showSwitchBuffer}
                 onUpdateDwellSeconds={(stationId, val) =>
                   updateDwellSeconds(instanceId, stationId, val)
                 }
                 onUpdateDwellMode={(stationId, mode) =>
                   updateDwellMode(instanceId, stationId, mode)
                 }
-                onUpdateDwellSlack={(val) => updateDwellSlack(instanceId, val)}
-                onUpdateSwitchBuffer={(val) => updateSwitchBuffer(instanceId, val)}
               />
             ) : null}
           </div>
 
           {!isEditing ? (
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                title={t('shiftList.routeGroups.editRoute')}
-                onClick={() => {
-                  setEditingRouteId(instanceId);
-                  setPendingEditRouteId(route.routeId);
-                }}
-                className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
-              >
-                <Pencil className="size-4" />
-              </button>
+            <div className="flex shrink-0 items-start gap-1 pl-3">
               <button
                 type="button"
                 title={t('shiftList.routeGroups.delete')}
                 onClick={() => deletePrimary(instanceId)}
-                className="rounded-lg p-2 text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+                aria-label={t('shiftList.routeGroups.delete')}
+                className="rounded-lg p-2 text-zinc-300 transition hover:bg-red-500/10 hover:text-red-400"
               >
-                <Trash2 className="size-4" />
+                <Trash2 className="size-5" />
               </button>
             </div>
           ) : null}
@@ -1803,37 +1923,33 @@ export function StepShiftRouteGroups({
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="mb-6 shrink-0 space-y-3">
         <div>
-          <h2 className="text-base font-medium text-zinc-100">{t('shiftList.routeGroups.configureTitle')}</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            {t('shiftList.routeGroups.configureHint')}
-            {turnaroundLoading
-              ? t('shiftList.routeGroups.loadingTurnaround')
-              : turnaroundLimitSeconds != null
-                ? t('shiftList.routeGroups.turnaroundValue', { value: formatSecondsLabel(turnaroundLimitSeconds) })
-                : timeTemplateId
-                  ? t('shiftList.routeGroups.noTurnaround')
-                  : t('shiftList.routeGroups.needTimeTemplate')}
-          </p>
-              </div>
-        <div className="flex flex-wrap items-end gap-3">
+          <h2 className="text-lg font-medium text-zinc-100">{t('shiftList.routeGroups.configureTitle')}</h2>
+          {!turnaroundLoading && turnaroundLimitSeconds == null ? (
+            <p className="mt-1 text-xs text-amber-300">
+              {timeTemplateId ? t('shiftList.routeGroups.noTurnaround') : t('shiftList.routeGroups.needTimeTemplate')}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
+            <span className="text-red-500">*</span>
+            {t('shiftList.routeGroups.siteMap')}
+          </span>
           <ShiftMenuSelect
             label={t('shiftList.routeGroups.siteMap')}
+            hideLabel
             value={selectedMapId}
             placeholder={t('shiftList.routeGroups.selectMap')}
             options={mapSelectOptions}
-            widthClass="w-[280px] shrink-0"
-            panelWidth={280}
+            widthClass="w-full"
+            panelWidth={480}
+            triggerClassName="!border-transparent !bg-[#232730]"
             disabled={loading || mapSelectOptions.length === 0}
             onChange={(mapId) => {
               if (!mapId || mapId === selectedMapId) return;
               setPreferredMapId(mapId);
             }}
           />
-          {!loading && !error && mapDisplayName ? (
-            <p className="pb-2 text-xs text-zinc-500">
-              {t('shiftList.routeGroups.loadedMapId', { id: selectedMapId || '—' })}
-            </p>
-          ) : null}
           </div>
         {!loading && !error && routeSyncNotice ? (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
@@ -1871,17 +1987,28 @@ export function StepShiftRouteGroups({
         </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 pb-4">
-          {!isManual ? (
-            <RecoveryAndServiceDirectionBar
-                  minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
-              onUpdateRecoveryTime={updateRecoveryTime}
-              collisionProtectionSeconds={draft.collisionProtectionSeconds ?? null}
-              onUpdateCollisionProtection={updateCollisionProtection}
-              serviceDirectionTags={serviceDirectionTags}
-              onAddTag={addServiceDirectionTag}
-              onRemoveTag={removeServiceDirectionTag}
-            />
-          ) : null}
+          <RecoveryAndServiceDirectionBar
+            manual={isManual}
+            minimumRecoveryTimeSeconds={draft.minimumRecoveryTimeSeconds}
+            onUpdateRecoveryTime={updateRecoveryTime}
+            collisionProtectionSeconds={draft.collisionProtectionSeconds ?? null}
+            onUpdateCollisionProtection={updateCollisionProtection}
+            serviceDirectionTags={serviceDirectionTags}
+            onAddTag={addServiceDirectionTag}
+            onRemoveTag={removeServiceDirectionTag}
+            dwellSlack={{
+              value: normalizeDwellSlackSeconds(draft.selectedRoutes[0]?.dwellSlackSeconds),
+              mixed: new Set(draft.selectedRoutes.map((route) => route.dwellSlackSeconds)).size > 1,
+              onChange: updateDwellSlack,
+              disabled: draft.selectedRoutes.length === 0,
+            }}
+            switchBuffer={{
+              value: normalizeSwitchBufferAfterSeconds(draft.selectedRoutes[0]?.switchBufferAfterSeconds),
+              mixed: new Set(draft.selectedRoutes.map((route) => route.switchBufferAfterSeconds)).size > 1,
+              onChange: updateSwitchBuffer,
+              disabled: draft.selectedRoutes.length === 0,
+            }}
+          />
 
           <TransitionCardCodesBar
             codes={draft.transitionCardCodes ?? null}
@@ -1892,7 +2019,7 @@ export function StepShiftRouteGroups({
             routeCodes={draft.selectedRoutes.map((route) => route.routeCode)}
           />
 
-          <div className="space-y-3">
+          <div className="space-y-4 border-t border-zinc-700/70 pt-6">
             {primaryRoutes.map((route) => renderConfiguredCard(route))}
 
             <RoutePickerBar
@@ -1914,7 +2041,7 @@ export function StepShiftRouteGroups({
           </div>
 
           {primaryRoutes.length > 0 ? (
-            <div className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50">
+            <div className="overflow-hidden rounded-xl bg-[#232329]">
               <RouteRelationGraphEditor
                 framed={false}
                 routes={primaryRoutes}
@@ -1940,7 +2067,7 @@ export function StepShiftRouteGroups({
               />
 
               {!isManual ? (
-                <div className="space-y-3 border-t border-zinc-800/70 px-4 py-3">
+                <div className="space-y-3 border-t border-zinc-700/60 px-5 py-4">
                   {throughGateStatus === 'missingGraph' ? (
                     <p className="text-[11px] text-zinc-500">{t('shiftList.routeGroups.needEdgesHint')}</p>
                   ) : throughGateStatus === 'missingMarks' ? (

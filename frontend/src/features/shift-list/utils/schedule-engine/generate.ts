@@ -22,6 +22,8 @@ import type {
   ScheduleServiceMetrics,
   SchedulingContext,
 } from './types';
+import { minuteToSecond } from './types';
+import { buildBlockStationDepartures, resolveRouteForBlock } from '../buildBlockStationDepartures';
 import {
   normalizeEngineInput,
   type PassengerTimetableMode,
@@ -47,6 +49,7 @@ import {
   validateYardExitContinuity,
   validateVehicleLocationContinuity,
   validateMoveJunctionConflicts,
+  validateMovePathConflicts,
   validateFacilityOccupancy,
   validateYardWorkPreserved,
 } from './validate';
@@ -69,6 +72,7 @@ import {
   findStationBerthCollisions,
 } from '../stationBerthOccupancy';
 import { fillYardHoldGaps } from '../fillYardHoldGaps';
+import { resolveMovePathConflicts } from '../resolveMovePathConflicts';
 import { trimIncompleteRotationCyclesOnTimelines } from '../trimIncompleteRotationCycles';
 
 import {
@@ -85,6 +89,8 @@ import {
   rerouteTripInCopy,
   resolveResidualConflicts,
   shiftTripInCopy,
+  holdTripAtStationInCopy,
+  terminalHoldOfTrip,
 } from './resolveResidualConflicts';
 import { collectPlanViolations, compareViolations, violationFromIssue, type PlanViolation } from './evaluatePlan';
 import { snapUpToClockAlignSeconds } from './physics';
@@ -924,8 +930,8 @@ function generateShiftScheduleOnce(
     candidate: GeneratedSchedulePlan['timelines'],
     reservedJunctionPasses?: JunctionReservation[],
     avoidYardSpots?: YardSpotAvoid[],
-  ) =>
-    insertMaintenanceTransferCards({
+  ) => {
+    const transferArgs = {
       reservedJunctionPasses,
       avoidYardSpots,
       searchBudget,
@@ -938,7 +944,9 @@ function generateShiftScheduleOnce(
       minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
       collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
       sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
-    });
+    };
+    return insertMaintenanceTransferCards(transferArgs);
+  };
 
   /**
    * 繞不去別站（關聯圖上沒有回得來的路線）→ 開進附近設施格暫停放，時間到再回來。
@@ -1203,6 +1211,139 @@ function generateShiftScheduleOnce(
   const rowOfBlock = (plan: GeneratedSchedulePlan['timelines'], blockId: string) =>
     plan.find((timeline) => timeline.blocks.some((block) => block.id === blockId))?.row ?? null;
 
+  /**
+   * 換班「先出後進」。
+   *
+   * 整備區出來的車接手載客、跑完的車回整備區，兩台常常要走同一段單線（例如入口點↔NW下發1）。
+   * 轉場卡固定是「回去的車先進」：它跑完就進單線，出來的車要等它開完整段才能出來，
+   * 單線連開兩趟，班表留的折返時間不夠時出來的車就趕不上發車（2026-11-09 使用者質疑後實測：
+   * 15:59:40 回去、16:01:40 要發車，只差 120 秒）。
+   *
+   * 另一種順序：回去的車在終點前一個停靠站多停，等出來的車先從終點發車開走，再進終點、進單線。
+   * 載客時刻不動（多停的是乘客已下車之後），只是回去的車晚一點進場。多停多少由衝突本身算：
+   * 出廠卡要等到下一班發車、轉場卡要等它經過終點，再加站位的碰撞保護（前車走、後車進各一份）。
+   * 能不能停那麼久（下一台載客車要進同一站）交給整張班表重跑後的驗證判定，有新問題就不採用。
+   */
+  const swapOutFirstCandidates = (
+    base: PostState,
+    skip: PostState['post']['transfer']['skipped'][number],
+  ): Array<{ label: string; pre: GeneratedSchedulePlan['timelines'] | null; reservations: JunctionReservation[]; notes: FeasibilityIssue[] }> => {
+    const out: ReturnType<typeof swapOutFirstCandidates> = [];
+    const protection = Math.max(0, engineInput.collisionProtectionSeconds ?? 0);
+    const rowsDone = new Set<number>();
+    const sortedRow = (plan: GeneratedSchedulePlan['timelines'], row: number) =>
+      [...(plan.find((timeline) => timeline.row === row)?.blocks ?? [])]
+        .filter((block) => block.source !== 'hold')
+        .sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    /** 日循環上 a 比 b 晚多少秒（-12h～+12h） */
+    const cyclicLater = (a: number, b: number) => {
+      const day = 86_400;
+      const diff = (((a - b) % day) + day) % day;
+      return diff > day / 2 ? diff - day : diff;
+    };
+    /** 出廠卡：出來的車要停在終點等到下一班發車，回傳那一班發車時刻 */
+    const exitDepartOf = (
+      plan: GeneratedSchedulePlan['timelines'],
+      item: PostState['post']['transfer']['skipped'][number],
+    ): number | null => {
+      if (!item.blockId || !/出廠卡/.test(item.reason)) return null;
+      const own = sortedRow(plan, item.timelineRow);
+      const index = own.findIndex((block) => block.id === item.blockId);
+      const next = index >= 0 ? own.slice(index + 1).find((block) => block.taskType === 'passenger') : undefined;
+      return next ? minuteToSecond(next.plannedStartMinute) : null;
+    };
+    /** 別列車的載客班次到某站的時刻（秒）——多停不能停到下一台進站 */
+    const arrivalsAt = (stationId: string, exceptRow: number) => {
+      const list: number[] = [];
+      for (const timeline of base.pre) {
+        if (timeline.row === exceptRow) continue;
+        for (const block of timeline.blocks) {
+          if (block.taskType !== 'passenger') continue;
+          const route = resolveRouteForBlock(block, engineInput.selectedRoutes);
+          for (const stop of buildBlockStationDepartures(block, route)) {
+            if (stop.stationId === stationId) list.push(minuteToSecond(stop.arrivalMinute));
+          }
+        }
+      }
+      return list;
+    };
+    for (const blocker of skip.blockers ?? []) {
+      if (blocker.kind !== 'junction' || !blocker.blockingBlockId) continue;
+      const row = rowOfBlock(base.pre, blocker.blockingBlockId);
+      if (row == null || row === skip.timelineRow || rowsDone.has(row)) continue;
+      const tasks = sortedRow(base.pre, row);
+      const at = tasks.findIndex((block) => block.id === blocker.blockingBlockId);
+      if (at < 0) continue;
+      // 擋路的是回去那台的整備（入廠卡記在整備上）或它最後一班載客
+      const yardIndex = YARD_TASK_TYPES.has(tasks[at]!.taskType) ? at
+        : tasks[at]!.taskType === 'passenger' && tasks[at + 1] && YARD_TASK_TYPES.has(tasks[at + 1]!.taskType) ? at + 1
+          : -1;
+      const trip = yardIndex > 0 ? tasks[yardIndex - 1] : undefined;
+      if (!trip || trip.taskType !== 'passenger') continue;
+      const terminal = terminalHoldOfTrip(trip, evaluationContext);
+      if (!terminal) continue;
+      const terminalNodeId = engineInput.pointTopology?.nodes
+        .find((node) => node.stationId?.trim() === terminal.terminalStationId)?.id;
+      const passSecond = terminalNodeId
+        ? skip.junctionReservation?.find((pass) => pass.nodeId === terminalNodeId)?.instant ?? null
+        : null;
+      const clearSecond = exitDepartOf(base.pre, skip) ?? passSecond;
+      if (clearSecond == null) continue;
+      rowsDone.add(row);
+      const tripEnd = minuteToSecond(trip.plannedEndMinute);
+      const holdStops = buildBlockStationDepartures(trip, resolveRouteForBlock(trip, engineInput.selectedRoutes));
+      const holdStop = holdStops[terminal.holdIndex];
+      if (!holdStop) continue;
+      const holdDepart = minuteToSecond(holdStop.departureMinute);
+      // 下一台載客車進這一站之前要讓開（站位碰撞保護：前車走、後車進各一份）
+      const nextArrival = arrivalsAt(terminal.holdStationId, row)
+        .map((second) => cyclicLater(second, minuteToSecond(holdStop.arrivalMinute)))
+        .filter((delta) => delta > 0)
+        .sort((a, b) => a - b)[0];
+      const maxHold = nextArrival == null
+        ? Number.POSITIVE_INFINITY
+        : nextArrival - 2 * protection - cyclicLater(holdDepart, minuteToSecond(holdStop.arrivalMinute));
+      /*
+       * 多停到出來的車都過去為止。一次換班常常不只一台要出來（16:00：一台 16:01:40 發車、
+       * 另一台 16:04:40 發車），只讓過第一台，第二台又撞上剛進單線的回去那台。
+       * 所以多停之後重排一次，還有出廠卡被同一台擋住就再延長到它也過得去，最多三輪。
+       */
+      let holdSeconds = snapUpToClockAlignSeconds(cyclicLater(clearSecond + 2 * protection, tripEnd));
+      let held: { timelines: GeneratedSchedulePlan['timelines']; description: string } | null = null;
+      let label = '';
+      for (let round = 0; round < 3; round += 1) {
+        if (holdSeconds <= 0 || holdSeconds > maxHold) { held = null; break; }
+        label = `換班先出後進：時間線 ${row} 在「${terminal.holdStationName}」多停 ${holdSeconds} 秒，`
+          + `等時間線 ${skip.timelineRow} 先從「${terminal.terminalStationName}」${exitDepartOf(base.pre, skip) != null ? '發車' : '經過'}`;
+        held = holdTripAtStationInCopy(
+          base.pre, trip.id, holdSeconds, terminal.holdIndex, evaluationContext, label,
+          {
+            code: 'MAINTENANCE_TRANSFER_REQUIRED_MISSING',
+            resourceId: terminal.terminalStationId,
+            resourceLabel: terminal.terminalStationName,
+            counterpartBlockIds: skip.blockId ? [skip.blockId] : [],
+            message: label,
+          },
+        );
+        if (!held || !searchBudget.tryCandidate()) break;
+        const screened = runPostLoop(held.timelines, base.reservations, undefined, true);
+        let extend = 0;
+        for (const other of screened.transfer.skipped) {
+          const depart = exitDepartOf(held.timelines, other);
+          if (depart == null) continue;
+          if (!(other.blockers ?? []).some((item) => item.blockingBlockId
+            && rowOfBlock(held!.timelines, item.blockingBlockId) === row)) continue;
+          extend = Math.max(extend, snapUpToClockAlignSeconds(cyclicLater(depart + 2 * protection, tripEnd)));
+        }
+        if (extend <= holdSeconds) break;
+        holdSeconds = extend;
+      }
+      if (held) out.push({ label, pre: held.timelines, reservations: base.reservations, notes: [] });
+      else note(skip.blockId, `換班先出後進（時間線 ${row}）：多停會擋到下一台進「${terminal.holdStationName}」，或超出合法範圍`);
+    }
+    return out;
+  };
+
   reportProgress({ stage: 'transfer', message: '安排整備進出與轉場', fraction: 0.55 });
   let state: PostState = {
     pre: preTransfer,
@@ -1288,6 +1429,7 @@ function generateShiftScheduleOnce(
           });
         }
       }
+      candidates.push(...swapOutFirstCandidates(base, skip));
       for (const candidate of candidates) {
         if (!candidate.pre) {
           note(skip.blockId, `${candidate.label}：超出合法行駛範圍或前後任務間隔`);
@@ -1723,6 +1865,23 @@ function generateShiftScheduleOnce(
     }
   }
   timelines = post.timelines;
+  /**
+   * 移動卡整條路徑：出入場、整備間轉場穿過正線月台或轉線點時跟別列車撞上，先用替代圖
+   * 整組決定誰先過，再逐串補修；只挪調度車，載客班次不動。見 resolveMovePathConflicts.ts。
+   *
+   * 放在搜尋選定最終版面之後只跑一次：它每個候選都要做全套限制比對，放進搜尋的每一次
+   * 後處理會吃光搜尋的時間預算（2026-11-08 實測觸發「搜尋未完成」）。
+   */
+  {
+    const repaired = resolveMovePathConflicts({
+      timelines,
+      ctx: evaluationContext,
+      selectedRoutes: routesForBerth,
+      maintenanceEntrySlackBySection: engineInput.maintenanceEntrySlackBySection,
+      warnings,
+    });
+    timelines = repaired.timelines;
+  }
   const maintenanceTransfer = post.transfer;
   const residual = post.residual;
   warnings.push(...post.warnings);
@@ -2062,6 +2221,13 @@ function generateShiftScheduleOnce(
     topology: engineInput.pointTopology,
     collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
     warnings,
+  });
+  validateMovePathConflicts({
+    timelines,
+    selectedRoutes: routesForBerth,
+    topology: engineInput.pointTopology,
+    collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+    errors,
   });
   validateRotationCyclesComplete(timelines, engineInput.passengerRoutes.length, errors);
   validateRouteSwitchBuffers(

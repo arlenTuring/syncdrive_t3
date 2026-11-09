@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { isChunkLoadError, reloadForNewBuild } from '../lib/chunkReload'
 
 type Props = {
   title?: string
@@ -22,9 +23,16 @@ export class ViewErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ViewErrorBoundary]', error, info.componentStack)
+    // 程式已更新、舊分片不在了：直接重新整理載入新版
+    if (isChunkLoadError(error)) reloadForNewBuild()
   }
 
   private handleRetry = () => {
+    // 分片載入失敗重新掛載也沒用（import 結果被快取），要整頁重新整理
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload()
+      return
+    }
     this.setState((s) => ({
       error: null,
       remountKey: s.remountKey + 1,

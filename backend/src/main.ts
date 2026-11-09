@@ -2,7 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, type LogLevel } from '@nestjs/common';
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { resolve } from 'node:path';
 import { json, urlencoded } from 'express';
 import type { NextFunction, Request, Response } from 'express';
@@ -116,6 +116,7 @@ async function bootstrap() {
   await app.startAllMicroservices();
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, '0.0.0.0');
+  keepIdleConnectionsOpen(app.getHttpServer() as Server);
   console.log(`Application is running on: http://127.0.0.1:${port}`);
   console.log(`Swagger docs are available at: ${await app.getUrl()}/api/docs`);
 
@@ -138,6 +139,7 @@ async function bootstrap() {
     const externalServer = createServer(
       app.getHttpAdapter().getInstance() as never,
     );
+    keepIdleConnectionsOpen(externalServer);
     await new Promise<void>((resolve) => {
       externalServer.listen(externalPort, '0.0.0.0', resolve);
     });
@@ -147,4 +149,14 @@ async function bootstrap() {
     );
   }
 }
+/**
+ * 閒置的 keep-alive 連線讓用戶端先關。Node 預設伺服器 5 秒就關，事件迴圈忙一下時，
+ * 計時器會在用戶端剛用這條連線送出請求的同一刻把它關掉，用戶端只看到 fetch failed。
+ * 用戶端（Node fetch 約 4 秒、一般反向代理 60 秒）都比這裡短，就不會撞上。
+ */
+function keepIdleConnectionsOpen(server: Server): void {
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+}
+
 bootstrap();

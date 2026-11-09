@@ -599,6 +599,74 @@ export function shiftTripInCopy(
 }
 
 /**
+ * 一趟的終點站，以及終點前最後一個有停靠的站（站序 index）。
+ * 換班「先出後進」時，回去的車就在這一站多停，終點站讓給出來的車先用。
+ */
+export function terminalHoldOfTrip(
+  trip: GeneratedScheduleBlock,
+  ctx: PlanEvaluationContext,
+): {
+  terminalStationId: string; terminalStationName: string;
+  holdIndex: number; holdStationId: string; holdStationName: string;
+} | null {
+  const route = resolveRouteForBlock(trip, ctx.selectedRoutes);
+  const inputs = resolveBlockStationDwellInputs(trip, route);
+  if (!route || !inputs || inputs.stations.length < 2) return null;
+  const last = inputs.stations.length - 1;
+  for (let index = last - 1; index >= 1; index -= 1) {
+    const station = inputs.stations[index]!;
+    if (applyStationDwellWithSlack(station, 1, index) <= 0) continue;
+    const terminal = inputs.stations[last]!;
+    return {
+      terminalStationId: terminal.stationId,
+      terminalStationName: terminal.stationName || terminal.stationId,
+      holdIndex: index,
+      holdStationId: station.stationId,
+      holdStationName: station.stationName || station.stationId,
+    };
+  }
+  return null;
+}
+
+/**
+ * 在副本上讓一趟在指定站多停 addSeconds 秒（晚 addSeconds 秒到終點，發車不動），
+ * 後面的卡照 buildShiftCandidate 的規則連動。寫進 dwellSlackAdjustment，畫面與後端展開
+ * 逐站時刻都看得到這段等待。這一趟已經在別站加過等待的不再換站加。
+ */
+export function holdTripAtStationInCopy(
+  timelines: Plan,
+  blockId: string,
+  addSeconds: number,
+  stationIndex: number,
+  ctx: PlanEvaluationContext,
+  description: string,
+  reason: DwellSlackAdjustment['reason'],
+): { timelines: Plan; description: string } | null {
+  const trip = timelines.flatMap((timeline) => timeline.blocks).find((block) => block.id === blockId);
+  if (!trip || !isTrip(trip) || addSeconds <= 0) return null;
+  const existing = trip.dwellSlackAdjustment;
+  if (existing && existing.stationIndex !== stationIndex) return null;
+  const candidate = buildShiftCandidate(
+    timelines, trip, 0, addSeconds / 60, ctx, description, addSeconds, stationIndex,
+  );
+  if (!candidate) return null;
+  const copy = clonePlan(timelines);
+  const timeline = copy.find((item) => item.row === candidate.row)!;
+  for (const change of candidate.changes) {
+    const block = timeline.blocks.find((item) => item.id === change.blockId)!;
+    const before = { ...block };
+    block.anchorStartMinute += change.toStartMinute - block.plannedStartMinute;
+    block.plannedStartMinute = change.toStartMinute;
+    block.plannedEndMinute = change.toEndMinute;
+    if (change.addSlackSeconds) {
+      const withSlack = withAddedSlack(block, change.addSlackSeconds, change.slackStationIndex);
+      block.dwellSlackAdjustment = buildSlackAdjustmentRecord(before, withSlack, reason, ctx);
+    }
+  }
+  return { timelines: copy, description: candidate.description };
+}
+
+/**
  * 換成另一條已允許的路線（同終點、關聯圖上的下游相同）在副本上跑同一趟。
  *
  * 起點站不同，車要去的地方就不同——出廠卡擠不過轉折點、或起點站位被佔時，換個起點

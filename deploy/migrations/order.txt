@@ -29,3 +29,7 @@ backend/src/database/migrations/20261028-station-eta-three-rows.sql
 backend/src/database/migrations/20261029-order-list-indexes.sql
 backend/src/database/migrations/20261101-trip-delayed-event.sql
 backend/src/database/migrations/20261102-system-backup.sql
+backend/src/database/migrations/20261103-vehicle-rotation.sql
+backend/src/database/migrations/20261106-event-type-definitions.sql
+backend/src/database/migrations/20261107-vehicle-rotation-recovery.sql
+backend/src/database/migrations/20261109-vendor-role-monitor-only.sql

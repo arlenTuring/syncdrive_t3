@@ -694,6 +694,40 @@ export function moveSelectedRouteExecutionOrder(
   );
 }
 
+/** 拖拉排序：把指定正線移到第 targetIndex 個位置（0 起算），其餘依原相對順序 */
+export function moveSelectedRouteToIndex(
+  routes: ShiftScheduleSelectedRoute[],
+  routeId: string,
+  targetIndex: number,
+): ShiftScheduleSelectedRoute[] {
+  const primaries = sortSelectedRoutesByExecutionOrder(
+    routes.filter((route) => isPrimarySelectedRoute(route)),
+  );
+  const index = primaries.findIndex(
+    (route) =>
+      resolveSelectedRouteInstanceId(route) === routeId || route.routeId === routeId,
+  );
+  if (index < 0) return routes;
+  const clamped = Math.max(0, Math.min(primaries.length - 1, targetIndex));
+  if (clamped === index) return routes;
+  const reordered = [...primaries];
+  const [moved] = reordered.splice(index, 1);
+  reordered.splice(clamped, 0, moved!);
+  const orderByInstanceId = new Map(
+    reordered.map((route, idx) => [resolveSelectedRouteInstanceId(route), idx + 1] as const),
+  );
+  return normalizeSelectedRouteExecutionOrders(
+    routes.map((route) => {
+      if (!isPrimarySelectedRoute(route)) return route;
+      return {
+        ...route,
+        executionOrder:
+          orderByInstanceId.get(resolveSelectedRouteInstanceId(route)) ?? route.executionOrder,
+      };
+    }),
+  );
+}
+
 /** 將指定正線設為火車頭（執行順序第 1）；其餘依原相對順序順延 */
 export function setSelectedRouteAsHead(
   routes: ShiftScheduleSelectedRoute[],

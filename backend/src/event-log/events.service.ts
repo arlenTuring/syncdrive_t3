@@ -8,8 +8,9 @@ import { EventCode, Severity } from '../database/entities/security-event-log.ent
 import { DatasourceInvalidationService } from '../events/datasource-invalidation.service';
 import { SystemFoundationSettingsService } from '../system-health/system-foundation-settings.service';
 import { toCsv, formatInZone, type CsvColumn } from './csv';
-import { DEFAULT_TIME_ZONE, EVENT_PAGE_SIZE, EXPORT_LIMIT, LIVE_LIMIT_MAX, REPLAY_AFTER_MS, REPLAY_BEFORE_MS } from './event-log.constants';
-import { boolParam, enumParam, pageParams, rangeParams, rejectUnknown, textParam } from './query-params';
+import { DEFAULT_TIME_ZONE, EVENT_PAGE_SIZE, EXPORT_LIMIT, LIVE_PAGE_SIZE, REPLAY_AFTER_MS, REPLAY_BEFORE_MS } from './event-log.constants';
+import { BUILT_IN_EVENT_LABEL, EventTypesService, type EventType } from './event-types.service';
+import { boolParam, enumParam, likePattern, pageParams, rangeParams, rejectUnknown, textParam } from './query-params';
 
 export const EVENT_SORTS = ['occurred_at', 'received_at', 'event_code', 'vehicle_code', 'severity'] as const;
 const SORT_SQL: Record<(typeof EVENT_SORTS)[number], string> = {
@@ -20,21 +21,16 @@ const SORT_SQL: Record<(typeof EVENT_SORTS)[number], string> = {
   severity: 'e.severity',
 };
 const SOURCE_TYPES = ['VEHICLE', 'FACILITY', 'SYSTEM'] as const;
-const LIVE_KEYS = ['bucket', 'limit', 'after'];
+const LIVE_KEYS = ['page', 'pageSize', 'keyword', 'vehicleCode', 'eventCode', 'sortBy', 'direction'];
+export const LIVE_SORTS = ['occurred_at', 'severity', 'status'] as const;
+/** 回報內容上限（新的回報；舊資料最多 500 字照常顯示） */
+export const REPORT_NOTE_MAX = 50;
 const QUERY_KEYS = ['from', 'to', 'eventRecordId', 'vehicleCode', 'eventCode', 'severity', 'sourceType', 'acknowledged', 'page', 'pageSize', 'sortBy', 'direction', 'snapshot'];
 const MAX_BIGINT = '9223372036854775807';
 
-export const EVENT_CODE_LABEL: Record<string, string> = {
-  UNSCHEDULED_DOOR_OPEN: '非預期開門',
-  OBSTACLE_DETECTED: '偵測到障礙物',
-  PATH_BLOCKED: '路徑受阻',
-  DIRECTION_VIOLATION: '行向偏離',
-  INTERLOCK_REQ: '路口聯鎖請求',
-  SYSTEM_HEALTH_DEGRADED: '車載系統健康度下降',
-  TRIP_DELAYED: '班車延誤',
-  SYSTEM_BACKUP_FAILED: '自動備份失敗',
-};
-export const SEVERITY_LABEL: Record<string, string> = { INFO: '資訊', WARNING: '警告', CRITICAL: '嚴重' };
+/** 事件類型名稱以事件類型管理為準；這是表格還沒建立時的內建名稱 */
+export const EVENT_CODE_LABEL: Record<string, string> = BUILT_IN_EVENT_LABEL;
+export const SEVERITY_LABEL: Record<string, string> = { INFO: '一般', WARNING: '警告', CRITICAL: '嚴重' };
 export const SOURCE_TYPE_LABEL: Record<string, string> = { VEHICLE: '載具', FACILITY: '設施', SYSTEM: '系統' };
 
 export type EventFilters = {
@@ -72,29 +68,8 @@ type EventRow = {
   acknowledgement_note: string | null;
 };
 
-type LiveBucket = 'pending' | 'confirmed';
-/** 游標：[集合, 嚴重度序／NULL時間序, 排序時間（NULL用0）, 中心端ID] */
-type LiveCursor = [LiveBucket, number, string, string];
 const SEVERITY_RANK_SQL = `CASE e.severity::text WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END`;
-
-function encodeCursor(cursor: LiveCursor) {
-  return Buffer.from(JSON.stringify(cursor)).toString('base64url');
-}
-
-function decodeCursor(raw: unknown): LiveCursor | null {
-  if (raw === undefined || raw === '') return null;
-  try {
-    const value: unknown = typeof raw === 'string' && raw.length <= 200 ? JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) : null;
-    if (
-      Array.isArray(value) && value.length === 4 && (value[0] === 'pending' || value[0] === 'confirmed') &&
-      Number.isInteger(value[1]) && value[1] >= 0 && value[1] <= 2 &&
-      typeof value[2] === 'string' && /^\d{1,19}$/.test(value[2]) && typeof value[3] === 'string' && /^\d{1,19}$/.test(value[3])
-    ) return value as LiveCursor;
-  } catch {
-    // 落到下方統一錯誤
-  }
-  throw new BadRequestException('游標不正確');
-}
+type Labels = Map<string, EventType>;
 
 const LIST_COLUMNS = `e.id::text AS id, e.event_id, e.source_type, e.source_id, e.source_name_snapshot, e.origin, e.vehicle_code,
   e.event_code::text AS event_code, e.severity::text AS severity, e.created_at, e.occurred_at_valid, e.received_at,
@@ -112,9 +87,18 @@ export class EventsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    @Optional() private readonly types?: EventTypesService,
     @Optional() private readonly settings?: SystemFoundationSettingsService,
     @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
+
+  private async labels(): Promise<Labels> {
+    try {
+      return (await this.types?.byCode()) ?? new Map();
+    } catch {
+      return new Map();
+    }
+  }
 
   async timeZone() {
     try {
@@ -195,15 +179,16 @@ export class EventsService {
     const snapshot = await this.snapshotId(filters);
     const where = this.where(filters, snapshot);
     const offset = (filters.page - 1) * filters.pageSize;
-    const [rows, [{ total }]] = await Promise.all([
+    const [rows, [{ total }], labels] = await Promise.all([
       this.dataSource.query(
         `SELECT ${LIST_COLUMNS} FROM security_event_logs e WHERE ${where.sql} ORDER BY ${this.orderBy(filters)} LIMIT ${filters.pageSize} OFFSET ${offset}`,
         where.params,
       ) as Promise<EventRow[]>,
       this.dataSource.query(`SELECT count(*)::int AS total FROM security_event_logs e WHERE ${where.sql}`, where.params),
+      this.labels(),
     ]);
     return {
-      items: rows.map((row) => this.present(row)),
+      items: rows.map((row) => this.present(row, labels)),
       total: Number(total),
       page: filters.page,
       pageSize: filters.pageSize,
@@ -213,71 +198,81 @@ export class EventsService {
     };
   }
 
-  /** 待確認／已確認各自查詢與分頁；兩者均涵蓋全部仍保留資料，不套 24 小時限制。 */
+  /**
+   * 即時事件清單：尚未回報與已回報放在同一張表，頁碼分頁。
+   * 預設發生時間新到舊；可依嚴重度或回報狀態排序，同值再依發生時間新到舊。涵蓋全部仍保留的資料。
+   */
   async live(query: Record<string, unknown>) {
     rejectUnknown(query, LIVE_KEYS);
-    const bucket = enumParam(query.bucket, ['pending', 'confirmed'] as const, '事件集合');
-    if (!bucket) throw new BadRequestException('事件集合為必填');
-    const limit = query.limit === undefined || query.limit === '' ? EVENT_PAGE_SIZE : Number(query.limit);
-    if (!Number.isInteger(limit) || limit < 1 || limit > LIVE_LIMIT_MAX) throw new BadRequestException(`筆數須為 1–${LIVE_LIMIT_MAX}`);
-    const after = decodeCursor(query.after);
-    if (after && after[0] !== bucket) throw new BadRequestException('游標與事件集合不符');
-    const serverTime = Date.now();
-    const params: unknown[] = [limit + 1];
-    let keyset = '';
-    if (after) {
-      const [, rank, time, id] = after;
-      if (bucket === 'pending') {
-        params.push(rank, time, id);
-        keyset = `AND (${SEVERITY_RANK_SQL} > $2::int OR (${SEVERITY_RANK_SQL} = $2::int AND (e.created_at < $3::bigint OR (e.created_at = $3::bigint AND e.id < $4::bigint))))`;
-      } else if (rank === 1) {
-        params.push(id);
-        keyset = `AND e.acknowledged_at IS NULL AND e.id < $2::bigint`;
-      } else {
-        params.push(time, id);
-        keyset = `AND ((e.acknowledged_at IS NOT NULL AND (e.acknowledged_at < $2::bigint OR (e.acknowledged_at = $2::bigint AND e.id < $3::bigint))) OR e.acknowledged_at IS NULL)`;
-      }
+    const { page, pageSize } = pageParams(query.page, query.pageSize, LIVE_PAGE_SIZE);
+    const keyword = textParam(query.keyword, '關鍵字', 64);
+    const vehicleCode = textParam(query.vehicleCode, '載具', 64);
+    const eventCode = textParam(query.eventCode, '事件類型', 64);
+    const sortBy = enumParam(query.sortBy, LIVE_SORTS, '排序欄位') ?? 'occurred_at';
+    const direction = enumParam(query.direction, ['asc', 'desc'] as const, '排序方向') ?? 'desc';
+    const labels = await this.labels();
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    const bind = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    if (vehicleCode) clauses.push(`e.vehicle_code = ${bind(vehicleCode)}`);
+    if (eventCode) clauses.push(`e.event_code::text = ${bind(eventCode)}`);
+    if (keyword) {
+      const like = bind(likePattern(keyword));
+      const lower = keyword.toLowerCase();
+      // 關鍵字也比對類型名稱：名稱在事件類型管理，事件列只有代碼
+      const named = new Set<string>();
+      for (const [code, name] of Object.entries(BUILT_IN_EVENT_LABEL)) if (name.toLowerCase().includes(lower)) named.add(code);
+      for (const item of labels.values()) if (item.name.toLowerCase().includes(lower)) named.add(item.code.toUpperCase());
+      const parts = [
+        `e.vehicle_code ILIKE ${like}`,
+        `e.event_code::text ILIKE ${like}`,
+        `e.display_message ILIKE ${like}`,
+        `e.detail ILIKE ${like}`,
+      ];
+      if (/^\d{1,19}$/.test(keyword)) parts.push(`e.id::text = ${bind(keyword)}`);
+      if (named.size) parts.push(`upper(e.event_code::text) = ANY(${bind([...named])}::text[])`);
+      clauses.push(`(${parts.join(' OR ')})`);
     }
-    const where = bucket === 'pending' ? 'e.is_acknowledged = false' : 'e.is_acknowledged = true';
-    const order = bucket === 'pending'
-      ? `${SEVERITY_RANK_SQL} ASC, e.created_at DESC, e.id DESC`
-      : `e.acknowledged_at DESC NULLS LAST, e.id DESC`;
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const dir = direction === 'asc' ? 'ASC' : 'DESC';
+    const order = sortBy === 'severity'
+      // 降冪＝最嚴重在上
+      ? `${SEVERITY_RANK_SQL} ${direction === 'desc' ? 'ASC' : 'DESC'}, e.created_at DESC, e.id DESC`
+      : sortBy === 'status'
+        // 升冪＝尚未回報在上
+        ? `e.is_acknowledged ${dir}, e.created_at DESC, e.id DESC`
+        : `e.created_at ${dir}, e.id ${dir}`;
+    const offset = (page - 1) * pageSize;
     const rowsPromise = this.dataSource.query(
-      `SELECT ${LIST_COLUMNS},
-              ${bucket === 'pending' ? SEVERITY_RANK_SQL : 'CASE WHEN e.acknowledged_at IS NULL THEN 1 ELSE 0 END'} AS rank,
-              COALESCE(${bucket === 'pending' ? 'e.created_at' : 'e.acknowledged_at'}, 0)::text AS sort_time
-         FROM security_event_logs e WHERE ${where} ${keyset}
-        ORDER BY ${order} LIMIT $1`,
+      `SELECT ${LIST_COLUMNS} FROM security_event_logs e ${where} ORDER BY ${order} LIMIT ${pageSize} OFFSET ${offset}`,
       params,
-    ) as Promise<Array<EventRow & { rank: number; sort_time: string }>>;
-    // 分開的純量子查詢可各自走待確認／已確認部分索引；單一 FILTER aggregate
-    // 會為十幾筆 live row 掃過曾大量刪除留下的整個 heap。
+    ) as Promise<EventRow[]>;
+    // 分開的純量子查詢可各自走尚未回報／已回報部分索引
     const countsPromise = this.dataSource.query(
       `SELECT (SELECT count(*)::int FROM security_event_logs WHERE is_acknowledged = false) AS pending,
-              (SELECT count(*)::int FROM security_event_logs WHERE is_acknowledged = true) AS confirmed,
-              COALESCE((SELECT id FROM security_event_logs ORDER BY id DESC LIMIT 1), 0)::text AS max_id,
-              COALESCE((SELECT acknowledged_at FROM security_event_logs
-                         WHERE is_acknowledged = true AND acknowledged_at IS NOT NULL
-                         ORDER BY acknowledged_at DESC, id DESC LIMIT 1), 0)::text AS max_ack`,
-    ) as Promise<Array<{ pending: number; confirmed: number; max_id: string; max_ack: string }>>;
-    const [rows, [counts], timeZone] = await Promise.all([rowsPromise, countsPromise, this.timeZone()]);
-    const hasMore = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const last = page[page.length - 1];
+              (SELECT count(*)::int FROM security_event_logs WHERE is_acknowledged = true) AS confirmed`,
+    ) as Promise<Array<{ pending: number; confirmed: number }>>;
+    const totalPromise = where
+      ? (this.dataSource.query(`SELECT count(*)::int AS total FROM security_event_logs e ${where}`, params) as Promise<Array<{ total: number }>>)
+      : Promise.resolve(null);
+    const [rows, [counts], filtered, timeZone] = await Promise.all([rowsPromise, countsPromise, totalPromise, this.timeZone()]);
+    const total = filtered ? Number(filtered[0].total) : Number(counts.pending) + Number(counts.confirmed);
     return {
-      items: page.map((row) => this.present(row)),
-      total: bucket === 'pending' ? counts.pending : counts.confirmed,
-      pendingTotal: counts.pending,
-      confirmedTotal: counts.confirmed,
-      hasMore,
-      nextCursor: hasMore && last ? encodeCursor([bucket, Number(last.rank), String(last.sort_time), last.id]) : null,
-      version: `${counts.max_id}:${counts.max_ack}`,
-      serverTime,
+      items: rows.map((row) => this.present(row, labels)),
+      total,
+      page,
+      pageSize,
+      pendingTotal: Number(counts.pending),
+      confirmedTotal: Number(counts.confirmed),
+      serverTime: Date.now(),
       timeZone,
     };
   }
 
-  private present(row: EventRow) {
+  private present(row: EventRow, labels: Labels) {
     return {
       id: row.id,
       eventId: row.event_id,
@@ -287,7 +282,7 @@ export class EventsService {
       origin: row.origin,
       vehicleCode: row.vehicle_code,
       eventCode: row.event_code,
-      eventLabel: EVENT_CODE_LABEL[row.event_code] ?? row.event_code,
+      eventLabel: labels.get(row.event_code.toUpperCase())?.name ?? EVENT_CODE_LABEL[row.event_code] ?? row.event_code,
       severity: row.severity,
       occurredAt: Number(row.created_at),
       // null＝舊資料（未知）；false＝來源沒給時間，以接收時間代替
@@ -315,13 +310,16 @@ export class EventsService {
       [this.parseId(id)],
     );
     if (!row) throw new NotFoundException('找不到事件（可能已依保存政策移除）');
+    const labels = await this.labels();
+    const type = labels.get(String(row.event_code).toUpperCase());
     const trail = await this.dataSource.query(
       `SELECT id::text, action_type, operator_id, operator_name_snapshot, source_ip, result, failure_reason, action_detail, created_at
          FROM operator_action_logs WHERE target_type = 'EVENT' AND target_id = $1 ORDER BY created_at ASC, id ASC LIMIT 50`,
       [id],
     );
     return {
-      ...this.present(row),
+      ...this.present(row, labels),
+      sop: type && (type.sopText || type.sopUrl) ? { text: type.sopText, url: type.sopUrl } : null,
       location: redact(row.location),
       params: redact(row.params),
       detail: row.detail,
@@ -340,14 +338,14 @@ export class EventsService {
   }
 
   /**
-   * 人工確認：條件更新（只更新尚未確認的列），同一交易寫操作稽核。
-   * 兩人同時確認時只有先到者成功；後到者拿到目前狀態與 alreadyAcknowledged=true，不偽造第二次成功。
+   * 回報事件：條件更新（只更新尚未回報的列），同一交易寫操作稽核。送出後不能修改或撤回。
+   * 兩人同時回報時只有先到者成功；後到者拿到目前狀態與 alreadyAcknowledged=true，不偽造第二次成功。
    */
   async acknowledge(id: string, noteRaw: unknown, actor: AuthUser, client: { ip?: string; userAgent?: string | null }) {
-    if (typeof noteRaw !== 'string') throw new BadRequestException('確認緣由為必填，且必須是文字');
+    if (typeof noteRaw !== 'string') throw new BadRequestException('回報內容為必填，且必須是文字');
     const note = noteRaw.trim();
-    if (!note) throw new BadRequestException('請填寫確認緣由');
-    if (note.length > 500) throw new BadRequestException('確認緣由最多 500 字');
+    if (!note) throw new BadRequestException('請填寫回報內容');
+    if ([...note].length > REPORT_NOTE_MAX) throw new BadRequestException(`回報內容最多 ${REPORT_NOTE_MAX} 字`);
     const eventId = this.parseId(id);
     const updated = await this.dataSource.transaction(async (manager) => {
       const rows: Array<{ id: string }> = await manager.query(
@@ -418,6 +416,7 @@ export class EventsService {
       this.dataSource.query(`SELECT count(*)::int AS total FROM security_event_logs e WHERE ${where.sql}`, where.params),
     ]);
     const tz = await this.timeZone();
+    const labels = await this.labels();
     const columns: CsvColumn<EventRow & { location: unknown }>[] = [
       { header: '事件 ID（系統紀錄主鍵）', value: (r) => r.id, raw: true },
       { header: '來源事件 ID', value: (r) => r.event_id, raw: true },
@@ -430,12 +429,12 @@ export class EventsService {
       { header: '來源名稱（當時）', value: (r) => r.source_name_snapshot },
       { header: '載具ID', value: (r) => r.vehicle_code ?? '不適用', raw: true },
       { header: '事件類型代碼', value: (r) => r.event_code, raw: true },
-      { header: '事件類型', value: (r) => EVENT_CODE_LABEL[r.event_code] ?? r.event_code },
+      { header: '事件類型', value: (r) => labels.get(r.event_code.toUpperCase())?.name ?? EVENT_CODE_LABEL[r.event_code] ?? r.event_code },
       { header: '嚴重度', value: (r) => SEVERITY_LABEL[r.severity] ?? r.severity },
-      { header: '人工確認', value: (r) => (r.is_acknowledged ? '已確認' : '未確認') },
-      { header: '確認人', value: (r) => r.acknowledged_by_name },
-      { header: `確認時間（${tz}）`, value: (r) => formatInZone(r.acknowledged_at === null ? null : Number(r.acknowledged_at), tz) },
-      { header: '確認緣由', value: (r) => r.acknowledgement_note },
+      { header: '回報狀態', value: (r) => (r.is_acknowledged ? '已回報' : '尚未回報') },
+      { header: '回報人', value: (r) => r.acknowledged_by_name },
+      { header: `回報時間（${tz}）`, value: (r) => formatInZone(r.acknowledged_at === null ? null : Number(r.acknowledged_at), tz) },
+      { header: '回報內容', value: (r) => r.acknowledgement_note },
       { header: '設備恢復狀態', value: () => '未知' },
       { header: '摘要', value: (r) => r.display_message || r.detail },
       { header: '位置', value: (r) => r.location },
@@ -465,7 +464,7 @@ export class EventsService {
         displayName: v.display_name?.trim() || v.vehicle_code,
         active: v.active,
       })),
-      eventCodes: Object.values(EventCode).map((code) => ({ value: code, label: EVENT_CODE_LABEL[code] ?? code })),
+      eventCodes: this.types ? await this.types.options() : Object.values(EventCode).map((code) => ({ value: code, label: EVENT_CODE_LABEL[code] ?? code })),
       severities: Object.values(Severity).map((value) => ({ value, label: SEVERITY_LABEL[value] })),
       sourceTypes: SOURCE_TYPES.map((value) => ({ value, label: SOURCE_TYPE_LABEL[value] })),
       timeZone: await this.timeZone(),

@@ -10,14 +10,31 @@
  * 日循環：兩個時刻的間距取繞一圈的最短距離（23:59:50 與 00:00:10 差 20 秒）。
  */
 
-export type JunctionPoint = { nodeId: string; instant: number };
+/**
+ * 經過某個點：instant 是到達，until 是離開（停靠、等候）；沒有 until＝一閃而過。
+ * 載客班次在月台的停靠、終點折返都是一段區間，不能只當一個瞬間。
+ */
+export type JunctionPoint = { nodeId: string; instant: number; until?: number };
 export type JunctionReservation = {
   nodeId: string;
   instant: number;
+  /** 離開這個點的時刻；沒有＝一閃而過 */
+  until?: number;
   timelineRow: number;
   /** 呼叫端事先保留、那一列還沒真的排出移動的時刻 */
   reserved?: boolean;
 };
+
+/**
+ * 會跟這筆經過相撞的預約鍵。點跟自己比；雙向路段（seg:…#f／#r）只跟<strong>反方向</strong>比——
+ * 單線防的是對開，同方向跟車由兩端點各自錯開保證先進先出。
+ */
+export function junctionClashKey(nodeId: string): string {
+  if (!nodeId.startsWith('seg:')) return nodeId;
+  if (nodeId.endsWith('#f')) return `${nodeId.slice(0, -2)}#r`;
+  if (nodeId.endsWith('#r')) return `${nodeId.slice(0, -2)}#f`;
+  return nodeId;
+}
 
 export type JunctionShiftQuery = {
   /** 已經加上其他位移（例如設施造成的位移）之後的經過時刻 */
@@ -41,11 +58,38 @@ function activePoints(points: ReadonlyArray<JunctionPoint | null>): JunctionPoin
   return points.filter((point): point is JunctionPoint => point != null);
 }
 
+/**
+ * 兩段佔用（日循環）是否貼得比 buffer 近：前一台離開到後一台到達至少要差開 buffer。
+ * 兩段都是瞬間時，等同 |a − b| < buffer（舊的單點規則）。
+ */
+export function occupanciesClash(
+  aFrom: number,
+  aUntil: number,
+  bFrom: number,
+  bUntil: number,
+  bufferSeconds: number,
+  daySeconds: number,
+): boolean {
+  const base = Math.round((aFrom - bFrom) / daySeconds) * daySeconds;
+  for (const wrap of [base - daySeconds, base, base + daySeconds]) {
+    if (aFrom < bUntil + wrap + bufferSeconds - 1e-9 && bFrom + wrap < aUntil + bufferSeconds - 1e-9) return true;
+  }
+  return false;
+}
+
 function pointIsFree(query: JunctionShiftQuery, point: JunctionPoint, shift: number): boolean {
+  const clashKey = junctionClashKey(point.nodeId);
   return !query.bookings.some((booking) =>
-    booking.nodeId === point.nodeId
+    booking.nodeId === clashKey
     && booking.timelineRow !== query.timelineRow
-    && cyclicGapSeconds(booking.instant, point.instant + shift, query.daySeconds) < query.bufferSeconds - 1e-9);
+    && occupanciesClash(
+      point.instant + shift,
+      (point.until ?? point.instant) + shift,
+      booking.instant,
+      booking.until ?? booking.instant,
+      query.bufferSeconds,
+      query.daySeconds,
+    ));
 }
 
 /** 最小可行位移；範圍內找不到回 null。buffer ≤ 0 或沒有點時回 0 */
@@ -62,9 +106,14 @@ export function solveJunctionShift(query: JunctionShiftQuery): number | null {
   const raw = new Set<number>([query.minShift, query.maxShift]);
   for (const point of points) {
     for (const booking of query.bookings) {
-      if (booking.nodeId !== point.nodeId || booking.timelineRow === query.timelineRow) continue;
-      for (const edge of [booking.instant - query.bufferSeconds, booking.instant + query.bufferSeconds]) {
-        for (const wrap of [-query.daySeconds, 0, query.daySeconds]) raw.add(edge + wrap - point.instant);
+      if (booking.nodeId !== junctionClashKey(point.nodeId) || booking.timelineRow === query.timelineRow) continue;
+      // 貼著對方到達前一個緩衝離開，或對方離開後一個緩衝才到
+      const edges = [
+        booking.instant - query.bufferSeconds - (point.until ?? point.instant),
+        (booking.until ?? booking.instant) + query.bufferSeconds - point.instant,
+      ];
+      for (const edge of edges) {
+        for (const wrap of [-query.daySeconds, 0, query.daySeconds]) raw.add(edge + wrap);
       }
     }
   }
@@ -109,9 +158,9 @@ export function diagnoseJunctionBlock(query: JunctionShiftQuery): JunctionBlockD
         instant: point.instant,
         bookingsInWindow: query.bookings
           .filter((booking) =>
-            booking.nodeId === point.nodeId
+            booking.nodeId === junctionClashKey(point.nodeId)
             && booking.timelineRow !== query.timelineRow
-            && cyclicGapSeconds(booking.instant, center, query.daySeconds) <= half + 1e-9)
+            && occupanciesClash(center - half, center + half, booking.instant, booking.until ?? booking.instant, 0, query.daySeconds))
           .sort((a, b) => a.instant - b.instant),
       };
     }),

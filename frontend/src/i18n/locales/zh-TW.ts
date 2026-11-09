@@ -65,7 +65,7 @@ const zhTW = {
       "media-content": "媒體內容清單",
       "media-groups": "媒體分組清單",
       "media-schedule": "媒體排程設定",
-      "event-list": "即時事件管理",
+      "event-list": "即時事件清單",
       "event-history": "事件管理紀錄",
       "order-records": "訂單管理記錄",
       "video-monitor": "即時影像監控",
@@ -541,6 +541,7 @@ const zhTW = {
     },
     overallPreview: {
       templateName: "模板名稱",
+      scrollHint: "時軸可以左右滑動，查看更多任務",
       emptyHint: "請於「任務排班」步驟放置任務後再預覽",
       readOnlyHint: "僅供預覽，可左右滑動查看班表",
     },
@@ -581,6 +582,7 @@ const zhTW = {
       previous: "上一步",
       next: "下一步",
       saveCreate: "儲存建立",
+      saveAndPreview: "儲存並最後預覽",
       savingDraft: "草稿儲存中…",
       draftSaved: "草稿已自動儲存 ({{time}})",
       autoSaveFailed: "自動儲存失敗",
@@ -960,8 +962,22 @@ const zhTW = {
         "滑鼠移到上方時間軸可看時段屬性；移到班次卡 i 可對照站間拓撲與靠站／緩衝；點選任務區塊可調整計畫發車時刻（10 秒刻度）；點空白處可取消選取",
       hintReadonly:
         "滑鼠移到上方時間軸可看時段屬性；移到班次卡 i 可對照站間拓撲與靠站／緩衝；時軸可以左右滑動",
+      hintWizardDetail:
+        "滑鼠移到上方時間軸可看時段屬性；移到班次卡 ⓘ 可對照站間拓撲與靠站／緩衝；點選班次卡後可用右上角刪除；點空白處取消選取",
     },
     scheduleAdjust: {
+      checkReport: "檢查報告",
+      recheck: "重新檢查",
+      safetyPassed: "安全檢查通過！",
+      safetyFailed: "安全檢查未通過：{{count}} 項阻擋發布",
+      qualityPassed: "品質檢查達標！",
+      qualityFailed: "品質檢查未達標！",
+      blocksPublish: "阻擋發布",
+      unresolved: "尚未排妥",
+      itemCount: "{{count}} 則",
+      showPolicyWarnings: "另有 {{count}} 則策略警告未列出，點此顯示",
+      hidePolicyWarnings: "收起策略警告",
+      rootCauseLabel: "根因：",
       rootFleet: "車不夠",
       rootFleetHint:
         "同時在線車數低於「一輪往返 ÷ 班距」。請增加車輛或放寬班距；分析報表已列出所需數值。",
@@ -1052,9 +1068,9 @@ const zhTW = {
       breakdownNoRecovery: "（{{travel}}s 行駛 + {{dwell}}s 靠站）",
       breakdownWithRecovery:
         "（{{travel}}s 行駛 + {{recovery}}s 恢復 + {{dwell}}s 靠站）",
-      station: "站點:{{name}}",
+      station: "{{name}}",
       dwellMode: "{{name}} 停靠方式",
-      dwellSeconds: "秒數",
+      dwellSeconds: "停靠",
       noStop: "不停靠",
       lineChange: "換線停靠",
       required: "必填",
@@ -1073,7 +1089,7 @@ const zhTW = {
       minRecoveryHelp1:
         "每趟正線行駛結束後，至下一趟正線發車前至少預留的整備／恢復時間。",
       minRecoveryHelp2: "輸入「30」代表最少保留 30 秒恢復空檔。",
-      minRecoveryLabel: "最低恢復時間（秒）",
+      minRecoveryLabel: "最低恢復時間",
       minRecoveryPlaceholder: "必填，如 30",
       minRecoveryAria: "最低恢復時間",
       secondsUnit: "秒",
@@ -1084,7 +1100,7 @@ const zhTW = {
         "規則：後車到站時刻 ≥ 前車實際離站時刻 + 2 × 碰撞保護時間。前車如果因為調度要滯留在站上，以它真正開走的時刻起算。",
       collisionHelp3:
         "這是防碰撞下限，不是把班次擠近的目標；班距約束照舊，兩者取較嚴的。輸入「30」代表兩台車至少隔 60 秒。",
-      collisionLabel: "碰撞保護時間（秒）",
+      collisionLabel: "碰撞保護時間",
       collisionPlaceholder: "預設 30",
       collisionAria: "碰撞保護時間",
       serviceDirHelp: "服務方向說明",
@@ -1135,7 +1151,7 @@ const zhTW = {
       codeRequired: "請填寫路線代號；變更後需重新產生班表。",
       editRoute: "編輯路線",
       delete: "刪除",
-      configureTitle: "配置路線群組",
+      configureTitle: "選擇要套用的路線群組",
       configureHint:
         "選擇場域管理地圖後，以此 mapId 的 JSON（含路網拓樸）載入路線與整備出場站",
       loadingTurnaround: " · 載入折返時限…",

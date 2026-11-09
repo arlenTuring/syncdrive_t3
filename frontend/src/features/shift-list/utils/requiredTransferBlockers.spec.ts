@@ -11,11 +11,12 @@ import type { GeneratedScheduleBlock, GeneratedScheduleTimeline } from './schedu
  *
  * 路網：站 N ──30s── 轉折點 G ──30s── E1／E2／E3；N ──30s── G2 ──30s── E5。
  * - 時間線 1：充電 E1 做到 430 分，接著待命 E2（E1 → G → E2）。
- * - 時間線 2：載客到 N，行檢入廠 N → G → E3，430:00 經過 G。
- * - 時間線 3：載客到 N，保養入廠 N → G → E1，431:00 經過 G、431:30 進 E1。
+ * - 時間線 2：載客到 N，行檢入廠 N → G → E3，430:10 經過 G。
+ * - 時間線 3：載客到 N，保養入廠 N → G → E1，430:50 經過 G、431:20 進 E1。
  *
- * 時間線 1 的充電是作業，不能提早走；又得在時間線 3 進 E1 前 60 秒讓出 E1，
- * 所以只能在 430:00～430:30 之間離開、430:30～431:00 經過 G——兩邊都跟別列車差不到 60 秒。
+ * 時間線 1 的充電是作業，不能提早走；又得在時間線 3 進 E1 前讓出 E1，
+ * 所以只能在 430:00～430:20 之間離開、430:30～430:50 經過 G——
+ * 跟兩邊別列車（430:10、430:50）都差不到碰撞保護的 30 秒（移動車經過點只錯開 1 倍保護）。
  */
 const edge = (from: string, to: string) => ({
   id: `${from}>${to}`, fromNodeId: from, toNodeId: to, avgTravelTimeSeconds: 30, minTravelTimeSeconds: 30, distanceMeters: 50,
@@ -57,8 +58,8 @@ function block(row: number, id: string, taskType: GeneratedScheduleBlock['taskTy
 function timelines(): GeneratedScheduleTimeline[] {
   return [
     { row: 1, blocks: [block(1, 'charge-1', 'charging', 300, 430), block(1, 'standby-1', 'standby', 430, 520)] },
-    { row: 2, blocks: [block(2, 'trip-2', 'passenger', 424.5, 429.5), block(2, 'inspect-2', 'inspection', 430, 480)] },
-    { row: 3, blocks: [block(3, 'trip-3', 'passenger', 425.5, 430.5), block(3, 'service-3', 'servicing', 431.5, 500)] },
+    { row: 2, blocks: [block(2, 'trip-2', 'passenger', 424.5 + 10 / 60, 429.5 + 10 / 60), block(2, 'inspect-2', 'inspection', 430 + 10 / 60, 480)] },
+    { row: 3, blocks: [block(3, 'trip-3', 'passenger', 425 + 20 / 60, 430 + 20 / 60), block(3, 'service-3', 'servicing', 431 + 20 / 60, 500)] },
   ];
 }
 
@@ -100,7 +101,7 @@ describe('必要轉場被別列車的移動佔住轉折點：回報是誰擋的�
     const window = skip!.departureWindow!;
     assert.equal(window.earliestSecond, 430 * 60, '充電做滿才走');
     assert.equal(window.earliestFixed, true, '作業不截尾是使用者固定規則');
-    assert.ok(window.latestSecond < 431.5 * 60 - 59, '最晚要在時間線 3 進 E1 前讓出（含交接間隔）');
+    assert.ok(window.latestSecond < 431 * 60 + 20 - 29, '最晚要在時間線 3 進 E1 前讓出（含交接間隔）');
     assert.equal(window.latestFixed, false, '原格下一台進入者是引擎排出來的，可以重排');
     assert.match(window.latestReason, /時間線 3 要進來/);
   });

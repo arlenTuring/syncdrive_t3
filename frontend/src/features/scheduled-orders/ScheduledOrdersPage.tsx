@@ -91,12 +91,12 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[92vh] w-full ${wide ? "max-w-6xl" : "max-w-2xl"} flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-[#17181c] shadow-2xl`}
+        className={`flex max-h-[92vh] w-full ${wide ? "max-w-6xl" : "max-w-2xl"} flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-[#17181c] text-sm shadow-2xl`}
       >
         <header className="flex items-center justify-between px-6 py-5">
-          <h2 className="text-xl font-semibold">{title}</h2>
+          <h2 className="text-lg font-semibold">{title}</h2>
           <button type="button" onClick={onClose} aria-label="關閉">
-            <X className="size-6" />
+            <X className="size-5" />
           </button>
         </header>
         {children}
@@ -330,7 +330,7 @@ function CreateDialog({
           </div>
           <div className="min-h-0 overflow-y-auto p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">基本資料</h3>
+              <h3 className="text-base font-semibold">基本資料</h3>
               <button
                 type="button"
                 onClick={() => setPicker(true)}
@@ -347,7 +347,7 @@ function CreateDialog({
               <div className="mt-6 space-y-4">
                 <div>
                   <span className="text-sm text-zinc-500">路線名稱</span>
-                  <p className="mt-1 text-lg">{route.route_name}</p>
+                  <p className="mt-1 text-base">{route.route_name}</p>
                 </div>
                 <div>
                   <span className="text-sm text-zinc-500">行程估計</span>
@@ -448,11 +448,11 @@ function DetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="訂單詳情"
-        className="ml-auto h-full w-full max-w-md overflow-y-auto border-l border-zinc-700 bg-[#17181c] p-6 shadow-2xl"
+        className="ml-auto h-full w-full max-w-md overflow-y-auto border-l border-zinc-700 bg-[#17181c] p-6 text-sm shadow-2xl"
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="font-mono text-lg">
+            <h2 className="font-mono text-base">
               {item.order_id || item.schedule_id || item.source_id}
             </h2>
             {!item.order_id ? (
@@ -541,7 +541,7 @@ function CalendarCard({
     <button
       type="button"
       onClick={() => onClick(item)}
-      className="w-full rounded-xl bg-zinc-800 p-4 text-left transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
+      className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-left transition hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
     >
       <div className="flex flex-wrap justify-between gap-3">
         <div className="space-y-2">
@@ -705,7 +705,7 @@ export function ScheduledOrdersPage() {
     );
   };
   return (
-    <div className="flex h-full min-h-0 flex-col p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col p-5 text-sm text-zinc-100">
       <div className="flex flex-wrap items-center gap-3">
         <SiteSelect
           value={vehicle}
@@ -720,14 +720,14 @@ export function ScheduledOrdersPage() {
               label: item.display_name,
             })) ?? []),
           ]}
-          className="w-56 rounded-lg bg-zinc-800 px-4 py-2"
+          className="h-[38px] w-48 rounded-lg bg-zinc-800 px-3 text-sm"
         />
         <button
           onClick={() => {
             setLimitPerGroup(20);
             setSelectedDay(dayKey(Date.now(), timeZone));
           }}
-          className="rounded-lg border border-zinc-700 px-4 py-2"
+          className="h-[38px] rounded-lg border border-zinc-700 px-4 text-sm"
         >
           今天
         </button>
@@ -737,7 +737,7 @@ export function ScheduledOrdersPage() {
         <button onClick={() => shift(1)} aria-label="下一個日期區間">
           <ChevronRight />
         </button>
-        <strong className="min-w-52 flex-1 text-center">
+        <strong className="min-w-52 flex-1 text-center text-base">
           {mode === "week" ? `${keys[0]} ～ ${keys[6]}` : selectedDay}
         </strong>
         <SiteSelect
@@ -750,7 +750,7 @@ export function ScheduledOrdersPage() {
             { value: "day", label: "日" },
             { value: "week", label: "週" },
           ]}
-          className="w-24 rounded-lg border border-zinc-700 px-4 py-2"
+          className="h-[38px] w-24 rounded-lg border border-zinc-700 px-3 text-sm"
         />
         <button
           type="button"
@@ -760,9 +760,9 @@ export function ScheduledOrdersPage() {
               ? setCreateOpen(true)
               : auth.require("operations.dispatch.create")
           }
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2"
+          className="flex h-[38px] items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm"
         >
-          <Plus className="size-5" />
+          <Plus className="size-4" />
           建立排程
         </button>
       </div>

@@ -47,6 +47,13 @@ export type ListOrdersQuery = {
   page_size?: number;
 };
 
+export type CancelOptions = {
+  /** 已請求過取消、車端還沒結案：重送 MQTT 取消通知 */
+  resend?: boolean;
+  /** 故障中的單也記下取消，之後不能再由車端復歸（被別張單取代時用） */
+  retireFaulted?: boolean;
+};
+
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.FAULTED],
   [OrderStatus.PROCESSING]: [OrderStatus.END, OrderStatus.FAULTED],
@@ -806,13 +813,26 @@ export class OrderService {
    * 重複呼叫同一張已請求取消的單，冪等回傳、不重發 MQTT（不然行控多點兩下，
    * 車端就收到兩則一樣的通知）。
    */
-  async requestCancel(id: string): Promise<OperationOrder> {
-    if (!this.nonEmpty(id)) return this.requestCancelLocked(id);
-    return this.withOrderLock(id, () => this.requestCancelLocked(id));
+  async requestCancel(id: string, options: CancelOptions = {}): Promise<OperationOrder> {
+    if (!this.nonEmpty(id)) return this.requestCancelLocked(id, options);
+    return this.withOrderLock(id, () => this.requestCancelLocked(id, options));
   }
 
-  private async requestCancelLocked(id: string): Promise<OperationOrder> {
+  private async requestCancelLocked(id: string, options: CancelOptions): Promise<OperationOrder> {
     const order = await this.getOrderById(id);
+
+    /*
+     * 故障（FAULTED）還能由車端復歸成 PROCESSING。系統要改派別張單取代它時（例如輪替重發調車），
+     * 先記下取消，舊單就不能再復活，兩張單不會同時在跑。只記取消意圖，狀態仍由車端回報。
+     */
+    if (options.retireFaulted && order.status === OrderStatus.FAULTED) {
+      const payload = (order.payload ?? {}) as Record<string, unknown>;
+      if (payload.cancel_requested_at) return order;
+      order.payload = { ...payload, cancel_requested_at: Date.now(), closed_reason: payload.closed_reason ?? 'superseded' };
+      const saved = await this.orderRepository.save(order);
+      this.orderMqttPublisher.publishCancel(saved.vehicleCode, saved.id);
+      return saved;
+    }
 
     if (order.status === OrderStatus.END || order.status === OrderStatus.FAULTED) {
       throw new BadRequestException({
@@ -824,7 +844,15 @@ export class OrderService {
 
     const payload = (order.payload ?? {}) as Record<string, unknown>;
     if (payload.cancel_requested_at) {
-      return order; // 已經請求過，冪等回傳，不重發 MQTT
+      // 已經請求過：預設冪等回傳、不重發 MQTT。呼叫端等太久還沒收到車端結案時可要求重送通知
+      // （通知是 retain:false，車端可能沒收到）；取消時刻不變，仍以第一次請求為準。
+      if (options.resend) {
+        order.payload = { ...payload, cancel_resent_at: Date.now() };
+        const saved = await this.orderRepository.save(order);
+        this.orderMqttPublisher.publishCancel(saved.vehicleCode, saved.id);
+        return saved;
+      }
+      return order;
     }
 
     order.payload = { ...payload, cancel_requested_at: Date.now() };

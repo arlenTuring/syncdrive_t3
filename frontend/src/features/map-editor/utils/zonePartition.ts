@@ -1262,3 +1262,47 @@ export function dropDuplicateZoneBindingsInAreas(areas: MapAreaObject[]): {
 
   return { areas: nextAreas, unbound }
 }
+
+/**
+ * 格位 → 所屬場區（分區入口 id）。
+ *
+ * 同一個場區裡的格位之間移動是場區內部的事：不經過場區入口、不走拓樸，車在區內
+ * 自己移動（模擬器也是這樣處理）。使用者只要在圖上把格位放進分區、分區掛在入口下，
+ * 不必把每一對格位都連成拓樸——那是多對多，畫不完。
+ *
+ * 對應鏈：格位 --parentZoneId--> 分區 --zonePartitionEntranceId--> 分區入口。
+ * 分區沒掛入口時，退回找哪個入口的連結指到這個分區；都沒有就以分區本身當場區。
+ * 設施停靠點節點（fdock:）跟設施本體同一個場區。
+ */
+export function resolveFacilityYardZones(
+  areas: readonly MapAreaObject[] | null | undefined,
+  dockingNodeId?: (facilityId: string) => string,
+): Map<string, string> {
+  const byId = new Map<string, FacilityObject>()
+  const entranceOfPartition = new Map<string, string>()
+  for (const area of areas ?? []) {
+    for (const facility of area.facilities) {
+      byId.set(facility.id, facility)
+      if (isZoneEntrance(facility)) {
+        for (const link of readZoneEntranceLinks(facility.parameters)) {
+          if (link.zoneFacilityId) entranceOfPartition.set(link.zoneFacilityId, facility.id)
+        }
+      }
+    }
+  }
+  const out = new Map<string, string>()
+  for (const facility of byId.values()) {
+    const parent = facility.parameters?.[PARENT_ZONE_ID_KEY]
+    if (typeof parent !== 'string' || !parent.trim()) continue
+    const partitionId = parent.trim()
+    const partition = byId.get(partitionId)
+    const declared = partition?.parameters?.[ZONE_PARTITION_ENTRANCE_ID_KEY]
+    const zoneId =
+      (typeof declared === 'string' && declared.trim() && byId.has(declared.trim()) ? declared.trim() : '')
+      || entranceOfPartition.get(partitionId)
+      || partitionId
+    out.set(facility.id, zoneId)
+    if (dockingNodeId) out.set(dockingNodeId(facility.id), zoneId)
+  }
+  return out
+}

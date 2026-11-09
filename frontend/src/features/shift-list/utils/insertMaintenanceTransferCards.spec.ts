@@ -262,26 +262,43 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     });
 
     it('兩條時間線會在同一個共用轉折點碰頭時，把出發時刻挪開——不是放棄整張卡', () => {
-      // 兩列車都是 09:30 跑完正線、都要進 M 系保養——路徑都要先經過共用的
-      // 轉折點 N2W，時刻完全相同：物理上不可能兩台車同時出現在同一個點。
+      // 兩列車都是 09:30 跑完正線、都要進 M1 保養，但停在<strong>不同的站</strong>（N2W、S2）。
+      // 兩條入廠路徑在共用轉折點 J 會合，抵達 J 的時刻完全相同：物理上不可能兩台車同時出現在同一個點。
+      // （舊版讓兩台車同一刻停在同一站 N2W——那本身就是站位重疊，載客車的停靠也是預約之後就不成立。）
+      const shared: PointTopology = {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'n-n2w', kind: 'docking', label: 'N2W', stationId: 'station_n2w', x: 0, y: 0, color: '#111111' },
+          { id: 'n-s2', kind: 'docking', label: 'S2', stationId: 'station_s2', x: 0, y: 0, color: '#111111' },
+          { id: 'J', kind: 'waypoint', label: 'J', x: 0, y: 0, color: '#111111' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#222222' },
+          { id: 'M2', kind: 'facility', label: 'M2', x: 0, y: 0, color: '#222222' },
+        ],
+        edges: [edge('n-n2w', 'J', 30), edge('n-s2', 'J', 30), edge('J', 'M1', 30), edge('J', 'M2', 30)],
+      };
+      const routes = [
+        ...(ROUTES as never as Array<Record<string, unknown>>),
+        { ...(ROUTES as never as Array<Record<string, unknown>>)[0], routeId: 'as2', routeCode: 'AS', routeName: 'A>S2', stationIds: ['station_a', 'station_s2'] },
+      ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
       const row1 = plan({ yardStartMinute: 10 * 60, row: 1 });
       const row2 = plan({ yardStartMinute: 10 * 60, row: 2 });
+      (row2.timelines[0]!.blocks[0] as { routeId: string }).routeId = 'as2';
       const p: GeneratedSchedulePlan = {
         timelines: [...row1.timelines, ...row2.timelines],
       } as never as GeneratedSchedulePlan;
 
       const result = insertMaintenanceTransferCards({
         timelines: p.timelines,
-        topology: topology(),
-        maintenanceBody: BODY,
-        selectedRoutes: ROUTES,
+        topology: shared,
+        maintenanceBody: { maintenance: { stepEnabled: true, equipmentRows: [{ id: 'r1', mapCode: 'M1' }, { id: 'r2', mapCode: 'M2' }] } },
+        selectedRoutes: routes,
         minimumRecoveryTimeSeconds: 0,
         collisionProtectionSeconds: 30,
       });
 
       assert.equal(
         countCards(p.timelines, 'yard_entry_move'), 2,
-        '兩條線都要排得出入廠卡——共用閘門會碰頭是常態，該由排班挪開時刻解掉',
+        '兩條線都要排得出入廠卡——共用轉折點會碰頭是常態，該由排班挪開時刻解掉',
       );
       assert.equal(
         result.skipped.some((s) => /轉折點撞上/.test(s.reason)), false,
@@ -291,13 +308,12 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const row1Card = p.timelines[0]!.blocks.find((b) => b.source === 'yard_entry_move')!;
       const row2Card = p.timelines[1]!.blocks.find((b) => b.source === 'yard_entry_move')!;
       assert.equal(row1Card.plannedStartMinute, 9 * 60 + 30, '先處理的那條照原本最早時刻走');
-      // 這條路徑只有一段邊，經過轉折點的時刻就等於出發時刻，
-      // 兩台車至少要差開 2 倍碰撞保護時間（2 × 30 秒）
+      // 經過 J 的時刻＝出發＋30 秒；移動車經過同一個點要錯開 1 倍碰撞保護（30 秒）
       const gapSeconds =
         Math.abs(row2Card.plannedStartMinute - row1Card.plannedStartMinute) * 60;
       assert.ok(
-        gapSeconds >= 60 - 1e-9,
-        `第二條要往後挪開至少 60 秒，實際只差 ${gapSeconds} 秒`,
+        gapSeconds >= 30 - 1e-9,
+        `第二條要往後挪開至少 30 秒，實際只差 ${gapSeconds} 秒`,
       );
       // 挪開的代價是整備晚一點開始，但結束時刻不動——入廠卡的規則沒變
       const row2Yard = p.timelines[1]!.blocks.find((b) => b.id === 'yard-2')!;

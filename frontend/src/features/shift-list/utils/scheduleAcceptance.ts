@@ -83,6 +83,8 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
     'VEHICLE_LOCATION_DISCONTINUITY',
     // 移動卡在同一個轉折點貼太近：兩台車實際在路網上交會
     'MOVE_JUNCTION_CONFLICT',
+    // 移動卡整條路徑跟別列車撞上（穿過有車停的月台、同向超車、聯絡線對開）
+    'MOVE_PATH_CONFLICT',
     // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
     'SCHEDULE_SEARCH_INCOMPLETE',
     // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表

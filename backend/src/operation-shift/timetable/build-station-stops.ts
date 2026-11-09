@@ -52,7 +52,7 @@ export type TimetableBlock = {
   /** 單班明確設定的緩衝（含 0）；沒給才看路線 */
   dwellSlackSeconds?: number;
   /** 排班引擎為解除資源衝突增加的緩衝；實際緩衝＝原始＋addedSeconds（見前端 DwellSlackAdjustment） */
-  dwellSlackAdjustment?: { addedSeconds?: number | null } | null;
+  dwellSlackAdjustment?: { addedSeconds?: number | null; stationIndex?: number | null } | null;
 };
 
 export type TimetableStationStop = {
@@ -199,7 +199,25 @@ export function resolveBlockEffectiveDwellSlackSeconds(
       ? 0
       : normalizeDwellSlackSeconds(route?.dwellSlackSeconds ?? 0);
   const added = Math.max(0, Math.round(block.dwellSlackAdjustment?.addedSeconds ?? 0));
-  return base + added;
+  // 指定站的增加量只加在那一站（見 resolveBlockStationExtraDwellSeconds），不算進每站都加的緩衝
+  return base + (block.dwellSlackAdjustment?.stationIndex != null ? 0 : added);
+}
+
+/**
+ * 與前端 `resolveBlockStationExtraDwellSeconds` 相同：引擎只在指定站增加的等待（秒），
+ * 依站序排列；沒有指定站時全是 0。只有適用緩衝的站（有停靠、不是首站／途經／換線）才會加。
+ */
+export function resolveBlockStationExtraDwellSeconds(
+  block: Pick<TimetableBlock, 'dwellSlackAdjustment'>,
+  stations: TimetableStationDwell[],
+): number[] {
+  const extra = stations.map(() => 0);
+  const adjustment = block.dwellSlackAdjustment;
+  const index = adjustment?.stationIndex;
+  if (adjustment == null || index == null || index < 0 || index >= stations.length) return extra;
+  if (applyStationDwellWithSlack(stations[index]!, 1, index) <= 0) return extra;
+  extra[index] = Math.max(0, Math.round(adjustment.addedSeconds ?? 0));
+  return extra;
 }
 
 function resolveBlockStationDwellInputs(
@@ -233,8 +251,9 @@ export function buildTimetableStationStops(
     if (mode === 'no_stop' || mode === 'line_change') return 0;
     return Math.max(0, station.dwellSeconds ?? 0);
   });
+  const extraDwells = resolveBlockStationExtraDwellSeconds(block, stations);
   const dwells = stations.map((station, index) =>
-    applyStationDwellWithSlack(station, slackSeconds, index),
+    applyStationDwellWithSlack(station, slackSeconds, index) + (extraDwells[index] ?? 0),
   );
   const dwellTotal = dwells.reduce((sum, value) => sum + value, 0);
   const startSecond = snapUpToClockAlignSeconds(minuteToSecond(block.plannedStartMinute));

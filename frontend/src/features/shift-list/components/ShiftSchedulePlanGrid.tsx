@@ -102,6 +102,42 @@ const TEMPLATE_TASK_BAR_HEIGHT = 26; // 頂部時間模板任務卡片高度
 const REAL_TASK_BAR_HEIGHT = 52;     // 下層真實排班班次卡卡片高度
 const REAL_TASK_BAR_TOP = 30;        // 下層真實排班班次卡卡片頂部位移
 const EDGE_HANDLE_PX = 8;
+
+/** 列高與卡片位置；精靈第 6 步（appearance='wizard'）上排時段條較高、班次卡較大 */
+type GridRowLayout = {
+  rowHeight: number;
+  templateTop: number;
+  templateHeight: number;
+  cardTop: number;
+  cardHeight: number;
+};
+const DEFAULT_ROW_LAYOUT: GridRowLayout = {
+  rowHeight: ROW_HEIGHT_PX,
+  templateTop: 2,
+  templateHeight: TEMPLATE_TASK_BAR_HEIGHT,
+  cardTop: REAL_TASK_BAR_TOP,
+  cardHeight: REAL_TASK_BAR_HEIGHT,
+};
+/** 精靈外觀：時段條比這寬就不置中（置中的字會跑到畫面外） */
+const WIZARD_CENTER_LABEL_MAX_PX = 720;
+/**
+ * 精靈外觀：每一列是一條「軌道底板」（比背景亮一點），上面是時段條、下面是班次卡，
+ * 列與列之間留暗縫（設計稿的邊界感）。底板從 laneTop 到 rowHeight - laneInset。
+ */
+const WIZARD_LANE_INSET = 5;
+const WIZARD_ROW_LAYOUT: GridRowLayout = {
+  rowHeight: 108,
+  templateTop: WIZARD_LANE_INSET,
+  templateHeight: 30,
+  cardTop: WIZARD_LANE_INSET + 36,
+  cardHeight: 56,
+};
+/**
+ * 精靈外觀的時間刻度：10 分鐘固定 360px（設計稿約 40 分鐘一個畫面）。
+ * 自動格寬會照最短的卡（30 秒的入廠／出廠卡）撐開，10 分鐘變成 800 多 px，
+ * 一個畫面只看得到十來分鐘。縮放（−／＋）照樣以這個為 100%。
+ */
+const WIZARD_SLOT_WIDTH_PX = 360;
 const MANUAL_MIN_DURATION_MINUTES = MANUAL_BLOCK_MIN_DURATION_SECONDS / 60;
 
 const GRID_SLOT_MINUTES = 10;
@@ -704,12 +740,22 @@ function formatBlockTimeRange(block: GeneratedScheduleBlock): string {
   );
 }
 
+function formatCompactTimeRange(block: GeneratedScheduleBlock): string {
+  const start = formatMinuteToHms(block.plannedStartMinute);
+  const end = formatMinuteToHms(block.plannedEndMinute);
+  return start.slice(0, 2) === end.slice(0, 2) ? `${start}–${end.slice(3)}` : `${start}–${end}`;
+}
+
 function TemplateTaskBar({
   task,
   slotWidthPx,
+  layout = DEFAULT_ROW_LAYOUT,
+  wizard = false,
 }: {
   task: ScheduleTask;
   slotWidthPx: number;
+  layout?: GridRowLayout;
+  wizard?: boolean;
 }) {
   const endMinute = task.startMinute + task.durationMinutes;
   const segments = splitIntoDayCycleSegments(task.startMinute, endMinute);
@@ -727,16 +773,28 @@ function TemplateTaskBar({
         return (
           <div
             key={`${task.id}-${index}`}
-            className="pointer-events-none absolute top-[2px] z-[2] flex items-center justify-start overflow-clip rounded-[4px] border border-zinc-700/60 bg-zinc-800/80 px-2"
+            className={`pointer-events-none absolute z-[2] flex items-center justify-start overflow-clip px-2 ${
+              wizard ? 'rounded-t-md border-r border-[#26262b] bg-[#323238]' : 'rounded-[4px] border border-zinc-700/60 bg-zinc-800/80'
+            }`}
             style={{
               left: leftPx,
               width: Math.max(widthPx, 4),
-              height: TEMPLATE_TASK_BAR_HEIGHT,
+              top: layout.templateTop,
+              height: layout.templateHeight,
             }}
             title={`${task.label} ${timeLabel}`}
             aria-hidden
           >
-            {index === 0 ? (
+            {index === 0 && wizard ? (
+              // 短的條置中（設計稿）；長的條置中會跑到畫面外，改成貼在可見範圍左邊
+              <span
+                className={`${widthPx <= WIZARD_CENTER_LABEL_MAX_PX ? 'mx-auto' : 'sticky left-[64px]'} max-w-full truncate text-sm leading-5 text-zinc-100`}
+              >
+                {task.label}
+                <span className="mx-2 text-zinc-500">｜</span>
+                <span className="tabular-nums">{timeLabel}</span>
+              </span>
+            ) : index === 0 ? (
               <span
                 className={`${
                   isSticky ? 'sticky left-[56px]' : ''
@@ -805,14 +863,68 @@ function ScheduleIntervalBackground({
   attributes,
   slotWidthPx,
   interactive = false,
+  wizard = false,
+  layout = DEFAULT_ROW_LAYOUT,
 }: {
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
   slotWidthPx: number;
   /** 頂部時間軸：可 hover 顯示時段屬性／班距 */
   interactive?: boolean;
+  /** 精靈第 6 步：表頭不上色（只保留 hover）；列底深色＋每 10 分鐘一條線，斜線只畫在班次卡那一排的空檔 */
+  wizard?: boolean;
+  layout?: GridRowLayout;
 }) {
   const totalWidth = GRID_VISIBLE_SLOTS * slotWidthPx;
+  if (wizard) {
+    if (!interactive) {
+      return (
+        <>
+          {/* 暗縫＋每 10 分鐘的刻度線：只在列與列之間露出來 */}
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 bg-[#18181b]"
+            style={{
+              width: totalWidth,
+              backgroundImage: `repeating-linear-gradient(to right, rgba(148,148,184,0.18) 0, rgba(148,148,184,0.18) 1px, transparent 1px, transparent ${slotWidthPx}px)`,
+            }}
+            aria-hidden
+          />
+          {/* 軌道底板：把時段條與班次卡框成一列 */}
+          <div
+            className="pointer-events-none absolute left-0 border-y border-white/[0.05] bg-[#26262b]"
+            style={{ width: totalWidth, top: WIZARD_LANE_INSET, height: layout.rowHeight - WIZARD_LANE_INSET * 2 }}
+            aria-hidden
+          />
+          {/* 斜線只畫在班次卡那一排的空檔 */}
+          <div
+            className="schedule-inactive-timeline pointer-events-none absolute left-0"
+            style={{ width: totalWidth, top: layout.cardTop, height: layout.cardHeight }}
+            aria-hidden
+          />
+        </>
+      );
+    }
+    return (
+      <>
+        {intervals.map((slot) => {
+          const range = parseIntervalMinuteRanges([slot])[0];
+          if (!range || range.end <= range.start) return null;
+          const attr = attributes.find((item) => item.id === slot.attributeId);
+          return (
+            <ScheduleIntervalAxisHit
+              key={slot.id}
+              interval={slot}
+              attribute={attr}
+              leftPx={(range.start / GRID_SLOT_MINUTES) * slotWidthPx}
+              widthPx={((range.end - range.start) / GRID_SLOT_MINUTES) * slotWidthPx}
+              accent={attr?.color ?? '#7C86FF'}
+              showBand={false}
+            />
+          );
+        })}
+      </>
+    );
+  }
   return (
     <>
       <div
@@ -864,12 +976,14 @@ function ScheduleIntervalAxisHit({
   leftPx,
   widthPx,
   accent,
+  showBand = true,
 }: {
   interval: TimeSlotInterval;
   attribute: TimeSlotAttribute | undefined;
   leftPx: number;
   widthPx: number;
   accent: string;
+  showBand?: boolean;
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [hovered, setHovered] = useState(false);
@@ -885,7 +999,7 @@ function ScheduleIntervalAxisHit({
   return (
     <>
       {/* 色帶在時間刻度之下，避免蓋住軸文字 */}
-      <div
+      {showBand ? <div
         className="pointer-events-none absolute inset-y-0 z-[1]"
         style={{
           left: leftPx,
@@ -893,7 +1007,7 @@ function ScheduleIntervalAxisHit({
           backgroundColor: blendHexOnBase(accent, 0.38),
         }}
         aria-hidden
-      />
+      /> : null}
       <button
         ref={anchorRef}
         type="button"
@@ -1020,7 +1134,11 @@ function ShiftScheduleBlockBar({
   leadingInsetPx = 0,
   trackOffsetPx = 0,
   pinnedDetail = false,
+  layout = DEFAULT_ROW_LAYOUT,
+  wizard = false,
 }: {
+  layout?: GridRowLayout;
+  wizard?: boolean;
   /** 從報表定位過來：明細（ⓘ 懸浮卡）釘住打開，捲動時跟著卡片走 */
   pinnedDetail?: boolean;
   block: GeneratedScheduleBlock;
@@ -1123,7 +1241,8 @@ function ShiftScheduleBlockBar({
       ? transitionCodes?.[moveCardKind.key] || null
       : resolveMoveCardPrefix(block)
     : null;
-  const timeLabel = formatBlockTimeRange(block);
+  // 精靈外觀卡片較窄：結束時刻跟開始同一小時就省掉小時（00:00:00–03:30），秒數照樣保留
+  const timeLabel = wizard ? formatCompactTimeRange(block) : formatBlockTimeRange(block);
   const selectable =
     block.source === 'template_bar'
     && block.taskType !== 'dispatch'
@@ -1389,7 +1508,7 @@ function ShiftScheduleBlockBar({
     <div
       key={`${block.id}-day-${segIndex}`}
       id={isPrimarySegment && primaryCopy ? `block-card-${block.id}` : undefined}
-      className={`absolute isolate flex flex-col justify-center overflow-hidden rounded-[4px] px-1 ${
+      className={`absolute isolate flex flex-col justify-center overflow-hidden ${wizard ? 'rounded-md px-1.5' : 'rounded-[4px] px-1'} ${
         isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
       } ${
         selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
@@ -1401,8 +1520,8 @@ function ShiftScheduleBlockBar({
       style={{
         left: leftPx,
         width: widthPx,
-        height: REAL_TASK_BAR_HEIGHT,
-        top: REAL_TASK_BAR_TOP,
+        height: layout.cardHeight,
+        top: layout.cardTop,
         backgroundColor: colors.bg,
         // 0 秒卡疊在整備卡的邊界上，要壓在上面才看得到
         zIndex: highlighted
@@ -1571,7 +1690,7 @@ function ShiftScheduleBlockBar({
         className="relative z-[6] w-fit min-w-0 max-w-full self-start px-1 will-change-transform"
       >
         <div
-          className="flex items-center gap-1 truncate text-xs font-semibold leading-tight"
+          className={`flex items-center gap-1 truncate font-semibold ${wizard ? 'text-[13px] leading-[18px]' : 'text-xs leading-tight'}`}
           style={{ color: hasError ? '#FCA5A5' : hasWarning ? '#FDE68A' : colors.text }}
         >
           {hasError || hasWarning ? (
@@ -1597,7 +1716,7 @@ function ShiftScheduleBlockBar({
           <span className="truncate">{code}</span>
         </div>
         {block.routeName ? (
-          <div className="flex min-w-0 items-center gap-0.5 truncate text-[11px] leading-tight text-zinc-200/90 font-medium">
+          <div className={`flex min-w-0 items-center gap-0.5 truncate font-medium text-zinc-200/90 ${wizard ? 'text-xs leading-[17px]' : 'text-[11px] leading-tight'}`}>
             <span className="truncate">{block.routeName}</span>
             {algorithmSummary.addedSlackSeconds > 0 ? (
               <span
@@ -1625,7 +1744,7 @@ function ShiftScheduleBlockBar({
           </div>
         ) : (
           <div
-            className="flex min-w-0 items-center gap-0.5 truncate text-[11px] leading-tight opacity-90 font-medium"
+            className={`flex min-w-0 items-center gap-0.5 truncate font-medium opacity-90 ${wizard ? 'text-xs leading-[17px]' : 'text-[11px] leading-tight'}`}
             style={{ color: block.yardFacilityUnavailable ? '#FCA5A5' : colors.text }}
           >
             <span className="truncate">
@@ -1649,7 +1768,7 @@ function ShiftScheduleBlockBar({
             ) : null}
           </div>
         )}
-        <div className="whitespace-nowrap text-[10px] tabular-nums leading-tight text-zinc-300 font-medium">
+        <div className={`whitespace-nowrap font-medium tabular-nums text-zinc-300 ${wizard ? 'text-[11px] leading-4' : 'text-[10px] leading-tight'}`}>
           {timeLabel}
         </div>
       </ScrollPinnedCardLabel>
@@ -1734,6 +1853,8 @@ export type ShiftSchedulePlanGridProps = {
   onDuplicateBlock?: (blockId: string) => void;
   /** 時間刻度縮放倍率（工具列 −／＋）；1＝自動格寬 */
   zoom?: number;
+  /** 建立班表精靈第 6 步的外觀（深紫藍表頭、較高的時段條與班次卡、底部只留短提示） */
+  appearance?: 'default' | 'wizard';
 };
 
 export function ShiftSchedulePlanGrid({
@@ -1759,12 +1880,15 @@ export function ShiftSchedulePlanGrid({
   onDeleteBlock,
   onDuplicateBlock,
   zoom = 1,
+  appearance = 'default',
 }: ShiftSchedulePlanGridProps) {
   const { t } = useTranslation();
+  const wizard = appearance === 'wizard';
+  const layout = wizard ? WIZARD_ROW_LAYOUT : DEFAULT_ROW_LAYOUT;
   const slotWidthPx = useMemo(
     // 下限 8px：縮到最小時整天仍要畫得出格線，不能塌成 0
-    () => Math.max(8, Math.round(computeAutoSlotWidthPx(plan) * clampGridZoom(zoom))),
-    [plan, zoom],
+    () => Math.max(8, Math.round((appearance === 'wizard' ? WIZARD_SLOT_WIDTH_PX : computeAutoSlotWidthPx(plan)) * clampGridZoom(zoom))),
+    [appearance, plan, zoom],
   );
   const activeIntervalRanges = useMemo(
     () => parseIntervalMinuteRanges(intervals.filter((slot) => !slot.isDraft)),
@@ -1859,23 +1983,25 @@ export function ShiftSchedulePlanGrid({
     });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+    <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${wizard ? 'gap-3' : 'rounded-xl border border-zinc-800/80 bg-zinc-950/40'}`}>
+      {/* 精靈外觀：捲動區是一塊深色、圓角的畫布（設計稿） */}
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto"
+        className={`min-h-0 flex-1 overflow-auto ${wizard ? 'rounded-lg bg-[#18181b]' : ''}`}
+        style={wizard ? { scrollbarColor: '#52525b transparent' } : undefined}
         data-schedule-grid-scroll="true"
       >
         <div
           className="min-w-max"
           style={{ width: totalTrackWidthPx + ROW_LABEL_WIDTH }}
         >
-          <div className="sticky top-0 z-10 bg-[#0c0c0e]/95 backdrop-blur-sm">
-            <div className="flex border-b border-zinc-800/80">
-              <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-zinc-800/60 bg-[#0c0c0e]/95" />
+          <div className={`sticky top-0 z-10 ${wizard ? '' : 'bg-[#0c0c0e]/95 backdrop-blur-sm'}`}>
+            <div className={`flex ${wizard ? '' : 'border-b border-zinc-800/80'}`}>
+              <div className={`sticky left-0 z-20 w-12 shrink-0 ${wizard ? 'border-b border-zinc-700/60 bg-[#18181b]' : 'border-r border-zinc-800/60 bg-[#0c0c0e]/95'}`} />
               {dayCopies.map((copyIndex) => (
                 <div
                   key={copyIndex}
-                  className="relative flex shrink-0"
+                  className={`relative flex shrink-0 ${wizard ? 'bg-[#2d2d4a]' : ''}`}
                   style={{ width: dayWidthPx }}
                 >
                 <ScheduleIntervalBackground
@@ -1883,6 +2009,7 @@ export function ShiftSchedulePlanGrid({
                   attributes={attributes}
                   slotWidthPx={slotWidthPx}
                     interactive
+                    wizard={wizard}
                 />
                   {/* P5: 未服務運能缺口標記 */}
                   <UnservedPulseMarkers report={report} slotWidthPx={slotWidthPx} />
@@ -1891,7 +2018,11 @@ export function ShiftSchedulePlanGrid({
                 {timeSlots.map((slot) => (
                   <div
                     key={slot}
-                      className={`pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                      className={
+                        wizard
+                          ? 'pointer-events-none relative z-[6] shrink-0 border-l border-[#9494b8]/20 py-2.5 pl-1 text-left text-sm tabular-nums text-zinc-300'
+                          : `pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`
+                      }
                     style={{ width: slotWidthPx }}
                   >
                     {formatSlotLabel(slot)}
@@ -1930,8 +2061,8 @@ export function ShiftSchedulePlanGrid({
               onDropTaskType(row, startMinute, taskType);
             };
             return (
-              <div key={row} className="relative flex border-b border-zinc-800/50">
-                <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
+              <div key={row} className={`relative flex ${wizard ? '' : 'border-b border-zinc-800/50'}`}>
+                <div className={`sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center ${wizard ? 'bg-[#18181b] text-sm tabular-nums text-zinc-300' : 'border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500'}`}>
                   {String(row).padStart(2, '0')}
                 </div>
                 {dayCopies.map((copyIndex) => {
@@ -1958,6 +2089,8 @@ export function ShiftSchedulePlanGrid({
                       intervals={intervals.filter((slot) => !slot.isDraft)}
                       attributes={attributes}
                       slotWidthPx={slotWidthPx}
+                      wizard={wizard}
+                      layout={layout}
                     />
                   </div>
                       {rowTemplateTasks.map((task) => (
@@ -1965,6 +2098,8 @@ export function ShiftSchedulePlanGrid({
                           key={task.id}
                           task={task}
                           slotWidthPx={slotWidthPx}
+                          layout={layout}
+                          wizard={wizard}
                         />
                       ))}
                       {visibleEntries.map((entry) => (
@@ -1993,9 +2128,11 @@ export function ShiftSchedulePlanGrid({
                           primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
                           leadingInsetPx={entry.leadingInsetPx}
                           trackOffsetPx={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
+                          layout={layout}
+                          wizard={wizard}
                     />
                   ))}
-                  <div style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }} aria-hidden />
+                  <div style={{ width: slotWidthPx, height: layout.rowHeight }} aria-hidden />
                 </div>
                   );
                 })}
@@ -2005,6 +2142,18 @@ export function ShiftSchedulePlanGrid({
         </div>
       </div>
 
+      {wizard ? (
+        <p className="flex shrink-0 items-center justify-center gap-2 text-sm text-zinc-300">
+          <span
+            className="inline-flex cursor-help"
+            title={interactiveEdit ? t('shiftList.planGrid.hintManual') : onSelectBlock ? t('shiftList.planGrid.hintWizardDetail') : t('shiftList.planGrid.hintReadonly')}
+          >
+            <Info className="size-4 shrink-0" aria-label={t('shiftList.planGrid.hintWizardDetail')} />
+          </span>
+          <span>{t('timeTemplates.overallPreview.scrollHint')}</span>
+          <span aria-hidden>← →</span>
+        </p>
+      ) : (
       <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
         <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
         <span>
@@ -2016,6 +2165,7 @@ export function ShiftSchedulePlanGrid({
         </span>
         <span className="text-zinc-600">← →</span>
       </div>
+      )}
     </div>
   );
 }

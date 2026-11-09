@@ -275,7 +275,26 @@ function moveEstimate(
   return { ms: found, estimated: start !== from || end !== to };
 }
 
-/** 某一列在某時刻停在哪：最後一個已開始任務的終點 */
+/**
+ * 某一列在某時刻依計畫的位置。計畫上已開始、還沒抵達的任務回報 moving，不當成已在終點；
+ * 這只是計畫推算，不能當成車真的到位的證據（到位看訂單回報）。
+ */
+export function rowPositionAt(
+  tasks: readonly PlanTask[],
+  row: number,
+  at: number,
+): { location: string | null; moving: boolean; headingTo: string | null } {
+  const own = sortByDepart(tasks.filter((task) => task.timeline_row === row));
+  const passed = own.filter((task) => task.depart_at <= at);
+  const last = passed.at(-1);
+  if (!last) return { location: own[0]?.origin ?? null, moving: false, headingTo: null };
+  if (last.kind !== 'maintenance' && taskEnd(last) > at && last.origin !== last.destination) {
+    return { location: null, moving: true, headingTo: last.destination };
+  }
+  return { location: last.destination, moving: false, headingTo: null };
+}
+
+/** 某一列在某時刻停在哪：最後一個已開始任務的終點（排換手時間用的計畫推算） */
 export function rowLocationAt(tasks: readonly PlanTask[], row: number, at: number): string | null {
   const own = sortByDepart(tasks.filter((task) => task.timeline_row === row));
   const passed = own.filter((task) => task.depart_at <= at);
@@ -412,6 +431,8 @@ export type ShuntChange = {
   before: string | null;
   after: string | null;
   estimated?: boolean;
+  /** 加開的調車預估要開多久 */
+  durationMs?: number;
 };
 
 export type ShuntOrder = {
@@ -453,6 +474,7 @@ export function buildShuntOrder(args: {
       before: null,
       after: incoming.code,
       estimated: window.moveInEstimated,
+      durationMs: window.moveInMs,
     },
     {
       key: 'add-outgoing',
@@ -464,6 +486,7 @@ export function buildShuntOrder(args: {
       before: null,
       after: outgoing.code,
       estimated: moveOut.estimated,
+      durationMs: Math.max(MINUTE_MS, moveOut.ms),
     },
   ];
   for (const task of window.cancelled) {
@@ -556,7 +579,22 @@ export type DailyReport = {
   blocked: { code: string; reason: string }[];
 };
 
-const swapSpan = (window: SwapWindow): [number, number] => [window.takeoverDepartAt, Math.max(window.next.depart_at, taskEnd(window.next))];
+/** 輪替之間至少隔這麼久，前一組的車放掉場區資源後下一組才進來 */
+export const ROTATION_RESOURCE_BUFFER_MS = 2 * MINUTE_MS;
+
+/**
+ * 一組輪替占用場區的時間：接替車出發、接班，到換下的車開回格位為止，再加緩衝。
+ * 只看到接班那一刻的話，回場期間下一組就可能進場（兩組車在單線場區對向）。
+ */
+export function orderSpan(order: ShuntOrder): [number, number] {
+  const { window } = order;
+  const out = order.changes.find((change) => change.key === 'add-outgoing');
+  const outEnd = out ? out.at + (out.durationMs ?? MINUTE_MS) : 0;
+  return [
+    window.takeoverDepartAt,
+    Math.max(window.next.depart_at, taskEnd(window.next), outEnd) + ROTATION_RESOURCE_BUFFER_MS,
+  ];
+}
 const overlaps = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
 
 /**
@@ -577,7 +615,7 @@ export function buildDailyReport(args: {
   const { tasks, cars, rules, now, dayStart, notBefore, keep = [] } = args;
   const kept = keep.filter((item) => item.status !== 'pending');
   const used = new Set(kept.flatMap((item) => [item.order.outgoing, item.order.incoming]));
-  const spans = kept.filter((item) => item.status !== 'skipped').map((item) => swapSpan(item.order.window));
+  const spans = kept.filter((item) => item.status !== 'skipped').map((item) => orderSpan(item.order));
   const orders: ShuntOrder[] = [];
   const spares = takeoverCandidates({ tasks, cars, rules, now, dayStart }).filter((car) => !used.has(car.code));
   const blocked: DailyReport['blocked'] = [];
@@ -588,24 +626,29 @@ export function buildDailyReport(args: {
       blocked.push({ code: outgoing.code, reason: '沒有可接替車輛' });
       continue;
     }
-    const match = spares
-      .map((incoming) => ({
-        incoming,
-        window: findSwapWindows({ tasks, row: outgoing.row, takeoverRow: incoming.row, dayStart, notBefore }).find(
-          (window) =>
-            window.endOfDay &&
-            window.skippedService.length === 0 &&
-            inTimeRange(window.takeoverDepartAt, rules.windowStart, rules.windowEnd) &&
-            !spans.some((span) => overlaps(span, swapSpan(window))),
-        ),
-      }))
-      .find((candidate) => candidate.window);
-    if (!match?.window) {
+    let match: { incoming: FleetCar; order: ShuntOrder } | null = null;
+    for (const incoming of spares) {
+      const windows = findSwapWindows({ tasks, row: outgoing.row, takeoverRow: incoming.row, dayStart, notBefore }).filter(
+        (window) =>
+          window.endOfDay &&
+          window.skippedService.length === 0 &&
+          inTimeRange(window.takeoverDepartAt, rules.windowStart, rules.windowEnd),
+      );
+      for (const window of windows) {
+        // 占用時間要含回場，所以先組出調車單才知道整段要多久
+        const order = buildShuntOrder({ tasks, outgoing, incoming, window });
+        if (spans.some((span) => overlaps(span, orderSpan(order)))) continue;
+        match = { incoming, order };
+        break;
+      }
+      if (match) break;
+    }
+    if (!match) {
       blocked.push({ code: outgoing.code, reason: `${rules.windowStart}–${rules.windowEnd} 內找不到可換手的時間` });
       continue;
     }
-    orders.push(buildShuntOrder({ tasks, outgoing, incoming: match.incoming, window: match.window }));
-    spans.push(swapSpan(match.window));
+    orders.push(match.order);
+    spans.push(orderSpan(match.order));
     spares.splice(spares.indexOf(match.incoming), 1);
   }
   return { orders, blocked };

@@ -68,6 +68,8 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: '必要的整備轉場排不出來，車到不了下一段',
   VEHICLE_LOCATION_DISCONTINUITY: '車的位置接不起來（缺移動）',
   MOVE_JUNCTION_CONFLICT: '車輛通過路口的間隔不足',
+  MOVE_PATH_CONFLICT: '移動卡途經的月台或路段有別列車',
+  MOVE_PATH_SHIFTED: '已挪動移動卡時刻，避開途經的別列車',
   MAINTENANCE_FACILITY_UNAVAILABLE: '未找到可用整備位置',
   MAINTENANCE_FACILITY_YIELDED: '已調整停放位置',
   MAINTENANCE_ENTRY_EARLY_BLOCKED: '提早進廠被擋，車在站位上多等',
@@ -128,6 +130,8 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: { id: 's10', label: '§10.5 整備轉場小卡' },
   VEHICLE_LOCATION_DISCONTINUITY: { id: 's10', label: '§10.5 整備轉場小卡' },
   MOVE_JUNCTION_CONFLICT: { id: 's10', label: '§10.5 整備轉場小卡' },
+  MOVE_PATH_CONFLICT: { id: 's10', label: '§10.5 整備轉場小卡' },
+  MOVE_PATH_SHIFTED: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_FACILITY_YIELDED: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: 's10', label: '§10.5 整備轉場小卡' },
@@ -383,6 +387,15 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'limit',
     guidance:
       '這是對班表本身的連續性檢查（手改過的班表也會重驗）：前一張卡結束時車在某一格或某一站，下一張卡卻要它在另一個地方，中間沒有任何移動卡。補一張移動卡，或把前後兩段改成同一個地點。',
+  },
+  MOVE_PATH_CONFLICT: {
+    kind: 'limit',
+    guidance:
+      '移動卡（出入場、整備轉場）是車真的開在路網上，整條路徑都要檢查：途經的轉折點跟別列車至少差開 1 × 碰撞保護時間（月台站位另照 §8：後車進站要在前車離站 2 × 碰撞保護時間之後）；同一段路同向行駛，先進的車要先出（不能要求後車穿過前車）；場區聯絡線兩個方向不能同時有車。排班時會先自動挪移動卡的時刻解掉，這一則代表在可挪範圍內找不到解。',
+  },
+  MOVE_PATH_SHIFTED: {
+    kind: 'policy',
+    guidance: '移動卡途經的月台或路段原本會碰上別列車，已自動提早出廠（到站等候）或在月台多等一下再入廠，載客班次時刻不變。',
   },
   MOVE_JUNCTION_CONFLICT: {
     kind: 'limit',
