@@ -14,6 +14,25 @@ import { decryptSecret, signToken, verifyToken, type VideoToken } from './video-
 
 const LIVE_TTL_MS = 10 * 60_000;
 const SAFE_FILE = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)*$/;
+/**
+ * HLS 轉送給媒體服務的查詢參數：LL-HLS 的阻塞請求（_HLS_*）、媒體服務的播放 session（子播放清單與分段網址
+ * 帶 ?session=…，少了它每個請求都會被當成新的播放者）、cookie 檢查。其他參數一律不轉。
+ */
+const HLS_QUERY = /^(_HLS_(msn|part|skip)|session|cookieCheck)$/;
+const HLS_QUERY_VALUE = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** 媒體服務回的導向：同一台、路徑以 prefix 開頭才跟（不跟去別的主機或別條路徑） */
+export function sameServerRedirect(from: URL, location: string | undefined, prefix: string): URL | null {
+  if (!location) return null;
+  let next: URL;
+  try {
+    next = new URL(location, from);
+  } catch {
+    return null;
+  }
+  if (next.origin !== from.origin || !next.pathname.startsWith(prefix)) return null;
+  return next;
+}
 
 type SourceTest = {
   id: string;
@@ -203,8 +222,12 @@ export class VideoLiveService implements OnModuleInit, OnModuleDestroy {
     if (!SAFE_FILE.test(file)) throw new NotFoundException();
     const payload = await this.authorize(token, req, file.endsWith('.m3u8'));
     const target = new URL(`${videoConfig().hlsUrl}/${payload.sub}/${file}`);
-    for (const [key, value] of Object.entries(req.query)) if (typeof value === 'string' && /^_HLS_(msn|part|skip)$/.test(key)) target.searchParams.set(key, value);
-    await this.pipe(target, 'GET', req, res, null);
+    for (const [key, value] of Object.entries(req.query)) {
+      if (typeof value === 'string' && HLS_QUERY.test(key) && HLS_QUERY_VALUE.test(value)) target.searchParams.set(key, value);
+    }
+    // 媒體服務第一次回播放清單前會先導到 ?cookieCheck=1（確認用戶端收不收 cookie）。這個導向不帶回瀏覽器
+    // （Location 是媒體服務內部的路徑，瀏覽器跟過去會打錯地方），在這裡跟過去，只限同一條媒體路徑。
+    await this.pipe(target, 'GET', req, res, null, undefined, `/${payload.sub}/`);
   }
 
   /** WebRTC（WHEP）：轉送 SDP offer／answer 與 ICE 更新 */
@@ -219,13 +242,31 @@ export class VideoLiveService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private pipe(target: URL, method: string, req: Request, res: Response, body: string | null, rewriteLocation?: (l: string) => string | null) {
+  private pipe(
+    target: URL,
+    method: string,
+    req: Request,
+    res: Response,
+    body: string | null,
+    rewriteLocation?: (l: string) => string | null,
+    /** 媒體服務導向同一條路徑底下（以這個前綴開頭）時，在後端直接跟過去，最多一次 */
+    followRedirectWithin?: string,
+    redirectsLeft = 1,
+  ): Promise<void> {
     const { user, password } = videoConfig();
     return new Promise<void>((resolve) => {
       const headers: Record<string, string> = { Authorization: `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}` };
       for (const h of ['content-type', 'if-match', 'range', 'accept']) if (req.headers[h]) headers[h] = String(req.headers[h]);
       if (body !== null) headers['content-length'] = String(Buffer.byteLength(body));
       const upstream = httpRequest(target, { method, headers, timeout: 15_000 }, (up: IncomingMessage) => {
+        const redirect = followRedirectWithin && redirectsLeft > 0 && [301, 302, 303, 307, 308].includes(up.statusCode ?? 0)
+          ? sameServerRedirect(target, up.headers.location, followRedirectWithin)
+          : null;
+        if (redirect) {
+          up.resume();
+          void this.pipe(redirect, method, req, res, body, rewriteLocation, followRedirectWithin, redirectsLeft - 1).then(resolve);
+          return;
+        }
         res.status(up.statusCode ?? 502);
         for (const h of ['content-type', 'content-length', 'cache-control', 'etag', 'accept-patch', 'link', 'content-range', 'accept-ranges']) if (up.headers[h]) res.setHeader(h, up.headers[h] as string);
         const location = up.headers.location;
