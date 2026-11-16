@@ -49,6 +49,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   HEADWAY_BELOW_TARGET: '班距低於目標',
   HEADWAY_PHASE_EVENED: '已調整發車間隔',
   UNSERVED_SERVICE_PULSE: '目標發車時刻未排到車',
+  SERVICE_DEMAND_UNVERIFIABLE: '缺應開服務明細，無法核對載客服務',
   INSUFFICIENT_TIMELINES: '時間線列數不足',
   RECOVERY_INSUFFICIENT: '恢復空檔不足',
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: '換線空檔不足',
@@ -74,6 +75,7 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   MAINTENANCE_FACILITY_YIELDED: '已調整停放位置',
   MAINTENANCE_ENTRY_EARLY_BLOCKED: '提早進廠被擋，車在站位上多等',
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: '已改派路線，配合車輛實際停放位置',
+  ROUND_JOINED_MIDWAY: '車上線時從一輪的中途加入',
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: '已改派路線，讓車開到進得了廠的那一站',
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: '出廠卡要空跑一段（車不在下一班的起點）',
   GEOMETRY_NOT_CONVERGED: '本次試算尚未排妥',
@@ -111,6 +113,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   HEADWAY_BELOW_TARGET: { id: 's5', label: '§5 掛車決策（脈衝）' },
   HEADWAY_PHASE_EVENED: { id: 's5', label: '§5 掛車決策（脈衝）' },
   UNSERVED_SERVICE_PULSE: { id: 's5', label: '§5 掛車決策（脈衝）' },
+  SERVICE_DEMAND_UNVERIFIABLE: { id: 's5', label: '§5 掛車決策（脈衝）' },
   INSUFFICIENT_TIMELINES: { id: 's14', label: '§14 端到端範例（車隊下限）' },
   RECOVERY_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: { id: 's1', label: '§1 核心原則（S1–S4 閘門）' },
@@ -136,6 +139,7 @@ const DOC_ANCHOR: Partial<Record<FeasibilityViolationCode, { id: string; label: 
   MAINTENANCE_FACILITY_YIELDED: { id: 's10', label: '§10.5 整備轉場小卡' },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: 's10', label: '§10.5 整備轉場小卡' },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: { id: 's7', label: '§7 路線關聯圖' },
+  ROUND_JOINED_MIDWAY: { id: 's7', label: '§7 路線關聯圖' },
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: { id: 's10', label: '§10.5 整備轉場小卡' },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: 's7', label: '§7 路線關聯圖' },
   GEOMETRY_NOT_CONVERGED: { id: 's3', label: '§3 流水線' },
@@ -254,7 +258,12 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   UNSERVED_SERVICE_PULSE: {
     kind: 'limit',
     guidance:
-      '這個目標發車時刻未排到車。請查看相鄰班次、車輛可用時間與整備安排。',
+      '時刻表訂的這個發車脈衝沒有車開，載客服務不完整，擋發布。訊息與明細寫著各列不能承接的原因；請查看相鄰班次、車輛可用時間與整備安排。',
+  },
+  SERVICE_DEMAND_UNVERIFIABLE: {
+    kind: 'actionable',
+    guidance:
+      '這份班表沒有記錄「應開的發車脈衝」明細（較舊版本產生的班表），無法確認載客服務是否完整，擋發布。請重新產生班表。',
   },
   INSUFFICIENT_TIMELINES: {
     kind: 'actionable',
@@ -366,6 +375,11 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
     kind: 'actionable',
     guidance:
       '出廠卡會把車從整備位置開到下一班的起點——這是正常機制，不是錯誤。這則只是把代價講出來（空跑多久、途經哪些點）讓你判斷值不值得。想省掉的話，方向是讓車一開始就停得離下一班起點更近，而不是硬補一條路線。',
+  },
+  ROUND_JOINED_MIDWAY: {
+    kind: 'policy',
+    guidance:
+      '車從整備位置出來，離這一輪後面某一站比較近，就直接從那一站加入，不先空車開回循環起點。之後各段時刻不變；前面沒開的那幾段是少掉的載客班次，訊息裡有列出。',
   },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: {
     kind: 'policy',

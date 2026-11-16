@@ -28,6 +28,7 @@ import type {
   FeasibilityIssue,
   GeneratedScheduleBlock,
   GeneratedSchedulePlan,
+  ServicePulseRecord,
 } from './types';
 import { minuteToSecond, secondToMinute, pushIssue } from './types';
 import { resolveEffectiveRouteTravelSeconds } from '../stationLegTravel';
@@ -37,6 +38,7 @@ import {
   resolveRouteForBlock,
 } from '../buildBlockStationDepartures';
 import { formatScheduleClockHms, blocksConflictOnDayCycle } from '../scheduleDayCycle';
+import { splitMidnightJoinedSpans } from '../mergeMidnightSplitYardCards';
 import { nonZeroYardWorkSeconds } from '../yardWorkMinimum';
 import { collectTrajectories, describePathConflict, findPathConflicts, movePassBufferSeconds } from '../pathOccupancy';
 import {
@@ -1404,7 +1406,9 @@ export function validateRotationCyclesComplete(
     let stretch: GeneratedScheduleBlock[] = [];
     const flush = () => {
       if (stretch.length === 0) return;
-      if (stretch.length % routeCount === 0) {
+      // 車上線時從一輪的中途加入：前面沒開的那幾段算進這一輪（見 roundJoinSkippedLegs）
+      const skippedLegs = stretch.reduce((sum, block) => sum + (block.roundJoinSkippedLegs ?? 0), 0);
+      if ((stretch.length + skippedLegs) % routeCount === 0) {
         stretch = [];
         return;
       }
@@ -1464,20 +1468,26 @@ export function validateYardWorkPreserved(args: {
     startMinute: number;
     durationMinutes: number;
     templateStartMinute?: number;
+    /** 這個整備可以被正線佔掉開頭幾秒（含進場）；沒給當 0 */
+    yieldAllowanceSeconds?: number;
   }>;
   maintenanceBody: Record<string, unknown> | null | undefined;
   errors: FeasibilityIssue[];
 }): void {
-  const blocksById = new Map<string, GeneratedScheduleBlock[]>();
+  // 午夜切開又合成一張的卡，模板上仍是兩根條子：拆回兩段，各算在各自的 id 上
+  type WorkSpan = { id: string; startMinute: number; endMinute: number };
+  const blocksById = new Map<string, WorkSpan[]>();
   for (const timeline of args.timelines) {
     for (const block of timeline.blocks) {
       if (!YARD_WORK_CHECK_TYPES.has(block.taskType)) continue;
-      const list = blocksById.get(block.id) ?? [];
-      list.push(block);
-      blocksById.set(block.id, list);
+      for (const span of splitMidnightJoinedSpans(block)) {
+        const list = blocksById.get(span.id) ?? [];
+        list.push(span);
+        blocksById.set(span.id, list);
+      }
     }
   }
-  const findBlocks = (taskId: string): GeneratedScheduleBlock[] => {
+  const findBlocks = (taskId: string): WorkSpan[] => {
     const out = [...(blocksById.get(taskId) ?? [])];
     for (const [id, list] of blocksById) {
       if (id !== taskId && id.startsWith(`${taskId}-`)) out.push(...list);
@@ -1492,7 +1502,10 @@ export function validateYardWorkPreserved(args: {
     if (templateSeconds <= 0) continue;
     void args.maintenanceBody;
     // 硬下限只有「不能歸零」：移動可以把作業壓到低於設定作業時長（使用者 2026-09-30），那部分逐筆揭露、不擋發布
-    const required = Math.min(templateSeconds, nonZeroYardWorkSeconds());
+    // 充電：模板原長扣掉可被正線佔掉的額度（整備任務設定的讓渡餘裕），再短就擋
+    const required = task.taskType === 'charging'
+      ? Math.max(nonZeroYardWorkSeconds(), templateSeconds - Math.max(0, task.yieldAllowanceSeconds ?? 0))
+      : Math.min(templateSeconds, nonZeroYardWorkSeconds());
     const blocks = findBlocks(task.id);
     const where = `時間線 ${task.rowIndex}「${task.label}」（模板 ${formatScheduleClockHms(templateStart)} 起 ${Math.round(templateSeconds / 60)} 分鐘）`;
     if (blocks.length === 0) {
@@ -1506,7 +1519,7 @@ export function validateYardWorkPreserved(args: {
       continue;
     }
     const remaining = Math.round(
-      blocks.reduce((sum, block) => sum + Math.max(0, block.plannedEndMinute - block.plannedStartMinute), 0) * 60,
+      blocks.reduce((sum, block) => sum + Math.max(0, block.endMinute - block.startMinute), 0) * 60,
     );
     if (remaining + 1e-6 < required) {
       pushIssue(args.errors, {
@@ -1796,7 +1809,8 @@ export function validateMovePathConflicts(args: {
         timelineRow: conflict.mine.timelineRow,
         otherTimelineRow: conflict.other.timelineRow,
         gapSeconds: conflict.gapSeconds != null ? Math.round(conflict.gapSeconds) : undefined,
-        shortfallSeconds: conflict.gapSeconds != null ? Math.max(0, bufferSeconds - conflict.gapSeconds) : bufferSeconds,
+        shortfallSeconds: conflict.gapSeconds != null
+          ? Math.max(0, (conflict.requiredGapSeconds ?? bufferSeconds) - conflict.gapSeconds) : bufferSeconds,
       },
     });
   }
@@ -1872,4 +1886,77 @@ export function validateMoveJunctionConflicts(args: {
       },
     });
   }
+}
+
+/**
+ * 應開載客服務完整性：時刻表訂的每一個班距脈衝，班表上都要有車開。
+ *
+ * 依據是產生班表時記下的應開服務明細（plan.servicePulses）：每個脈衝有穩定識別，掛上車的每一趟
+ * 載客班次都帶著同一個 servicePulseId。核對方式只看「班表上實際有沒有這個脈衝的載客班次」，
+ * 不信產生當下的掛車結果——班表可以手改、後處理也可能刪掉班次，發布前要對實際內容重算。
+ *
+ * <ul>
+ *   <li>明細裡標 <code>no_service_window</code> 的脈衝：那個時刻時間模板沒有安排任何一列跑正線，
+ *       不算應開（照樣列在明細裡供檢查）。</li>
+ *   <li>標 <code>no_vehicle</code> 的脈衝：車不夠，仍屬於應開需求。</li>
+ *   <li>其他脈衝班表上找不到載客班次：<code>UNSERVED_SERVICE_PULSE</code>（擋發布）。</li>
+ *   <li>沒有明細、卻是排班引擎產生的班表（班次帶交路識別）：舊產物，核對不了，
+ *       <code>SERVICE_DEMAND_UNVERIFIABLE</code>（擋發布）。手動製作的班表沒有班距需求，不檢查。</li>
+ * </ul>
+ *
+ * @param onlyAssigned 產生器自己用：掛車當下已經報過「沒車承接」的脈衝不再重報，
+ *   只抓「當時有掛上、之後班次卻不見了」的。
+ */
+export function validateServicePulseCoverage(args: {
+  plan: Pick<GeneratedSchedulePlan, 'timelines' | 'servicePulses'>;
+  issues: FeasibilityIssue[];
+  onlyAssigned?: boolean;
+}): void {
+  const { plan, issues, onlyAssigned = false } = args;
+  const passengerBlocks = plan.timelines.flatMap((timeline) =>
+    timeline.blocks.filter((block) => block.taskType === 'passenger'));
+  const pulses = plan.servicePulses;
+  if (!pulses) {
+    const engineGenerated = passengerBlocks.some((block) => block.cycleChainId != null);
+    if (engineGenerated) {
+      pushIssue(issues, {
+        code: 'SERVICE_DEMAND_UNVERIFIABLE',
+        severity: 'error',
+        message: '這份班表沒有應開服務明細（較舊版本產生），無法核對時刻表訂的班次是否都有車開；請重新產生班表。',
+      });
+    }
+    return;
+  }
+  const servedPulseIds = new Set<string>();
+  for (const block of passengerBlocks) {
+    if (block.servicePulseId) servedPulseIds.add(block.servicePulseId);
+  }
+  for (const pulse of pulses) {
+    if (pulse.status === 'no_service_window') continue;
+    if (onlyAssigned && pulse.status !== 'assigned') continue;
+    if (servedPulseIds.has(pulse.pulseId)) continue;
+    pushIssue(issues, {
+      code: 'UNSERVED_SERVICE_PULSE',
+      severity: onlyAssigned ? 'warning' : 'error',
+      message: `班距需求 ${formatScheduleClockHms(secondToMinute(pulse.departureSecond))} 沒有車開：${describeUnservedPulse(pulse)}`,
+      detail: {
+        pulseId: pulse.pulseId,
+        departureSecond: pulse.departureSecond,
+        headwaySeconds: pulse.headwaySeconds,
+        intervalId: pulse.intervalId,
+        intervalName: pulse.intervalName,
+        routeId: pulse.routeId,
+        status: pulse.status,
+        reason: pulse.reason,
+        ...(pulse.rowRejections ? { rowRejections: pulse.rowRejections } : {}),
+      },
+    });
+  }
+}
+
+function describeUnservedPulse(pulse: ServicePulseRecord): string {
+  if (pulse.status === 'assigned') {
+    return `產生時掛在時間線 ${pulse.assignedRow}，但班表上找不到這一輪的載客班次（被刪除或改掉）`;
+  }
+  return pulse.reason ?? '沒有任何一列能合法承接';
 }

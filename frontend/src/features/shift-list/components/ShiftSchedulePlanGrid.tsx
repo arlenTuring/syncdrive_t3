@@ -14,6 +14,7 @@ import {
 import { createPortal } from 'react-dom';
 import { ScrollPinnedCardLabel } from '../../../components/ScrollPinnedCardLabel';
 import {
+  DAY_COPY_COUNT,
   PRIMARY_DAY_COPY_INDEX,
   isWithinDayCycleWindow,
   useDayCycleGridScroll,
@@ -74,6 +75,7 @@ import {
   formatScheduleClockHm,
   formatScheduleClockHms,
   formatScheduleClockRangeHms,
+  resolveDayCopySegments,
   splitIntoDayCycleSegments,
   wrapScheduleMinute,
 } from '../utils/scheduleDayCycle';
@@ -96,6 +98,11 @@ const ROW_LABEL_WIDTH = 48;
  * 各佔一側，誰也不蓋誰；後一段任務的卡面文字往右讓出同樣的寬度。
  */
 const ZERO_DURATION_CARD_WIDTH_PX = 30;
+/**
+ * 卡片窄於這個寬度就不印卡面文字。幾十秒的暫停卡照時間比例只有幾十 px，
+ * 硬印只會剩下被切掉的半個字；內容改由滑鼠停上去的說明顯示。
+ */
+const NARROW_CARD_TEXT_MIN_PX = 56;
 
 // 班次卡大小高度調整參數
 const TEMPLATE_TASK_BAR_HEIGHT = 26; // 頂部時間模板任務卡片高度
@@ -1131,6 +1138,7 @@ function ShiftScheduleBlockBar({
   onDeleteBlock,
   onDuplicateBlock,
   primaryCopy = true,
+  copyIndex = PRIMARY_DAY_COPY_INDEX,
   leadingInsetPx = 0,
   trackOffsetPx = 0,
   pinnedDetail = false,
@@ -1169,6 +1177,11 @@ function ShiftScheduleBlockBar({
    */
   primaryCopy?: boolean;
   /**
+   * 第幾份日拷貝。跨午夜的卡不在日界切開，從日尾一路畫進下一份拷貝；
+   * 只有最左、最右兩份的畫法不同（見 resolveDayCopySegments）。
+   */
+  copyIndex?: number;
+  /**
    * 卡面文字往右讓出的寬度。開頭剛好被一張 0 秒入廠卡壓住時，
    * 不讓的話代號（SC0000 這種）會整個被蓋掉。
    */
@@ -1201,9 +1214,11 @@ function ShiftScheduleBlockBar({
   const isZeroDuration = durationMinutes <= 1e-9;
   const daySegments = useMemo(
     () => {
-      const segments = splitIntoDayCycleSegments(
+      const segments = resolveDayCopySegments(
         block.plannedStartMinute,
         block.plannedEndMinute,
+        copyIndex,
+        DAY_COPY_COUNT,
       );
       if (segments.length > 0 || !isZeroDuration) return segments;
       // 0 長度切不出區段，整張卡會消失——但它是真的存在的一張卡。
@@ -1211,7 +1226,7 @@ function ShiftScheduleBlockBar({
       const point = wrapScheduleMinute(block.plannedStartMinute);
       return [{ startMinute: point, endMinute: point }];
     },
-    [block.plannedStartMinute, block.plannedEndMinute, isZeroDuration],
+    [block.plannedStartMinute, block.plannedEndMinute, isZeroDuration, copyIndex],
   );
   // 跨午夜的卡（兩段）以前不給拖：那時日尾與日頭畫在畫面的兩端，拖哪一段
   // 都看不懂在拖什麼。無限捲動之後兩段實體相鄰、看起來就是一張，拖任一段
@@ -1500,19 +1515,25 @@ function ShiftScheduleBlockBar({
           isZeroDuration && block.source === 'yard_exit_move'
             ? rawLeftPx - widthPx
             : rawLeftPx;
-        // 跨夜卡被日界切成頭尾兩段，兩段是<strong>同一張卡</strong>，內容要一樣——
+        // 跨夜卡平常是完整的一張（從日尾畫進下一份拷貝）。只有最左那份拷貝會多出
+        // 一段日頭，兩段是<strong>同一張卡</strong>，內容要一樣——
         // 只有 DOM id 與 hover 卡這種「整份文件只能有一個」的東西掛在第一段上。
         const showChrome = true;
         const isPrimarySegment = segIndex === 0;
+        // 太窄的卡不印字（只會剩半個字），改成滑鼠停上去看說明；
+        // 不能點選的卡（暫停、等待）平常不收滑鼠事件，窄的時候要打開才看得到說明。
+        const isNarrowCard =
+          !isMoveCard && !isZeroDuration && widthPx < NARROW_CARD_TEXT_MIN_PX;
+        const hoverOnly = isNarrowCard && !selectable;
   return (
     <div
       key={`${block.id}-day-${segIndex}`}
       id={isPrimarySegment && primaryCopy ? `block-card-${block.id}` : undefined}
       className={`absolute isolate flex flex-col justify-center overflow-hidden ${wizard ? 'rounded-md px-1.5' : 'rounded-[4px] px-1'} ${
-        isIdleLike ? 'schedule-task-inactive-overlay pointer-events-none' : ''
+        isIdleLike ? `schedule-task-inactive-overlay ${hoverOnly ? '' : 'pointer-events-none'}` : ''
       } ${
         selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
-      } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : 'pointer-events-none'} ${
+      } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : hoverOnly ? 'cursor-help' : 'pointer-events-none'} ${
         // 虛線邊框＝這張卡不佔時間（同區域 0 秒示意轉移），
         // 跟一般有長度的轉場卡一眼分得出來
         isZeroDuration ? 'border border-dashed border-zinc-100/60' : ''
@@ -1681,7 +1702,7 @@ function ShiftScheduleBlockBar({
           <Info className="ml-0.5 size-2.5 shrink-0 opacity-70" aria-hidden />
         </button>
       ) : null}
-      {showChrome && !isMoveCard ? (
+      {showChrome && !isMoveCard && !isNarrowCard ? (
       <ScrollPinnedCardLabel
         cardLeftPx={trackOffsetPx + leftPx}
         cardWidthPx={widthPx}
@@ -1925,8 +1946,12 @@ export function ShiftSchedulePlanGrid({
         block: GeneratedScheduleBlock;
         index: number;
         previousPassengerBlock: GeneratedScheduleBlock | null;
-        /** 這張卡在鐘面上實際佔用的區間（跨午夜會有兩段），裁切用 */
-        spans: Array<{ start: number; end: number }>;
+        /**
+         * 這張卡在每一份日拷貝上實際畫出來的區間，裁切用。跨午夜的卡從日尾一路畫進
+         * 下一份拷貝，end 會超過 1440——用鐘面兩段去裁的話，視窗停在下一份的凌晨時，
+         * 畫過來的那半張會被當成看不到而整張消失。
+         */
+        spansByCopy: Array<Array<{ start: number; end: number }>>;
         /** 卡面文字要往右讓出的寬度（開頭被 0 秒入廠卡壓住時） */
         leadingInsetPx: number;
       }>
@@ -1953,15 +1978,17 @@ export function ShiftSchedulePlanGrid({
           previousPassengerBlock,
           // 0 秒卡切不出區段，這裡要補回一個點，否則裁切階段就把它整張丟掉，
           // 卡片再怎麼給最小寬度也畫不出來
-          spans: (() => {
-            const segments = splitIntoDayCycleSegments(
+          spansByCopy: Array.from({ length: DAY_COPY_COUNT }, (_, copyIndex) => {
+            const segments = resolveDayCopySegments(
               block.plannedStartMinute,
               block.plannedEndMinute,
+              copyIndex,
+              DAY_COPY_COUNT,
             ).map((seg) => ({ start: seg.startMinute, end: seg.endMinute }));
             if (segments.length > 0) return segments;
             const point = wrapScheduleMinute(block.plannedStartMinute);
             return [{ start: point, end: point }];
-          })(),
+          }),
           leadingInsetPx:
             !isMoveCardBlockSource(block.source) && zeroEntryMinutes.has(startSecond)
               ? ZERO_DURATION_CARD_WIDTH_PX
@@ -2068,7 +2095,7 @@ export function ShiftSchedulePlanGrid({
                 {dayCopies.map((copyIndex) => {
                   // 這一份拷貝在虛擬數線上的起點；跟 viewWindow 同一套座標
                   const visibleEntries = rowEntries.filter((entry) =>
-                    isWithinDayCycleWindow(viewWindow, copyIndex, entry.spans),
+                    isWithinDayCycleWindow(viewWindow, copyIndex, entry.spansByCopy[copyIndex] ?? []),
                   );
                   return (
                     <div
@@ -2126,6 +2153,7 @@ export function ShiftSchedulePlanGrid({
                           onDeleteBlock={onDeleteBlock}
                           onDuplicateBlock={onDuplicateBlock}
                           primaryCopy={copyIndex === PRIMARY_DAY_COPY_INDEX}
+                          copyIndex={copyIndex}
                           leadingInsetPx={entry.leadingInsetPx}
                           trackOffsetPx={ROW_LABEL_WIDTH + copyIndex * dayWidthPx}
                           layout={layout}

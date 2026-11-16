@@ -116,7 +116,8 @@ export function collectMoveJunctionPasses(
           });
           break;
         }
-        instant += edgeSeconds(edge, 'avg');
+        // 卡片是用快排的就用快算經過時刻（見 GeneratedScheduleBlock.yardMovePace）
+        instant += edgeSeconds(edge, block.yardMovePace === 'min' ? 'min' : 'avg');
         if (index === to && !isSharedPoint(ids[index]!)) break;
         passes.push({
           nodeId: ids[index]!,

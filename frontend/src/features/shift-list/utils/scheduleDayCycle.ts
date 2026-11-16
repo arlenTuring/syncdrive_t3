@@ -105,6 +105,37 @@ export function splitIntoDayCycleSegments(
 }
 
 /**
+ * 無限捲動格線（好幾份日拷貝左右並排）專用：同一張卡在「第 copyIndex 份拷貝」上要畫哪幾段。
+ *
+ * 並排之後，日尾和下一份的日頭在畫面上是相鄰的，所以跨午夜的卡<strong>不在日界切開</strong>：
+ * 從日尾一路畫進下一份拷貝，是一張完整的卡（回傳的 endMinute 會超過 1440）。
+ * 切成兩段的話，像 23:59:30 發車的班次，日尾那段只剩 30 秒寬，卡面什麼都看不到。
+ *
+ * 只有整條捲動內容的兩端接不起來：
+ * - 最左那份沒有「前一份」可以把卡畫過來，所以補畫日頭那一段；
+ * - 最右那份後面沒有東西，日尾那段切在日界。
+ * 無限捲動會把視窗拉回中間那份，使用者平常看不到這兩端。
+ */
+export function resolveDayCopySegments(
+  startMinute: number,
+  endMinute: number,
+  copyIndex: number,
+  copyCount: number,
+): DayCycleSegment[] {
+  const segments = splitIntoDayCycleSegments(startMinute, endMinute);
+  if (segments.length !== 2) return segments;
+  const [tail, head] = segments as [DayCycleSegment, DayCycleSegment];
+  const out: DayCycleSegment[] = [];
+  if (copyIndex === 0) out.push(head);
+  out.push(
+    copyIndex < copyCount - 1
+      ? { startMinute: tail.startMinute, endMinute: SCHEDULE_DAY_MINUTES + head.endMinute }
+      : tail,
+  );
+  return out;
+}
+
+/**
  * 引擎占用檢查：把 blocker（通常落在 [0,1440]）貼到 nearMinute 附近 ±1 日，
  * 得到連續時間軸上的拷貝（處理「跨夜保養拆成晚段＋晨段」時，午夜後正線仍撞晨段）。
  */

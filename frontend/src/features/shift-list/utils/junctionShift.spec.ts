@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { diagnoseJunctionBlock, solveJunctionShift, type JunctionShiftQuery } from './junctionShift';
+import { diagnoseJunctionBlock, solveJunctionShift, type JunctionReservation, type JunctionShiftQuery } from './junctionShift';
 
 /** 時刻都只是測試資料；間隔 60 秒、刻度 10 秒 */
 const DAY = 86_400;
-function query(overrides: Partial<JunctionShiftQuery>): JunctionShiftQuery {
+function query({ bookings = [], ...overrides }: Partial<Omit<JunctionShiftQuery, 'bookings'>> & { bookings?: JunctionReservation[] }): JunctionShiftQuery {
+  const byNode = new Map<string, JunctionReservation[]>();
+  for (const booking of bookings) {
+    const group = byNode.get(booking.nodeId) ?? [];
+    group.push(booking);
+    byNode.set(booking.nodeId, group);
+  }
   return {
     points: [{ nodeId: 'gate', instant: 1000 }],
-    bookings: [],
+    bookings: byNode,
     timelineRow: 1,
     minShift: 0,
     maxShift: 119,
@@ -19,6 +25,42 @@ function query(overrides: Partial<JunctionShiftQuery>): JunctionShiftQuery {
 }
 
 describe('轉折點錯開 solveJunctionShift', () => {
+  it('拒絕兩端各有 40 秒間隔但在路段內超車的安排', () => {
+    const nodeId = 'seg:A:B#f';
+    const q = query({
+      points: [{ nodeId, instant: 40, until: 60 }],
+      bookings: [{ nodeId, instant: 0, until: 100, timelineRow: 2 }],
+      minShift: 0,
+      maxShift: 0,
+      bufferSeconds: 30,
+    });
+    assert.equal(solveJunctionShift(q), null);
+    assert.equal(solveJunctionShift({ ...q, points: [{ nodeId, instant: 40, until: 140 }] }), 0);
+  });
+  it('跨午夜的同向路段仍須先進先出', () => {
+    const nodeId = 'seg:A:B#f';
+    const q = query({
+      points: [{ nodeId, instant: 20, until: 80 }],
+      bookings: [{ nodeId, instant: DAY - 40, until: DAY + 120, timelineRow: 2 }],
+    });
+    assert.equal(solveJunctionShift({ ...q, maxShift: 30 }), null);
+    assert.equal(solveJunctionShift(q), 40);
+  });
+
+  it('拒絕 07:04:30 出場移動穿越載客車仍佔用的 T3U', () => {
+    const nodeId = '156';
+    const q = query({
+      points: [{ nodeId, instant: 7 * 3600 + 4 * 60 + 30 }],
+      bookings: [{
+        nodeId, instant: 7 * 3600 + 60 + 30, until: 7 * 3600 + 7 * 60 + 30, timelineRow: 5,
+      }],
+      timelineRow: 2,
+      berthNodeIds: new Set([nodeId]),
+      bufferSeconds: 30,
+      maxShift: 0,
+    });
+    assert.equal(solveJunctionShift(q), null);
+  });
   it('單一阻擋：往後挪到剛好差開保護間隔', () => {
     const shift = solveJunctionShift(query({ bookings: [{ nodeId: 'gate', instant: 1010, timelineRow: 2 }] }));
     assert.equal(shift, 70); // 1070 − 1010 = 60，剛好等於間隔也算差開
@@ -102,5 +144,46 @@ describe('單線路段：只防對開，同方向跟車不互斥', () => {
       maxShift: 200,
     }));
     assert.equal(shift, 90); // 1030 + 60 − 1000
+  });
+});
+
+describe('月台套站位規則 solveJunctionShift', () => {
+  const berthNodeIds = new Set(['NWD']);
+
+  it('跟在停靠車後面可留 30 秒，有空檔時優先留 60 秒', () => {
+    const q = query({
+      points: [{ nodeId: 'NWD', instant: 1030 }],
+      bookings: [{ nodeId: 'NWD', instant: 800, until: 1000, timelineRow: 2 }],
+      bufferSeconds: 30,
+      minShift: 0,
+      maxShift: 300,
+      berthNodeIds,
+      preferBerthClearance: true,
+    });
+    assert.equal(solveJunctionShift(q), 30);
+    assert.equal(solveJunctionShift({ ...q, maxShift: 0 }), 0);
+  });
+
+  it('月台上對方在停靠：要差開兩倍間隔', () => {
+    // 我 1000 經過；對方 1030 到、停到 1600。一倍間隔 30 秒本來可以，站位規則要 60 秒
+    const base = query({
+      points: [{ nodeId: 'NWD', instant: 1000 }],
+      bookings: [{ nodeId: 'NWD', instant: 1030, until: 1600, timelineRow: 2 }],
+      bufferSeconds: 30,
+      minShift: -120,
+      maxShift: 0,
+    });
+    assert.equal(solveJunctionShift(base), 0);
+    assert.equal(solveJunctionShift({ ...base, berthNodeIds }), -30);
+  });
+
+  it('月台上兩台都只是經過：維持一倍間隔', () => {
+    const q = query({
+      points: [{ nodeId: 'NWD', instant: 1000 }],
+      bookings: [{ nodeId: 'NWD', instant: 1030, timelineRow: 2 }],
+      bufferSeconds: 30,
+      berthNodeIds,
+    });
+    assert.equal(solveJunctionShift(q), 0);
   });
 });

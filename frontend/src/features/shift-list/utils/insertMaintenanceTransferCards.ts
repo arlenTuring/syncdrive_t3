@@ -4,7 +4,7 @@ import {
   resolveMaintenanceEntrySlackSeconds,
   type MaintenanceEntrySlackBySection,
 } from './resolveMaintenanceEntrySlackSeconds';
-import { diagnoseJunctionBlock, junctionClashKey, occupanciesClash, solveJunctionShift, type JunctionShiftQuery } from './junctionShift';
+import { diagnoseJunctionBlock, hasPreferredBerthClearance, junctionClashKey, junctionOvertakes, occupanciesClash, occupancyGapSeconds, occupancyStops, solveJunctionShift, type JunctionShiftQuery } from './junctionShift';
 import { collectTrajectories, movePassBufferSeconds } from './pathOccupancy';
 import type { PointTopology, PointTopologyEdge } from '../../map-editor/types/pointTopology';
 import type { MapAreaObject } from '../../map-editor/types/area';
@@ -16,6 +16,7 @@ import {
   edgeSeconds,
   explainTopologyPathGap,
   findTopologyPath,
+  findTopologyPaths,
   missingTravelTimeEdgesBetween,
   type TopologyEdgeRef,
 } from './findTopologyPath';
@@ -267,6 +268,11 @@ export type MaintenanceTransferCardsResult = {
     reason: string;
   }>;
   skipped: Array<{
+    /**
+     * 哪一種移動卡排不出：入廠（載客→整備）、出廠（整備→載客）、整備間轉場（整備→整備）。
+     * 呼叫端要依種類決定怎麼補救，<strong>不得</strong>從 reason 的文字去猜。
+     */
+    transferKind: 'entry' | 'exit' | 'transit';
     timelineRow: number;
     /** 對應的整備任務區塊 id，讓警告能掛回那張卡（UI 靠這個標 ⚠） */
     blockId?: string;
@@ -274,6 +280,14 @@ export type MaintenanceTransferCardsResult = {
     fromTaskType?: string;
     toTaskType?: string;
     reason: string;
+    chargingEntry?: {
+      startSecond: number;
+      endSecond: number;
+      requiredSeconds: number;
+      passengerReleaseSecond: number;
+      recoverySeconds: number;
+      candidates: Array<{ facilityId: string; nodeIds: string[]; travelSeconds: number; latestDeparture: number }>;
+    };
     /**
      * 這一列整天都沒有前／後載客班次——車沒有要去的地方，本來就不需要入出廠卡，
      * 不是排不出來。跟「有後續任務、但排不出合法移動」的必要轉場失敗分開；
@@ -1129,6 +1143,13 @@ export function insertMaintenanceTransferCards(args: {
    * movePassBufferSeconds）。
    */
   const collisionBufferSeconds = movePassBufferSeconds(collisionProtectionSeconds);
+  /** 月台（停靠點）：移動車在這裡掉頭、進出，跟別台車的停靠套站位規則（見 junctionShift.occupancyGapSeconds） */
+  const berthNodeIds: ReadonlySet<string> = new Set(
+    (topology?.nodes ?? []).filter((node) => node.kind === 'docking').map((node) => node.id),
+  );
+  /** 這個點上，我的佔用跟一筆別列車的佔用要差開幾秒 */
+  const junctionGapSeconds = (nodeId: string, laterStops: boolean) =>
+    occupancyGapSeconds({ berth: berthNodeIds.has(nodeId), bStops: laterStops, passSeconds: collisionBufferSeconds });
 
   /**
    * 整備開始最多可以晚多久＝<strong>車最多可以晚多久才進得到設施</strong>。
@@ -1181,11 +1202,13 @@ export function insertMaintenanceTransferCards(args: {
     return Math.max(60, collisionBufferSeconds * 4);
   }
   /**
-   * 移動（入廠晚到、整備間轉場）之後整備至少要留下的工作時間：不能是零就好（使用者 2026-09-30：
-   * 模板不會替移動留時間，移動可以佔用後一段作業的開頭，低於設定作業時長時逐筆揭露）。
+   * 充電的設定時長來自這次轉場處理前的作業卡。其餘整備沿用至少一個刻度。
    */
-  function minimumYardWorkSeconds(taskType: string): number {
-    void taskType;
+  function minimumYardWorkSeconds(block: GeneratedScheduleBlock): number {
+    if (block.taskType === 'charging') {
+      return Math.max(nonZeroYardWorkSeconds(), block.requiredChargingSeconds
+        ?? minuteToSecond(block.plannedEndMinute - block.plannedStartMinute));
+    }
     return nonZeroYardWorkSeconds();
   }
   /** 整備設定裡的作業時長（沒有設定的是一個刻度）；只用來在報告裡對照 */
@@ -1210,37 +1233,23 @@ export function insertMaintenanceTransferCards(args: {
    *
    * 只預約點的話，一台進場、一台出場在同一段單線上對開時，兩邊經過端點的時刻可以各自
    * 差開保護時間，卻在路段中間迎面撞上（2026-11-09 實錄：入口點 ↔ NW下發1 對開 7 筆）。
-   * 路段用「進入～離開」整段時間預約，同向跟車也要等前車出了這一段——保守，但不會對撞。
+   * 路段用「進入～離開」整段時間預約；同向跟車允許區間重疊，但必須先進先出。
    */
-  const twoWayEdges = new Set<string>();
-  {
-    const directed = new Set(topology.edges.map((edge) => `${edge.fromNodeId}>${edge.toNodeId}`));
-    for (const edge of topology.edges) {
-      if (directed.has(`${edge.toNodeId}>${edge.fromNodeId}`)) twoWayEdges.add(`${edge.fromNodeId}>${edge.toNodeId}`);
-    }
-  }
-  /**
-   * 雙向路段的佔用鍵，帶方向（#f＝由小 id 往大 id、#r＝反方向）。
-   * 單線要防的是<strong>對開</strong>：反方向的車在同一段上就撞。同方向先後開上去是跟車，
-   * 兩端的點各自錯開碰撞保護就夠（先進先出由端點保證），不必整段互斥——
-   * 2026-11-09 實測：兩台車同方向出 E 區只差 20 秒進入口點↔NW下發1，被整段互斥擋掉出廠卡。
-   */
-  function segmentKey(fromNodeId: string, toNodeId: string): string | null {
-    if (!twoWayEdges.has(`${fromNodeId}>${toNodeId}`)) return null;
+  /** 有向路段的進出區間。雙向路段查反向佔用，所有路段都查同向先進先出。 */
+  function segmentKey(fromNodeId: string, toNodeId: string): string {
     return fromNodeId < toNodeId ? `seg:${fromNodeId}|${toNodeId}#f` : `seg:${toNodeId}|${fromNodeId}#r`;
   }
-  /** 一條路徑從 startInstant 出發，經過的每一段雙向路段與進出時刻 */
   function segmentPassesOf(
     edges: readonly PointTopologyEdge[],
     startInstant: number,
+    pace: 'avg' | 'min' = 'avg',
   ): Array<{ nodeId: string; instant: number; until: number }> {
     const out: Array<{ nodeId: string; instant: number; until: number }> = [];
     let instant = startInstant;
     for (const edge of edges) {
       const enter = instant;
-      instant += edgeSeconds(edge, 'avg');
-      const key = segmentKey(edge.fromNodeId, edge.toNodeId);
-      if (key) out.push({ nodeId: key, instant: enter, until: instant });
+      instant += edgeSeconds(edge, pace);
+      out.push({ nodeId: segmentKey(edge.fromNodeId, edge.toNodeId), instant: enter, until: instant });
     }
     return out;
   }
@@ -1250,9 +1259,14 @@ export function insertMaintenanceTransferCards(args: {
     return { ...pass, instant: pass.instant + shift, ...(pass.until != null ? { until: pass.until + shift } : {}) };
   }
 
-  const junctionBookings: JunctionBooking[] = [];
+  const junctionBookings = new Map<string, JunctionBooking[]>();
+  function addJunctionBooking(booking: JunctionBooking) {
+    const list = junctionBookings.get(booking.nodeId);
+    if (list) list.push(booking);
+    else junctionBookings.set(booking.nodeId, [booking]);
+  }
   if (collisionBufferSeconds > 0) {
-    for (const pass of args.reservedJunctionPasses ?? []) junctionBookings.push({ ...pass, reserved: true });
+    for (const pass of args.reservedJunctionPasses ?? []) addJunctionBooking({ ...pass, reserved: true });
     /*
      * 載客班次走過、停過的每一個點（含終點折返的停留）也是預約。
      * 原本只登記別張移動卡的轉折點，移動卡排時刻時看不到載客車——出場卡穿過
@@ -1264,17 +1278,16 @@ export function insertMaintenanceTransferCards(args: {
       // 這裡會重新產生的入廠／出廠／轉場卡不算（舊的會被換掉）；其他策略已經插好的移動卡（讓站等）照樣是預約
       if (trajectory.kind !== 'passenger' && /^(yardentry|yardexit|yardtransit)-/.test(trajectory.blockId)) continue;
       trajectory.visits.forEach((visit, index) => {
-        junctionBookings.push({
+        addJunctionBooking({
           nodeId: visit.nodeId,
           instant: visit.arriveSecond,
           until: visit.departSecond,
           timelineRow: trajectory.timelineRow,
         });
         const next = trajectory.visits[index + 1];
-        const key = next ? segmentKey(visit.nodeId, next.nodeId) : null;
-        if (key && next) {
-          junctionBookings.push({
-            nodeId: key,
+        if (next && next.nodeId !== visit.nodeId) {
+          addJunctionBooking({
+            nodeId: segmentKey(visit.nodeId, next.nodeId),
             instant: visit.departSecond,
             until: next.arriveSecond,
             timelineRow: trajectory.timelineRow,
@@ -1287,10 +1300,14 @@ export function insertMaintenanceTransferCards(args: {
   function junctionIsFree(nodeId: string, instant: number, timelineRow: number, until = instant): boolean {
     if (collisionBufferSeconds <= 0) return true;
     const clashKey = junctionClashKey(nodeId);
-    return !junctionBookings.some((b) =>
-      b.nodeId === clashKey
-      && b.timelineRow !== timelineRow
-      && occupanciesClash(instant, until, b.instant, b.until ?? b.instant, collisionBufferSeconds, daySeconds));
+    return !(junctionBookings.get(clashKey) ?? []).some((b) =>
+      b.timelineRow !== timelineRow
+      && occupanciesClash(
+        instant, until, b.instant, b.until ?? b.instant,
+        junctionGapSeconds(nodeId, occupancyStops(b.instant, b.until)),
+        daySeconds,
+        junctionGapSeconds(nodeId, occupancyStops(instant, until)),
+      )) && !junctionOvertakes(junctionBookings, nodeId, instant, until, timelineRow, daySeconds);
   }
 
   /** 整條路徑的每個點平移 shift 秒後都沒撞到別列車 */
@@ -1311,17 +1328,18 @@ export function insertMaintenanceTransferCards(args: {
     path: { edges: PointTopologyEdge[] },
     startInstant: number,
     options: { includeStart: boolean; includeEnd: boolean },
+    pace: 'avg' | 'min' = 'avg',
   ): Array<{ nodeId: string; instant: number; until?: number }> {
     const out: Array<{ nodeId: string; instant: number; until?: number }> = [];
     if (path.edges.length === 0) return out;
     let instant = startInstant;
     if (options.includeStart) out.push({ nodeId: path.edges[0]!.fromNodeId, instant });
     path.edges.forEach((edge, index) => {
-      instant += edgeSeconds(edge, 'avg');
+      instant += edgeSeconds(edge, pace);
       if (index === path.edges.length - 1 && !options.includeEnd) return;
       out.push({ nodeId: edge.toNodeId, instant });
     });
-    out.push(...segmentPassesOf(path.edges, startInstant));
+    out.push(...segmentPassesOf(path.edges, startInstant, pace));
     return out;
   }
 
@@ -1335,13 +1353,14 @@ export function insertMaintenanceTransferCards(args: {
     if (collisionBufferSeconds <= 0) return;
     // 這一列真的排出經過這個點的移動了：它自己在這個點的保留就作廢（時刻可能已經不同），
     // 不然沒人用的舊保留會繼續擋住別列車的搜尋
-    for (let index = junctionBookings.length - 1; index >= 0; index -= 1) {
-      const booking = junctionBookings[index]!;
-      if (booking.reserved && booking.timelineRow === timelineRow && booking.nodeId === nodeId) {
-        junctionBookings.splice(index, 1);
+    const bookings = junctionBookings.get(nodeId);
+    if (bookings) for (let index = bookings.length - 1; index >= 0; index -= 1) {
+      const booking = bookings[index]!;
+      if (booking.reserved && booking.timelineRow === timelineRow) {
+        bookings.splice(index, 1);
       }
     }
-    junctionBookings.push({
+    addJunctionBooking({
       nodeId, instant, timelineRow, ...(until != null && until > instant ? { until } : {}), ...(owner ? { owner } : {}),
     });
   }
@@ -1359,15 +1378,16 @@ export function insertMaintenanceTransferCards(args: {
   ): void {
     for (const point of points) {
       if (!point) continue;
-      for (const booking of junctionBookings) {
-        if (!booking.owner || booking.nodeId !== junctionClashKey(point.nodeId) || booking.timelineRow === timelineRow) continue;
+      for (const booking of junctionBookings.get(junctionClashKey(point.nodeId)) ?? []) {
+        if (!booking.owner || booking.timelineRow === timelineRow) continue;
         const inWindow = occupanciesClash(
           point.instant + minShiftSeconds,
           point.instant + maxShiftSeconds,
           booking.instant,
           booking.until ?? booking.instant,
-          collisionBufferSeconds,
+          junctionGapSeconds(point.nodeId, occupancyStops(booking.instant, booking.until)),
           daySeconds,
+          collisionBufferSeconds,
         );
         if (!inWindow) continue;
         if (tally.junctionBlockers.some((item) => item.blockingBlockId === booking.owner!.blockId)) continue;
@@ -1435,6 +1455,7 @@ export function insertMaintenanceTransferCards(args: {
       bufferSeconds: collisionBufferSeconds,
       daySeconds,
       alignSeconds: SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS,
+      berthNodeIds,
     };
   }
   function resolveJunctionShiftSeconds(
@@ -1444,7 +1465,10 @@ export function insertMaintenanceTransferCards(args: {
     minShiftSeconds: number,
     maxShiftSeconds: number,
   ): number | null {
-    return solveJunctionShift(junctionQuery(points, timelineRow, minShiftSeconds, maxShiftSeconds));
+    return solveJunctionShift({
+      ...junctionQuery(points, timelineRow, minShiftSeconds, maxShiftSeconds),
+      preferBerthClearance: true,
+    });
   }
 
   /**
@@ -1458,14 +1482,15 @@ export function insertMaintenanceTransferCards(args: {
     referenceInstant: number,
     direction: 'arriving-at-facility' | 'leaving-facility',
     fallbackNodeId: string,
+    pace: 'avg' | 'min' = 'avg',
   ): { nodeId: string; instant: number } {
     if (path.edges.length === 0) return { nodeId: fallbackNodeId, instant: referenceInstant };
     if (direction === 'arriving-at-facility') {
       const lastEdge = path.edges[path.edges.length - 1]!;
-      return { nodeId: lastEdge.fromNodeId, instant: referenceInstant - edgeSeconds(lastEdge, 'avg') };
+      return { nodeId: lastEdge.fromNodeId, instant: referenceInstant - edgeSeconds(lastEdge, pace) };
     }
     const firstEdge = path.edges[0]!;
-    return { nodeId: firstEdge.toNodeId, instant: referenceInstant + edgeSeconds(firstEdge, 'avg') };
+    return { nodeId: firstEdge.toNodeId, instant: referenceInstant + edgeSeconds(firstEdge, pace) };
   }
 
   // 前一次 decideOnly 呼叫的結果，哪些要沿用、哪些要重算：
@@ -1594,6 +1619,267 @@ export function insertMaintenanceTransferCards(args: {
   }
 
   /**
+   * 選位用的佔用索引：轉折點／路段 → 別列車在那裡的時段。第一次選位時建一次。
+   * 選位發生在任何移動卡排定之前，這時的預約就是載客班次走過、停過的每一個點
+   * （加上呼叫端保留的轉折點），跟最終驗證看的是同一份軌跡。
+   */
+  let stayPickOccupancy: Map<string, Array<{ from: number; until: number; row: number }>> | null = null;
+  function stayPickOccupancyIndex() {
+    if (stayPickOccupancy) return stayPickOccupancy;
+    stayPickOccupancy = new Map();
+    const add = (nodeId: string, from: number, until: number, row: number) => {
+      const list = stayPickOccupancy!.get(nodeId) ?? [];
+      list.push({ from, until, row });
+      stayPickOccupancy!.set(nodeId, list);
+    };
+    for (const bookings of junctionBookings.values()) {
+      for (const booking of bookings) add(booking.nodeId, booking.instant, booking.until ?? booking.instant, booking.timelineRow);
+    }
+    for (const move of predictedYardMoves()) {
+      for (const point of pathPointsOf(move.path, move.departSecond, { includeStart: false, includeEnd: true })) {
+        add(point.nodeId, point.instant, point.until ?? point.instant, move.row);
+      }
+    }
+    return stayPickOccupancy;
+  }
+  /** 新的一批位置定案後重建索引（下一階段的選位要看得到前一階段定案的進出移動） */
+  function resetStayPickOccupancy() {
+    stayPickOccupancy = null;
+  }
+
+  /**
+   * 已定案地點的整備，可以預估的進出移動。
+   *
+   * 選位時別張移動卡還沒排，但有兩種是確定會發生、時刻也算得出來的：
+   * - 入廠：前一段是載客，車跑完、過了最低恢復時間就從終點站開往那一格；
+   * - 出廠：後一段是載客，車要在下一班發車時到達起點站。
+   * 都照最短路估。把它們當成佔用，選位才看得到「這一格的進出會跟某台車進場對撞」
+   * （2026-11-10 實錄：時間線 3 待命挑了 E3，09:03 出來發車時跟剛跑完要進 E 區充電的
+   * 時間線 6 在同一段單線對開；改挑走正線側進出的位置就不會撞）。
+   */
+  function predictedYardMoves(): Array<{ row: number; departSecond: number; path: { edges: PointTopologyEdge[] } }> {
+    const out: Array<{ row: number; departSecond: number; path: { edges: PointTopologyEdge[] } }> = [];
+    for (const timeline of timelines) {
+      const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+      sorted.forEach((block, index) => {
+        if (!YARD_TASK_TYPES.has(block.taskType)) return;
+        const facility = yardBlockFacility.get(block.id)?.nodeId;
+        if (!facility) return;
+        const isNeighbor = (other: GeneratedScheduleBlock) =>
+          other.taskType === 'passenger' || (other.source !== 'hold' && YARD_TASK_TYPES.has(other.taskType));
+        const prev = findPrevCyclic(sorted, index, isNeighbor);
+        if (prev?.block.taskType === 'passenger' && prev.block.routeId) {
+          const stationId = routeEndStation.get(prev.block.routeId);
+          const stationNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
+          const path = stationNodeId ? findTopologyPath(topology, stationNodeId, facility) : null;
+          if (path && path.edges.length > 0) {
+            out.push({
+              row: timeline.row,
+              departSecond: minuteToSecond(prev.block.plannedEndMinute + prev.offsetMinute) + Math.max(0, minimumRecoveryTimeSeconds),
+              path,
+            });
+          }
+        }
+        const next = findNextCyclic(sorted, index, isNeighbor);
+        if (next?.block.taskType === 'passenger' && next.block.routeId) {
+          const stationId = routeStartStation.get(next.block.routeId);
+          const stationNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
+          const path = stationNodeId ? findTopologyPath(topology, facility, stationNodeId) : null;
+          if (path && path.edges.length > 0) {
+            out.push({
+              row: timeline.row,
+              departSecond: minuteToSecond(next.block.plannedStartMinute + next.offsetMinute) - path.avgSeconds,
+              path,
+            });
+          }
+        }
+      });
+    }
+    return out;
+  }
+
+  /**
+   * 這趟移動在 [earliestDepart, latestDepart] 之間出發，有沒有任何一個時刻整條路都不撞別列車。
+   *
+   * 跟排移動卡時同一把尺（每個點、每段雙向路段都要差開碰撞保護時間），但不逐一試候選：
+   * 每一筆別列車的佔用換算成「這個出發位移會撞」的區間，看這些區間有沒有把整個時間窗蓋滿。
+   * 同一座設施、或同場區內換格（不經入口、不走正線）一律可行。
+   */
+  function moveFeasibleInWindow(
+    fromNodeId: string,
+    toNodeId: string,
+    earliestDepart: number,
+    latestDepart: number,
+    timelineRow: number,
+  ): boolean {
+    if (fromNodeId === toNodeId || sameYardZone(fromNodeId, toNodeId)) return true;
+    if (latestDepart < earliestDepart - 1e-9) return false;
+    if (collisionBufferSeconds <= 0) return true;
+    // 任何一條路線（最短路或替代路線）在時間窗內排得開就算可行
+    return findTopologyPaths(topology, fromNodeId, toNodeId)
+      .some((path) => pathFeasibleInWindow(path, earliestDepart, latestDepart, timelineRow));
+  }
+
+  function pathFeasibleInWindow(
+    path: { edges: PointTopologyEdge[] },
+    earliestDepart: number,
+    latestDepart: number,
+    timelineRow: number,
+  ): boolean {
+    const points = pathPointsOf(path, earliestDepart, { includeStart: false, includeEnd: false });
+    const width = latestDepart - earliestDepart;
+    const index = stayPickOccupancyIndex();
+    const blocked: Array<[number, number]> = [];
+    for (const point of points) {
+      const pointUntil = point.until ?? point.instant;
+      const clashKey = junctionClashKey(point.nodeId);
+      for (const booking of index.get(clashKey) ?? []) {
+        if (booking.row === timelineRow) continue;
+        const before = junctionGapSeconds(point.nodeId, occupancyStops(booking.from, booking.until));
+        const after = junctionGapSeconds(point.nodeId, occupancyStops(point.instant, point.until));
+        for (const wrap of [-daySeconds, 0, daySeconds]) {
+          const lo = booking.from + wrap - before - pointUntil;
+          const hi = booking.until + wrap + after - point.instant;
+          if (hi <= 0 || lo >= width) continue;
+          blocked.push([lo, hi]);
+        }
+      }
+      if (clashKey !== point.nodeId) {
+        for (const booking of index.get(point.nodeId) ?? []) {
+          if (booking.row === timelineRow) continue;
+          const enterShift = booking.from - point.instant;
+          const exitShift = booking.until - pointUntil;
+          const lo = Math.min(enterShift, exitShift);
+          const hi = Math.max(enterShift, exitShift);
+          if (lo === hi) continue;
+          for (const wrap of [-daySeconds, 0, daySeconds]) {
+            if (hi + wrap > 0 && lo + wrap < width) blocked.push([lo + wrap, hi + wrap]);
+          }
+        }
+      }
+    }
+    blocked.sort((a, b) => a[0] - b[0]);
+    let cursor = 0;
+    for (const [lo, hi] of blocked) {
+      if (lo >= cursor - 1e-9) return true;
+      cursor = Math.max(cursor, hi);
+    }
+    return cursor <= width + 1e-9;
+  }
+
+  /**
+   * 別列車在 beforeSecond 之前最後一次離開這個點的時刻（選位用的佔用索引，含預估的進出移動）；
+   * 沒有就回 −∞。只看前 6 小時內開始的佔用，日循環照算。
+   */
+  function lastOtherOccupancyBefore(nodeId: string, timelineRow: number, beforeSecond: number): number {
+    let latest = Number.NEGATIVE_INFINITY;
+    for (const booking of stayPickOccupancyIndex().get(junctionClashKey(nodeId)) ?? []) {
+      if (booking.row === timelineRow) continue;
+      for (const wrap of [-daySeconds, 0, daySeconds]) {
+        const from = booking.from + wrap;
+        const until = booking.until + wrap;
+        if (from >= beforeSecond - 1e-9 || from < beforeSecond - 6 * 3600) continue;
+        if (until > latest) latest = until;
+      }
+    }
+    return latest;
+  }
+
+  /**
+   * 這一格在 afterSecond 之後，別列車最早什麼時候要進來（已排定的佔用；照日循環）。
+   * 車最晚要在那之前一個碰撞保護時間離開；沒有人要進來回傳 +∞。
+   */
+  function nextOtherOccupantSecond(facilityNodeId: string, timelineRow: number, afterSecond: number): number {
+    let earliest = Number.POSITIVE_INFINITY;
+    for (const booking of bookings) {
+      if (booking.facilityNodeId !== facilityNodeId || booking.timelineRow === timelineRow) continue;
+      for (const wrap of [-daySeconds, 0, daySeconds, 2 * daySeconds]) {
+        const start = booking.startSecond + wrap;
+        if (start >= afterSecond - 1e-9 && start < earliest) earliest = start;
+      }
+    }
+    return earliest;
+  }
+
+  /**
+   * 候選位置前後兩趟移動（從上一段整備的設施進來、出去接下一段）在各自可用的時間窗內
+   * 排不排得開。只看已經定案地點的相鄰整備與下一班載客；上一段是載客（入廠）時交給入廠卡處理。
+   * 回傳排不開的那一趟（'in'／'out'），都排得開回 null。
+   */
+  function stayMovesBlocked(
+    yard: GeneratedScheduleBlock,
+    timelineRow: number,
+    sorted: GeneratedScheduleBlock[],
+    index: number,
+    candidateId: string,
+  ): 'in' | 'out' | null {
+    const isNeighbor = (block: GeneratedScheduleBlock) =>
+      block.taskType === 'passenger' || (block.source !== 'hold' && YARD_TASK_TYPES.has(block.taskType));
+    const leaveEarliest = (block: GeneratedScheduleBlock, offsetSecond: number) =>
+      (isWorkYardTaskType(block.taskType)
+        ? minuteToSecond(block.plannedEndMinute)
+        : minuteToSecond(block.plannedStartMinute) + minimumYardWorkSeconds(block)) + offsetSecond;
+    const endSecond = minuteToSecond(yard.plannedEndMinute);
+
+    const prev = findPrevCyclic(sorted, index, isNeighbor);
+    if (prev && prev.block.taskType !== 'passenger' && prev.block.taskType !== yard.taskType) {
+      const prevFacility = yardBlockFacility.get(prev.block.id)?.nodeId;
+      if (prevFacility) {
+        const seconds = moveSeconds(prevFacility, candidateId) ?? 0;
+        const earliest = leaveEarliest(prev.block, minuteToSecond(prev.offsetMinute));
+        // 後一段只會被往後推、結束不動：抵達後至少留一個刻度；原格有下一台要進來時，
+        // 車要在它進來前一個保護時間離開
+        const latest = Math.min(
+          endSecond - minimumYardWorkSeconds(yard) - seconds,
+          nextOtherOccupantSecond(prevFacility, timelineRow, earliest) - collisionBufferSeconds,
+        );
+        if (!moveFeasibleInWindow(prevFacility, candidateId, earliest, latest, timelineRow)) return 'in';
+      }
+    }
+
+    const next = findNextCyclic(sorted, index, isNeighbor);
+    if (next) {
+      const offsetSecond = minuteToSecond(next.offsetMinute);
+      const earliest = leaveEarliest(yard, 0);
+      // 這一格有下一台要進來時，車最晚要在那之前一個保護時間開走
+      const leaveBy = nextOtherOccupantSecond(candidateId, timelineRow, earliest) - collisionBufferSeconds;
+      if (next.block.taskType === 'passenger') {
+        const routeId = next.block.routeId;
+        const stationId = (routeId ? routeStartStation.get(routeId) : undefined)
+          || resolveBlockOriginStationId(next.block);
+        const stationNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
+        if (stationNodeId) {
+          const departNext = minuteToSecond(next.block.plannedStartMinute) + offsetSecond;
+          /*
+           * 提早出廠就要在月台上等到發車，等的那段月台必須是空的：最早只能在別列車
+           * 最後一次佔用這個月台（發車之前）離開、再過一個保護時間之後才到站。
+           */
+          const arriveNotBefore = lastOtherOccupancyBefore(stationNodeId, timelineRow, departNext) + collisionBufferSeconds;
+          const feasible = findTopologyPaths(topology, candidateId, stationNodeId).some((path) => {
+            const pathEarliest = Math.max(earliest, arriveNotBefore - path.avgSeconds);
+            const pathLatest = Math.min(departNext - path.avgSeconds, leaveBy);
+            return pathLatest >= pathEarliest - 1e-9
+              && (collisionBufferSeconds <= 0 || pathFeasibleInWindow(path, pathEarliest, pathLatest, timelineRow));
+          });
+          if (!feasible) return 'out';
+        }
+      } else if (next.block.taskType !== yard.taskType) {
+        const nextFacility = yardBlockFacility.get(next.block.id)?.nodeId;
+        if (nextFacility) {
+          const seconds = moveSeconds(candidateId, nextFacility) ?? 0;
+          const latest = Math.min(
+            minuteToSecond(next.block.plannedEndMinute) + offsetSecond
+              - minimumYardWorkSeconds(next.block) - seconds,
+            leaveBy,
+          );
+          if (!moveFeasibleInWindow(candidateId, nextFacility, earliest, latest, timelineRow)) return 'out';
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * 依「進來 + 出去總移動最小」挑一個位置，並確認整段時間都空得下來。
    * 到不了的候選直接淘汰；兩邊都查不到錨點時退回「隨便一個空的」。
    */
@@ -1605,6 +1891,8 @@ export function insertMaintenanceTransferCards(args: {
     nextAnchor: string | null,
     /** 車最早可以離開上一段的時刻；入廠卡會用它算提前抵達，null＝無從得知 */
     freeSecond: number | null,
+    /** 這一段在該線排序中的位置；有給才檢查前後移動在時間窗內排不排得開 */
+    position?: { sorted: GeneratedScheduleBlock[]; index: number },
   ): { nodeId: string; label: string } | null {
     let best: { nodeId: string; label: string; tier: number; cost: number; seconds: number } | null = null;
     const startSecond = minuteToSecond(yard.plannedStartMinute);
@@ -1650,7 +1938,16 @@ export function insertMaintenanceTransferCards(args: {
       // 壓住正線一格是要付營運代價的（那條路線那段時間排不了車），移動個幾分鐘
       // 進設施才是便宜的選項。所以先分層、層內才比移動成本：停靠站是
       // <strong>沒設施可去時的退路</strong>，不是預設解。
-      const tier = nodeById.get(candidate.id)?.kind === 'docking' ? 1 : 0;
+      /*
+       * 進出這一格的移動在可用時間窗內完全排不開（每個出發時刻都會撞上正線車）的候選排最後：
+       * 成本再低，選了也只會在轉場階段變成「必要移動卡排不出」。先確認整段進出可行才選
+       * （2026-11-10 實錄：充電在 E 區、待命挑了 H 區，轉場必須穿過 NW下發1 折返月台，
+       * 那裡每 6 分鐘只空 70 秒，扣掉兩側保護時間無解）。
+       */
+      const moveBlocked = position
+        ? stayMovesBlocked(yard, timelineRow, position.sorted, position.index, candidate.id)
+        : null;
+      const tier = (nodeById.get(candidate.id)?.kind === 'docking' ? 1 : 0) + (moveBlocked ? 2 : 0);
       const cost = inCost + outCost;
       /*
        * 同成本時比<strong>實際要開的秒數</strong>。同區域的選位偏好把成本壓成 0，
@@ -1660,7 +1957,7 @@ export function insertMaintenanceTransferCards(args: {
        */
       const outSeconds = nextAnchor ? moveSeconds(candidate.id, nextAnchor) ?? 0 : 0;
       const seconds = inSeconds + outSeconds;
-      traced?.push({ id: candidate.id, tier, inCost, outCost, seconds });
+      traced?.push({ id: candidate.id, tier, inCost, outCost, seconds, moveBlocked });
       if (
         !best
         || tier < best.tier
@@ -1677,6 +1974,79 @@ export function insertMaintenanceTransferCards(args: {
       });
     }
     return best ? { nodeId: best.nodeId, label: best.label } : null;
+  }
+
+  /**
+   * 拆掉「兩台車同時互換格子」。
+   *
+   * 選位是一台一台挑的：A 車做完整備要換格、B 車也要換格，兩邊各自挑到對方正要離開的那一格，
+   * 就湊成「A 從 X 到 Y、B 從 Y 到 X」同時發生。同場區換格當 0 秒，這種互換在班表上看起來
+   * 合法，實際上兩台車擋在彼此的出口，誰都走不了（2026-11-10 模擬實測：午夜時間線 3 從 E2
+   * 換到 E4、時間線 8 從 E4 換到 E2，兩台互卡）。其實兩台都不必動：各自留在原格就好。
+   *
+   * 做法：找出這種成對的換格，兩段後一段的地點對調（各自留在前一段的格子），對調後兩格整段
+   * 停留都空得下、而且格子是那一類整備允許的，才採用；否則維持原樣。
+   */
+  function eliminateYardSlotSwaps(): void {
+    type Move = { row: number; later: GeneratedScheduleBlock; from: string; to: string; atSecond: number };
+    const collectMoves = (): Move[] => {
+      const moves: Move[] = [];
+      for (const timeline of timelines) {
+        const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+        sorted.forEach((block, index) => {
+          if (!YARD_TASK_TYPES.has(block.taskType)) return;
+          const prev = immediatePrevCyclic(sorted, index);
+          if (!prev || !YARD_TASK_TYPES.has(prev.block.taskType)) return;
+          const from = yardBlockFacility.get(prev.block.id)?.nodeId;
+          const to = yardBlockFacility.get(block.id)?.nodeId;
+          if (!from || !to || from === to) return;
+          moves.push({ row: timeline.row, later: block, from, to, atSecond: minuteToSecond(block.plannedStartMinute) });
+        });
+      }
+      return moves;
+    };
+    const allowed = (block: GeneratedScheduleBlock, nodeId: string) =>
+      facilityNodesForBlock(block).some((facility) => facility.id === nodeId);
+    const labelOf = (nodeId: string) => nodeById.get(nodeId)?.label || nodeId;
+    const fits = (move: Move) => stayFacilityIsFree(
+      move.from, move.later, move.row,
+      vehicleArrivesFacilityAtSecond(move.later, move.from), vehicleLeavesFacilityAtSecond(move.later),
+    );
+    /** 試過、對調不成的組合不再試 */
+    const rejected = new Set<string>();
+    // 每對調一次就重新收集：對調會改變相鄰段的「從哪裡來」，舊清單會把剛拆掉的互換又換回去
+    for (let guard = 0; guard < 64; guard += 1) {
+      const moves = collectMoves();
+      let swapped = false;
+      for (const a of moves) {
+        const b = moves.find((other) =>
+          other !== a && other.row !== a.row
+          && other.from === a.to && other.to === a.from
+          && Math.abs(cyclicDeltaSeconds(other.atSecond, a.atSecond)) <= 30 * 60
+          && !rejected.has(`${a.later.id}|${other.later.id}`));
+        if (!b) continue;
+        if (!allowed(a.later, a.from) || !allowed(b.later, b.from)) {
+          rejected.add(`${a.later.id}|${b.later.id}`);
+          continue;
+        }
+        assignYardStay(a.later, a.from, labelOf(a.from));
+        assignYardStay(b.later, b.from, labelOf(b.from));
+        if (fits(a) && fits(b)) {
+          engineTrace('yard-swap-removed', { rows: [a.row, b.row], slots: [labelOf(a.from), labelOf(b.from)] });
+          swapped = true;
+          break;
+        }
+        assignYardStay(a.later, a.to, labelOf(a.to));
+        assignYardStay(b.later, b.to, labelOf(b.to));
+        rejected.add(`${a.later.id}|${b.later.id}`);
+      }
+      if (!swapped) break;
+    }
+  }
+  /** 兩個日內秒數在日循環上的差（−半天～半天） */
+  function cyclicDeltaSeconds(a: number, b: number): number {
+    const raw = ((a - b) % daySeconds + daySeconds) % daySeconds;
+    return raw > daySeconds / 2 ? raw - daySeconds : raw;
   }
 
   /** 依時刻排好的（時間線、區塊、該線排序、索引），供兩階段指派共用 */
@@ -1698,6 +2068,7 @@ export function insertMaintenanceTransferCards(args: {
   yardSlots.sort((a, b) => a.block.plannedStartMinute - b.block.plannedStartMinute);
 
   for (const priorityPhase of ['facility-first', 'standby-last'] as const) {
+    resetStayPickOccupancy();
     for (const slot of yardSlots) {
       const isStandby = slot.block.taskType === 'standby';
       if ((priorityPhase === 'facility-first') === isStandby) continue;
@@ -1729,10 +2100,13 @@ export function insertMaintenanceTransferCards(args: {
         resolveAnchor(slot.sorted, slot.index, 'prev'),
         resolveAnchor(slot.sorted, slot.index, 'next'),
         freeSecond,
+        { sorted: slot.sorted, index: slot.index },
       );
       if (picked) assignYardStay(slot.block, picked.nodeId, picked.label);
     }
   }
+
+  eliminateYardSlotSwaps();
 
   if (decideOnly) {
     return {
@@ -1763,6 +2137,7 @@ export function insertMaintenanceTransferCards(args: {
         const basis = describeYardOnlyNeighborBasis(sorted, i, 'prev');
         skipped.push(basis
           ? {
+            transferKind: 'entry',
             timelineRow: timeline.row,
             blockId: yard.id,
             taskType: yard.taskType,
@@ -1770,6 +2145,7 @@ export function insertMaintenanceTransferCards(args: {
             necessity: 'not_needed',
           }
           : {
+            transferKind: 'entry',
             timelineRow: timeline.row,
             blockId: yard.id,
             taskType: yard.taskType,
@@ -1781,6 +2157,7 @@ export function insertMaintenanceTransferCards(args: {
         // 沉默略過的話，畫面上就是「這段整備沒有入廠卡」，跟排不出來、
         // 跟同區域 0 秒轉移長得一模一樣。要卡而給不出卡，一律講原因。
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
@@ -1792,6 +2169,7 @@ export function insertMaintenanceTransferCards(args: {
       const fromNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
       if (!fromNodeId) {
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
@@ -1803,6 +2181,7 @@ export function insertMaintenanceTransferCards(args: {
       const allFacilities = facilityNodesForBlock(yard);
       if (allFacilities.length === 0) {
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
@@ -1930,6 +2309,7 @@ export function insertMaintenanceTransferCards(args: {
         : allFacilities;
       if (facilities.length === 0) {
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
@@ -1945,6 +2325,7 @@ export function insertMaintenanceTransferCards(args: {
       if (freeSecond >= yardEndSecond - 1e-9) {
         // 車跑完正線的時候整備視窗<strong>整段都過去了</strong>，怎麼讓都塞不下。
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
@@ -1954,10 +2335,11 @@ export function insertMaintenanceTransferCards(args: {
         });
         continue;
       }
-      let chosen: {
+      type EntryChoice = {
         nodeId: string; label: string; seconds: number;
         /** 含外部性的比較成本；只用來排名，不是車真的花的時間 */
         decisionCost: number;
+        preferredClearance: boolean;
         departureSecond: number;
         gatewayNodeId: string; gatewayInstant: number;
         /** 整條路徑經過的點（已含定案位移）；預約與再檢查都用這一組 */
@@ -1966,7 +2348,9 @@ export function insertMaintenanceTransferCards(args: {
         wait?: { nodeId: string; instant: number; until: number };
         /** 這條路徑實際途經的節點名稱（含起訖），給卡片顯示分段用 */
         viaLabels: string[];
-      } | null = null;
+      };
+      // 型別斷言：巢狀迴圈裡才指定，TypeScript 的流程分析追不到，避免被收窄成 null
+      let chosen = null as EntryChoice | null;
       let tally = newTally();
       /**
        * 候選池：先用「決定去哪」定案的位置。待命在那裡排不出入廠（路程塞不進空檔、位置被佔）時，
@@ -1991,6 +2375,7 @@ export function insertMaintenanceTransferCards(args: {
       }
       let firstTally: RejectTally | null = null;
       let relocated = false;
+      const chargingCandidates: NonNullable<MaintenanceTransferCardsResult['skipped'][number]['chargingEntry']>['candidates'] = [];
       for (const [poolIndex, pool] of pools.entries()) {
         // 先找守交接間隔的候選；全滅才退一步只求排得出移動（缺移動比交接不足更糟，
         // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋發布）
@@ -1998,164 +2383,172 @@ export function insertMaintenanceTransferCards(args: {
           handoverEnforced = enforceHandover;
           tally = newTally();
           for (const facility of pool) {
-            const path = findTopologyPath(topology, fromNodeId, facility.id);
-            if (!path) { tallyNoPath(tally, fromNodeId, facility.id); continue; }
-            // 車一空出來就走——不站在正線格子上等，能提早進整備格就提早進，
-            // 整備跟著提早開始沒有關係（2026-08-10 使用者裁決）。
-            // freeSecond 可能是負的（前一段載客在前一天），那就照負的算，
-            // 最後整張連整備區塊一起平移一天，避免出現負時刻。
-            const preferredDeparture = freeSecond;
-            /**
-             * 整備開始跟著<strong>實際進廠時刻</strong>走，兩個方向都是。
-             *
-             * 早到就早開工（原本就有），晚到就晚開工（原本沒有）。這跟整備間轉場的
-             * 既有規則是同一條——後一段開始被推遲、結束不動，運輸成本佔的是後一段
-             * 自己的工作時間；入廠卡先前只做了一半。
-             *
-             * 順序上仍然<strong>優先最早</strong>：偏好出發＝車一空出來就走，
-             * 設施與轉折點的搜尋都取最小位移，所以只有在真的被擋住時才會超過原訂開始。
-             */
-            const latestDeparture = Math.min(
-              // 讓渡是「讓一點」，不是把整備吃掉——最多往後推幾倍碰撞保護時間，
-              // 夠閃開轉折點、夠等前一台車讓出設施就好。真的要等更久，那是設施
-              // 不足或時段安排的問題，該回報讓使用者去調，不是把工作時間吃光。
-              yardStartSecond + yardStartPushLimitSeconds(yard.taskType),
-              yardEndSecond - minimumYardWorkSeconds(yard.taskType),
-            ) - path.avgSeconds;
-            if (latestDeparture < preferredDeparture - 1e-9) { tally.noTime += 1; continue; }
+            // 最短路在可用時間內排不開時，改試替代路線（同一套時間窗與佔用檢查）
+            const facilityPaths = findTopologyPaths(topology, fromNodeId, facility.id);
+            if (facilityPaths.length === 0) { tallyNoPath(tally, fromNodeId, facility.id); continue; }
+            for (const path of facilityPaths) {
+              // 車一空出來就走——不站在正線格子上等，能提早進整備格就提早進，
+              // 整備跟著提早開始沒有關係（2026-08-10 使用者裁決）。
+              // freeSecond 可能是負的（前一段載客在前一天），那就照負的算，
+              // 最後整張連整備區塊一起平移一天，避免出現負時刻。
+              const preferredDeparture = freeSecond;
+              /**
+               * 整備開始跟著<strong>實際進廠時刻</strong>走，兩個方向都是。
+               *
+               * 早到就早開工（原本就有），晚到就晚開工（原本沒有）。這跟整備間轉場的
+               * 既有規則是同一條——後一段開始被推遲、結束不動，運輸成本佔的是後一段
+               * 自己的工作時間；入廠卡先前只做了一半。
+               *
+               * 順序上仍然<strong>優先最早</strong>：偏好出發＝車一空出來就走，
+               * 設施與轉折點的搜尋都取最小位移，所以只有在真的被擋住時才會超過原訂開始。
+               */
+              const latestDeparture = Math.min(
+                // 讓渡是「讓一點」，不是把整備吃掉——最多往後推幾倍碰撞保護時間，
+                // 夠閃開轉折點、夠等前一台車讓出設施就好。真的要等更久，那是設施
+                // 不足或時段安排的問題，該回報讓使用者去調，不是把工作時間吃光。
+                yardStartSecond + yardStartPushLimitSeconds(yard.taskType),
+                yardEndSecond - minimumYardWorkSeconds(yard),
+              ) - path.avgSeconds;
+              if (yard.taskType === 'charging') chargingCandidates.push({
+                facilityId: facility.id, nodeIds: path.nodeIds, travelSeconds: path.avgSeconds, latestDeparture,
+              });
+              if (latestDeparture < preferredDeparture - 1e-9) { tally.noTime += 1; continue; }
 
-            /**
-             * 這台設施在「抵達 → 整備做完」整段都是空的嗎。
-             *
-             * 要佔的是車在裡面的全程，檢查窗必須跟佔用窗一致——只檢查頭部那一小段
-             * 的話，別列車早就訂走整段的設施還是會被判定成空的。
-             */
-            const facilityFreeFor = (departure: number) =>
-              stayFacilityIsFree(
-                facility.id, yard, timeline.row, departure + path.avgSeconds, yardEndSecond,
-              )
-              && handoverEdgeIsClear(facility.id, timeline.row, departure + path.avgSeconds, 'entering');
+              /**
+               * 這台設施在「抵達 → 整備做完」整段都是空的嗎。
+               *
+               * 要佔的是車在裡面的全程，檢查窗必須跟佔用窗一致——只檢查頭部那一小段
+               * 的話，別列車早就訂走整段的設施還是會被判定成空的。
+               */
+              const facilityFreeFor = (departure: number) =>
+                stayFacilityIsFree(
+                  facility.id, yard, timeline.row, departure + path.avgSeconds, yardEndSecond,
+                )
+                && handoverEdgeIsClear(facility.id, timeline.row, departure + path.avgSeconds, 'entering');
 
-            /**
-             * 提早到不了就晚一點到，不是整張卡作廢。
-             *
-             * 前一台車還在這格裡（例如它充到 24:00 才出來），車就沒辦法 23:53 進去；
-             * 但整備本來就從 00:00 開始，晚一點出發、剛好 00:00 到，一樣成立。
-             * 原本只試「最早出發」一個時刻，一被擋就報「設施被別列車佔著」，
-             * 使用者看畫面覺得空蕩蕩卻排不進去（2026-08-10 使用者追問）。
-             *
-             * 出發時刻越晚，要佔的窗口只會越短、越不可能撞到——這個單調性讓
-             * 「最早可行的出發時刻」可以直接二分找出來，不必逐秒掃。
-             */
-            let departureSecond: number;
-            if (facilityFreeFor(preferredDeparture)) {
-              departureSecond = preferredDeparture;
-            } else if (!facilityFreeFor(latestDeparture)) {
-              // 連「剛好趕上整備開始」都塞不進去，那是真的沒位置
-              tallyFacilityBusy(tally);
-              continue;
-            } else {
-              let busy = preferredDeparture;
-              let free = latestDeparture;
-              for (let step = 0; step < 32 && free - busy > 1; step += 1) {
-                const mid = (busy + free) / 2;
-                if (facilityFreeFor(mid)) free = mid; else busy = mid;
+              /**
+               * 提早到不了就晚一點到，不是整張卡作廢。
+               *
+               * 前一台車還在這格裡（例如它充到 24:00 才出來），車就沒辦法 23:53 進去；
+               * 但整備本來就從 00:00 開始，晚一點出發、剛好 00:00 到，一樣成立。
+               * 原本只試「最早出發」一個時刻，一被擋就報「設施被別列車佔著」，
+               * 使用者看畫面覺得空蕩蕩卻排不進去（2026-08-10 使用者追問）。
+               *
+               * 出發時刻越晚，要佔的窗口只會越短、越不可能撞到——這個單調性讓
+               * 「最早可行的出發時刻」可以直接二分找出來，不必逐秒掃。
+               */
+              let departureSecond: number;
+              if (facilityFreeFor(preferredDeparture)) {
+                departureSecond = preferredDeparture;
+              } else if (!facilityFreeFor(latestDeparture)) {
+                // 連「剛好趕上整備開始」都塞不進去，那是真的沒位置
+                tallyFacilityBusy(tally);
+                continue;
+              } else {
+                let busy = preferredDeparture;
+                let free = latestDeparture;
+                for (let step = 0; step < 32 && free - busy > 1; step += 1) {
+                  const mid = (busy + free) / 2;
+                  if (facilityFreeFor(mid)) free = mid; else busy = mid;
+                }
+                // 對齊排程 10 秒刻度；對齊後超出可動範圍才退回原秒數
+                // 二分停在邊界上方 1 秒內，先試邊界所在的那一格刻度
+                const lowest = snapUpToClockAlignSeconds(busy);
+                const aligned = facilityFreeFor(lowest) ? lowest : snapUpToClockAlignSeconds(free);
+                departureSecond = aligned <= latestDeparture + 1e-9 ? aligned : Math.ceil(free);
               }
-              // 對齊排程 10 秒刻度；對齊後超出可動範圍才退回原秒數
-              // 二分停在邊界上方 1 秒內，先試邊界所在的那一格刻度
-              const lowest = snapUpToClockAlignSeconds(busy);
-              const aligned = facilityFreeFor(lowest) ? lowest : snapUpToClockAlignSeconds(free);
-              departureSecond = aligned <= latestDeparture + 1e-9 ? aligned : Math.ceil(free);
-            }
 
-            // 轉折點撞上就再往後挪一點（挪到還趕得上整備開始為止）。閘門時刻與
-            // 出發時刻是等量平移的關係，位移可以直接在閘門上算完再回推。
-            // 往後挪只會讓設施佔用窗更短，不會把剛解好的設施衝突變回來。
-            const baseArrive = departureSecond + path.avgSeconds;
-            const baseGateway = resolveGatewayFromPath(
-              path, baseArrive, 'arriving-at-facility', fromNodeId,
-            );
-            // 整條路都要檢查：離站那一刻、沿途每個月台與轉線點（不是只看最後一個閘門）
-            const basePoints = pathPointsOf(path, departureSecond, { includeStart: true, includeEnd: false });
-            const checkPoints = basePoints.length > 0 ? basePoints : [baseGateway];
-            const shift = resolveJunctionShiftSeconds(
-              checkPoints,
-              timeline.row,
-              0,
-              latestDeparture - departureSecond,
-            );
-            if (shift === null) {
-              tally.junctionBusy += 1;
-              tally.junctionDetail ??= describeJunctionBlock(
-                checkPoints, timeline.row, 0, latestDeparture - departureSecond,
+              // 轉折點撞上就再往後挪一點（挪到還趕得上整備開始為止）。閘門時刻與
+              // 出發時刻是等量平移的關係，位移可以直接在閘門上算完再回推。
+              // 往後挪只會讓設施佔用窗更短，不會把剛解好的設施衝突變回來。
+              const baseArrive = departureSecond + path.avgSeconds;
+              const baseGateway = resolveGatewayFromPath(
+                path, baseArrive, 'arriving-at-facility', fromNodeId,
               );
-              tallyJunctionBlockers(tally, checkPoints, timeline.row, 0, latestDeparture - departureSecond);
-              continue;
-            }
+              // 整條路都要檢查：離站那一刻、沿途每個月台與轉線點（不是只看最後一個閘門）
+              const basePoints = pathPointsOf(path, departureSecond, { includeStart: true, includeEnd: false });
+              const checkPoints = basePoints.length > 0 ? basePoints : [baseGateway];
+              const shift = resolveJunctionShiftSeconds(
+                checkPoints,
+                timeline.row,
+                0,
+                latestDeparture - departureSecond,
+              );
+              if (shift === null) {
+                tally.junctionBusy += 1;
+                tally.junctionDetail ??= describeJunctionBlock(
+                  checkPoints, timeline.row, 0, latestDeparture - departureSecond,
+                );
+                tallyJunctionBlockers(tally, checkPoints, timeline.row, 0, latestDeparture - departureSecond);
+                continue;
+              }
 
-            departureSecond += shift;
-            const gateway = {
-              nodeId: baseGateway.nodeId,
-              instant: baseGateway.instant + shift,
-            };
-            /*
-             * 車跑完載客停在站上，等到出發才進場——這段等待也佔著站位。只預約「出發那一刻」
-             * 的話，別張移動卡會從正在等的車身上穿過去（2026-11-08 實測：時間線 1 在 NW下發1
-             * 從 02:54:10 等到 02:59:00，兩張轉場 02:55 從它身上經過）。
-             */
-            const waitFrom = minuteToSecond(previousPassenger.plannedEndMinute + prevPax.offsetMinute);
-            const waitPoint = basePoints[0]
-              ? { nodeId: basePoints[0].nodeId, instant: Math.min(waitFrom, departureSecond), until: departureSecond }
-              : null;
-            if (waitPoint && !junctionIsFree(waitPoint.nodeId, waitPoint.instant, timeline.row, waitPoint.until)) {
-              tally.junctionBusy += 1;
-              tally.junctionDetail ??= `${nodeById.get(waitPoint.nodeId)?.label ?? waitPoint.nodeId} `
-                + `${formatSecondOfDay(waitPoint.instant)}～${formatSecondOfDay(waitPoint.until)} 在站上等進場，這段有別列車經過`;
-              continue;
-            }
-            /**
-             * <strong>挑設施要一起比「能多早進去」，不是只比「開過去多久」。</strong>
-             *
-             * 每一台候選設施上面已經二分找出了「最早可行的出發時刻」——那正是
-             * 「這台設施讓我多早進得去」。但成本函式只看移動時間與外部性，
-             * 完全沒用到它：於是一台讓車 18:30 就能進的遠設施，會輸給一台
-             * 要等到 19:00 的近設施，即使多繞的那點路遠比多等半小時划算
-             * （2026-08-12 使用者：「因為要選近的地方去佔才對」——近，但也要進得去）。
-             *
-             * <strong>等待的代價不用寫死係數。</strong>車在等的時候是杵在正線停靠站上，
-             * 代價就是<strong>那段時間會擋到幾班車</strong>——直接數該站在這段等待窗內
-             * 有幾個載客佔用，再乘以碰撞保護時間，跟路徑外部性用<strong>同一種計價</strong>。
-             * 忙站上多等一分鐘很貴，閒站上等再久也不花錢，比例自己會浮現，
-             * 不需要任何人去調一個魔術數字。
-             */
-            const waitSeconds = Math.max(0, departureSecond - preferredDeparture);
-            let blockedTrips = 0;
-            if (waitSeconds > 1e-9 && stationId) {
-              for (const window of mainlineBerthWindows(stationId)) {
-                if (
-                  cyclicWindowsOverlap(
-                    preferredDeparture,
-                    departureSecond,
-                    window.startSecond,
-                    window.endSecond,
-                  )
-                ) {
-                  blockedTrips += 1;
+              departureSecond += shift;
+              const gateway = {
+                nodeId: baseGateway.nodeId,
+                instant: baseGateway.instant + shift,
+              };
+              /*
+               * 車跑完載客停在站上，等到出發才進場——這段等待也佔著站位。只預約「出發那一刻」
+               * 的話，別張移動卡會從正在等的車身上穿過去（2026-11-08 實測：時間線 1 在 NW下發1
+               * 從 02:54:10 等到 02:59:00，兩張轉場 02:55 從它身上經過）。
+               */
+              const waitFrom = minuteToSecond(previousPassenger.plannedEndMinute + prevPax.offsetMinute);
+              const waitPoint = basePoints[0]
+                ? { nodeId: basePoints[0].nodeId, instant: Math.min(waitFrom, departureSecond), until: departureSecond }
+                : null;
+              if (waitPoint && !junctionIsFree(waitPoint.nodeId, waitPoint.instant, timeline.row, waitPoint.until)) {
+                tally.junctionBusy += 1;
+                tally.junctionDetail ??= `${nodeById.get(waitPoint.nodeId)?.label ?? waitPoint.nodeId} `
+                  + `${formatSecondOfDay(waitPoint.instant)}～${formatSecondOfDay(waitPoint.until)} 在站上等進場，這段有別列車經過`;
+                continue;
+              }
+              /**
+               * <strong>挑設施要一起比「能多早進去」，不是只比「開過去多久」。</strong>
+               *
+               * 每一台候選設施上面已經二分找出了「最早可行的出發時刻」——那正是
+               * 「這台設施讓我多早進得去」。但成本函式只看移動時間與外部性，
+               * 完全沒用到它：於是一台讓車 18:30 就能進的遠設施，會輸給一台
+               * 要等到 19:00 的近設施，即使多繞的那點路遠比多等半小時划算
+               * （2026-08-12 使用者：「因為要選近的地方去佔才對」——近，但也要進得去）。
+               *
+               * <strong>等待的代價不用寫死係數。</strong>車在等的時候是杵在正線停靠站上，
+               * 代價就是<strong>那段時間會擋到幾班車</strong>——直接數該站在這段等待窗內
+               * 有幾個載客佔用，再乘以碰撞保護時間，跟路徑外部性用<strong>同一種計價</strong>。
+               * 忙站上多等一分鐘很貴，閒站上等再久也不花錢，比例自己會浮現，
+               * 不需要任何人去調一個魔術數字。
+               */
+              const waitSeconds = Math.max(0, departureSecond - preferredDeparture);
+              let blockedTrips = 0;
+              if (waitSeconds > 1e-9 && stationId) {
+                for (const window of mainlineBerthWindows(stationId)) {
+                  if (
+                    cyclicWindowsOverlap(
+                      preferredDeparture,
+                      departureSecond,
+                      window.startSecond,
+                      window.endSecond,
+                    )
+                  ) {
+                    blockedTrips += 1;
+                  }
                 }
               }
-            }
-            const waitCost = blockedTrips * collisionBufferSeconds;
-            const decisionCost = pathDecisionCost(path) + waitCost;
-            if (!chosen || decisionCost < chosen.decisionCost) {
-              chosen = {
-                nodeId: facility.id, label: facility.label || facility.id, seconds: path.avgSeconds,
-                decisionCost,
-                departureSecond,
-                gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
-                points: checkPoints.map((point) => (shiftPass(point, shift))),
-                ...(waitPoint ? { wait: waitPoint } : {}),
-                viaLabels: pathViaLabels(path),
-              };
+              const waitCost = blockedTrips * collisionBufferSeconds;
+              const preferredClearance = hasPreferredBerthClearance(junctionQuery(checkPoints, timeline.row, 0, 0), shift);
+              const decisionCost = pathDecisionCost(path) + waitCost;
+              if (!chosen || (preferredClearance && !chosen.preferredClearance)
+                || (preferredClearance === chosen.preferredClearance && decisionCost < chosen.decisionCost)) {
+                chosen = {
+                  nodeId: facility.id, label: facility.label || facility.id, seconds: path.avgSeconds,
+                  decisionCost, preferredClearance,
+                  departureSecond,
+                  gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant,
+                  points: checkPoints.map((point) => (shiftPass(point, shift))),
+                  ...(waitPoint ? { wait: waitPoint } : {}),
+                  viaLabels: pathViaLabels(path),
+                };
+              }
             }
           }
           if (chosen) break;
@@ -2170,11 +2563,19 @@ export function insertMaintenanceTransferCards(args: {
       if (!chosen) {
         const reportTally = firstTally ?? tally;
         skipped.push({
+          transferKind: 'entry',
           timelineRow: timeline.row,
           blockId: yard.id,
           taskType: yard.taskType,
           reason: `排不出入廠卡：${describeReject(reportTally, facilities.length)}`
             + (pools.length > 1 ? `；待命清單上其他 ${pools[1]!.length} 個位置也排不出（${describeReject(tally, pools[1]!.length)}）` : ''),
+          ...(yard.taskType === 'charging' ? { chargingEntry: {
+            startSecond: yardStartSecond, endSecond: yardEndSecond,
+            requiredSeconds: minimumYardWorkSeconds(yard),
+            passengerReleaseSecond: freeSecond - Math.max(0, minimumRecoveryTimeSeconds),
+            recoverySeconds: Math.max(0, minimumRecoveryTimeSeconds),
+            candidates: chargingCandidates,
+          } } : {}),
           ...blockersOf(reportTally),
           ...dataGapFields(...(pools.length > 1 && reportTally !== tally ? [reportTally, tally] : [reportTally])),
         });
@@ -2410,6 +2811,45 @@ export function insertMaintenanceTransferCards(args: {
    *
    * 失敗寫進 sink；成功就插卡並綁設施。
    */
+  /**
+   * 後一段整備做完、車要直接出廠去開下一班時，後一段最晚可以在什麼時刻開始
+   * （跟 earlier 同一條時間軸的秒數）；後一段之後還有別的整備、或查不到下一班時回 null。
+   *
+   * 留給出廠的時間：整條出廠路徑的行駛時間，加上兩個碰撞保護時間——出廠撞上轉折點時
+   * 要往前錯開，錯過一筆別列車的經過最多要退兩個保護時間（對方到達前一個、離開後一個）。
+   * 後一段自己也要留下最少的一個刻度。
+   */
+  function laterOwnExitLatestStartSecond(
+    sorted: GeneratedScheduleBlock[],
+    later: GeneratedScheduleBlock,
+    laterOffsetSecond: number,
+    facilityNodeId: string,
+  ): number | null {
+    const laterIndex = sorted.indexOf(later);
+    if (laterIndex < 0) return null;
+    const nextPax = findNextCyclic(sorted, laterIndex, requiresVehicleAtStation);
+    if (!nextPax) return null;
+    const nextYard = findNextCyclic(sorted, laterIndex, (block) => YARD_TASK_TYPES.has(block.taskType));
+    if (
+      nextYard
+      && nextYard.block !== later
+      && nextYard.block.plannedStartMinute + nextYard.offsetMinute
+        < nextPax.block.plannedStartMinute + nextPax.offsetMinute
+    ) {
+      return null;
+    }
+    const next = nextPax.block;
+    const stationId = (next.routeId ? routeStartStation.get(next.routeId) : undefined)
+      || resolveBlockOriginStationId(next)
+      || next.firstTripOriginStationId?.trim();
+    const stationNodeId = stationId ? nodeIdByStationId.get(stationId) : undefined;
+    if (!stationNodeId) return null;
+    const path = findTopologyPath(topology, facilityNodeId, stationNodeId);
+    if (!path) return null;
+    const nextDepartSecond = minuteToSecond(next.plannedStartMinute + nextPax.offsetMinute) + laterOffsetSecond;
+    return nextDepartSecond - path.avgSeconds - 2 * collisionBufferSeconds - minimumYardWorkSeconds(later);
+  }
+
   function processTransitPair(
     timeline: GeneratedSchedulePlan['timelines'][number],
     sorted: GeneratedScheduleBlock[],
@@ -2432,6 +2872,7 @@ export function insertMaintenanceTransferCards(args: {
     const allEntryFacilities = facilityNodesForBlock(later);
     if (allExitFacilities.length === 0 || allEntryFacilities.length === 0) {
       sink.push({
+        transferKind: 'transit',
         timelineRow: timeline.row,
         blockId: later.id,
         fromTaskType: earlier.taskType,
@@ -2457,6 +2898,7 @@ export function insertMaintenanceTransferCards(args: {
     if (exitFacilities.length === 0 || entryFacilities.length === 0) {
       const pinned = exitFacilities.length === 0 ? earlierAssigned! : laterAssigned!;
       sink.push({
+        transferKind: 'transit',
         timelineRow: timeline.row,
         blockId: later.id,
         fromTaskType: earlier.taskType,
@@ -2472,7 +2914,7 @@ export function insertMaintenanceTransferCards(args: {
     const departSecond = minuteToSecond(earlier.plannedEndMinute);
     const laterEndSecond = minuteToSecond(later.plannedEndMinute) + laterOffsetSecond;
     /** 後一段最晚要在這一刻開始，才留得下整備設定的作業時長 */
-    const laterLatestStartSecond = laterEndSecond - minimumYardWorkSeconds(later.taskType);
+    const laterLatestStartSecond = laterEndSecond - minimumYardWorkSeconds(later);
 
 
     let chosen: {
@@ -2501,6 +2943,7 @@ export function insertMaintenanceTransferCards(args: {
       departureShiftSeconds: number;
       /** 含外部性的比較成本；只用來排名 */
       decisionCost: number;
+      preferredClearance: boolean;
       /** 後一段實際開始時刻（位移座標）；只會等於或晚於它原訂的開始 */
       finalLaterStartSecond: number;
     } | null = null;
@@ -2518,361 +2961,392 @@ export function insertMaintenanceTransferCards(args: {
       if (enforceHandover) strictTally = tally;
       for (const exitFacility of exitFacilities) {
         for (const entryFacility of entryFacilities) {
+          // 最短路在可用時間內排不開時，改試替代路線；每一條都跑同一套時間窗、設施與轉折點檢查
+          const transferPathOptions: Array<ReturnType<typeof findTopologyPath>> = sameYardZone(exitFacility.id, entryFacility.id)
+            ? [null]
+            : (() => {
+              const options = findTopologyPaths(topology, exitFacility.id, entryFacility.id);
+              return options.length > 0 ? options : [null];
+            })();
+          for (const transferPath of transferPathOptions) {
 
-          let midNodeId: string;
-          let midLabel: string;
-          let exitLegSeconds: number;
-          let entryLegSeconds: number;
-          // 同一區域是 0 秒示意轉移，沒有真實移動，不會有轉折點碰撞問題
-          let exitGateway: { nodeId: string; instant: number } | null = null;
-          let entryGateway: { nodeId: string; instant: number } | null = null;
-          /**
-           * 路徑上每一個中途節點的經過時刻。跨區轉場會沿正線走（例：充電洗車入口點 →
-           * N2W下行出發 → T3下行 → 整備調度入口點），只預約頭尾兩個閘門的話，中間那幾個
-           * 點跟別列車的移動貼在一起也看不到；最終驗證（MOVE_JUNCTION_CONFLICT）看的是
-           * 全部中途節點，求解時要用同一把尺。
-           */
-          let pathPasses: Array<{ nodeId: string; instant: number; until?: number }> = [];
-          /** 這一對轉場的外部成本（路徑經過的共用轉折點會鎖住別人多久） */
-          let externalitySeconds = 0;
+            let midNodeId: string;
+            let midLabel: string;
+            let exitLegSeconds: number;
+            let entryLegSeconds: number;
+            // 同一區域是 0 秒示意轉移，沒有真實移動，不會有轉折點碰撞問題
+            let exitGateway: { nodeId: string; instant: number } | null = null;
+            let entryGateway: { nodeId: string; instant: number } | null = null;
+            /**
+             * 路徑上每一個中途節點的經過時刻。跨區轉場會沿正線走（例：充電洗車入口點 →
+             * N2W下行出發 → T3下行 → 整備調度入口點），只預約頭尾兩個閘門的話，中間那幾個
+             * 點跟別列車的移動貼在一起也看不到；最終驗證（MOVE_JUNCTION_CONFLICT）看的是
+             * 全部中途節點，求解時要用同一把尺。
+             */
+            let pathPasses: Array<{ nodeId: string; instant: number; until?: number }> = [];
+            /** 這一對轉場的外部成本（路徑經過的共用轉折點會鎖住別人多久） */
+            let externalitySeconds = 0;
 
-          let transferVia: string[];
-          /**
-           * 拓樸上的實際路徑才算數，同一個 Area 也一樣。
-           *
-           * 先前同 Area 查不到路徑就當 0 秒示意轉移（2026-08-09：使用者不可能把每一對設施
-           * 都連好）。但 Area 容器可能大到整張圖只有一個，兩座不同設施之間沒有路徑、或路徑上
-           * 某段沒填行駛時間，都不代表車可以瞬間抵達——那樣排出來的時刻與佔用都不成立。
-           * 現在只有「同一個實體節點」才是 0 秒；不同節點缺路徑或缺時間就是到不了，訊息寫出
-           * 缺的是哪一段（2026-09-28）。sameArea 只留作卡面顯示用。
-           */
-          // 同場區換格是區內移動：不走拓樸、不經入口，當成 0 秒（車在區內自己移動）
-          const zoneInternal = sameYardZone(exitFacility.id, entryFacility.id);
-          const transferPath = zoneInternal ? null : findTopologyPath(topology, exitFacility.id, entryFacility.id);
-          const placeholder = zoneInternal || (transferPath !== null && transferPath.edges.length === 0);
-          /**
-           * 作業類前一段跑滿全長才出廠：整備尾巴沒有授權，不能為了讓後一段留足作業時長而提早結束
-           * （白皮書 YARD-07）。後一段放不下作業時長就回報，由使用者調整模板（YARD-06）。
-           * 前一段是待命（不是作業）時可以提早離開，把移動時間讓出來，待命至少留一個刻度。
-           */
-          const travelSecondsForWork = transferPath && !placeholder ? transferPath.avgSeconds : 0;
-          const earlyDepartureShift = !isWorkYardTaskType(earlier.taskType)
-            ? -snapUpToClockAlignSeconds(Math.max(0, departSecond + travelSecondsForWork - laterLatestStartSecond))
-            : 0;
-          const candidateDepartSecond = departSecond + earlyDepartureShift;
-          if (
-            earlyDepartureShift < 0
-            && candidateDepartSecond
-              < minuteToSecond(earlier.plannedStartMinute) + minimumYardWorkSeconds(earlier.taskType) - 1e-9
-          ) {
-            tally.noTime += 1;
-            continue;
-          }
-          if (placeholder) {
-            // 同一個實體節點：車不用移動，開始跟結束是同一刻
-            midNodeId = entryFacility.id;
-            midLabel = entryFacility.label || entryFacility.id;
-            exitLegSeconds = 0;
-            entryLegSeconds = 0;
-            transferVia = [
-              exitFacility.label || exitFacility.id,
-              entryFacility.label || entryFacility.id,
-            ];
-          } else {
-            const path = transferPath;
-            if (!path || path.edges.length === 0) { tallyNoPath(tally, exitFacility.id, entryFacility.id); continue; }
-            transferVia = pathViaLabels(path);
-            // 分界點取第一段邊的終點：出廠卡永遠是「離開這座設施專屬的那一段
-            // 邊」（例 E2 → N2W下行出發），入廠卡吸收掉中間所有正線轉乘直到
-            // 目的設施（例 N2W下行出發 → T3下行 → M1）——出廠短、入廠長，
-            // 入廠卡負責吸收這段真實的移動距離。
-            exitGateway = resolveGatewayFromPath(path, candidateDepartSecond, 'leaving-facility', exitFacility.id);
-            midNodeId = exitGateway.nodeId;
-            midLabel = nodeById.get(midNodeId)?.label || midNodeId;
-            exitLegSeconds = exitGateway.instant - candidateDepartSecond;
-            entryLegSeconds = Math.max(0, path.avgSeconds - exitLegSeconds);
-            entryGateway = resolveGatewayFromPath(
-              path,
-              candidateDepartSecond + path.avgSeconds,
-              'arriving-at-facility',
-              entryFacility.id,
-            );
-            externalitySeconds = pathExternalitySeconds(path);
-            let passInstant = candidateDepartSecond;
-            pathPasses = [
-              ...path.edges.slice(0, -1).map((edge) => {
-                passInstant += edgeSeconds(edge, 'avg');
-                return { nodeId: edge.toNodeId, instant: passInstant } as { nodeId: string; instant: number; until?: number };
-              }),
-              ...segmentPassesOf(path.edges, candidateDepartSecond),
-            ];
-          }
-
-          const totalSeconds = exitLegSeconds + entryLegSeconds;
-          const baseArriveSecond = candidateDepartSecond + totalSeconds;
-          // 後一段只會被<strong>往後推</strong>，絕不會被往前拉——兩段之間本來就
-          // 有空檔時（車提早到、在那邊等），它照原訂時刻開始。少了這個 max，
-          // 空檔一大就會把後一段硬拉到抵達時刻，跨午夜那一對甚至會被拉成負時刻。
-          const laterStartSecond = minuteToSecond(later.plannedStartMinute) + laterOffsetSecond;
-          // 一秒都不挪就已經超過後一段的結束了 = 這段路本來就塞不進空檔，
-          // 跟設施有沒有被佔無關，要分開報，否則使用者會去找根本不存在的佔用
-          if (Math.max(laterStartSecond, baseArriveSecond) > laterLatestStartSecond + 1e-9) {
-            tally.noTime += 1;
-            continue;
-          }
-          // 前一段整備在它自己的全程都佔著出廠那台設施，這個窗是固定的，挪不動
-          if (
-            !stayFacilityIsFree(
-              exitFacility.id,
-              earlier,
-              timeline.row,
-              minuteToSecond(earlier.plannedStartMinute),
-              candidateDepartSecond,
-            )
-          ) {
-            tallyFacilityBusy(tally);
-            continue;
-          }
-
-          /**
-           * 晚一點出廠也是解。
-           *
-           * 車在原本那台設施裡多留一會兒，後一段整備就晚一點開始——那本來就是
-           * 轉場的既有規則（後一段被往後推、結束不動）。目的設施被前一台車佔著
-           * 時，多等一下等它走就好，不必整張卡作廢。
-           *
-           * 往後挪只會讓「後一段佔用目的設施」的窗口變短，所以可行性是單調的，
-           * 最早可行的位移可以二分找出來。上限是後一段還剩得下時間。
-           *
-           * <strong>但晚走也要有格子可待。</strong>車多留的那幾分鐘還是佔著出廠
-           * 那台設施，所以位移還有第二道上限：出廠設施保持空著到什麼時候。少了
-           * 這道上限，出廠設施的預約會在<strong>別人已經挑完之後</strong>才被撐
-           * 大，後車眼中那格當時是空的，於是直接開進來——2026-08-25 實測剩下的
-           * 兩筆重疊（E3 241 秒、M1 401 秒）全是這樣來的。挪不動就換一組設施，
-           * 這正是候選迴圈存在的意義。
-           */
-          /**
-           * 位移 shift 之下，車實際離開出廠設施的時刻。
-           *
-           * 必須跟 {@link vehicleLeavesFacilityAtSecond} 用同一個定義（下一張非零
-           * 長度卡的起點），否則檢查與預約會各說各話：同區域轉場的兩張移動卡是
-           * 零長度示意卡，車其實一路待到後一段整備開始。
-           */
-          const exitStayEndAt = (shift: number) =>
-            totalSeconds > 0
-              ? candidateDepartSecond + shift
-              : Math.max(laterStartSecond, baseArriveSecond + shift);
-          const exitFacilityFreeAt = (shift: number) =>
-            stayFacilityIsFree(
-              exitFacility.id,
-              earlier,
-              timeline.row,
-              minuteToSecond(earlier.plannedStartMinute),
-              exitStayEndAt(shift),
-            )
-            // 原訂時刻離格不檢查交接：交接由進格的那一方讓（它看得到我何時走）。
-            // 只有我為了閃避而多留時，才不能留到擋住別人已排好的進格
-            && (shift <= 0 || handoverEdgeIsClear(exitFacility.id, timeline.row, exitStayEndAt(shift), 'leaving'));
-          let maxShift = Math.max(0, laterLatestStartSecond - baseArriveSecond);
-          /** 最晚離開被什麼限制：後一段要留下作業時間（固定規則），或原格下一台要進來（可重排） */
-          let latestReason = `後一段「${later.label}」要留下作業時間，最晚 ${formatSecondOfDay(laterLatestStartSecond)} 開始`;
-          let latestFixed = true;
-          if (maxShift > 0 && !exitFacilityFreeAt(maxShift)) {
-            let free = 0;
-            let busy = maxShift;
-            for (let step = 0; step < 32 && busy - free > 1; step += 1) {
-              const mid = (free + busy) / 2;
-              if (exitFacilityFreeAt(mid)) free = mid; else busy = mid;
+            let transferVia: string[];
+            /**
+             * 拓樸上的實際路徑才算數，同一個 Area 也一樣。
+             *
+             * 先前同 Area 查不到路徑就當 0 秒示意轉移（2026-08-09：使用者不可能把每一對設施
+             * 都連好）。但 Area 容器可能大到整張圖只有一個，兩座不同設施之間沒有路徑、或路徑上
+             * 某段沒填行駛時間，都不代表車可以瞬間抵達——那樣排出來的時刻與佔用都不成立。
+             * 現在只有「同一個實體節點」才是 0 秒；不同節點缺路徑或缺時間就是到不了，訊息寫出
+             * 缺的是哪一段（2026-09-28）。sameArea 只留作卡面顯示用。
+             */
+            // 同場區換格是區內移動：不走拓樸、不經入口，當成 0 秒（車在區內自己移動）
+            const zoneInternal = sameYardZone(exitFacility.id, entryFacility.id);
+            const placeholder = zoneInternal || (transferPath !== null && transferPath.edges.length === 0);
+            /**
+             * 作業類前一段跑滿全長才出廠：整備尾巴沒有授權，不能為了讓後一段留足作業時長而提早結束
+             * （白皮書 YARD-07）。後一段放不下作業時長就回報，由使用者調整模板（YARD-06）。
+             * 前一段是待命（不是作業）時可以提早離開，把移動時間讓出來，待命至少留一個刻度。
+             */
+            const travelSecondsForWork = transferPath && !placeholder ? transferPath.avgSeconds : 0;
+            const earlyDepartureShift = !isWorkYardTaskType(earlier.taskType)
+              ? -snapUpToClockAlignSeconds(Math.max(0, departSecond + travelSecondsForWork - laterLatestStartSecond))
+              : 0;
+            const candidateDepartSecond = departSecond + earlyDepartureShift;
+            if (
+              earlyDepartureShift < 0
+              && candidateDepartSecond
+                < minuteToSecond(earlier.plannedStartMinute) + minimumYardWorkSeconds(earlier) - 1e-9
+            ) {
+              tally.noTime += 1;
+              continue;
             }
-            maxShift = Math.floor(free);
-            // 可延後範圍是被「原格下一台要進來」縮小的：那一台也要交給搜尋，不能只報最後撞到的轉折點
-            exitFacilityFreeAt(busy);
-            const limiter = lastBlocker as TransferBlocker | null;
-            if (limiter) {
-              tally.limitBlockers.push({ ...limiter, role: 'origin-next-occupant', adjustable: Boolean(limiter.blockingBlockId) });
-              latestReason = `原格「${exitFacility.label || exitFacility.id}」`
-                + `時間線 ${limiter.blockingRow} 要進來（${formatSecondOfDay(limiter.occupiedFrom)}），交接要隔 ${collisionBufferSeconds} 秒`;
-              latestFixed = false;
+            if (placeholder) {
+              // 同一個實體節點：車不用移動，開始跟結束是同一刻
+              midNodeId = entryFacility.id;
+              midLabel = entryFacility.label || entryFacility.id;
+              exitLegSeconds = 0;
+              entryLegSeconds = 0;
+              transferVia = [
+                exitFacility.label || exitFacility.id,
+                entryFacility.label || entryFacility.id,
+              ];
+            } else {
+              const path = transferPath;
+              if (!path || path.edges.length === 0) { tallyNoPath(tally, exitFacility.id, entryFacility.id); continue; }
+              transferVia = pathViaLabels(path);
+              // 分界點取第一段邊的終點：出廠卡永遠是「離開這座設施專屬的那一段
+              // 邊」（例 E2 → N2W下行出發），入廠卡吸收掉中間所有正線轉乘直到
+              // 目的設施（例 N2W下行出發 → T3下行 → M1）——出廠短、入廠長，
+              // 入廠卡負責吸收這段真實的移動距離。
+              exitGateway = resolveGatewayFromPath(path, candidateDepartSecond, 'leaving-facility', exitFacility.id);
+              midNodeId = exitGateway.nodeId;
+              midLabel = nodeById.get(midNodeId)?.label || midNodeId;
+              exitLegSeconds = exitGateway.instant - candidateDepartSecond;
+              entryLegSeconds = Math.max(0, path.avgSeconds - exitLegSeconds);
+              entryGateway = resolveGatewayFromPath(
+                path,
+                candidateDepartSecond + path.avgSeconds,
+                'arriving-at-facility',
+                entryFacility.id,
+              );
+              externalitySeconds = pathExternalitySeconds(path);
+              let passInstant = candidateDepartSecond;
+              pathPasses = [
+                ...path.edges.slice(0, -1).map((edge) => {
+                  passInstant += edgeSeconds(edge, 'avg');
+                  return { nodeId: edge.toNodeId, instant: passInstant } as { nodeId: string; instant: number; until?: number };
+                }),
+                ...segmentPassesOf(path.edges, candidateDepartSecond),
+              ];
             }
-          }
-          tally.departureWindow ??= {
-            earliestSecond: candidateDepartSecond,
-            earliestReason: isWorkYardTaskType(earlier.taskType)
-              ? `「${earlier.label}」是作業，做滿才走（不截尾）`
-              : `「${earlier.label}」至少留一個刻度`,
-            earliestFixed: true,
-            latestSecond: candidateDepartSecond + maxShift,
-            latestReason,
-            latestFixed,
-          };
-          // 一秒都不挪就已經佔到別人的格子——這組設施不能用，換下一組
-          if (!exitFacilityFreeAt(0)) { tallyFacilityBusy(tally); continue; }
-          const entryFacilityFreeAt = (shift: number) => {
-            const start = Math.max(laterStartSecond, baseArriveSecond + shift);
-            if (start > laterLatestStartSecond + 1e-9) return false;
-            // 提早到只是等待（後一段照原訂開始），但車從抵達起就在目的格裡：佔用從抵達算起
-            const occupyFrom = Math.min(start, baseArriveSecond + shift);
-            return stayFacilityIsFree(
-              entryFacility.id,
-              later,
-              timeline.row,
-              occupyFrom - laterOffsetSecond,
-              laterEndSecond - laterOffsetSecond,
-            )
-            && handoverEdgeIsClear(entryFacility.id, timeline.row, occupyFrom - laterOffsetSecond, 'entering');
-          };
-          let facilityShift: number;
-          if (entryFacilityFreeAt(0)) {
-            facilityShift = 0;
-          } else if (!entryFacilityFreeAt(maxShift)) {
-            tallyFacilityBusy(tally);
-            continue;
-          } else {
-            let busy = 0;
-            let free = maxShift;
-            for (let step = 0; step < 32 && free - busy > 1; step += 1) {
-              const mid = (busy + free) / 2;
-              if (entryFacilityFreeAt(mid)) free = mid; else busy = mid;
-            }
-            const lowest = snapUpToClockAlignSeconds(busy);
-            const aligned = entryFacilityFreeAt(lowest) ? lowest : snapUpToClockAlignSeconds(free);
-            facilityShift = aligned <= maxShift + 1e-9 ? aligned : Math.ceil(free);
-          }
-          /**
-           * 場區內換格：能晚就晚。
-           *
-           * 區內移動不經入口、不佔轉折點，車多留在原格一會兒不影響任何人；反過來，一做完就
-           * 換進別人剛空出來的格，那台要離開的車就一秒都不能晚走——它出場要經過入口點、要閃
-           * 正線，等於被逼到零秒窗（2026-11-09 實錄：列 1 11:30 從 E1 換進 E4，列 2 同一刻
-           * 要從 E4 出場去 H2，可走範圍 0 秒）。所以區內換格挪到原格還能待的最晚時刻，
-           * 把目的格交接的時間讓給要出場的那一台。原格被已排定的車要回去時，maxShift 已經
-           * 把那一刻算進去了。
-           */
-          if (zoneInternal && maxShift > facilityShift) {
-            const latest = Math.floor(maxShift / SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS) * SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
-            if (latest > facilityShift && entryFacilityFreeAt(latest)) facilityShift = latest;
-          }
 
-          // 轉折點撞上就再往後挪一點。往後挪只會讓目的設施的佔用窗更短，
-          // 不會把剛解好的設施衝突變回來。
-          // 閃轉折點：作業類前一段只能晚一點出廠（不吃尾巴）；前一段是待命才可以提早離開
-          let earliestJunctionShift = !isWorkYardTaskType(earlier.taskType)
-            ? Math.min(
-              0,
-              minuteToSecond(earlier.plannedStartMinute) + minimumYardWorkSeconds(earlier.taskType) - candidateDepartSecond,
-            )
-            : 0;
-          /**
-           * 提早離開只到「目的格那時已經空著」為止。
-           *
-           * 提早走的車一到就停進目的格等，所以目的格要從抵達起就空著。先前閃轉折點只看路上，
-           * 挑到一個很早的時刻（例：待命 00:00 就出發，去等 02:00 的充電），到了才發現格子
-           * 還被別台佔著，整組淘汰——後面明明還有晚一點、格子已空的時刻沒試（2026-11-09
-           * 列 8、列 11）。提早量是單調的：越早到越容易撞到前一台，二分找出最早可行的。
-           */
-          if (earliestJunctionShift < 0) {
-            const earlyEntryFree = (shift: number) => {
-              const arrive = baseArriveSecond + facilityShift + shift;
-              return stayFacilityIsFree(
-                entryFacility.id, later, timeline.row,
-                arrive - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
-              )
-              && handoverEdgeIsClear(entryFacility.id, timeline.row, arrive - laterOffsetSecond, 'entering');
-            };
-            if (!earlyEntryFree(earliestJunctionShift)) {
-              let busy = earliestJunctionShift;
-              let free = 0;
-              for (let step = 0; step < 32 && free - busy > 1; step += 1) {
-                const mid = (busy + free) / 2;
-                if (earlyEntryFree(mid)) free = mid; else busy = mid;
-              }
-              earliestJunctionShift = Math.min(0, Math.ceil(free));
+            const totalSeconds = exitLegSeconds + entryLegSeconds;
+            const baseArriveSecond = candidateDepartSecond + totalSeconds;
+            // 後一段只會被<strong>往後推</strong>，絕不會被往前拉——兩段之間本來就
+            // 有空檔時（車提早到、在那邊等），它照原訂時刻開始。少了這個 max，
+            // 空檔一大就會把後一段硬拉到抵達時刻，跨午夜那一對甚至會被拉成負時刻。
+            const laterStartSecond = minuteToSecond(later.plannedStartMinute) + laterOffsetSecond;
+            // 一秒都不挪就已經超過後一段的結束了 = 這段路本來就塞不進空檔，
+            // 跟設施有沒有被佔無關，要分開報，否則使用者會去找根本不存在的佔用
+            if (Math.max(laterStartSecond, baseArriveSecond) > laterLatestStartSecond + 1e-9) {
+              tally.noTime += 1;
+              continue;
             }
-          }
-          const junctionShift = resolveJunctionShiftSeconds(
-            pathPasses.length > 0
-              ? pathPasses.map((pass) => (shiftPass(pass, facilityShift)))
-              : [
-                  exitGateway && { ...exitGateway, instant: exitGateway.instant + facilityShift },
-                  entryGateway && { ...entryGateway, instant: entryGateway.instant + facilityShift },
-                ],
-            timeline.row,
-            earliestJunctionShift,
-            maxShift - facilityShift,
-          );
-          if (junctionShift === null) {
-            transferReservation ??= (pathPasses.length > 0
-              ? pathPasses
-              : [exitGateway, entryGateway].filter((p): p is { nodeId: string; instant: number } => p != null)
-            ).map((pass) => (shiftPass(pass, facilityShift)));
-            tally.junctionBusy += 1;
-            tally.junctionDetail ??= describeJunctionBlock(
-              (pathPasses.length > 0 ? pathPasses : [exitGateway, entryGateway])
-                .map((pass) => pass && shiftPass(pass, facilityShift)),
-              timeline.row,
-              earliestJunctionShift,
-              maxShift - facilityShift,
-              facilityShift,
-            );
-            tallyJunctionBlockers(
-              tally,
-              (pathPasses.length > 0 ? pathPasses : [exitGateway, entryGateway])
-                .map((pass) => pass && shiftPass(pass, facilityShift)),
-              timeline.row,
-              earliestJunctionShift,
-              maxShift - facilityShift,
-            );
-            continue;
-          }
-          const departureShift = facilityShift + junctionShift;
-          if (departureShift < 0) {
-            // 提早離開待命、提早到：車從抵達起就在目的格裡等，那一格要從抵達起空著
-            const earlyArriveSecond = baseArriveSecond + departureShift;
+            // 前一段整備在它自己的全程都佔著出廠那台設施，這個窗是固定的，挪不動
             if (
               !stayFacilityIsFree(
-                entryFacility.id, later, timeline.row,
-                earlyArriveSecond - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
+                exitFacility.id,
+                earlier,
+                timeline.row,
+                minuteToSecond(earlier.plannedStartMinute),
+                candidateDepartSecond,
               )
-              || !handoverEdgeIsClear(entryFacility.id, timeline.row, earlyArriveSecond - laterOffsetSecond, 'entering')
             ) {
               tallyFacilityBusy(tally);
               continue;
             }
-          }
-          if (departureShift !== 0) {
-            if (exitGateway) exitGateway = { ...exitGateway, instant: exitGateway.instant + departureShift };
-            if (entryGateway) entryGateway = { ...entryGateway, instant: entryGateway.instant + departureShift };
-          }
-          const arriveSecond = baseArriveSecond + departureShift;
-          // 後一段只會被往後推：提早到是等待，不提前開工（白皮書 YARD-07）
-          const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
-          // 後一段被推遲後，剩下的工作時間不少於整備設定的作業時長（轉場的移動時間本來就佔後一段開頭）
-          if (finalLaterStartSecond > laterEndSecond - minimumYardWorkSeconds(later.taskType) + 1e-9) {
-            tally.noTime += 1;
-            continue;
-          }
-          // 同區域是 0 秒示意轉移、沒有真實路徑，外部成本自然是 0
-          const decisionCost = totalSeconds + externalitySeconds;
-          if (!chosen || decisionCost < chosen.decisionCost) {
-            chosen = {
-              exitNodeId: exitFacility.id,
-              exitLabel: exitFacility.label || exitFacility.id,
-              entryNodeId: entryFacility.id,
-              entryLabel: entryFacility.label || entryFacility.id,
-              midNodeId,
-              midLabel,
-              viaLabels: transferVia,
-              exitLegSeconds,
-              entryLegSeconds,
-              // 卡面「設施 → 設施」只給真的沒有路徑的示意轉移；有實際路徑就照分段顯示
-              sameArea: placeholder,
-              exitGateway,
-              entryGateway,
-              passes: pathPasses.map((pass) => (shiftPass(pass, departureShift))),
-              departureShiftSeconds: earlyDepartureShift + departureShift,
-              decisionCost,
-              finalLaterStartSecond,
+
+            /**
+             * 晚一點出廠也是解。
+             *
+             * 車在原本那台設施裡多留一會兒，後一段整備就晚一點開始——那本來就是
+             * 轉場的既有規則（後一段被往後推、結束不動）。目的設施被前一台車佔著
+             * 時，多等一下等它走就好，不必整張卡作廢。
+             *
+             * 往後挪只會讓「後一段佔用目的設施」的窗口變短，所以可行性是單調的，
+             * 最早可行的位移可以二分找出來。上限是後一段還剩得下時間。
+             *
+             * <strong>但晚走也要有格子可待。</strong>車多留的那幾分鐘還是佔著出廠
+             * 那台設施，所以位移還有第二道上限：出廠設施保持空著到什麼時候。少了
+             * 這道上限，出廠設施的預約會在<strong>別人已經挑完之後</strong>才被撐
+             * 大，後車眼中那格當時是空的，於是直接開進來——2026-08-25 實測剩下的
+             * 兩筆重疊（E3 241 秒、M1 401 秒）全是這樣來的。挪不動就換一組設施，
+             * 這正是候選迴圈存在的意義。
+             */
+            /**
+             * 位移 shift 之下，車實際離開出廠設施的時刻。
+             *
+             * 必須跟 {@link vehicleLeavesFacilityAtSecond} 用同一個定義（下一張非零
+             * 長度卡的起點），否則檢查與預約會各說各話：同區域轉場的兩張移動卡是
+             * 零長度示意卡，車其實一路待到後一段整備開始。
+             */
+            const exitStayEndAt = (shift: number) =>
+              totalSeconds > 0
+                ? candidateDepartSecond + shift
+                : Math.max(laterStartSecond, baseArriveSecond + shift);
+            const exitFacilityFreeAt = (shift: number) =>
+              stayFacilityIsFree(
+                exitFacility.id,
+                earlier,
+                timeline.row,
+                minuteToSecond(earlier.plannedStartMinute),
+                exitStayEndAt(shift),
+              )
+              // 原訂時刻離格不檢查交接：交接由進格的那一方讓（它看得到我何時走）。
+              // 只有我為了閃避而多留時，才不能留到擋住別人已排好的進格
+              && (shift <= 0 || handoverEdgeIsClear(exitFacility.id, timeline.row, exitStayEndAt(shift), 'leaving'));
+            let maxShift = Math.max(0, laterLatestStartSecond - baseArriveSecond);
+            /** 最晚離開被什麼限制：後一段要留下作業時間（固定規則），或原格下一台要進來（可重排） */
+            let latestReason = `後一段「${later.label}」要留下作業時間，最晚 ${formatSecondOfDay(laterLatestStartSecond)} 開始`;
+            let latestFixed = true;
+            if (maxShift > 0 && !exitFacilityFreeAt(maxShift)) {
+              let free = 0;
+              let busy = maxShift;
+              for (let step = 0; step < 32 && busy - free > 1; step += 1) {
+                const mid = (free + busy) / 2;
+                if (exitFacilityFreeAt(mid)) free = mid; else busy = mid;
+              }
+              maxShift = Math.floor(free);
+              // 可延後範圍是被「原格下一台要進來」縮小的：那一台也要交給搜尋，不能只報最後撞到的轉折點
+              exitFacilityFreeAt(busy);
+              const limiter = lastBlocker as TransferBlocker | null;
+              if (limiter) {
+                tally.limitBlockers.push({ ...limiter, role: 'origin-next-occupant', adjustable: Boolean(limiter.blockingBlockId) });
+                latestReason = `原格「${exitFacility.label || exitFacility.id}」`
+                  + `時間線 ${limiter.blockingRow} 要進來（${formatSecondOfDay(limiter.occupiedFrom)}），交接要隔 ${collisionBufferSeconds} 秒`;
+                latestFixed = false;
+              }
+            }
+            tally.departureWindow ??= {
+              earliestSecond: candidateDepartSecond,
+              earliestReason: isWorkYardTaskType(earlier.taskType)
+                ? `「${earlier.label}」是作業，做滿才走（不截尾）`
+                : `「${earlier.label}」至少留一個刻度`,
+              earliestFixed: true,
+              latestSecond: candidateDepartSecond + maxShift,
+              latestReason,
+              latestFixed,
             };
+            // 一秒都不挪就已經佔到別人的格子——這組設施不能用，換下一組
+            if (!exitFacilityFreeAt(0)) { tallyFacilityBusy(tally); continue; }
+            const entryFacilityFreeAt = (shift: number) => {
+              const start = Math.max(laterStartSecond, baseArriveSecond + shift);
+              if (start > laterLatestStartSecond + 1e-9) return false;
+              // 提早到只是等待（後一段照原訂開始），但車從抵達起就在目的格裡：佔用從抵達算起
+              const occupyFrom = Math.min(start, baseArriveSecond + shift);
+              return stayFacilityIsFree(
+                entryFacility.id,
+                later,
+                timeline.row,
+                occupyFrom - laterOffsetSecond,
+                laterEndSecond - laterOffsetSecond,
+              )
+              && handoverEdgeIsClear(entryFacility.id, timeline.row, occupyFrom - laterOffsetSecond, 'entering');
+            };
+            let facilityShift: number;
+            if (entryFacilityFreeAt(0)) {
+              facilityShift = 0;
+            } else if (!entryFacilityFreeAt(maxShift)) {
+              tallyFacilityBusy(tally);
+              continue;
+            } else {
+              let busy = 0;
+              let free = maxShift;
+              for (let step = 0; step < 32 && free - busy > 1; step += 1) {
+                const mid = (busy + free) / 2;
+                if (entryFacilityFreeAt(mid)) free = mid; else busy = mid;
+              }
+              const lowest = snapUpToClockAlignSeconds(busy);
+              const aligned = entryFacilityFreeAt(lowest) ? lowest : snapUpToClockAlignSeconds(free);
+              facilityShift = aligned <= maxShift + 1e-9 ? aligned : Math.ceil(free);
+            }
+            /**
+             * 場區內換格：能晚就晚。
+             *
+             * 區內移動不經入口、不佔轉折點，車多留在原格一會兒不影響任何人；反過來，一做完就
+             * 換進別人剛空出來的格，那台要離開的車就一秒都不能晚走——它出場要經過入口點、要閃
+             * 正線，等於被逼到零秒窗（2026-11-09 實錄：列 1 11:30 從 E1 換進 E4，列 2 同一刻
+             * 要從 E4 出場去 H2，可走範圍 0 秒）。所以區內換格挪到原格還能待的最晚時刻，
+             * 把目的格交接的時間讓給要出場的那一台。原格被已排定的車要回去時，maxShift 已經
+             * 把那一刻算進去了。
+             */
+            /*
+             * 但有三種情況不能挪到最晚：
+             * - 同一台設施：車根本沒換格，挪晚對誰都沒好處，只會把後一段壓成一個刻度。
+             * - 後一段是作業（充電、保養、行檢）：挪晚就是平白砍掉作業時間。
+             * - 後一段做完車要出廠：出廠要在下一班發車前走完整條路，還要留閃避轉折點的餘地。
+             *   挪到最晚會讓後一段只剩一個刻度，出廠沒有時間可用（2026-11-10 實錄：列 1 充電轉待命
+             *   同在 E3，待命被挪到 23:59:50，00:00 那班的出廠排不出來）。
+             */
+            if (
+              zoneInternal
+              && maxShift > facilityShift
+              && exitFacility.id !== entryFacility.id
+              && !isWorkYardTaskType(later.taskType)
+            ) {
+              let latest = Math.floor(maxShift / SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS) * SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
+              const ownExitLatestStart = laterOwnExitLatestStartSecond(
+                sorted, laterNeighbor.block, laterOffsetSecond, entryFacility.id,
+              );
+              if (ownExitLatestStart != null) {
+                const cap = Math.floor((ownExitLatestStart - baseArriveSecond) / SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS)
+                  * SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS;
+                latest = Math.min(latest, cap);
+              }
+              if (latest > facilityShift && entryFacilityFreeAt(latest)) facilityShift = latest;
+            }
+
+            // 轉折點撞上就再往後挪一點。往後挪只會讓目的設施的佔用窗更短，
+            // 不會把剛解好的設施衝突變回來。
+            // 閃轉折點：作業類前一段只能晚一點出廠（不吃尾巴）；前一段是待命才可以提早離開
+            let earliestJunctionShift = !isWorkYardTaskType(earlier.taskType)
+              ? Math.min(
+                0,
+                minuteToSecond(earlier.plannedStartMinute) + minimumYardWorkSeconds(earlier) - candidateDepartSecond,
+              )
+              : 0;
+            /**
+             * 提早離開只到「目的格那時已經空著」為止。
+             *
+             * 提早走的車一到就停進目的格等，所以目的格要從抵達起就空著。先前閃轉折點只看路上，
+             * 挑到一個很早的時刻（例：待命 00:00 就出發，去等 02:00 的充電），到了才發現格子
+             * 還被別台佔著，整組淘汰——後面明明還有晚一點、格子已空的時刻沒試（2026-11-09
+             * 列 8、列 11）。提早量是單調的：越早到越容易撞到前一台，二分找出最早可行的。
+             */
+            if (earliestJunctionShift < 0) {
+              const earlyEntryFree = (shift: number) => {
+                const arrive = baseArriveSecond + facilityShift + shift;
+                return stayFacilityIsFree(
+                  entryFacility.id, later, timeline.row,
+                  arrive - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
+                )
+                && handoverEdgeIsClear(entryFacility.id, timeline.row, arrive - laterOffsetSecond, 'entering');
+              };
+              if (!earlyEntryFree(earliestJunctionShift)) {
+                let busy = earliestJunctionShift;
+                let free = 0;
+                for (let step = 0; step < 32 && free - busy > 1; step += 1) {
+                  const mid = (busy + free) / 2;
+                  if (earlyEntryFree(mid)) free = mid; else busy = mid;
+                }
+                earliestJunctionShift = Math.min(0, Math.ceil(free));
+              }
+            }
+            const junctionShift = resolveJunctionShiftSeconds(
+              pathPasses.length > 0
+                ? pathPasses.map((pass) => (shiftPass(pass, facilityShift)))
+                : [
+                    exitGateway && { ...exitGateway, instant: exitGateway.instant + facilityShift },
+                    entryGateway && { ...entryGateway, instant: entryGateway.instant + facilityShift },
+                  ],
+              timeline.row,
+              earliestJunctionShift,
+              maxShift - facilityShift,
+            );
+            if (junctionShift === null) {
+              transferReservation ??= (pathPasses.length > 0
+                ? pathPasses
+                : [exitGateway, entryGateway].filter((p): p is { nodeId: string; instant: number } => p != null)
+              ).map((pass) => (shiftPass(pass, facilityShift)));
+              tally.junctionBusy += 1;
+              tally.junctionDetail ??= describeJunctionBlock(
+                (pathPasses.length > 0 ? pathPasses : [exitGateway, entryGateway])
+                  .map((pass) => pass && shiftPass(pass, facilityShift)),
+                timeline.row,
+                earliestJunctionShift,
+                maxShift - facilityShift,
+                facilityShift,
+              );
+              tallyJunctionBlockers(
+                tally,
+                (pathPasses.length > 0 ? pathPasses : [exitGateway, entryGateway])
+                  .map((pass) => pass && shiftPass(pass, facilityShift)),
+                timeline.row,
+                earliestJunctionShift,
+                maxShift - facilityShift,
+              );
+              continue;
+            }
+            const departureShift = facilityShift + junctionShift;
+            if (departureShift < 0) {
+              // 提早離開待命、提早到：車從抵達起就在目的格裡等，那一格要從抵達起空著
+              const earlyArriveSecond = baseArriveSecond + departureShift;
+              if (
+                !stayFacilityIsFree(
+                  entryFacility.id, later, timeline.row,
+                  earlyArriveSecond - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
+                )
+                || !handoverEdgeIsClear(entryFacility.id, timeline.row, earlyArriveSecond - laterOffsetSecond, 'entering')
+              ) {
+                tallyFacilityBusy(tally);
+                continue;
+              }
+            }
+            if (departureShift !== 0) {
+              if (exitGateway) exitGateway = { ...exitGateway, instant: exitGateway.instant + departureShift };
+              if (entryGateway) entryGateway = { ...entryGateway, instant: entryGateway.instant + departureShift };
+            }
+            const arriveSecond = baseArriveSecond + departureShift;
+            // 後一段只會被往後推：提早到是等待，不提前開工（白皮書 YARD-07）
+            const finalLaterStartSecond = Math.max(laterStartSecond, arriveSecond);
+            // 後一段被推遲後，剩下的工作時間不少於整備設定的作業時長（轉場的移動時間本來就佔後一段開頭）
+            if (finalLaterStartSecond > laterEndSecond - minimumYardWorkSeconds(later) + 1e-9) {
+              tally.noTime += 1;
+              continue;
+            }
+            // 同區域是 0 秒示意轉移、沒有真實路徑，外部成本自然是 0
+            const preferredClearance = hasPreferredBerthClearance(junctionQuery(pathPasses, timeline.row, 0, 0), departureShift);
+            const decisionCost = totalSeconds + externalitySeconds;
+            if (!chosen || (preferredClearance && !chosen.preferredClearance)
+              || (preferredClearance === chosen.preferredClearance && decisionCost < chosen.decisionCost)) {
+              chosen = {
+                exitNodeId: exitFacility.id,
+                exitLabel: exitFacility.label || exitFacility.id,
+                entryNodeId: entryFacility.id,
+                entryLabel: entryFacility.label || entryFacility.id,
+                midNodeId,
+                midLabel,
+                viaLabels: transferVia,
+                exitLegSeconds,
+                entryLegSeconds,
+                // 卡面「設施 → 設施」只給真的沒有路徑的示意轉移；有實際路徑就照分段顯示
+                sameArea: placeholder,
+                exitGateway,
+                entryGateway,
+                passes: pathPasses.map((pass) => (shiftPass(pass, departureShift))),
+                departureShiftSeconds: earlyDepartureShift + departureShift,
+                decisionCost, preferredClearance,
+                finalLaterStartSecond,
+              };
+            }
           }
         }
       }
@@ -2881,6 +3355,7 @@ export function insertMaintenanceTransferCards(args: {
     handoverEnforced = true;
     if (!chosen) {
       sink.push({
+        transferKind: 'transit',
         timelineRow: timeline.row,
         blockId: later.id,
         fromTaskType: earlier.taskType,
@@ -3047,6 +3522,7 @@ export function insertMaintenanceTransferCards(args: {
         const basis = describeYardOnlyNeighborBasis(sorted, i, 'next');
         skipped.push(basis
           ? {
+            transferKind: 'exit',
             timelineRow: timeline.row,
             blockId: yard.id,
             taskType: yard.taskType,
@@ -3054,6 +3530,7 @@ export function insertMaintenanceTransferCards(args: {
             necessity: 'not_needed',
           }
           : {
+            transferKind: 'exit',
             timelineRow: timeline.row,
             blockId: yard.id,
             taskType: yard.taskType,
@@ -3090,6 +3567,7 @@ export function insertMaintenanceTransferCards(args: {
       || next.firstTripOriginStationId?.trim();
     if (!stationId) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3100,6 +3578,7 @@ export function insertMaintenanceTransferCards(args: {
     const stationNodeId = nodeIdByStationId.get(stationId);
     if (!stationNodeId) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3112,6 +3591,7 @@ export function insertMaintenanceTransferCards(args: {
     const allFacilities = facilityNodesForBlock(yard);
     if (allFacilities.length === 0) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3128,6 +3608,7 @@ export function insertMaintenanceTransferCards(args: {
       : allFacilities;
     if (facilities.length === 0) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3136,23 +3617,38 @@ export function insertMaintenanceTransferCards(args: {
       continue;
     }
 
-    // 快的先挑：佔整備尾巴的風險最小
+    // 快的先挑：佔整備尾巴的風險最小。每台設施除了最短路，也列出替代路線——
+    // 最短路在可用時間內排不開時，改走別條路（同一套時間窗與轉折點檢查）
     const candidates = facilities
-      .map((facility) => {
-        const path = findTopologyPath(topology, facility.id, stationNodeId);
-        if (!path) return null;
+      .flatMap((facility) => {
+        const paths = findTopologyPaths(topology, facility.id, stationNodeId);
+        if (paths.length === 0) return [null];
         // seconds 是卡片與時刻要用的實際移動時間；decisionCost 只用來排序
-        return {
-          facility,
-          seconds: path.avgSeconds,
-          decisionCost: pathDecisionCost(path),
-          edges: path.edges,
-          viaLabels: pathViaLabels(path),
-        };
+        /*
+         * 每條路先用均（平均行駛時間）排；排不進去再用快（最短行駛時間）。出廠卡緊貼下一班發車，
+         * 用快就是晚一點出發、同一時刻到站，經過中途各點的時刻跟著往後挪——剛好有車擋在那一點時
+         * 就錯得開。均排得進去就不用快：車不必每次都趕（使用者：「車輛不是都到快才是最優解」）。
+         */
+        return paths.flatMap((path) => {
+          const base = {
+            facility,
+            decisionCost: pathDecisionCost(path),
+            edges: path.edges,
+            viaLabels: pathViaLabels(path),
+          };
+          const variants: Array<typeof base & { seconds: number; pace: 'avg' | 'min' }> = [
+            { ...base, seconds: path.avgSeconds, pace: 'avg' },
+          ];
+          if (path.minSeconds > 0 && path.minSeconds < path.avgSeconds) {
+            variants.push({ ...base, seconds: path.minSeconds, pace: 'min' });
+          }
+          return variants;
+        });
       })
       .filter((c): c is {
         facility: (typeof facilities)[number];
         seconds: number;
+        pace: 'avg' | 'min';
         decisionCost: number;
         edges: PointTopologyEdge[];
         viaLabels: string[];
@@ -3160,6 +3656,7 @@ export function insertMaintenanceTransferCards(args: {
       .sort((a, b) => a.decisionCost - b.decisionCost);
     if (candidates.length === 0) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3175,6 +3672,8 @@ export function insertMaintenanceTransferCards(args: {
 
     let chosen: {
       nodeId: string; label: string; seconds: number;
+      /** 用均還是快排的（見 GeneratedScheduleBlock.yardMovePace） */
+      pace: 'avg' | 'min';
       gatewayNodeId: string; gatewayInstant: number;
         /** 整條路徑經過的點（已含定案位移）；預約與再檢查都用這一組 */
         points: Array<{ nodeId: string; instant: number; until?: number }>;
@@ -3198,8 +3697,8 @@ export function insertMaintenanceTransferCards(args: {
      */
     const earliestLeaveSecond = isWorkYardTaskType(yard.taskType)
       ? yardEndSecond
-      : yardStartSecond + minimumYardWorkSeconds(yard.taskType);
-    for (const { facility, seconds, edges, viaLabels } of candidates) {
+      : yardStartSecond + minimumYardWorkSeconds(yard);
+    for (const { facility, seconds, pace, edges, viaLabels } of candidates) {
       const startSecond = departSecond - seconds;
       if (startSecond < earliestLeaveSecond - 1e-9) {
         tally.noTime += 1;
@@ -3213,10 +3712,10 @@ export function insertMaintenanceTransferCards(args: {
         tallyFacilityBusy(tally);
         continue;
       }
-      const gateway = resolveGatewayFromPath({ edges }, startSecond, 'leaving-facility', stationNodeId);
+      const gateway = resolveGatewayFromPath({ edges }, startSecond, 'leaving-facility', stationNodeId, pace);
       // 整條路都要檢查：沿途每個月台、轉線點，加上抵達的站點（不是只看出設施後第一個閘門）
-      const exitPoints = (() => {
-        const points = pathPointsOf({ edges }, startSecond, { includeStart: false, includeEnd: true });
+      const exitPoints: Array<{ nodeId: string; instant: number; until?: number }> = (() => {
+        const points = pathPointsOf({ edges }, startSecond, { includeStart: false, includeEnd: true }, pace);
         return points.length > 0 ? points : [gateway];
       })();
       let shift = 0;
@@ -3234,12 +3733,13 @@ export function insertMaintenanceTransferCards(args: {
         const earliestStart = earliestLeaveSecond;
         const candidateShifts: number[] = [];
         for (const point of exitPoints) {
-          for (const booking of junctionBookings) {
-            if (booking.nodeId !== junctionClashKey(point.nodeId) || booking.timelineRow === timeline.row) continue;
+          for (const booking of junctionBookings.get(junctionClashKey(point.nodeId)) ?? []) {
+            if (booking.timelineRow === timeline.row) continue;
             for (const wrap of [-daySeconds, 0, daySeconds]) {
-              // 往前挪：貼著對方到達前一個緩衝離開，或對方離開後一個緩衝才到
-              candidateShifts.push(booking.instant - collisionBufferSeconds + wrap - point.instant);
-              candidateShifts.push((booking.until ?? booking.instant) + collisionBufferSeconds + wrap - point.instant);
+              const before = junctionGapSeconds(point.nodeId, occupancyStops(booking.instant, booking.until));
+              const after = junctionGapSeconds(point.nodeId, occupancyStops(point.instant, point.until));
+              candidateShifts.push(booking.instant - before + wrap - (point.until ?? point.instant));
+              candidateShifts.push((booking.until ?? booking.instant) + after + wrap - point.instant);
             }
           }
         }
@@ -3275,8 +3775,10 @@ export function insertMaintenanceTransferCards(args: {
         }
         shift = found;
       }
+      const preferred = hasPreferredBerthClearance(junctionQuery(exitPoints, timeline.row, 0, 0), shift);
+      if (chosen && !preferred) continue;
       chosen = {
-        nodeId: facility.id, label: facility.label || facility.id, seconds,
+        nodeId: facility.id, label: facility.label || facility.id, seconds, pace,
         gatewayNodeId: gateway.nodeId, gatewayInstant: gateway.instant + shift,
         points: exitPoints.map((point) => (shiftPass(point, shift))),
         // 提早到站：抵達到下一班發車這段車停在站上
@@ -3285,10 +3787,11 @@ export function insertMaintenanceTransferCards(args: {
       };
       chosenStart = startSecond + shift;
       chosenEarlySeconds = -shift;
-      break;
+      if (preferred) break;
     }
     if (!chosen) {
       skipped.push({
+        transferKind: 'exit',
         timelineRow: timeline.row,
         blockId: yard.id,
         taskType: yard.taskType,
@@ -3351,6 +3854,7 @@ export function insertMaintenanceTransferCards(args: {
       yardExitStationId: stationId,
       yardExitStationLabel: stationLabel,
       yardMoveViaLabels: chosen.viaLabels,
+      ...(chosen.pace === 'min' ? { yardMovePace: 'min' as const } : {}),
       yardExitSectionCode:
         resolveMaintenanceSectionCodeForTaskType(yard.taskType, sectionCodes) ?? undefined,
       yardExitSectionLabel: resolveMaintenanceSectionLabelForTaskType(yard.taskType) ?? undefined,

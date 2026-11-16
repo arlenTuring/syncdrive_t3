@@ -43,7 +43,6 @@ export const NON_BLOCKING_WARNING_CODES: ReadonlySet<FeasibilityViolationCode> =
     'STATION_BERTH_BACKUP_USED',
     'MAINTENANCE_DISPATCH_UNREACHABLE',
     'HEADWAY_BELOW_TARGET',
-    'UNSERVED_SERVICE_PULSE',
     'INSUFFICIENT_TIMELINES',
     'ROUTE_ROTATION_OVER_TURNAROUND',
     'STATION_LEG_TRAVEL_INCOMPLETE',
@@ -89,6 +88,10 @@ export const PUBLISH_BLOCKING_CODES: ReadonlySet<FeasibilityViolationCode> =
     'SCHEDULE_SEARCH_INCOMPLETE',
     // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表
     'MAINTENANCE_WORK_INSUFFICIENT',
+    // 時刻表訂的發車脈衝沒有車開：載客服務不完整，不能靠少開班次排出表面沒衝突的班表
+    'UNSERVED_SERVICE_PULSE',
+    // 沒有應開服務明細就核對不了載客服務是否完整
+    'SERVICE_DEMAND_UNVERIFIABLE',
   ]);
 
 /** 常見硬錯誤代號（文件／報表用；實際硬閘以 severity=error 為準） */

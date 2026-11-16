@@ -149,6 +149,18 @@ describe('expandTimetableTrips', () => {
     expect(trips[0]!.card_label).toBe('暫停');
   });
 
+  it('跨過午夜延續到隔天清晨的班次（24:02 起）：全天下單範圍要收得到，只看 00:00–24:00 的範圍收不到', () => {
+    const spill = JSON.parse(JSON.stringify(body));
+    spill.scheduleOutput.plan.timelines[0].blocks[0].plannedStartMinute = 24 * 60 + 2 + 40 / 60;
+    spill.scheduleOutput.plan.timelines[0].blocks[0].plannedEndMinute = 24 * 60 + 5 + 40 / 60;
+    const fullDay = expandTimetableTrips({ body: spill, range: { fromSecond: 0, toSecond: 2 * 24 * 3600 } });
+    const spilled = fullDay.find((trip) => trip.block_id === 'b-st');
+    expect(spilled?.card_start_second).toBe(24 * 3600 + 2 * 60 + 40);
+    expect(spilled?.trip_code).toBe('ST0002');
+    const dayOnly = expandTimetableTrips({ body: spill, range: parseTimeRangeQuery({}) });
+    expect(dayOnly.find((trip) => trip.block_id === 'b-st')).toBeUndefined();
+  });
+
   it('filters by time range on card overlap', () => {
     const trips = expandTimetableTrips({
       body,

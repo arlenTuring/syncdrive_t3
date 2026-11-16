@@ -9,6 +9,7 @@ import {
   validateFacilityOccupancy,
   validateMoveJunctionConflicts,
   validateMovePathConflicts,
+  validateServicePulseCoverage,
   validateStationBerthCollisions,
   validateStationTimingsWithinBlocks,
   validateTimelineOverlaps,
@@ -81,6 +82,7 @@ export function buildPlanFingerprint(
           block.id,
           block.plannedStartMinute,
           block.plannedEndMinute,
+          block.requiredChargingSeconds ?? '',
           block.taskType,
           block.source,
           block.routeId ?? '',
@@ -164,7 +166,8 @@ export function buildTopologyFingerprint(topology: PointTopology | null | undefi
  * 跑一次發布前檢查。
  *
  * 檢查「物理上做不到／有行車安全疑慮」的全部幾類：站位重疊與碰撞保護、設施格
- * 重疊與交接間隔、車的位置連續性（缺移動）。班距、未承接脈衝那些屬服務品質，
+ * 重疊與交接間隔、車的位置連續性（缺移動）；以及載客服務完整——時刻表訂的發車脈衝
+ * 沒有車開也擋發布（不能靠少開班次排出表面沒衝突的班表）。班距略低屬服務品質，
  * 由分析報表與既有警告呈現，不擋發布。
  */
 export function runSchedulePublishCheck(args: {
@@ -181,6 +184,14 @@ export function runSchedulePublishCheck(args: {
 
   for (const timeline of plan.timelines) {
     for (const block of timeline.blocks) {
+      if (block.taskType === 'charging' && block.requiredChargingSeconds != null) {
+        const remaining = Math.round((block.plannedEndMinute - block.plannedStartMinute) * 60);
+        if (remaining < block.requiredChargingSeconds) {
+          errors.push({ code: 'MAINTENANCE_WORK_INSUFFICIENT', severity: 'error',
+            message: `時間線 ${timeline.row}：充電只剩 ${remaining} 秒，低於原定 ${block.requiredChargingSeconds} 秒。`,
+            detail: { timelineRow: timeline.row, blockId: block.id, remainingWorkSeconds: remaining, requiredWorkSeconds: block.requiredChargingSeconds } });
+        }
+      }
       if (block.taskType !== 'passenger') continue;
       const route = resolveRouteForBlock(block, selectedRoutes);
       if (!route || (route.stationIds?.length ?? 0) < 2) {
@@ -191,6 +202,8 @@ export function runSchedulePublishCheck(args: {
     }
   }
 
+  // 載客服務完整：時刻表訂的每個發車脈衝班表上都要有車開（見 validateServicePulseCoverage）
+  validateServicePulseCoverage({ plan, issues: errors });
   validateTimelineOverlaps(plan.timelines, errors);
   validateStationTimingsWithinBlocks(plan.timelines, selectedRoutes, errors);
   if (!topology?.nodes.length && plan.timelines.some((timeline) =>

@@ -11,6 +11,8 @@ import type { MaintenanceFirstTripOrigin } from '../maintenanceFirstTripOrigins'
 import { extractFacilityMapCodes } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
+import { annotateMoveStops } from '../annotateMoveStops';
+import { mergeMidnightSplitYardCards, remapMergedBlockIds } from '../mergeMidnightSplitYardCards';
 import { computeScheduleGateOk, PUBLISH_BLOCKING_CODES } from '../scheduleAcceptance';
 import type {
   FeasibilityIssue,
@@ -19,15 +21,20 @@ import type {
   GeneratedSchedulePlan,
   GeneratedScheduleTimeline,
   GenerateShiftScheduleResult,
+  ScheduleSearchSummary,
   ScheduleServiceMetrics,
+  ScheduleVariantSelection,
   SchedulingContext,
+  ShiftScheduleVariant,
 } from './types';
 import { minuteToSecond } from './types';
 import { buildBlockStationDepartures, resolveRouteForBlock } from '../buildBlockStationDepartures';
 import {
   normalizeEngineInput,
+  STANDBY_RELEASE_CUT_ROW,
   type PassengerTimetableMode,
 } from './normalizeInput';
+import type { AssignmentCut } from './normalizeInput';
 import {
   expandRowBlocks,
   groupTasksByRow,
@@ -52,6 +59,7 @@ import {
   validateMovePathConflicts,
   validateFacilityOccupancy,
   validateYardWorkPreserved,
+  validateServicePulseCoverage,
 } from './validate';
 import {
   enforceStationBerthConstraints,
@@ -82,9 +90,11 @@ import {
 import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
 import { pushIssue } from './feasibilityIssueMeta';
 import type { PlanEvaluationContext } from './evaluatePlan';
+import { applyRoundJoinAtYardExit, listOnlineBoundaries, roundJoinNote } from './roundJoin';
 import {
   DEFAULT_RESIDUAL_REPAIR_BUDGET,
   type ResidualRepairBudget,
+  joinRoundLaterInCopy,
   rerouteBerthPairInCopy,
   rerouteTripInCopy,
   resolveResidualConflicts,
@@ -138,6 +148,20 @@ export type GenerateShiftScheduleInput = {
    * 測試用它驗證停止機制。
    */
   searchBudget?: Partial<SearchBudgetLimits>;
+  /** 同樣準時時在線車優先（預設開，給 false 才關；見 NormalizeInputArgs.preferCirculatingVehicles） */
+  preferCirculatingVehicles?: boolean;
+  /** 待命提早結束接班（預設關，原因見 NormalizeInputArgs.allowStandbyEarlyRelease） */
+  standbyEarlyRelease?: boolean;
+  /**
+   * 車上線時可以從一輪的中途加入（試驗功能，預設關）。
+   *
+   * 一輪原本固定從循環起點開始，車從整備位置出來一律先空車開到循環起點。打開後，車可以直接到
+   * 這一輪後面某一段的起點站加入，前面沒開的那幾段就是少掉的載客班次（之後各段時刻不變）。
+   * - 'onFailure'：只有出廠卡排不出來時才這樣做（少掉的班次最少）。
+   * - 'always'：只要到那一站的空車路程比到循環起點短、又沒有帶來新的問題，就這樣做。
+   * 候選由路線資料與路網推出來，不寫任何站名。2026-11-16 使用者要求評估，見總表第 28 節。
+   */
+  roundJoin?: 'off' | 'onFailure' | 'always';
 };
 
 /**
@@ -219,15 +243,6 @@ function traceLayout(
   engineTrace('layout', { at: stage, ...extra, rows });
 }
 
-/**
- * 排班引擎主入口：依策略文件 1.1–1.8、S1–S4 與優化算法展開班表。
- *
- * 有未承接脈衝時，會用「掛脈衝時可再往後推過貼太近的同向班次」再完整重跑一次
- * （見 NormalizeInputArgs.allowBumpPastEarlierSameRoute），兩份整張比較：
- * 硬錯誤與擋發布的安全問題都不能變多，之後依 班距 > 承接 > 班次 取較好的一份。
- * 不是直接拿掉拒絕條件——實測直接拿掉承接 2 → 1、班次 1184 → 1188，卻多出站位
- * 保護不足與班距不足，所以只在整張變好時才用。
- */
 /** 殘留修復之後重算轉場的最多輪數（每輪都要比上一輪好才採用） */
 const POST_RESIDUAL_RECOMPUTE_ROUNDS = 3;
 
@@ -266,25 +281,332 @@ function carryTripEditsIntoPre(
   return { timelines, changed };
 }
 
+/**
+ * 排班引擎主入口：依策略文件 1.1–1.8、S1–S4 與優化算法展開班表。
+ *
+ * 有未承接脈衝時，會用「掛脈衝時可再往後推過貼太近的同向班次」再完整跑一次
+ * （見 NormalizeInputArgs.allowBumpPastEarlierSameRoute），兩份整張比較
+ * （{@link selectShiftScheduleVariant}）。不是直接拿掉拒絕條件——後面所有脈衝的承接
+ * 都會跟著變，可能多出站位保護不足與班距不足，所以只在整張變好時才用。
+ *
+ * 這裡同步跑完兩個版本並挑一份（單元測試、Node 重播、沒有 Worker 的環境）。
+ *
+ * 兩個版本各自有完整的搜尋預算，不共用：先前共用一份時，第一個版本用完 240 秒，
+ * 第二個版本幾乎沒有搜尋就帶著站位碰撞被淘汰——那是預算用盡，不是它比較差。
+ * 瀏覽器裡由 runScheduleEngineInBackground 開兩個背景執行緒同時跑，結果與這裡相同。
+ */
 export function generateShiftSchedule(
   input: GenerateShiftScheduleInput,
 ): GenerateShiftScheduleResult {
-  // 一次生成只有一份搜尋預算：兩次完整生成（見下）與其中所有後處理搜尋共用，不會各自重拿
+  const base = generateShiftScheduleVariant(input, 'base');
+  if (!needsAlternateVariant(base)) return selectShiftScheduleVariant(base, null);
+  return selectShiftScheduleVariant(base, generateShiftScheduleVariant(input, 'alt'));
+}
+
+/** 跑一個派車版本；每次都用自己的一份搜尋預算 */
+export function generateShiftScheduleVariant(
+  rawInput: GenerateShiftScheduleInput,
+  variant: ShiftScheduleVariant,
+): GenerateShiftScheduleResult {
   const searchBudget = new SearchBudget({
-    ...(input.residualRepairBudget?.maxEvaluations != null
-      ? { maxEvaluations: input.residualRepairBudget.maxEvaluations }
+    ...(rawInput.residualRepairBudget?.maxEvaluations != null
+      ? { maxEvaluations: rawInput.residualRepairBudget.maxEvaluations }
       : {}),
-    ...input.searchBudget,
+    ...rawInput.searchBudget,
   });
-  const base = generateShiftScheduleOnce(input, false, searchBudget);
-  const unserved = base.report.warnings.filter((issue) => issue.code === 'UNSERVED_SERVICE_PULSE');
-  if (unserved.length === 0 || !base.plan) return base;
-  const alt = generateShiftScheduleOnce(input, true, searchBudget);
-  if (!alt.plan) return base;
+  const allowBump = variant === 'alt';
+  const startedAt = performance.now();
+  const stages: NonNullable<ScheduleSearchSummary['stages']> = [];
+  const observe = (round: number) => (progress: ScheduleEngineProgress) => {
+    stages.push({ round, stage: progress.stage, elapsedMs: Math.round(performance.now() - startedAt) });
+    reportProgress(progress);
+  };
+  /*
+   * 待命提早接班的試排（在耗時的搜尋之前）。
+   *
+   * 派車時還不知道待命的車會停在哪一格，所以「提早出來接班」排不排得出出廠移動，要等移動卡
+   * 排過才知道。排不出的那幾次不值得拿整份搜尋預算去救——撤回就好，那一班回到「待命整點結束
+   * 才出來」的原本排法。這裡用不帶搜尋的快速生成試排，把排不出出廠卡的提早接班列成派車限制，
+   * 最多試幾輪（撤回後同一班可能改由另一台待命車接，要再確認一次）。
+   */
+  const releaseCuts = probeStandbyReleaseCuts(rawInput, allowBump, observe(0));
+  const input = rawInput;
+  let result = generateShiftScheduleOnce(input, allowBump, searchBudget, releaseCuts, observe(0));
+  /*
+   * 派車回饋（排不出就回頭改）。
+   *
+   * 派車先定好「哪台車開哪一班」，移動卡事後才排；排不出來時，之後的步驟只能挪時刻、換格位、
+   * 換起點，改不了派車。所以跑完一次後，從結果推出限制再派一次：
+   * - 出廠卡排不出：這一列不要接它出廠後的那一班；
+   * - 入廠卡排不出：這一列不要開它進廠前的那一班；
+   * - 派出去的班次後來被刪掉：這個脈衝不要派給那一列。
+   * 每一輪的限制都疊加（沒變差就沿用，讓下一輪能再換一台車試）；最後交出試過的結果裡
+   * 「離完全解決最近」的那一份：擋發布的問題（含沒車接）總數最少，同數時載客班次最多。
+   * 用同一份搜尋預算，用盡、結果變差或沒有新限制就停。
+   */
+  let cuts: AssignmentCut[] = releaseCuts;
+  let best = result;
+  let bestCuts: AssignmentCut[] = releaseCuts;
+  const feedbackRounds: AssignmentFeedbackRound[] = [];
+  for (let round = 0; round < ASSIGNMENT_FEEDBACK_MAX_ROUNDS; round += 1) {
+    if (!result.plan || searchBudget.exhausted) break;
+    const fresh = deriveAssignmentCuts(result)
+      .filter((cut) => !cuts.some((known) => known.pulseId === cut.pulseId && known.row === cut.row));
+    if (fresh.length === 0) break;
+    const trialCuts = [...cuts, ...fresh];
+    const trial = generateShiftScheduleOnce(input, allowBump, searchBudget, trialCuts, observe(round + 1));
+    const before = solvedKeyOf(result);
+    const after = solvedKeyOf(trial);
+    const notWorse = Boolean(trial.plan) && !lexicographicLess(before, after);
+    const adopted = notWorse && lexicographicLess(after, solvedKeyOf(best));
+    feedbackRounds.push({ round, cuts: fresh, adopted, before, after });
+    engineTrace('assignment-feedback', { variant, round, cuts: fresh, adopted, notWorse, before, after });
+    if (!notWorse) break;
+    result = trial;
+    cuts = trialCuts;
+    if (adopted) {
+      best = trial;
+      bestCuts = trialCuts;
+    }
+  }
+  result = best;
+  cuts = bestCuts;
+  const budget = searchBudget.report();
+  const search: ScheduleSearchSummary = {
+    variant,
+    stages,
+    feedbackRounds: feedbackRounds.length,
+    totalElapsedMs: Math.round(performance.now() - startedAt),
+    candidates: budget.candidates,
+    evaluations: budget.evaluations,
+    duplicatesSkipped: budget.duplicatesSkipped,
+    elapsedMs: budget.elapsedMs,
+    exhaustedBy: budget.exhaustedBy,
+    limits: { ...budget.limits },
+  };
+  return {
+    ...result,
+    report: {
+      ...result.report,
+      search,
+      ...(feedbackRounds.length > 0 ? { assignmentFeedback: { cuts, rounds: feedbackRounds } } : {}),
+    },
+  };
+}
+
+/** 派車回饋最多再派幾次車（每次都是完整生成，用同一份搜尋預算） */
+const ASSIGNMENT_FEEDBACK_MAX_ROUNDS = 5;
+
+type AssignmentFeedbackRound = {
+  round: number;
+  cuts: AssignmentCut[];
+  adopted: boolean;
+  /** [擋發布的問題數, −載客班次, 班距低於目標] */
+  before: number[];
+  after: number[];
+};
+
+/** 離「完全解決」多遠：擋發布的問題（含沒車接、搜尋未完成）越少越好，同數時載客班次越多越好，再看班距 */
+function solvedKeyOf(result: GenerateShiftScheduleResult): number[] {
+  const blocking = [...result.report.errors, ...result.report.warnings]
+    .filter((issue) => issue.severity === 'error' || PUBLISH_BLOCKING_CODES.has(issue.code)).length;
+  const trips = result.plan?.timelines.reduce(
+    (sum, timeline) => sum + timeline.blocks.filter((block) => block.taskType === 'passenger').length,
+    0,
+  ) ?? 0;
+  const headway = result.report.warnings.filter((issue) => issue.code === 'HEADWAY_BELOW_TARGET').length;
+  return [blocking, -trips, headway];
+}
+
+function lexicographicLess(a: number[], b: number[]): boolean {
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const left = a[index] ?? 0;
+    const right = b[index] ?? 0;
+    if (left !== right) return left < right;
+  }
+  return false;
+}
+
+const STANDBY_RELEASE_PROBE_MAX_ROUNDS = 4;
+
+/** 提早接班（待命提早結束）之後出廠卡排不出來的那幾次：這一班不要用提早接班 */
+export function deriveStandbyReleaseCuts(result: GenerateShiftScheduleResult): AssignmentCut[] {
+  const plan = result.plan;
+  if (!plan) return [];
+  const ledger = new Map((plan.servicePulses ?? []).map((pulse) => [pulse.pulseId, pulse] as const));
+  const cuts: AssignmentCut[] = [];
+  for (const issue of result.report.errors) {
+    if (issue.code !== 'MAINTENANCE_TRANSFER_REQUIRED_MISSING') continue;
+    const detail = (issue.detail ?? {}) as { timelineRow?: number; blockId?: string; transferKind?: string; taskType?: string };
+    if (detail.transferKind !== 'exit' || detail.taskType !== 'standby' || !detail.blockId) continue;
+    const timeline = plan.timelines.find((item) => item.row === detail.timelineRow);
+    if (!timeline) continue;
+    const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    const index = sorted.findIndex((block) => block.id === detail.blockId);
+    if (index < 0) continue;
+    const next = sorted.slice(index + 1).find((block) => block.taskType === 'passenger');
+    const pulse = next?.servicePulseId ? ledger.get(next.servicePulseId) : undefined;
+    if (!pulse?.standbyRelease || pulse.assignedRow !== timeline.row) continue;
+    if (cuts.some((known) => known.pulseId === pulse.pulseId)) continue;
+    // 整班撤回，不是換另一台待命車再試：換車只會把同一個問題搬到另一列，試排一輪要十幾秒
+    cuts.push({
+      pulseId: pulse.pulseId,
+      row: STANDBY_RELEASE_CUT_ROW,
+      reason: `時間線 ${timeline.row} 提早結束待命來接這一班時，出廠移動排不出來`,
+    });
+  }
+  return cuts;
+}
+
+/** 派車階段的輸入（生成與試排共用同一份，避免兩邊看到不同的條件） */
+function normalizeArgsOf(
+  input: GenerateShiftScheduleInput,
+  allowBumpPastEarlierSameRoute: boolean,
+  assignmentCuts: AssignmentCut[],
+): Parameters<typeof normalizeEngineInput>[0] {
+  return {
+    shiftId: input.shiftId,
+    draft: input.draft,
+    templateBody: input.templateBody,
+    maintenanceTaskBody: input.maintenanceTaskBody,
+    turnaroundLimitSeconds: input.turnaroundLimitSeconds,
+    passengerTimetableMode: input.passengerTimetableMode ?? 'template',
+    firstTripOrigins: input.firstTripOrigins,
+    pointTopology: input.pointTopology,
+    areas: input.areas,
+    allowBumpPastEarlierSameRoute,
+    assignmentCuts,
+    allowStandbyEarlyRelease: input.standbyEarlyRelease === true,
+    preferCirculatingVehicles: input.preferCirculatingVehicles !== false,
+  };
+}
+
+function probeStandbyReleaseCuts(
+  input: GenerateShiftScheduleInput,
+  allowBump: boolean,
+  progress: (event: ScheduleEngineProgress) => void,
+): AssignmentCut[] {
+  const cuts: AssignmentCut[] = [];
+  if (input.standbyEarlyRelease !== true) return cuts;
+  for (let round = 0; round < STANDBY_RELEASE_PROBE_MAX_ROUNDS; round += 1) {
+    // 派車本身很快：先看這一輪還有沒有提早接班，沒有就不必試排
+    const assigned = normalizeEngineInput(normalizeArgsOf(input, allowBump, cuts), []);
+    if (!assigned?.servicePulses.some((pulse) => pulse.standbyRelease)) break;
+    const probe = generateShiftScheduleOnce(
+      input,
+      allowBump,
+      new SearchBudget({ maxCandidates: 0, maxEvaluations: 0, timeLimitMs: 0 }),
+      cuts,
+      progress,
+    );
+    const fresh = deriveStandbyReleaseCuts(probe)
+      .filter((cut) => !cuts.some((known) => known.pulseId === cut.pulseId && known.row === cut.row));
+    engineTrace('standby-release-probe', { round, cuts: fresh });
+    if (fresh.length === 0) break;
+    cuts.push(...fresh);
+  }
+  return cuts;
+}
+
+/**
+ * 從一次完整生成的結果推出派車限制（見 generateShiftScheduleVariant 的派車回饋）。
+ * 只用結構化欄位（移動卡種類、班次的脈衝編號、應開服務明細），不比對文字。
+ */
+export function deriveAssignmentCuts(result: GenerateShiftScheduleResult): AssignmentCut[] {
+  const plan = result.plan;
+  if (!plan) return [];
+  const cuts: AssignmentCut[] = [];
+  const push = (cut: AssignmentCut) => {
+    if (!cuts.some((known) => known.pulseId === cut.pulseId && known.row === cut.row)) cuts.push(cut);
+  };
+  for (const issue of result.report.errors) {
+    if (issue.code !== 'MAINTENANCE_TRANSFER_REQUIRED_MISSING') continue;
+    const detail = (issue.detail ?? {}) as { timelineRow?: number; blockId?: string; transferKind?: string };
+    if (detail.transferKind !== 'exit' && detail.transferKind !== 'entry') continue;
+    const timeline = plan.timelines.find((item) => item.row === detail.timelineRow);
+    if (!timeline || !detail.blockId) continue;
+    const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+    const index = sorted.findIndex((block) => block.id === detail.blockId);
+    if (index < 0) continue;
+    const step = detail.transferKind === 'exit' ? 1 : -1;
+    for (let offset = 1; offset < sorted.length; offset += 1) {
+      const block = sorted[(index + step * offset + sorted.length * 2) % sorted.length]!;
+      if (block.taskType !== 'passenger') continue;
+      if (block.servicePulseId) {
+        push({
+          pulseId: block.servicePulseId,
+          row: timeline.row,
+          reason: detail.transferKind === 'exit'
+            ? '上一次由這一列接這一班時，出廠移動排不出來'
+            : '上一次由這一列開這一班時，之後的入廠移動排不出來',
+        });
+      }
+      break;
+    }
+  }
+  const ledger = new Map((plan.servicePulses ?? []).map((pulse) => [pulse.pulseId, pulse] as const));
+  for (const issue of result.report.warnings) {
+    if (issue.code !== 'UNSERVED_SERVICE_PULSE') continue;
+    const pulseId = (issue.detail as { pulseId?: string } | undefined)?.pulseId;
+    const pulse = pulseId ? ledger.get(pulseId) : undefined;
+    if (!pulse || pulse.status !== 'assigned' || pulse.assignedRow == null) continue;
+    push({ pulseId: pulse.pulseId, row: pulse.assignedRow, reason: '上一次派給這一列的班次之後被刪掉' });
+  }
+  return cuts;
+}
+
+/**
+ * base 版本還沒完全解決，才需要 alt 版本：有沒開的發車脈衝（含車不夠直接放下的，那種不發警告，
+ * 要看應開服務明細），或還有擋發布的問題。
+ */
+export function needsAlternateVariant(base: GenerateShiftScheduleResult): boolean {
+  if (!base.plan) return false;
+  const dropped = (base.plan.servicePulses ?? []).some((pulse) =>
+    pulse.status !== 'assigned' && pulse.status !== 'no_service_window');
+  const blocking = [...base.report.errors, ...base.report.warnings]
+    .some((issue) => issue.severity === 'error' || PUBLISH_BLOCKING_CODES.has(issue.code));
+  return dropped || blocking;
+}
+
+const VARIANT_KEY_ORDER = ['errors', 'safety', 'HEADWAY_BELOW_TARGET', 'UNSERVED_SERVICE_PULSE', '-trips'];
+
+/**
+ * 兩個版本整張比較後挑一份：硬錯誤與擋發布的安全問題都不能變多，之後依
+ * 班距 > 承接 > 班次 取較好的一份。alt 為 null（不需要或沒跑成）時用 base。
+ * 選擇結果與雙方搜尋用量寫在 report.variantSelection。
+ */
+export function selectShiftScheduleVariant(
+  base: GenerateShiftScheduleResult,
+  alt: GenerateShiftScheduleResult | null,
+  options: { altFailure?: string } = {},
+): GenerateShiftScheduleResult {
+  const withSelection = (
+    result: GenerateShiftScheduleResult,
+    selection: ScheduleVariantSelection,
+  ): GenerateShiftScheduleResult => {
+    engineTrace('variant-select', { ...selection });
+    return { ...result, report: { ...result.report, variantSelection: selection } };
+  };
+  const common = {
+    keyOrder: VARIANT_KEY_ORDER,
+    ...(base.report.search ? { baseSearch: base.report.search } : {}),
+    ...(alt?.report.search ? { altSearch: alt.report.search } : {}),
+  };
+  if (!alt) {
+    return withSelection(base, {
+      chosen: 'base',
+      why: options.altFailure ? 'alt-failed' : 'base-fully-served',
+      ...common,
+      ...(options.altFailure ? { altFailure: options.altFailure } : {}),
+    });
+  }
+  if (!alt.plan) return withSelection(base, { chosen: 'base', why: 'alt-has-no-plan', ...common });
   const keyOf = (result: GenerateShiftScheduleResult): number[] => {
     const count = (code: string) =>
       result.report.warnings.filter((issue) => issue.code === code).length;
-    const safety = result.report.warnings.filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code)).length;
+    // 未承接脈衝有自己的排序位置（見下），不重複算進安全問題
+    const safety = result.report.warnings.filter((issue) =>
+      PUBLISH_BLOCKING_CODES.has(issue.code) && issue.code !== 'UNSERVED_SERVICE_PULSE').length;
     const trips = result.plan?.timelines.reduce(
       (sum, timeline) => sum + timeline.blocks.filter((block) => block.taskType === 'passenger').length,
       0,
@@ -301,7 +623,8 @@ export function generateShiftSchedule(
   const altKey = keyOf(alt);
   const safetyIssues = (result: GenerateShiftScheduleResult) => [
     ...result.report.errors,
-    ...result.report.warnings.filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code)),
+    ...result.report.warnings.filter((issue) =>
+      PUBLISH_BLOCKING_CODES.has(issue.code) && issue.code !== 'UNSERVED_SERVICE_PULSE'),
   ].map((issue) => violationFromIssue(issue, issue.severity === 'error' ? 'hard' : 'safety'));
   const safetyNotWorse = compareViolations(safetyIssues(base), safetyIssues(alt)).safeToAdopt;
   let better = false;
@@ -311,13 +634,23 @@ export function generateShiftSchedule(
       break;
     }
   }
-  return safetyNotWorse && better ? alt : base;
+  const chosen: ShiftScheduleVariant = safetyNotWorse && better ? 'alt' : 'base';
+  return withSelection(chosen === 'alt' ? alt : base, {
+    chosen,
+    why: 'compared',
+    ...common,
+    baseKey,
+    altKey,
+    safetyNotWorse,
+  });
 }
 
 function generateShiftScheduleOnce(
   input: GenerateShiftScheduleInput,
   allowBumpPastEarlierSameRoute: boolean,
   searchBudget: SearchBudget,
+  assignmentCuts: AssignmentCut[] = [],
+  progress: (event: ScheduleEngineProgress) => void = reportProgress,
 ): GenerateShiftScheduleResult {
   const errors: FeasibilityIssue[] = [];
   const warnings: FeasibilityIssue[] = [];
@@ -327,20 +660,9 @@ function generateShiftScheduleOnce(
     ...input.residualRepairBudget,
   };
 
-  reportProgress({ stage: 'normalize', message: '整理輸入、派車', fraction: 0.05 });
+  progress({ stage: 'normalize', message: '整理輸入、派車', fraction: 0.05 });
   const engineInput = normalizeEngineInput(
-    {
-      shiftId: input.shiftId,
-      draft: input.draft,
-      templateBody: input.templateBody,
-      maintenanceTaskBody: input.maintenanceTaskBody,
-      turnaroundLimitSeconds: input.turnaroundLimitSeconds,
-      passengerTimetableMode: input.passengerTimetableMode ?? 'template',
-      firstTripOrigins: input.firstTripOrigins,
-      pointTopology: input.pointTopology,
-      areas: input.areas,
-      allowBumpPastEarlierSameRoute,
-    },
+    normalizeArgsOf(input, allowBumpPastEarlierSameRoute, assignmentCuts),
     errors,
     warnings,
   );
@@ -434,6 +756,15 @@ function generateShiftScheduleOnce(
     sectionCodes: input.draft.maintenanceTask.sectionCodeBySection,
     decideOnly: true,
   });
+
+  if (input.roundJoin === 'always') {
+    timelines = applyRoundJoinAtYardExit({
+      timelines,
+      topology: engineInput.pointTopology,
+      selectedRoutes: routesForBerth,
+      warnings,
+    });
+  }
 
   traceLayout('decide-only', timelines);
 
@@ -591,7 +922,7 @@ function generateShiftScheduleOnce(
   let converged = false;
   for (let round = 0; round < GEOMETRY_CONVERGENCE_MAX_ROUNDS; round += 1) {
     currentRound = round;
-    reportProgress({
+    progress({
       stage: 'geometry',
       message: `站位與班距調整，第 ${round + 1} 輪`,
       fraction: 0.1 + 0.4 * (round / GEOMETRY_CONVERGENCE_MAX_ROUNDS),
@@ -1111,7 +1442,13 @@ function generateShiftScheduleOnce(
     if (cached) return cached;
     if (!searchBudget.tryCandidate()) return null;
     const result = runPostLoop(pre, reservations, avoid);
+    // 完整候選包含整日班表；限制保留份數，避免長搜尋持續累積整份快照。
+    if (postLoopCache.size >= 8) {
+      const oldest = postLoopCache.keys().next();
+      if (!oldest.done) postLoopCache.delete(oldest.value);
+    }
     postLoopCache.set(key, result);
+    screenCache.set(key, result.required);
     return result;
   };
 
@@ -1224,6 +1561,36 @@ function generateShiftScheduleOnce(
    * 出廠卡要等到下一班發車、轉場卡要等它經過終點，再加站位的碰撞保護（前車走、後車進各一份）。
    * 能不能停那麼久（下一台載客車要進同一站）交給整張班表重跑後的驗證判定，有新問題就不採用。
    */
+  /** 見呼叫處說明：出入場對換時，讓「出來接班」的那一班改從另一個起點發車 */
+  const swapPartnerReroutes = (
+    pre: GeneratedSchedulePlan['timelines'],
+    skip: PostState['post']['transfer']['skipped'][number],
+  ) => {
+    const yard = pre.flatMap((timeline) => timeline.blocks).find((block) => block.id === skip.blockId);
+    if (!yard) return [];
+    const pivotMinute = skip.transferKind === 'entry' ? yard.plannedStartMinute : yard.plannedEndMinute;
+    const tripIds: Array<{ row: number; blockId: string }> = [];
+    for (const timeline of pre) {
+      const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+      sorted.forEach((block, index) => {
+        if (block.taskType !== 'passenger') return;
+        const prev = sorted[index - 1];
+        if (!prev || !YARD_TASK_TYPES.has(prev.taskType)) return;
+        const own = timeline.row === skip.timelineRow;
+        if (own ? prev.id !== skip.blockId || skip.transferKind !== 'exit' : Math.abs(block.plannedStartMinute - pivotMinute) > 10) return;
+        tripIds.push({ row: timeline.row, blockId: block.id });
+      });
+    }
+    return tripIds.flatMap(({ row, blockId }) =>
+      rerouteTripInCopy(pre, blockId, evaluationContext).map((item) => ({
+        ...item,
+        row,
+        blockId,
+        from: item.fromRoute.routeName ?? item.fromRoute.routeId,
+        to: item.toRoute.routeName ?? item.toRoute.routeId,
+      })));
+  };
+
   const swapOutFirstCandidates = (
     base: PostState,
     skip: PostState['post']['transfer']['skipped'][number],
@@ -1246,7 +1613,7 @@ function generateShiftScheduleOnce(
       plan: GeneratedSchedulePlan['timelines'],
       item: PostState['post']['transfer']['skipped'][number],
     ): number | null => {
-      if (!item.blockId || !/出廠卡/.test(item.reason)) return null;
+      if (!item.blockId || item.transferKind !== 'exit') return null;
       const own = sortedRow(plan, item.timelineRow);
       const index = own.findIndex((block) => block.id === item.blockId);
       const next = index >= 0 ? own.slice(index + 1).find((block) => block.taskType === 'passenger') : undefined;
@@ -1344,7 +1711,7 @@ function generateShiftScheduleOnce(
     return out;
   };
 
-  reportProgress({ stage: 'transfer', message: '安排整備進出與轉場', fraction: 0.55 });
+  progress({ stage: 'transfer', message: '安排整備進出與轉場', fraction: 0.55 });
   let state: PostState = {
     pre: preTransfer,
     reservations: [],
@@ -1358,16 +1725,146 @@ function generateShiftScheduleOnce(
     if (list.length < 16) list.push(text);
     triedNotes.set(blockId ?? '', list);
   };
+  /*
+   * 車上線時從一輪的中途加入（試驗功能，input.roundJoin: 'onFailure'；預設關）。
+   *
+   * 換月台之後還排不出來的出廠卡，在副本上把這一輪最前面幾段拿掉，車直接到下一段的起點站加入。
+   * 採用條件跟搜尋相同：必要轉場失敗真的變少，而且沒有新增任何硬錯誤或安全問題。
+   * 少掉的班次寫成 ROUND_JOINED_MIDWAY（警告），逐筆列出。
+   * （'always' 在整備位置定案後就處理，見 applyRoundJoinAtYardExit。）
+   */
+  const runRoundJoinPass = () => {
+    const tried = new Set<string>();
+    let budgetLeft = true;
+    for (let guard = 0; guard < 64 && budgetLeft; guard += 1) {
+      let adopted: PostState | null = null;
+      const failedYardIds = new Set<string>();
+      for (const skip of state.post.transfer.skipped) {
+        if (skip.transferKind !== 'exit' || skip.necessity === 'not_needed' || skip.onlyMissingData) continue;
+        if (skip.blockId) failedYardIds.add(skip.blockId);
+      }
+      for (const boundary of listOnlineBoundaries(state.pre)) {
+        if (adopted || !budgetLeft) break;
+        if (!failedYardIds.has(boundary.yard.id)) continue;
+        for (const item of joinRoundLaterInCopy(state.pre, boundary.first.id)) {
+          const key = `${boundary.yard.id}|${boundary.first.id}|${item.dropped.length}`;
+          if (tried.has(key)) continue;
+          tried.add(key);
+          const screened = screenRequired(item.timelines, state.reservations);
+          if (screened === null) { budgetLeft = false; break; }
+          if (screened >= state.post.required) continue;
+          const result = searchPostLoop(item.timelines, state.reservations);
+          if (!result) { budgetLeft = false; break; }
+          if (result.required >= state.post.required) continue;
+          if (!noNewProblems(state.post.violations, result.violations).ok) continue;
+          adopted = {
+            pre: item.timelines,
+            reservations: state.reservations,
+            post: result,
+            notes: [
+              ...state.notes,
+              roundJoinNote({
+                timelineRow: item.timelineRow,
+                joinBlockId: item.joinBlockId,
+                description: item.description,
+                dropped: item.dropped,
+                why: '整備後的出廠卡排不出來',
+              }),
+            ],
+          };
+          break;
+        }
+      }
+      if (!adopted) break;
+      state = adopted;
+    }
+  };
+  /*
+   * 新車第一班換月台（在耗時的搜尋之前，逐筆直接試）。
+   *
+   * 車從整備出來接的第一班，常常被排在「離線那台車剛到的月台」發車：新車要等它離開月台才能進站，
+   * 出廠卡只能剛好那一秒到，沿途經過各點的時刻沒有挪動空間，一有車擋著就排不出來。改跑同終點、
+   * 從另一個月台發車的已允許路線（備用路線），新車可以提早進站等，通過沿途各點的時刻就有得挪。
+   * 2026-11-15 實測：排不出的出廠卡，逐筆試這個換法大多數直接排得出來；原本它排在搜尋候選的
+   * 後段，搜尋時間用完時多半還沒輪到。
+   *
+   * 採用條件跟搜尋相同：必要轉場失敗真的變少，而且沒有新增任何硬錯誤或安全問題。
+   */
+  {
+    const triedReroutes = new Set<string>();
+    const firstTripAfter = (timelineRow: number, blockId: string | undefined): string | null => {
+      const timeline = state.pre.find((item) => item.row === timelineRow);
+      if (!timeline || !blockId) return null;
+      const sorted = [...timeline.blocks].sort((x, y) => x.plannedStartMinute - y.plannedStartMinute);
+      const index = sorted.findIndex((block) => block.id === blockId);
+      if (index < 0) return null;
+      for (let offset = 1; offset < sorted.length; offset += 1) {
+        const block = sorted[(index + offset) % sorted.length]!;
+        if (block.taskType === 'passenger') return block.id;
+        if (block.source === 'template_bar') return null;
+      }
+      return null;
+    };
+    let budgetLeft = true;
+    for (let guard = 0; guard < 64 && budgetLeft; guard += 1) {
+      let adopted: PostState | null = null;
+      for (const skip of state.post.transfer.skipped) {
+        if (adopted || !budgetLeft) break;
+        if (skip.transferKind !== 'exit' || skip.necessity === 'not_needed' || skip.onlyMissingData) continue;
+        const nextBlockId = skip.exitDelay?.nextBlockId ?? firstTripAfter(skip.timelineRow, skip.blockId);
+        if (!nextBlockId) continue;
+        for (const item of rerouteTripInCopy(state.pre, nextBlockId, evaluationContext)) {
+          const key = `${skip.blockId ?? ''}|${item.description}`;
+          if (triedReroutes.has(key)) continue;
+          triedReroutes.add(key);
+          const screened = screenRequired(item.timelines, state.reservations);
+          if (screened === null) { budgetLeft = false; break; }
+          if (screened >= state.post.required) continue;
+          const result = searchPostLoop(item.timelines, state.reservations);
+          if (!result) { budgetLeft = false; break; }
+          if (result.required >= state.post.required) continue;
+          if (!noNewProblems(state.post.violations, result.violations).ok) continue;
+          const from = item.fromRoute.routeName ?? item.fromRoute.routeId;
+          const to = item.toRoute.routeName ?? item.toRoute.routeId;
+          adopted = {
+            pre: item.timelines,
+            reservations: state.reservations,
+            post: result,
+            notes: [
+              ...state.notes,
+              rerouteNote(skip.timelineRow, nextBlockId, from, to, '整備後的出廠卡原本排不出（離線的車剛到同一個月台），改從另一個月台發車'),
+            ],
+          };
+          break;
+        }
+      }
+      if (!adopted) break;
+      state = adopted;
+    }
+  }
+  if (input.roundJoin === 'onFailure') runRoundJoinPass();
   const maxRounds = state.post.required;
+  /** 試過不行的（移動卡, 候選）；下一輪排到最後再試 */
+  const failedCandidates = new Set<string>();
   for (let round = 0; round < maxRounds; round += 1) {
-    reportProgress({
+    progress({
       stage: 'search',
       message: `搜尋必要轉場的排法（${round + 1}／${maxRounds}）`,
       fraction: 0.6 + 0.3 * (round / Math.max(1, maxRounds)),
     });
     let adopted: PostState | null = null;
     const base = state;
-    for (const skip of base.post.transfer.skipped) {
+    /*
+     * 先試便宜、成功機會高的：出廠卡只差幾十秒的那幾筆排前面（下一班晚一點發、用較快的行駛
+     * 時間補回來就過得去）。照原本的順序，前面幾筆解不掉的轉場每一輪都把所有候選重試一遍，
+     * 搜尋時間用完時這些只差一點的還沒輪到（2026-11-15 實測：15 筆裡 9 筆是「搜尋預算用盡，未試」）。
+     * 同理，上一輪試過不行的候選排到最後——狀態變了它有可能變成可行，所以不是不試，是晚點試。
+     */
+    const orderedSkips = [...base.post.transfer.skipped].sort((a, b) =>
+      (a.exitDelay ? a.exitDelay.seconds : Number.POSITIVE_INFINITY)
+      - (b.exitDelay ? b.exitDelay.seconds : Number.POSITIVE_INFINITY));
+    for (const pass of [0, 1] as const) {
+    for (const skip of orderedSkips) {
       if (adopted) break;
       if (skip.necessity === 'not_needed') continue;
       // 只輸在缺行駛時間：是缺資料，不是時序衝突，換時刻、換路線都解不了，不在這裡反覆搜
@@ -1382,17 +1879,6 @@ function generateShiftScheduleOnce(
         notes: FeasibilityIssue[];
       };
       const candidates: Candidate[] = [];
-      if (skip.junctionReservation?.length) {
-        candidates.push({
-          label: '把原訂經過的轉折點先保留給它、其他移動去閃',
-          pre: base.pre,
-          reservations: [
-            ...base.reservations,
-            ...skip.junctionReservation.map((pass) => ({ ...pass, timelineRow: skip.timelineRow })),
-          ],
-          notes: [],
-        });
-      }
       if (skip.exitDelay) {
         const delayMinutes = snapUpToClockAlignSeconds(skip.exitDelay.seconds) / 60;
         const delaySeconds = Math.round(delayMinutes * 60);
@@ -1429,10 +1915,39 @@ function generateShiftScheduleOnce(
           });
         }
       }
+      if (skip.junctionReservation?.length) {
+        candidates.push({
+          label: '把原訂經過的轉折點先保留給它、其他移動去閃',
+          pre: base.pre,
+          reservations: [
+            ...base.reservations,
+            ...skip.junctionReservation.map((pass) => ({ ...pass, timelineRow: skip.timelineRow })),
+          ],
+          notes: [],
+        });
+      }
       candidates.push(...swapOutFirstCandidates(base, skip));
+      /*
+       * 換起點也試在「出入場對換」的另一方。場區出入口常常只有一段單線：一台跑完要進去、
+       * 另一台從裡面出來接下一班，兩台在同一段單線上對開。地圖上若有另一條出入口
+       * （例如 NW下發2），讓「出來接班」的那一班改從另一個起點發車，兩台就錯開了。
+       * 候選是：自己這台出場後接的那一班（出廠失敗時），以及前後 10 分鐘內、
+       * 別列車剛從整備出來就接的班次。路線只在已允許、同終點、下游相同的範圍內換。
+       */
+      for (const item of swapPartnerReroutes(base.pre, skip)) {
+        candidates.push({
+          label: item.description,
+          pre: item.timelines,
+          reservations: base.reservations,
+          notes: [rerouteNote(item.row, item.blockId, item.from, item.to, '場區出入口與別列車對換時會在同一段路上對開，改從另一個起點發車')],
+        });
+      }
       for (const candidate of candidates) {
+        const candidateKey = `${skip.blockId ?? ''}|${candidate.label}`;
+        if ((pass === 0) === failedCandidates.has(candidateKey)) continue;
         if (!candidate.pre) {
           note(skip.blockId, `${candidate.label}：超出合法行駛範圍或前後任務間隔`);
+          failedCandidates.add(candidateKey);
           continue;
         }
         const screened = screenRequired(candidate.pre, candidate.reservations);
@@ -1442,6 +1957,7 @@ function generateShiftScheduleOnce(
         }
         if (screened >= base.post.required) {
           note(skip.blockId, `${candidate.label}：移動仍排不出`);
+          failedCandidates.add(candidateKey);
           continue;
         }
         const result = searchPostLoop(candidate.pre, candidate.reservations);
@@ -1541,7 +2057,10 @@ function generateShiftScheduleOnce(
             ? '移動仍排不出'
             : `引出 ${check.introduced.map((item) => item.code).join('、') || '更多安全問題'}`),
         );
+        failedCandidates.add(candidateKey);
       }
+    }
+      if (adopted) break;
     }
     if (!adopted) break;
     state = adopted;
@@ -1922,13 +2441,16 @@ function generateShiftScheduleOnce(
       detail: {
         timelineRow: skip.timelineRow,
         blockId: skip.blockId,
+        transferKind: skip.transferKind,
         taskType: skip.taskType,
         fromTaskType: skip.fromTaskType,
         toTaskType: skip.toTaskType,
         reason: skip.reason,
         necessity: skip.necessity ?? 'required',
         ...(skip.blockers ? { blockers: skip.blockers } : {}),
+        ...(skip.chargingEntry ? { chargingEntry: skip.chargingEntry } : {}),
         ...(skip.departureWindow ? { departureWindow: skip.departureWindow } : {}),
+        ...(skip.exitDelay ? { exitDelay: skip.exitDelay } : {}),
         ...(skip.missingTravelTimeEdges ? { missingTravelTimeEdges: skip.missingTravelTimeEdges } : {}),
         ...(skip.onlyMissingData ? { onlyMissingData: true } : {}),
         ...(skip.blockId && transferSearchLog.has(skip.blockId)
@@ -2073,9 +2595,15 @@ function generateShiftScheduleOnce(
     });
   }
 
+  // 移動卡走的不是唯一最短路時，記下途經點，讓訂單帶著它（見 annotateMoveStops）
+  annotateMoveStops(timelines, engineInput.pointTopology);
+
+  // 午夜切開的整備卡合成一張（同一台車、同一格、同一種整備）。放在最終驗證之前：
+  // 下面每一項檢查看到的，就是發布出去的那份班表。
+  const midnightMerges = mergeMidnightSplitYardCards(timelines);
 
   const allBlocks = timelines.flatMap((timeline) => timeline.blocks);
-  reportProgress({ stage: 'validate', message: '最終驗證', fraction: 0.95 });
+  progress({ stage: 'validate', message: '最終驗證', fraction: 0.95 });
   validateTimelineOverlaps(timelines, errors);
   validateStationTimingsWithinBlocks(
     timelines,
@@ -2299,7 +2827,14 @@ function generateShiftScheduleOnce(
     ...(engineInput.timetableGenerationAlgorithm
       ? { timetableGenerationAlgorithm: engineInput.timetableGenerationAlgorithm }
       : {}),
+    servicePulses: engineInput.servicePulses,
   };
+
+  // 掛車時有車、之後班次卻不見了的脈衝（掛車當下沒車的已在 normalizeInput 報過）
+  validateServicePulseCoverage({ plan, issues: warnings, onlyAssigned: true });
+
+  // 合併之前寫好的問題若還指著被併掉的卡，改指合併後那一張
+  remapMergedBlockIds([...errors, ...warnings], midnightMerges);
 
   const ok =
     computeScheduleGateOk(errors, warnings)

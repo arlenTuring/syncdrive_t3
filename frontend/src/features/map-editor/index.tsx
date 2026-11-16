@@ -786,8 +786,10 @@ export default function MapEditorApp({
       selectedFacilityIds,
       selectedBasemapId,
       nextNumericId,
+      // 刪設施會連帶移除拓樸節點：拓樸要跟區域一起記，復原才回得來
+      pointTopology: structuredClone(pointTopology),
     }),
-    [areas, basemaps, selectedAreaId, selectedFacilityIds, selectedBasemapId, nextNumericId],
+    [areas, basemaps, selectedAreaId, selectedFacilityIds, selectedBasemapId, nextNumericId, pointTopology],
   )
 
   const applySnapshot = useCallback(
@@ -800,8 +802,10 @@ export default function MapEditorApp({
       selectedFacilityIds: string[]
       selectedBasemapId: string | null
       nextNumericId: number
+      pointTopology: PointTopology
     }) => {
       setAreas(s.areas)
+      setPointTopology(s.pointTopology)
       setBasemaps(s.basemaps)
       setMapPixelSize(s.mapPixelSize)
       setMapPixelOrigin(s.mapPixelOrigin)
@@ -4635,6 +4639,8 @@ export default function MapEditorApp({
             onApply={(next) => {
               // 拓撲對話框本身即可編輯；套用後進入地圖編輯模式以便儲存
               if (mapEditorMode !== 'edit') setMapEditorMode('edit')
+              // 套用拓樸也記一筆：之後按復原先退回這次套用，不會被更早的區域快照連帶蓋掉
+              pushHistory()
               setPointTopology(next)
               setPointTopologyEditorOpen(false)
             }}

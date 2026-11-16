@@ -6,6 +6,7 @@ import type { PointTopology } from '../../map-editor/types/pointTopology';
 import {
   explainTopologyPathGap,
   findTopologyPath,
+  findTopologyPaths,
   listTopologyTravelTimeGaps,
   missingTravelTimeEdgesBetween,
 } from './findTopologyPath';
@@ -186,5 +187,35 @@ describe('不設固定段數上限（白皮書 ROUTE-03）', () => {
     };
     assert.equal(findTopologyPath(through, 'a', 'b'), null);
     assert.ok(findTopologyPath(through, 'a', 'mid'), '設施當目的地可以');
+  });
+});
+
+
+describe('findTopologyPaths：替代路線', () => {
+  /** E 經兩個月台都能到 H：P1 那條 30 秒、P2 那條 40 秒；還有一條穿過設施 X 的捷徑不能走 */
+  const topology: PointTopology = {
+    ...emptyPointTopology(),
+    nodes: [node('E', 'facility'), node('P1'), node('P2'), node('T'), node('H', 'facility'), node('X', 'facility')],
+    edges: [
+      edge('E', 'P1', 10, 10), edge('P1', 'T', 10, 10),
+      edge('E', 'P2', 10, 10), edge('P2', 'T', 20, 20),
+      edge('T', 'H', 10, 10),
+      edge('E', 'X', 1, 1), edge('X', 'H', 1, 1),
+    ],
+  };
+
+  it('由快到慢列出不重複的路徑，第一條就是最短路', () => {
+    const paths = findTopologyPaths(topology, 'E', 'H');
+    assert.deepEqual(paths.map((path) => path.nodeIds.join('>')), ['E>P1>T>H', 'E>P2>T>H']);
+    assert.deepEqual(paths[0]!.nodeIds, findTopologyPath(topology, 'E', 'H')!.nodeIds);
+  });
+
+  it('替代路線同樣不能穿過設施', () => {
+    assert.ok(findTopologyPaths(topology, 'E', 'H').every((path) => !path.nodeIds.slice(1, -1).includes('X')));
+  });
+
+  it('只有一條路時只回一條；到不了回空陣列', () => {
+    assert.equal(findTopologyPaths(topology, 'P1', 'H').length, 1);
+    assert.deepEqual(findTopologyPaths(topology, 'H', 'E'), []);
   });
 });

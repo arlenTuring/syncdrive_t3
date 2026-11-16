@@ -48,7 +48,7 @@ import {
   type TimeSlotAttribute,
   type TimeSlotInterval,
 } from '../../../time-templates/types/editor';
-import type { FeasibilityIssue } from './types';
+import type { FeasibilityIssue, ServicePulseRecord, ServicePulseStatus } from './types';
 import { pushIssue, secondToMinute } from './types';
 import {
   generateDirectionalDeparturesFromHeadway,
@@ -83,6 +83,16 @@ type ActivePassengerWindow = {
   nextMaintenanceStartSecond: number | null;
   /** 接下整備／空時段的切入餘裕（秒）：回程最晚可占用整備開頭至此秒數 */
   entrySlackSeconds: number;
+  nextMaintenanceEntrySeconds?: ReadonlyMap<string, number>;
+  /**
+   * 這個視窗是「待命，而且待命一結束就接正線」時，記待命的結束秒。
+   * 交班時要去充電的車必須提早收班（充電準時開始、不縮短），接手的車如果等到待命整點
+   * 結束才出來，中間的脈衝就沒有車開。待命是最不在乎早幾分鐘結束的整備，所以允許它的
+   * 尾巴提早結束來接班——只在沒有其他車能開時才用，見 assignDirectionalDepartures。
+   */
+  standbyEndSecond?: number;
+  /** 待命提早結束的額度，除了「一整輪」之外再加的秒數（交班車進充電要預留的時間） */
+  standbyReleaseExtraSeconds?: number;
 };
 
 export type EngineInput = {
@@ -91,6 +101,8 @@ export type EngineInput = {
   confirmedTasks: ScheduleTask[];
   /** 時刻表要求的班距脈衝總數＝服務需求的分母（承接率用）。非範本模式為 0。 */
   servicePulseDemand: number;
+  /** 應開服務明細（每個脈衝的掛車結果）；非範本模式為空陣列 */
+  servicePulses: ServicePulseRecord[];
   intervals: TimeSlotInterval[];
   attributes: TimeSlotAttribute[];
   passengerRoutes: ShiftScheduleSelectedRoute[];
@@ -159,7 +171,35 @@ export type NormalizeInputArgs = {
    * 會改變後面所有脈衝的承接，好壞要看整張班表——由呼叫端在副本上比較後決定用不用。
    */
   allowBumpPastEarlierSameRoute?: boolean;
+  /**
+   * 派車回饋限制：某個脈衝不能派給某一列。由上一次完整生成「移動卡排不出來、或派出去的班次
+   * 被刪掉」推出來（見 generate.ts 的 deriveAssignmentCuts），再派一次車時遵守。
+   */
+  assignmentCuts?: AssignmentCut[];
+  /**
+   * 待命提早結束接班（預設關）。交班時要去充電的車必須提早收班，接手的車若等到待命整點結束
+   * 才出來，交班前的脈衝就沒有車開；打開後「待命後緊接正線」的車可以提早出來接。
+   *
+   * 預設關的原因（2026-11-14 實測，地圖 v0.5）：派車排得出來，但交班那幾分鐘線上多兩台車，
+   * 接手車要到發車月台的路（正線空檔、充電區唯一的出入口）排不開——多開 20 班，硬錯誤卻從
+   * 4 筆變 10 筆。交班的進出順序沒有解決之前打開只會把「沒車開」換成「月台碰撞」。
+   */
+  allowStandbyEarlyRelease?: boolean;
+  /**
+   * 同樣準時的時候，在線車優先於從整備區叫出來的新車（預設開；給 false 才關）。
+   * 見 assignDirectionalDepartures 的 freshFromYard。
+   */
+  preferCirculatingVehicles?: boolean;
 };
+
+/**
+ * 派車回饋限制：這個脈衝不要派給這一列（reason 寫進拒絕原因）。
+ * row 為 {@link STANDBY_RELEASE_CUT_ROW} 時不是指某一列，而是「這個脈衝不要用待命提早接班」。
+ */
+export type AssignmentCut = { pulseId: string; row: number; reason: string };
+
+/** 沒有第 0 列：拿來表示「這個脈衝不要用待命提早接班」的限制 */
+export const STANDBY_RELEASE_CUT_ROW = 0;
 
 function resolveRouteOccupancySeconds(route: ShiftScheduleSelectedRoute): number {
   return resolvePassengerRouteOccupancy(route)?.occupancySeconds ?? 0;
@@ -427,7 +467,8 @@ function resolveYardEntrySlackSeconds(args: {
     && lockedRotationSeconds > 0
     && yardDurationSeconds > LONG_YARD_YIELD_THRESHOLD_SECONDS
   ) {
-    return lockedRotationSeconds;
+    // 使用者把設定值調得比一輪還大時，照設定值（2026-11-15：設定值加大要有作用）
+    return Math.max(lockedRotationSeconds, resolveMaintenanceEntrySlackSeconds(taskType, slackBySection));
   }
   // 短整備、或沒有鎖定導通組合（算不出一輪要多久）：沿用各區段既有設定
   return resolveMaintenanceEntrySlackSeconds(taskType, slackBySection);
@@ -440,15 +481,26 @@ function resolveNextMaintenanceAfterWindow(
   slackBySection: MaintenanceEntrySlackBySection,
   lockedRotationSeconds: number | null,
   maintenanceBody: Record<string, unknown> | null,
-): { startSecond: number; entrySlackSeconds: number } | null {
-  const next = nonPassengerTasks
+  templateTasks: ReadonlyArray<ScheduleTask> = [],
+): { startSecond: number; entrySlackSeconds: number; taskType: string } | null {
+  const sameDayNext = nonPassengerTasks
     .filter(
       (task) =>
         task.rowIndex === row
         && minuteToSecondApprox(task.startMinute) >= windowEndSecond - 1e-9,
     )
     .sort((a, b) => a.startMinute - b.startMinute)[0];
+  /**
+   * 一天是循環的：這個時段之後當天已經沒有任何任務時，「下一個整備」就是隔天最早的那一個
+   * （例：正線 22:00–24:00 之後接 00:00 的充電）。只看當天的話，日尾的時段會被當成後面
+   * 什麼都沒有，最後一輪就跑過午夜、吃掉隔天一開始的充電。
+   */
+  const wrappedNext = sameDayNext
+    ? null
+    : resolveFirstTaskOfNextDay(row, windowEndSecond, nonPassengerTasks, templateTasks);
+  const next = sameDayNext ?? wrappedNext;
   if (!next) return null;
+  const dayOffsetSeconds = wrappedNext ? SECONDS_PER_DAY : 0;
   const yardDurationSeconds = Math.round(next.durationMinutes * 60);
   const allowance = resolveYardEntrySlackSeconds({
     taskType: next.taskType,
@@ -461,11 +513,45 @@ function resolveNextMaintenanceAfterWindow(
    * 不能被壓成零（白皮書 YARD-03、YARD-04）。所以實際可用的額度不超過「整備長度 − 最低工作時間」，
    * 會吃光整備的那一輪在這裡就不是合法候選。
    */
+  /**
+   * 充電跟其他整備一樣照「正線優先讓渡餘裕」讓（使用者 2026-11-15：以正線為主，整備任務設定的額度
+   * 每一種整備都適用）。2026-11-13 曾被改成充電額度一律 0，結果每次有車離線去充電，離線前那一輪
+   * 都沒有車開。
+   */
   const keepSeconds = minimumYardWorkSeconds(next.taskType, maintenanceBody);
   return {
-    startSecond: minuteToSecondApprox(next.startMinute),
+    startSecond: minuteToSecondApprox(next.startMinute) + dayOffsetSeconds,
+    taskType: next.taskType,
     entrySlackSeconds: Math.max(0, Math.min(allowance, yardDurationSeconds - keepSeconds)),
   };
+}
+
+const SECONDS_PER_DAY = 24 * 3600;
+
+/**
+ * 這個時段是該時間線當天的最後一件事時，回傳隔天最早的那個整備任務；否則回 null。
+ * 隔天最早的是正線（或當天後面還有別的任務）就不算——那不是「時段結束後接整備」。
+ */
+function resolveFirstTaskOfNextDay(
+  row: number,
+  windowEndSecond: number,
+  nonPassengerTasks: ReadonlyArray<ScheduleTask>,
+  templateTasks: ReadonlyArray<ScheduleTask>,
+): ScheduleTask | null {
+  const rowTemplate = templateTasks.filter((task) => task.rowIndex === row);
+  if (rowTemplate.length === 0) return null;
+  const somethingLaterToday = rowTemplate.some(
+    (task) => minuteToSecondApprox(task.startMinute) >= windowEndSecond - 1e-9,
+  );
+  if (somethingLaterToday) return null;
+  const firstStartMinute = Math.min(...rowTemplate.map((task) => task.startMinute));
+  const firstYard = nonPassengerTasks
+    .filter((task) => task.rowIndex === row)
+    .sort((a, b) => a.startMinute - b.startMinute)[0];
+  if (!firstYard || firstYard.startMinute > firstStartMinute + 1e-9) return null;
+  // 隔天那個任務要排在這個時段結束之後；時段自己就跨過午夜、蓋到它的話不處理
+  if (minuteToSecondApprox(firstYard.startMinute) + SECONDS_PER_DAY < windowEndSecond - 1e-9) return null;
+  return firstYard;
 }
 
 function resolveNextSpillBoundary(args: {
@@ -562,6 +648,7 @@ function cycleViolatesMaintenanceEntryPolicy(args: {
   legs: PlannedCycleLeg[];
   nextMaintenanceStartSecond: number | null;
   entrySlackSeconds: number;
+  nextMaintenanceEntrySeconds?: ReadonlyMap<string, number>;
 }): string | null {
   const { legs, nextMaintenanceStartSecond } = args;
   if (nextMaintenanceStartSecond == null || legs.length === 0) return null;
@@ -577,6 +664,11 @@ function cycleViolatesMaintenanceEntryPolicy(args: {
   }
 
   const last = legs[legs.length - 1]!;
+  const entrySeconds = args.nextMaintenanceEntrySeconds?.get(last.route.stationIds.at(-1)?.trim() ?? '');
+  // 讓渡額度是全部：跑完最後一輪再進到充電位，都要落在額度內（使用者 2026-11-15）
+  if (entrySeconds != null && last.endSecond + entrySeconds > latestEnd + 1e-9) {
+    return `整備前交路結束 ${last.endSecond}s，加恢復及最短合法入廠 ${entrySeconds}s，超過整備讓渡上限 ${latestEnd}s`;
+  }
   if (last.endSecond > latestEnd + 1e-9) {
     return `整輪結束 ${last.endSecond}s 超過整備讓渡上限 ${latestEnd}s`;
   }
@@ -665,6 +757,14 @@ function assignDirectionalDepartures(args: {
   warnings?: FeasibilityIssue[];
   /** 見 NormalizeInputArgs.allowBumpPastEarlierSameRoute */
   allowBumpPastEarlierSameRoute?: boolean;
+  /** 見 NormalizeInputArgs.assignmentCuts */
+  assignmentCuts?: AssignmentCut[];
+  /** 應開服務明細：每個脈衝寫一筆掛車結果（含沒車開的原因），不靜默丟棄 */
+  pulseLedger?: ServicePulseRecord[];
+  /** 見 NormalizeInputArgs.allowStandbyEarlyRelease */
+  allowStandbyEarlyRelease?: boolean;
+  /** 見 NormalizeInputArgs.preferCirculatingVehicles */
+  preferCirculatingVehicles?: boolean;
 }): ScheduleTask[] {
   const {
     departures,
@@ -678,7 +778,17 @@ function assignDirectionalDepartures(args: {
     successorPolicy,
     warnings,
     allowBumpPastEarlierSameRoute = false,
+    pulseLedger,
+    assignmentCuts = [],
+    allowStandbyEarlyRelease = false,
+    preferCirculatingVehicles = true,
   } = args;
+  const cutsByPulse = new Map<string, Map<number, string>>();
+  for (const cut of assignmentCuts) {
+    const byRow = cutsByPulse.get(cut.pulseId) ?? new Map<number, string>();
+    byRow.set(cut.row, cut.reason);
+    cutsByPulse.set(cut.pulseId, byRow);
+  }
   const routeCount = passengerRoutes.length;
   if (scheduleRowCount <= 0 || departures.length === 0 || routeCount === 0) return [];
 
@@ -794,6 +904,11 @@ function assignDirectionalDepartures(args: {
       (win) => timeSec >= win.dispatchStartSecond && timeSec < win.endSecond,
     ) ?? null;
   };
+  /** 起點落在「待命後緊接正線」的待命裡＝這一班是待命提早結束接的 */
+  const startsInsideReleasableStandby = (row: number, startSecond: number): boolean => {
+    const win = findWindow(row, startSecond);
+    return win?.standbyEndSecond != null && startSecond < win.standbyEndSecond - 1e-9;
+  };
   const windowKey = (win: ActivePassengerWindow): string =>
     `${win.startSecond}-${win.endSecond}`;
 
@@ -828,8 +943,48 @@ function assignDirectionalDepartures(args: {
 
   for (let index = 0; index < departures.length; index += 1) {
     const departure = departures[index]!;
+    const pulseId = servicePulseIdOf(departure);
+    /** 這個脈衝沒有車開：寫進明細，並留一則可觀測的 issue（擋發布，見 PUBLISH_BLOCKING_CODES） */
+    const recordUnserved = (
+      status: Exclude<ServicePulseStatus, 'assigned'>,
+      reason: string,
+      rowRejections?: Record<string, string>,
+    ) => {
+      pulseLedger?.push({
+        pulseId,
+        departureSecond: departure.startSecond,
+        headwaySeconds: departure.headwaySeconds,
+        intervalId: departure.intervalId,
+        intervalName: departure.intervalName,
+        routeId: departure.routeId,
+        status,
+        reason,
+        ...(rowRejections ? { rowRejections } : {}),
+      });
+      if (status === 'no_service_window' || !warnings) return;
+      pushIssue(warnings, {
+        code: 'UNSERVED_SERVICE_PULSE',
+        severity: 'warning',
+        message:
+          `班距需求 ${formatClockSecond(departure.startSecond)} 無可用車承接（${reason}），`
+          + '該時段實際 PPHPD 將低於目標',
+        detail: {
+          pulseId,
+          departureSecond: departure.startSecond,
+          headwaySeconds: departure.headwaySeconds,
+          intervalId: departure.intervalId,
+          intervalName: departure.intervalName,
+          status,
+          reason,
+          ...(rowRejections ? { rowRejections } : {}),
+        },
+      });
+    };
     const pulseRoute = passengerRoutes[departure.routeIndex];
-    if (!pulseRoute || pulseRoute.routeId !== departure.routeId) continue;
+    if (!pulseRoute || pulseRoute.routeId !== departure.routeId) {
+      recordUnserved('unserved', `脈衝起班路線 ${departure.routeId} 不在目前的路線執行順序裡`);
+      continue;
+    }
 
     // 下一脈衝邊界：延後若跨越此線，應留給下一脈衝，避免雙掛
     const nextPulseSecond = pulseSecond(departure);
@@ -896,6 +1051,36 @@ function assignDirectionalDepartures(args: {
     const hangPolicy = {
       maxDelayScale: 1,
       pulseSlackSeconds: 0,
+      /** 待命提早結束接班：一般與壓快都掛不上之後才打開 */
+      standbyRelease: false,
+    };
+    /**
+     * 這個起點可不可以用「待命提早結束」承接。條件：
+     * 1. 待命之後緊接正線（視窗有 standbyEndSecond）。
+     * 2. 待命不能被吃光（至少留一個排班刻度）。
+     * 3. 最多提早「一整輪＋交班車進充電要預留的時間」：這正好是交班車開不了的那一段；
+     *    再早出來，車開完一輪還接不上自己的正線時段，只會停在月台上占位置。
+     */
+    const standbyReleaseAllowed = (
+      row: number,
+      win: ActivePassengerWindow,
+      startSecond: number,
+    ): boolean => {
+      if (!hangPolicy.standbyRelease || win.standbyEndSecond == null) return false;
+      if (startSecond >= win.standbyEndSecond) return false;
+      if (startSecond < win.startSecond + SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS) return false;
+      const legs = buildPlannedCycleLegs({
+        startRouteIndex: resolveStartRouteIndex(row),
+        startSecond,
+        passengerRoutes,
+        minimumRecoveryTimeSeconds,
+        useMinimumOccupancy: false,
+        successorPolicy,
+      });
+      const last = legs[legs.length - 1];
+      if (!last) return false;
+      const leadSeconds = last.endSecond - startSecond + (win.standbyReleaseExtraSeconds ?? 0);
+      return win.standbyEndSecond - startSecond <= leadSeconds;
     };
 
     const evaluateRow = (
@@ -905,6 +1090,11 @@ function assignDirectionalDepartures(args: {
       compressPreviousTo: number | null,
       compressionPenalty: number,
     ): void => {
+      const cutReason = cutsByPulse.get(pulseId)?.get(row);
+      if (cutReason) {
+        rejectionByRow.set(row, `回饋限制：${cutReason}`);
+        return;
+      }
       const rotation = rotationIndex[row]!;
       const startRouteIndex = resolveStartRouteIndex(row);
       const provisionalEarliest = Math.max(
@@ -919,8 +1109,10 @@ function assignDirectionalDepartures(args: {
         winAtPulse.startSecond,
       );
       let startSecond = Math.max(provisionalEarliest, gate.headwayFloor);
-      // 整備連串（保養→行檢…）內不得掛正線：起點若落在串內，硬推到串尾
-      {
+      // 整備連串（保養→行檢…）內不得掛正線：起點若落在串內，硬推到串尾。
+      // 例外：待命接正線、而且沒有其他車能開時，待命的尾巴可以提早結束（standbyReleaseAllowed）
+      const releasedFromStandby = standbyReleaseAllowed(row, winAtPulse, startSecond);
+      if (!releasedFromStandby) {
         const busyUntilMinute = resolveContiguousYardBusyUntilMinute(
           nonPassengerTasks,
           row,
@@ -963,7 +1155,7 @@ function assignDirectionalDepartures(args: {
         return;
       }
       // 推過整備串後仍不得坐落任一整備內（銜接點以外）
-      {
+      if (!releasedFromStandby) {
         const busyUntilMinute = resolveContiguousYardBusyUntilMinute(
           nonPassengerTasks,
           row,
@@ -1085,7 +1277,7 @@ function assignDirectionalDepartures(args: {
         );
         const latestAllowedEnd =
           winAtPulse.nextMaintenanceStartSecond + winAtPulse.entrySlackSeconds;
-        if (startSecond + cycleNeed > latestAllowedEnd) {
+        if (startSecond + cycleNeed > latestAllowedEnd || cycleViolatesMaintenanceEntryPolicy({ legs: plannedLegs, ...winAtPulse })) {
           const minimumLegs = buildPlannedCycleLegs({
             startRouteIndex,
             startSecond,
@@ -1134,6 +1326,7 @@ function assignDirectionalDepartures(args: {
           legs: plannedLegs,
           nextMaintenanceStartSecond: winAtPulse.nextMaintenanceStartSecond,
           entrySlackSeconds: winAtPulse.entrySlackSeconds,
+          nextMaintenanceEntrySeconds: winAtPulse.nextMaintenanceEntrySeconds,
         });
         if (entryPolicyViolation) {
           rejectionByRow.set(row, entryPolicyViolation);
@@ -1141,8 +1334,22 @@ function assignDirectionalDepartures(args: {
         }
       }
 
+      /**
+       * 同樣準時的時候，在線車優先。
+       *
+       * 這個時段還沒跑過任何一輪的車，是要從整備區叫出來的車。兩台車都能準時（延遲相同）接這一班
+       * 時，先給已經在線上跑的那台。以前同分是比「誰空得比較久」，結果永遠是還在整備區的新車贏：
+       * 新車一上線就把班次拿光，原本在線的車回到終點站沒有班可發，停在月台上等好幾分鐘，後面進站
+       * 的車就撞上（2026-11-15 實測 14:00：三班全給新車，在線的兩台各在月台停 8 分鐘）。
+       *
+       * 只當同分時的先後，不拿延遲去換：試過「在線車晚兩分鐘以內也優先」，整天班次平均晚 87 秒、
+       * 夜間晚到 10 分鐘，違反「照班表準時」。
+       */
+      const freshFromYard =
+        preferCirculatingVehicles && earliestFree <= winAtPulse.dispatchStartSecond + 1e-9;
       const score =
         delay * 1e9
+        + (freshFromYard ? 5e8 : 0)
         + (compressionPenalty + (useMinimumCycle ? 1 : 0)) * 1e7
         + startSecond * 1e3
         + earliestFree;
@@ -1187,7 +1394,11 @@ function assignDirectionalDepartures(args: {
       }
       const nextWindowKey = windowKey(winAtPulse);
       if (windowKeyByRow[row] !== nextWindowKey) {
-        const phase = resolveWindowRotationPhase(row, winAtPulse.startSecond);
+        // 待命接正線的視窗：車是從待命的位置出來，相位看待命本身，不看待命之前那一段整備
+        const phase = resolveWindowRotationPhase(
+          row,
+          winAtPulse.standbyEndSecond ?? winAtPulse.startSecond,
+        );
         rotationIndex[row] =
           Math.ceil(rotationIndex[row]! / routeCount) * routeCount + phase;
         rotationPhaseByRow[row] = phase;
@@ -1291,6 +1502,22 @@ function assignDirectionalDepartures(args: {
     // 2) 僅當用均完全掛不上，才把上一趟壓到快再試
     if (chosenRow < 0) {
       scoreAllRows('compress');
+    }
+
+    // 2.5) 待命提早結束接班：值勤中的車都開不了，才讓「待命後接正線」的車早點出來。
+    //      試排時這一班的提早接班排不出出廠移動（STANDBY_RELEASE_CUT_ROW）就不再用，回到整點才出來
+    if (
+      chosenRow < 0
+      && allowStandbyEarlyRelease
+      && !cutsByPulse.get(pulseId)?.has(STANDBY_RELEASE_CUT_ROW)
+    ) {
+      hangPolicy.standbyRelease = true;
+      bestScore = Number.POSITIVE_INFINITY;
+      rejectionByRow.clear();
+      scoreAllRows('normal');
+      if (chosenRow < 0) {
+        scoreAllRows('compress');
+      }
     }
 
     // 3) 補掛：尖峰／肩段放大延遲與跨脈衝餘裕後再評分（讓路前先擴門檻）
@@ -1434,7 +1661,8 @@ function assignDirectionalDepartures(args: {
             blockerWindow.nextMaintenanceStartSecond != null
               ? blockerWindow.nextMaintenanceStartSecond + blockerWindow.entrySlackSeconds
               : blockerWindow.endSecond;
-          if (lastShiftedEnd > latestAllowedEnd) continue;
+          const entrySeconds = blockerWindow.nextMaintenanceEntrySeconds?.get(lastShifted.route.stationIds.at(-1)?.trim() ?? '') ?? 0;
+          if (lastShiftedEnd + entrySeconds > latestAllowedEnd) continue;
         }
 
         // 候選車整輪在讓路後的班距仍成立
@@ -1502,6 +1730,7 @@ function assignDirectionalDepartures(args: {
             legs: previewLegs,
             nextMaintenanceStartSecond: winAtPulse.nextMaintenanceStartSecond,
             entrySlackSeconds: winAtPulse.entrySlackSeconds,
+            nextMaintenanceEntrySeconds: winAtPulse.nextMaintenanceEntrySeconds,
           })
         ) {
           continue;
@@ -1602,29 +1831,11 @@ function assignDirectionalDepartures(args: {
       const hadDispatchableServiceWindow = [...rejectionByRow.values()].some(
         (reason) => reason !== '脈衝時刻沒有正線可用視窗',
       );
-      if (
-        warnings
-        && hadDispatchableServiceWindow
-        && successorPolicy?.algorithm === ROUTE_SUCCESSOR_ALGORITHM_GRAPH
-      ) {
-        pushIssue(warnings, {
-          code: 'UNSERVED_SERVICE_PULSE',
-          severity: 'warning',
-          message:
-            `班距需求 ${Math.floor(departure.startSecond / 3600)
-              .toString()
-              .padStart(2, '0')}:${Math.floor((departure.startSecond % 3600) / 60)
-              .toString()
-              .padStart(2, '0')} 無可用車承接，該時段實際 PPHPD 將低於目標`,
-          detail: {
-            departureSecond: departure.startSecond,
-            headwaySeconds: departure.headwaySeconds,
-            intervalId: departure.intervalId,
-            intervalName: departure.intervalName,
-            rowRejections: Object.fromEntries(rejectionByRow),
-            recoveredAttempt: true,
-          },
-        });
+      const rowRejections = Object.fromEntries(rejectionByRow);
+      if (hadDispatchableServiceWindow) {
+        recordUnserved('no_vehicle', '沒有任何一列能合法承接', rowRejections);
+      } else {
+        recordUnserved('no_service_window', '這個時刻所有列都沒有正線視窗', rowRejections);
       }
       continue;
     }
@@ -1649,7 +1860,10 @@ function assignDirectionalDepartures(args: {
       useMinimumOccupancy: chosenUseMinimumCycle,
       successorPolicy,
     });
-    if (!isAcceptablePlannedCycleLength(cycleLegs, routeCount, successorPolicy)) continue;
+    if (!isAcceptablePlannedCycleLength(cycleLegs, routeCount, successorPolicy)) {
+      recordUnserved('unserved', `時間線 ${chosenRow} 展開的整輪交路腿數不完整`);
+      continue;
+    }
     {
       const winAtCommit = findWindow(chosenRow, chosenStartSecond);
       if (
@@ -1658,8 +1872,10 @@ function assignDirectionalDepartures(args: {
           legs: cycleLegs,
           nextMaintenanceStartSecond: winAtCommit.nextMaintenanceStartSecond,
           entrySlackSeconds: winAtCommit.entrySlackSeconds,
+          nextMaintenanceEntrySeconds: winAtCommit.nextMaintenanceEntrySeconds,
         })
       ) {
+        recordUnserved('unserved', `時間線 ${chosenRow} 這一輪會壓進下一段整備超過讓渡額度`);
         continue;
       }
     }
@@ -1732,6 +1948,7 @@ function assignDirectionalDepartures(args: {
         // 跨時段的第一脈已經用 max(舊班距,新班距) 頂起來，記下來那個較嚴值，
         // 後面班距檢查／修復才不會誤以為只要守住新時段自己的班距就好。
         cycleHeadwayTargetSeconds: cycleOrigin.headwayTargetSeconds,
+        servicePulseId: pulseId,
       });
       trackedLegs.push({
         taskIndex: finalTaskIndex,
@@ -1756,9 +1973,34 @@ function assignDirectionalDepartures(args: {
     };
     // 一個班距脈衝已展開本輪腿數；下一次仍從同一相位開輪。
     rotationIndex[chosenRow] += Math.max(cycleLegs.length, 1);
+    pulseLedger?.push({
+      pulseId,
+      departureSecond: departure.startSecond,
+      headwaySeconds: departure.headwaySeconds,
+      intervalId: departure.intervalId,
+      intervalName: departure.intervalName,
+      routeId: departure.routeId,
+      status: 'assigned',
+      assignedRow: chosenRow,
+      actualStartSecond: chosenStartSecond,
+      legCount: cycleLegs.length,
+      ...(startsInsideReleasableStandby(chosenRow, chosenStartSecond) ? { standbyRelease: true } : {}),
+    });
   }
 
   return tasks;
+}
+
+/** 脈衝穩定識別：時段＋目標發車秒（同一份輸入每次產生都一樣） */
+export function servicePulseIdOf(departure: Pick<DirectionalHeadwayDeparture, 'intervalId' | 'startSecond'>): string {
+  return `pulse-${departure.intervalId}-${departure.startSecond}`;
+}
+
+function formatClockSecond(second: number): string {
+  const s = ((Math.round(second) % 86400) + 86400) % 86400;
+  return [Math.floor(s / 3600), Math.floor(s / 60) % 60]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':');
 }
 
 function pulseSecond(departure: DirectionalHeadwayDeparture): number {
@@ -1814,6 +2056,47 @@ function deferNonPassengerTasksAfterCycleSpill(
       0,
       secondToMinute(originalEndSecond - deferredStartSecond),
     );
+  }
+}
+
+/** 模板上「待命一結束就接正線」：容許模板手拉時差一兩分鐘 */
+const STANDBY_TO_PASSENGER_JOIN_TOLERANCE_MINUTES = 2;
+
+function standbyLeadsIntoPassenger(
+  templateTasks: ReadonlyArray<ScheduleTask>,
+  standby: ScheduleTask,
+): boolean {
+  const endMinute = standby.startMinute + standby.durationMinutes;
+  return templateTasks.some(
+    (task) =>
+      task.rowIndex === standby.rowIndex
+      && task.taskType === 'passenger'
+      && Math.abs(task.startMinute - endMinute) <= STANDBY_TO_PASSENGER_JOIN_TOLERANCE_MINUTES,
+  );
+}
+
+/**
+ * 待命提早結束接班之後，把待命卡的尾巴收到第一班發車為止。
+ * 只處理「待命後緊接正線」的待命；開頭不動，所以待命之前那一段整備（例如充電）不受影響。
+ * 必須在 deferNonPassengerTasksAfterCycleSpill 之前做，否則那一步會把待命的「開頭」
+ * 推到班次之後，變成車先載客再回去待命。
+ */
+function releaseStandbyTailForEarlyDispatch(
+  nonPassengerTasks: ScheduleTask[],
+  passengerTasks: ReadonlyArray<ScheduleTask>,
+  templateTasks: ReadonlyArray<ScheduleTask>,
+): void {
+  for (const task of nonPassengerTasks) {
+    if (task.taskType !== 'standby' || !standbyLeadsIntoPassenger(templateTasks, task)) continue;
+    const startMinute = task.startMinute;
+    const endMinute = startMinute + task.durationMinutes;
+    let firstDeparture = endMinute;
+    for (const passenger of passengerTasks) {
+      if (passenger.rowIndex !== task.rowIndex) continue;
+      if (passenger.startMinute <= startMinute + 1e-9 || passenger.startMinute >= endMinute - 1e-9) continue;
+      firstDeparture = Math.min(firstDeparture, passenger.startMinute);
+    }
+    if (firstDeparture < endMinute - 1e-9) task.durationMinutes = firstDeparture - startMinute;
   }
 }
 
@@ -2004,6 +2287,7 @@ export function normalizeEngineInput(
   let confirmedTasks: ScheduleTask[] = templateTasks;
   let timetableGenerationAlgorithm: string | undefined;
   let servicePulseDemand = 0;
+  const servicePulses: ServicePulseRecord[] = [];
 
   if (mode === 'headway') {
     const generatedPassenger = buildHeadwayPassengerTasks({
@@ -2052,6 +2336,17 @@ export function normalizeEngineInput(
     });
     // 一個完整輪迴要多久——長整備的讓渡額度就是這個數字（見 resolveYardEntrySlackSeconds）
     const lockedRotationSeconds = resolveLockedRotationMinSeconds(successorPolicy);
+    // 每個整備最多可以被正線佔掉開頭幾秒（含進場）。寫在任務上，展開、排移動卡、最終驗證都用同一個數字
+    nonPassengerTasks.forEach((task, index) => {
+      const yardDurationSeconds = Math.round(task.durationMinutes * 60);
+      const allowance = Math.max(0, Math.min(
+        resolveYardEntrySlackSeconds({ taskType: task.taskType, yardDurationSeconds, lockedRotationSeconds, slackBySection }),
+        yardDurationSeconds - minimumYardWorkSeconds(task.taskType, maintenanceBody),
+      ));
+      task.yieldAllowanceSeconds = allowance;
+      const copy = templateYardTasks[index];
+      if (copy && copy.id === task.id) copy.yieldAllowanceSeconds = allowance;
+    });
     /**
      * 作業類整備做滿才出廠（不截尾巴，白皮書 YARD-07），所以整備結束後至少要先開完出廠移動，
      * 第一班才可能在站上發車。取「這一類任一設施 → 任一條正線路線起點站」在路網上的最短時間當下界；
@@ -2079,6 +2374,38 @@ export function normalizeEngineInput(
       exitSecondsByTaskType.set(taskType, best ?? 0);
       return best ?? 0;
     };
+    /**
+     * 最後一輪跑完之後，從終點站進到下一個整備的設施最少要多久（含恢復時間），依整備種類。
+     * 讓渡額度是全部——跑完加進場都要落在額度內（使用者 2026-11-15，每一種整備都一樣）。
+     * 取「任一終點站 → 這一類任一設施」在路網上的最短時間當下界；拓樸沒有資料時不檢查（照舊）。
+     */
+    const entrySecondsByTaskType = new Map<string, Map<string, number>>();
+    const yardEntrySecondsFor = (taskType: string): Map<string, number> => {
+      const cached = entrySecondsByTaskType.get(taskType);
+      if (cached) return cached;
+      const result = new Map<string, number>();
+      const section = FACILITY_SECTION_BY_TASK_TYPE[taskType as keyof typeof FACILITY_SECTION_BY_TASK_TYPE];
+      const topology = args.pointTopology;
+      if (section && topology) {
+        const codes = extractFacilityMapCodes(maintenanceBody, section);
+        const facilities = topology.nodes.filter((node) => node.kind === 'facility' && nodeMatchesMoveCardCodes(node, codes));
+        const terminals = new Set(passengerRoutes.map((route) => route.stationIds.at(-1)?.trim()));
+        for (const station of topology.nodes) {
+          const id = station.stationId?.trim();
+          if (!id || station.kind !== 'docking' || !terminals.has(id)) continue;
+          for (const facility of facilities) {
+            const path = findTopologyPath(topology, station.id, facility.id);
+            if (!path) continue;
+            const seconds = path.avgSeconds + minimumRecovery;
+            if (seconds < (result.get(id) ?? Infinity)) result.set(id, seconds);
+          }
+        }
+      }
+      entrySecondsByTaskType.set(taskType, result);
+      return result;
+    };
+    const chargingEntrySeconds = yardEntrySecondsFor('charging');
+    const maxChargingEntrySeconds = Math.max(0, ...chargingEntrySeconds.values());
     for (const pTask of dispatchWindowTasks) {
       const startSec = pTask.startMinute * 60;
       const endSec = (pTask.startMinute + pTask.durationMinutes) * 60;
@@ -2089,6 +2416,7 @@ export function normalizeEngineInput(
         slackBySection,
         lockedRotationSeconds,
         maintenanceBody,
+        templateTasks,
       );
       const spill = resolveNextSpillBoundary({
         windowEndSecond: endSec,
@@ -2132,6 +2460,10 @@ export function normalizeEngineInput(
         endSecond: endSec,
         nextMaintenanceStartSecond: spill.nextMaintenanceStartSecond,
         entrySlackSeconds: spill.entrySlackSeconds,
+        nextMaintenanceEntrySeconds: nextMaint ? yardEntrySecondsFor(nextMaint.taskType) : undefined,
+        ...(args.allowStandbyEarlyRelease && pTask.taskType === 'standby' && standbyLeadsIntoPassenger(templateTasks, pTask)
+          ? { standbyEndSecond: endSec, standbyReleaseExtraSeconds: maxChargingEntrySeconds }
+          : {}),
       });
       rowActiveWindows.set(pTask.rowIndex, list);
     }
@@ -2149,8 +2481,15 @@ export function normalizeEngineInput(
       successorPolicy,
       warnings,
       allowBumpPastEarlierSameRoute: args.allowBumpPastEarlierSameRoute,
+      assignmentCuts: args.assignmentCuts,
+      pulseLedger: servicePulses,
+      allowStandbyEarlyRelease: args.allowStandbyEarlyRelease,
+      preferCirculatingVehicles: args.preferCirculatingVehicles,
     });
 
+    if (args.allowStandbyEarlyRelease) {
+      releaseStandbyTailForEarlyDispatch(nonPassengerTasks, passengerTasks, templateTasks);
+    }
     deferNonPassengerTasksAfterCycleSpill(nonPassengerTasks, passengerTasks, maintenanceBody);
     confirmedTasks = [
       ...nonPassengerTasks.filter((task) => task.durationMinutes > 0),
@@ -2177,6 +2516,7 @@ export function normalizeEngineInput(
     confirmedTasks,
     templateYardTasks,
     servicePulseDemand,
+    servicePulses,
     intervals: template.intervals,
     attributes: template.attributes,
     passengerRoutes,

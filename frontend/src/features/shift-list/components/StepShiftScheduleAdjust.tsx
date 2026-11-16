@@ -752,6 +752,7 @@ export function StepShiftScheduleAdjust({
   const isManual = draft.creationMode === 'manual';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generationAttempt, setGenerationAttempt] = useState(0);
   /** 生成在背景執行緒跑：目前這一次的取消控制與進度（新的一次開始就取消舊的，舊結果不會蓋掉新的） */
   const generationAbortRef = useRef<AbortController | null>(null);
   const [generationProgress, setGenerationProgress] = useState<ScheduleEngineProgress | null>(null);
@@ -976,6 +977,7 @@ export function StepShiftScheduleAdjust({
     draft.maintenanceTask,
     draft.timeTemplate,
     draft.routeGroups,
+    generationAttempt,
     onScheduleOutputReady,
     shiftId,
   ]);
@@ -1401,10 +1403,17 @@ export function StepShiftScheduleAdjust({
 
   if (error && !plan) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center p-4">
+      <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 p-4">
         <div className="max-w-3xl whitespace-pre-line rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200">
           {error}
         </div>
+        <button
+          type="button"
+          className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
+          onClick={() => setGenerationAttempt((attempt) => attempt + 1)}
+        >
+          重新生成
+        </button>
       </div>
     );
   }

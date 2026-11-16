@@ -118,6 +118,12 @@ function findNextAnchorSecondOnRow(
   return null;
 }
 
+function requiredChargingSecondsOf(task: ScheduleTask): number {
+  const endMinute = task.startMinute + task.durationMinutes;
+  const templateSeconds = Math.round((endMinute - (task.templateStartMinute ?? task.startMinute)) * 60);
+  return Math.max(SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS, templateSeconds - Math.max(0, task.yieldAllowanceSeconds ?? 0));
+}
+
 function buildTemplateBarBlock(
   resolved: ResolvedTemplateTask,
   actualStartSecond?: number,
@@ -140,9 +146,12 @@ function buildTemplateBarBlock(
     cycleOriginSecond: resolved.task.cycleOriginSecond,
     cycleOriginIntervalId: resolved.task.cycleOriginIntervalId,
     cycleHeadwayTargetSeconds: resolved.task.cycleHeadwayTargetSeconds,
+    servicePulseId: resolved.task.servicePulseId,
     anchorStartMinute: resolved.task.templateStartMinute ?? resolved.task.startMinute,
     plannedStartMinute: secondToMinute(startSecond),
     plannedEndMinute: secondToMinute(endSecond),
+    // 充電至少要留下：模板原長 − 可被正線佔掉的額度（含進場）。排移動卡與發布檢查都看這個數字
+    ...(resolved.task.taskType === 'charging' ? { requiredChargingSeconds: requiredChargingSecondsOf(resolved.task) } : {}),
     travelSeconds: resolved.travelSeconds,
     dwellSeconds: resolved.dwellSeconds,
     source: 'template_bar',

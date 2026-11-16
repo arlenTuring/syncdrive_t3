@@ -46,7 +46,7 @@ describe('scheduleAcceptance', () => {
     );
   });
 
-  it('quality fails on unserved pulse / headway-below but gate can still pass', () => {
+  it('quality fails on unserved pulse / headway-below; unserved pulse also blocks the gate', () => {
     const warnings: FeasibilityIssue[] = [
       {
         code: 'UNSERVED_SERVICE_PULSE',
@@ -64,7 +64,8 @@ describe('scheduleAcceptance', () => {
       errors: [],
       warnings,
     });
-    assert.equal(summary.gatePassed, true);
+    // 2026-11-10 起沒車開的脈衝是載客服務不完整：品質不過，而且擋發布（硬閘不過）
+    assert.equal(summary.gatePassed, false);
     assert.equal(summary.qualityPassed, false);
     assert.equal(summary.qualityFailByCode.UNSERVED_SERVICE_PULSE, 1);
     assert.equal(summary.policyNoiseCount, 1);

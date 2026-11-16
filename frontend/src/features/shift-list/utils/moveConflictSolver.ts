@@ -1,3 +1,4 @@
+import { occupancyGapSeconds } from './junctionShift';
 import type { VehicleTrajectory } from './pathOccupancy';
 
 /**
@@ -45,7 +46,7 @@ const DAY = 24 * 60 * 60;
 const GRID = 10;
 const INF = Number.POSITIVE_INFINITY;
 
-type Visit = { node: string; a: number; d: number; dFixed: boolean; aFixed?: boolean };
+type Visit = { node: string; a: number; d: number; dFixed: boolean; aFixed?: boolean; berth?: boolean };
 type Edge = { from: string; to: string; enter: number; exit: number };
 
 function visitsOf(variable: ShiftVariable): Visit[] {
@@ -67,6 +68,7 @@ function visitsOf(variable: ShiftVariable): Visit[] {
         a: visit.arriveSecond,
         d: fixed ? Math.max(visit.departSecond, variable.fixedLastDepartSecond!) : visit.departSecond,
         dFixed: fixed,
+        ...(visit.berth ? { berth: true } : {}),
       });
     });
   }
@@ -96,22 +98,22 @@ function edgesOf(trajectories: VehicleTrajectory[]): Edge[] {
  * 我（平移 δ）跟一段固定的佔用 [oa, od] 在同一個節點：會撞的 δ 範圍（開區間）。
  * 我的佔用是 [a+δ, d+δ]；最後一站若離站固定則是 [a+δ, D]。
  */
-function nodeForbidden(mine: Visit, oa: number, od: number, buffer: number): Interval | null {
+function nodeForbidden(mine: Visit, oa: number, od: number, buffer: number, after = buffer): Interval | null {
   // 撞上 ⇔ 對方到達 − 我離開 < 緩衝，且 我到達 − 對方離開 < 緩衝
   if (mine.aFixed && mine.dFixed) {
-    return oa - mine.d < buffer && mine.a - od < buffer ? [-INF, INF] : null;
+    return oa - mine.d < buffer && mine.a - od < after ? [-INF, INF] : null;
   }
   if (mine.dFixed) {
     // 離站固定：對方在我離開後一個緩衝才到就永遠不撞；否則我必須在對方離開後一個緩衝才到
     if (oa - mine.d >= buffer) return null;
-    return [-INF, od + buffer - mine.a];
+    return [-INF, od + after - mine.a];
   }
   if (mine.aFixed) {
     // 到達固定（停放開始）：我到之前對方早就走了就不撞；否則我必須在對方到之前一個緩衝就離開
-    if (mine.a - od >= buffer) return null;
+    if (mine.a - od >= after) return null;
     return [oa - buffer - mine.d, INF];
   }
-  return [oa - buffer - mine.d, od + buffer - mine.a];
+  return [oa - buffer - mine.d, od + after - mine.a];
 }
 
 /** 同向同一段路：我（平移 δ）跟對方的進出順序不同就是超車 */
@@ -140,7 +142,13 @@ function forbiddenAgainstFixed(
     for (const mine of visits) {
       for (const visit of other.visits) {
         if (visit.nodeId !== mine.node) continue;
-        const interval = nodeForbidden(mine, visit.arriveSecond + day, visit.departSecond + day, buffer);
+        const gap = (stops: boolean) => occupancyGapSeconds({
+          berth: mine.berth === true || visit.berth === true,
+          bStops: stops,
+          passSeconds: buffer,
+        });
+        const interval = nodeForbidden(mine, visit.arriveSecond + day, visit.departSecond + day,
+          gap(visit.departSecond - visit.arriveSecond > 1e-6), gap(mine.d - mine.a > 1e-6));
         if (interval) out.push(interval);
       }
     }
@@ -276,8 +284,8 @@ export function solveMoveShifts(args: {
 function againstFixed(variable: ShiftVariable, fixed: readonly VehicleTrajectory[], buffer: number): Interval[] {
   const visits = visitsOf(variable);
   const edges = edgesOf(variable.trajectories);
-  const start = Math.min(...visits.map((v) => v.a)) + variable.min - buffer;
-  const end = Math.max(...visits.map((v) => v.d)) + variable.max + buffer;
+  const start = Math.min(...visits.map((v) => v.a)) + variable.min - 2 * buffer;
+  const end = Math.max(...visits.map((v) => v.d)) + variable.max + 2 * buffer;
   const out: Interval[] = [];
   for (const other of fixed) {
     if (other.timelineRow === variable.timelineRow) continue;

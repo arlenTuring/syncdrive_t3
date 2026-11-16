@@ -1,20 +1,25 @@
 /// <reference lib="webworker" />
 /**
  * 排班引擎背景執行緒：生成是一段長時間的同步運算，放在主執行緒會讓頁面無回應、瀏覽器跳出「請稍候」
- * （白皮書 GEN-15）。這裡只負責收輸入、跑同一個 generateShiftSchedule、回傳結果與進度；
- * 引擎本身一行都不改，所以同一份輸入搬到背景前後的結果相同。
+ * （白皮書 GEN-15）。這裡只負責收輸入、跑一個派車版本、回傳結果與進度；
+ * 兩個版本由呼叫端各開一個執行緒同時跑，再用同一個選擇規則挑一份（見 runScheduleEngineInBackground）。
  */
-import { generateShiftSchedule, setScheduleEngineProgressReporter, type GenerateShiftScheduleInput } from '../generate';
+import {
+  generateShiftScheduleVariant,
+  setScheduleEngineProgressReporter,
+  type GenerateShiftScheduleInput,
+} from '../generate';
+import type { ShiftScheduleVariant } from '../types';
 
-type Request = { id: number; input: GenerateShiftScheduleInput };
+type Request = { id: number; input: GenerateShiftScheduleInput; variant: ShiftScheduleVariant };
 
 self.onmessage = (event: MessageEvent<Request>) => {
-  const { id, input } = event.data;
+  const { id, input, variant } = event.data;
   setScheduleEngineProgressReporter((progress) => {
     (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, type: 'progress', progress });
   });
   try {
-    const result = generateShiftSchedule(input);
+    const result = generateShiftScheduleVariant(input, variant);
     (self as unknown as DedicatedWorkerGlobalScope).postMessage({ id, type: 'result', result });
   } catch (error) {
     (self as unknown as DedicatedWorkerGlobalScope).postMessage({

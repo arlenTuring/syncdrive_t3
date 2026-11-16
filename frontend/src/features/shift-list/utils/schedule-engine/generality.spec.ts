@@ -6,7 +6,9 @@ import {
   type ShiftScheduleSelectedRoute,
 } from '../../types/create';
 import type { ScheduleTask } from '../../../time-templates/types/editor';
-import { generateShiftSchedule, type GenerateShiftScheduleInput } from './generate';
+import { deriveAssignmentCuts, generateShiftSchedule, type GenerateShiftScheduleInput } from './generate';
+import { normalizeEngineInput } from './normalizeInput';
+import type { FeasibilityIssue, GenerateShiftScheduleResult } from './types';
 import type { GeneratedSchedulePlan } from './types';
 import { buildPlanFingerprint } from '../schedulePublishCheck';
 import { withListedOrderRelationGraph } from '../../testing/relationGraphFixture';
@@ -176,7 +178,7 @@ describe('排班引擎泛用性', () => {
     next.draft = {
       ...next.draft,
       scheduleOutput: {
-        outputVersion: 2,
+        outputVersion: 3,
         generatedAt: '',
         plan: previousPlan,
         feasibilityReport: baseline.report,
@@ -206,5 +208,53 @@ describe('排班引擎泛用性', () => {
   it('保存／重開：JSON 來回後指紋與緩衝紀錄不變', () => {
     const reopened = JSON.parse(JSON.stringify(baseline.plan)) as GeneratedSchedulePlan;
     assert.equal(buildPlanFingerprint(reopened), buildPlanFingerprint(baseline.plan));
+  });
+});
+
+
+describe('派車回饋限制', () => {
+  const engineInputOf = (cuts: Array<{ pulseId: string; row: number; reason: string }> = []) => {
+    const source = input();
+    const issues: FeasibilityIssue[] = [];
+    return normalizeEngineInput({ ...source, passengerTimetableMode: 'template', assignmentCuts: cuts }, issues);
+  };
+
+  it('某個脈衝不能派給某一列：再派一次時改派別列，拒絕原因寫明是回饋限制', () => {
+    const first = engineInputOf();
+    assert.ok(first);
+    const assigned = first!.servicePulses.find((pulse) => pulse.status === 'assigned');
+    assert.ok(assigned?.assignedRow != null);
+    const again = engineInputOf([{ pulseId: assigned!.pulseId, row: assigned!.assignedRow!, reason: '測試' }]);
+    const retried = again!.servicePulses.find((pulse) => pulse.pulseId === assigned!.pulseId)!;
+    assert.notEqual(retried.assignedRow, assigned!.assignedRow);
+    if (retried.status !== 'assigned') {
+      assert.equal(retried.rowRejections?.[String(assigned!.assignedRow)], '回饋限制：測試');
+    }
+  });
+
+  it('從結果推出限制：出廠排不出 → 這一列不接出廠後那一班；被刪的班次 → 不派給原本那一列', () => {
+    const result = {
+      plan: {
+        shiftId: 'S',
+        generatedAt: '',
+        scheduleRowCount: 2,
+        timelines: [{
+          row: 1,
+          blocks: [
+            { id: 'y1', taskType: 'standby', plannedStartMinute: 60, plannedEndMinute: 90 },
+            { id: 'p1', taskType: 'passenger', plannedStartMinute: 95, plannedEndMinute: 100, servicePulseId: 'pulse-a' },
+          ],
+        }],
+        servicePulses: [
+          { pulseId: 'pulse-b', departureSecond: 0, headwaySeconds: 600, intervalId: 'i', routeId: 'r', status: 'assigned', assignedRow: 2 },
+        ],
+      },
+      report: {
+        ok: false,
+        errors: [{ code: 'MAINTENANCE_TRANSFER_REQUIRED_MISSING', severity: 'error', message: '', detail: { timelineRow: 1, blockId: 'y1', transferKind: 'exit' } }],
+        warnings: [{ code: 'UNSERVED_SERVICE_PULSE', severity: 'error', message: '', detail: { pulseId: 'pulse-b' } }],
+      },
+    } as unknown as GenerateShiftScheduleResult;
+    assert.deepEqual(deriveAssignmentCuts(result).map((cut) => [cut.pulseId, cut.row]), [['pulse-a', 1], ['pulse-b', 2]]);
   });
 });

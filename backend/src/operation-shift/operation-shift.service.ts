@@ -1,3 +1,4 @@
+import { DAY_END_SECOND } from './timetable/clock';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -474,10 +475,18 @@ export class OperationShiftService {
     }
   }
 
+  /**
+   * 整天的班次（調度下單、模擬器重播用）。
+   *
+   * 要包含<strong>跨過午夜延續到隔天清晨</strong>的班次：一輪交路在 23:56 起班，後面幾腿在班表上記成
+   * 24:02、24:05（跟同一列 24:09 的入廠卡、24:11 的充電一樣屬於這一天的計畫）。只取 00:00–24:00
+   * 開始的班次會把這幾腿濾掉，移動卡卻照樣下單，車就會停在半路沒有單可做（2026-11-10 正式測試：
+   * 時間線 7 的 ST0002、TN0005 沒下單，車停在 SW上發1 擋住後車）。所以上限放到隔天同一時刻。
+   */
   private expandAllTrips(body: Record<string, unknown>): TimetableTripDto[] {
     return expandTimetableTrips({
       body,
-      range: parseTimeRangeQuery({}),
+      range: { fromSecond: 0, toSecond: 2 * DAY_END_SECOND },
       passengerOnly: false,
     });
   }

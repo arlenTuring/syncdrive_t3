@@ -57,7 +57,25 @@ export type YardMove = {
   origin: YardMoveEndpoint | null;
   /** 終點。同樣可能是 null，理由相同。 */
   destination: YardMoveEndpoint | null;
+  /**
+   * 必須經過的途經點（不含起訖）。只有排班引擎走的不是唯一最短路時才有（班表卡
+   * yardMoveStops）；寫進訂單 stations[]，讓車端照同一條路規劃。offsetSeconds 從卡片開始起算。
+   */
+  via: Array<{ stationId: string; name: string; offsetSeconds: number }>;
 };
+
+function readMoveStops(value: unknown): YardMove['via'] {
+  if (!Array.isArray(value)) return [];
+  const out: YardMove['via'] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    const stationId = str(record?.stationId);
+    const offsetSeconds = num(record?.offsetSeconds);
+    if (!stationId || offsetSeconds == null) continue;
+    out.push({ stationId, name: str(record?.name) ?? stationId, offsetSeconds });
+  }
+  return out;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -182,6 +200,7 @@ export function extractYardMoves(body: Record<string, unknown>): {
         endMinute,
         origin: outbound ? facility : station,
         destination: outbound ? station : facility,
+        via: readMoveStops(block.yardMoveStops),
       });
     }
   }

@@ -80,7 +80,10 @@ export class MaintenanceDistributionService {
         const block = raw as Record<string, unknown>;
         const start = Number(block.plannedStartMinute);
         const end = Number(block.plannedEndMinute);
-        if (!(start <= nowMinute && nowMinute < end)) continue;
+        // 跨午夜的卡記成 1440 以上（例：待命 21:50 → 隔天 03:00 記成 1310–1620）：
+        // 凌晨那一段要用「昨天延續到今天」去對，否則這台車此刻對不到任何卡
+        const inside = [nowMinute, nowMinute + 24 * 60].some((at) => start <= at && at < end);
+        if (!inside) continue;
         const row = Number(block.timelineRow);
         const vehicle = Number.isInteger(row) && row >= 1 ? context.fleet[row - 1] : undefined;
         if (!vehicle || result.has(vehicle)) continue;

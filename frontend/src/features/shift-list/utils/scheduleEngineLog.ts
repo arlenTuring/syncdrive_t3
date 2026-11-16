@@ -215,6 +215,9 @@ export function buildScheduleEngineLogPayload(args: {
       errors: report.errors,
       warnings: report.warnings,
       acceptance: evaluateScheduleAcceptance(report),
+      search: report.search,
+      variantSelection: report.variantSelection,
+      assignmentFeedback: report.assignmentFeedback,
     },
     plan: plan
       ? {

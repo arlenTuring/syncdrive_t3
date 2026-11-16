@@ -4,8 +4,10 @@ import {
   dispatchDecision,
   localMidnight,
   planDispatches,
+  planYardMoves,
   vehicleForRow,
 } from './dispatch.plan';
+import type { YardMove } from './dispatch.yard-moves';
 
 const FLEET = ['PMS01', 'PMS02', 'PMS03'];
 
@@ -227,5 +229,43 @@ describe('dispatchDecision', () => {
     expect(dispatchDecision({ ...base, now, departAt: now - 600_000 })).toBe(
       'expired',
     );
+  });
+});
+
+describe('planYardMoves：途經點寫進訂單站序', () => {
+  const reference = new Date(2026, 10, 10, 12, 0, 0).getTime();
+  const baseMove: YardMove = {
+    blockId: 'yardtransit-in-x',
+    timelineRow: 1,
+    tripCode: 'EI1130',
+    label: '整備入廠',
+    direction: 'entry',
+    sectionCode: null,
+    startMinute: 11 * 60 + 30,
+    endMinute: 11 * 60 + 36,
+    origin: { id: '160', name: '充電洗車入口點', kind: 'station' },
+    destination: { id: '132', name: 'H1', kind: 'facility' },
+    via: [],
+  };
+
+  it('沒有途經點：維持只給起訖兩端（站序空陣列）', () => {
+    const { planned } = planYardMoves({ moves: [baseMove], fleet: FLEET, reference });
+    expect(planned[0]!.stations).toEqual([]);
+  });
+
+  it('有途經點：起點 → 途經點（intermediate，時刻照偏移）→ 終點', () => {
+    const { planned } = planYardMoves({
+      moves: [{ ...baseMove, via: [{ stationId: 'n2w_u_start', name: 'NW下發2', offsetSeconds: 50 }] }],
+      fleet: FLEET,
+      reference,
+    });
+    const departAt = planned[0]!.departAt;
+    expect(planned[0]!.stations.map((station) => [station.order, station.stationId, station.role])).toEqual([
+      [1, '160', 'origin'],
+      [2, 'n2w_u_start', 'intermediate'],
+      [3, '132', 'terminal'],
+    ]);
+    expect(planned[0]!.stations[1]!.arriveAt).toBe(departAt + 50_000);
+    expect(planned[0]!.stations[2]!.arriveAt).toBe(planned[0]!.arriveAt);
   });
 });

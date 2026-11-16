@@ -369,6 +369,8 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(result.inserted, 0);
       // 要講出缺的是哪一段（起終點），不是只說「沒有路徑」
       assert.match(result.skipped[0]!.reason, /到不了（拓樸上沒有「N2W」到「M1」的路徑）/);
+      // 種類用欄位標明（呼叫端靠它判斷，不從原因文字猜）
+      assert.equal(result.skipped[0]!.transferKind, 'entry');
     });
 
     it('沒有拓樸時安靜略過，不當成錯誤', () => {
@@ -536,8 +538,9 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       assert.equal(result.ateYardTail, 0);
       const yard = timelines[0]!.blocks.find((b) => b.id === 'yard-1');
       assert.equal(yard?.plannedEndMinute, 70, '整備做滿到原訂結束');
-      const skip = result.skipped.find((item) => item.blockId === 'yard-1' && item.reason.startsWith('排不出出廠卡'));
+      const skip = result.skipped.find((item) => item.blockId === 'yard-1' && item.transferKind === 'exit');
       assert.ok(skip, '排不出要回報');
+      assert.match(skip.reason, /^排不出出廠卡/);
       // M1 出場 30 秒 → 下一班至少晚 30 秒，交給呼叫端連同後續班次一起評估
       assert.deepEqual(skip?.exitDelay, { nextBlockId: 'trip-1', seconds: 30 });
       assert.equal(result.yardWorkShortened.length, 0);
@@ -770,6 +773,18 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const result = run(p);
       assert.equal(result.skipped.filter((x) => x.fromTaskType === 'charging').length, 1);
       assert.equal(servicing.plannedStartMinute, 430, '排不出就不動');
+    });
+
+    it('轉場沒有空檔時保留整段充電，不挪用充電開頭', () => {
+      const p = plan();
+      const [first, second] = p.timelines[0]!.blocks;
+      first!.taskType = 'servicing';
+      second!.taskType = 'charging';
+      const { plannedStartMinute, plannedEndMinute } = second!;
+      const result = run(p);
+      assert.ok(result.skipped.some((item) => item.fromTaskType === 'servicing'));
+      assert.equal(second!.plannedStartMinute, plannedStartMinute);
+      assert.equal(second!.plannedEndMinute, plannedEndMinute);
     });
 
     it('前一段跑滿全長、結束時刻不動；後一段開始被推遲、結束時刻不動', () => {
@@ -1016,6 +1031,7 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
       const forwardSkip = result.skipped.find((x) => x.fromTaskType === 'charging');
       assert.ok(forwardSkip, '充電→保養這個方向要被擋下並回報');
       assert.match(forwardSkip.reason, /塞不進這段空檔/);
+      assert.equal(forwardSkip.transferKind, 'transit');
       // 兩段都維持原樣
       assert.equal(p.timelines[0]!.blocks[0]!.plannedEndMinute, 430);
     });
@@ -1700,3 +1716,39 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
 function minuteToSecond(minute: number): number {
   return minute * 60;
 }
+
+describe('同場區兩台車同時互換格子：改成各自留在原格', () => {
+  const block = (id: string, row: number, taskType: string, start: number, end: number) => ({
+    id, timelineRow: row, taskType, label: taskType, anchorStartMinute: start, plannedStartMinute: start,
+    plannedEndMinute: end, travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+  });
+  it('A 充電轉待命、B 待命轉充電同一刻發生：兩段後一段各自留在前一段的格子', () => {
+    const topology: PointTopology = {
+      ...emptyPointTopology(),
+      nodes: [
+        { id: 'E1', kind: 'facility', label: 'E1', x: 0, y: 0, color: '#222' },
+        { id: 'E2', kind: 'facility', label: 'E2', x: 0, y: 0, color: '#222' },
+        { id: 'G', kind: 'waypoint', label: 'G', x: 0, y: 0, color: '#111' },
+      ],
+      edges: [edge('E1', 'G', 30), edge('G', 'E1', 30), edge('E2', 'G', 30), edge('G', 'E2', 30)],
+    } as PointTopology;
+    const timelines = [
+      { row: 1, blocks: [block('c1', 1, 'charging', 600, 720), block('s1', 1, 'standby', 720, 840)] },
+      { row: 2, blocks: [block('s2', 2, 'standby', 600, 720), block('c2', 2, 'charging', 720, 840)] },
+    ] as never as GeneratedSchedulePlan['timelines'];
+    insertMaintenanceTransferCards({
+      timelines, topology,
+      maintenanceBody: {
+        charging: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'E1' }, { id: 'b', mapCode: 'E2' }] },
+        mobile: { stepEnabled: true, equipmentRows: [{ id: 'c', mapCode: 'E1' }, { id: 'd', mapCode: 'E2' }] },
+      },
+      selectedRoutes: [], minimumRecoveryTimeSeconds: 0, collisionProtectionSeconds: 30,
+      sectionCodes: SECTION_CODES, decideOnly: true,
+      areas: [{ id: 'e-zone', facilities: [{ id: 'E1', type: 'Facility' }, { id: 'E2', type: 'Facility' }, { id: 'G', type: 'DockingPoint' }] }] as never,
+    });
+    const at = (id: string) => timelines.flatMap((t) => t.blocks).find((b) => b.id === id)!.yardFacilityLabel;
+    assert.equal(at('s1'), at('c1'), '時間線 1 待命留在充電那一格');
+    assert.equal(at('c2'), at('s2'), '時間線 2 充電留在待命那一格');
+    assert.notEqual(at('c1'), at('c2'));
+  });
+});

@@ -256,13 +256,16 @@ export function checkShiftCardCodes(
     const code = cardDisplayCode(block, settings);
     const start = Number(block.plannedStartMinute);
     if (!code) continue;
+    const hhmm = formatHhmm(start);
+    const second = ((Math.round(start * 60) % 60) + 60) % 60;
+    const seconds = second ? `:${String(second).padStart(2, '0')}` : '';
     entries.push({
       code,
       kind: kind.label,
       blockId: typeof block.id === 'string' ? block.id : '',
       timelineRow: Number(block.timelineRow) || 0,
       plannedStartMinute: start,
-      time: `${formatHhmm(start).slice(0, 2)}:${formatHhmm(start).slice(2)}`,
+      time: `${hhmm.slice(0, 2)}:${hhmm.slice(2)}${seconds}`,
     });
   }
   const routes = Array.isArray(body.selectedRoutes) ? body.selectedRoutes : [];

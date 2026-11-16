@@ -2,6 +2,7 @@ import type { PointTopology, PointTopologyEdge } from '../../map-editor/types/po
 import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { buildBlockStationDepartures, resolveRouteForBlock } from './buildBlockStationDepartures';
 import { edgeHasTravelTime, edgeSeconds, findTopologyPath } from './findTopologyPath';
+import { occupancyGapSeconds, traversalOvertakes } from './junctionShift';
 import type { GeneratedScheduleBlock, GeneratedScheduleTimeline } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
 
@@ -39,6 +40,8 @@ export type TrajectoryVisit = {
   arriveSecond: number;
   /** 離開這個節點的時刻（秒）；經過不停＝arriveSecond */
   departSecond: number;
+  /** 這個節點是月台（停靠點）：有一方在這裡停就套站位規則（見 junctionShift.occupancyGapSeconds） */
+  berth?: boolean;
 };
 
 export type VehicleTrajectory = {
@@ -68,6 +71,8 @@ export type PathConflict = {
   otherSecond: number;
   /** node：兩段佔用之間的間隔（秒，負數＝重疊） */
   gapSeconds?: number;
+  /** node：這個點要求的間隔（月台有一方停靠＝兩倍碰撞保護，其餘＝碰撞保護） */
+  requiredGapSeconds?: number;
 };
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -83,6 +88,8 @@ type TopologyIndex = {
   resourceLabel: Map<string, string>;
   /** 0 秒相連的點對（雙向，`from>to`） */
   zeroLinked: Set<string>;
+  /** 月台（停靠點）節點 */
+  berthNodes: Set<string>;
 };
 
 const indexCache = new WeakMap<PointTopology, TopologyIndex>();
@@ -122,8 +129,10 @@ function indexTopology(topology: PointTopology): TopologyIndex {
   const resourceLabel = new Map<string, string>(
     topology.nodes.map((node) => [node.id, labelById.get(node.id) ?? node.id]),
   );
+  const berthNodes = new Set(topology.nodes.filter((node) => node.kind === 'docking').map((node) => node.id));
   const index = {
     labelById, nodeIdByLabel, ambiguousLabels, nodeIdByStationId, edgeByPair, resourceOf, resourceLabel, zeroLinked,
+    berthNodes,
   };
   indexCache.set(topology, index);
   return index;
@@ -146,7 +155,7 @@ function toResources(visits: TrajectoryVisit[], index: TopologyIndex): Trajector
       last.departSecond = Math.max(last.departSecond, visit.departSecond);
       continue;
     }
-    out.push({ ...visit, nodeId: resource, nodeLabel: label });
+    out.push({ ...visit, nodeId: resource, nodeLabel: label, ...(index.berthNodes.has(resource) ? { berth: true } : {}) });
   }
   return out;
 }
@@ -207,6 +216,27 @@ export function moveTrajectory(
   /** 班表裡「卡片上的設施名稱 → 節點 id」：地圖改名後用來對回舊名稱，見 {@link facilityAliases} */
   aliases?: ReadonlyMap<string, string>,
 ): VehicleTrajectory | null {
+  const visits = moveOwnVisits(block, topology, startSecondOverride, aliases);
+  if (!visits) return null;
+  return {
+    blockId: block.id,
+    timelineRow,
+    kind: 'move',
+    label: block.label ?? block.id,
+    visits: toResources(visits, indexTopology(topology)),
+  };
+}
+
+/**
+ * 移動卡自己那一段實際經過的拓樸節點（不合併成實體資源），照路段平均行駛秒數從卡片開始
+ * 時刻累加。{@link moveTrajectory} 與訂單途經點都用這一份，兩邊看到的是同一條路。
+ */
+export function moveOwnVisits(
+  block: GeneratedScheduleBlock,
+  topology: PointTopology,
+  startSecondOverride?: number,
+  aliases?: ReadonlyMap<string, string>,
+): TrajectoryVisit[] | null {
   if (block.taskType !== 'dispatch') return null;
   let labels = block.yardMoveViaLabels ?? [];
   if (labels.length < 2) return null;
@@ -245,18 +275,13 @@ export function moveTrajectory(
   for (let i = 1; i < ids.length; i += 1) {
     const edge = edgeBetween(index, ids[i - 1]!, ids[i]!);
     if (!edge || !edgeHasTravelTime(edge)) return null;
-    instant += edgeSeconds(edge, 'avg');
+    // 卡片是用快排的就用快算經過時刻（見 GeneratedScheduleBlock.yardMovePace）
+    instant += edgeSeconds(edge, block.yardMovePace === 'min' ? 'min' : 'avg');
     visits.push({ nodeId: ids[i]!, nodeLabel: labels[i]!.trim(), arriveSecond: instant, departSecond: instant });
   }
   const last = visits[visits.length - 1]!;
   if (endSecond > last.arriveSecond) last.departSecond = endSecond;
-  return {
-    blockId: block.id,
-    timelineRow,
-    kind: 'move',
-    label: block.label ?? block.id,
-    visits: toResources(visits, index),
-  };
+  return visits;
 }
 
 /**
@@ -431,7 +456,7 @@ export function conflictsBetween(
   const oStart = oStart0 + shift;
   const oEnd = oEnd0 + shift;
   // 整段時間都不重疊（含緩衝）就不可能撞
-  if (oStart - mEnd >= bufferSeconds || mStart - oEnd >= bufferSeconds) return [];
+  if (oStart - mEnd >= 2 * bufferSeconds || mStart - oEnd >= 2 * bufferSeconds) return [];
 
   const out: PathConflict[] = [];
   for (const a of mine.visits) {
@@ -440,10 +465,17 @@ export function conflictsBetween(
       const bArrive = raw.arriveSecond + shift;
       const bDepart = raw.departSecond + shift;
       const gap = Math.max(bArrive - a.departSecond, a.arriveSecond - bDepart);
-      if (gap < bufferSeconds - 1e-9) {
+      const laterStops = bArrive - a.departSecond >= a.arriveSecond - bDepart
+        ? bDepart - bArrive > 1e-6 : a.departSecond - a.arriveSecond > 1e-6;
+      const required = occupancyGapSeconds({
+        berth: a.berth === true || raw.berth === true,
+        bStops: laterStops,
+        passSeconds: bufferSeconds,
+      });
+      if (gap < required - 1e-9) {
         out.push({
           kind: 'node', mine, other, nodeId: a.nodeId, nodeLabel: a.nodeLabel,
-          mineSecond: a.arriveSecond, otherSecond: bArrive, gapSeconds: gap,
+          mineSecond: a.arriveSecond, otherSecond: bArrive, gapSeconds: gap, requiredGapSeconds: required,
         });
       }
     }
@@ -456,9 +488,7 @@ export function conflictsBetween(
     for (const b of otherEdges) {
       if (a.from === b.from && a.to === b.to) {
         // 同向：先進先出
-        const enterOrder = Math.sign(a.enter - b.enter);
-        const exitOrder = Math.sign(a.exit - b.exit);
-        if (enterOrder !== 0 && exitOrder !== 0 && enterOrder !== exitOrder) {
+        if (traversalOvertakes(a.enter, a.exit, b.enter, b.exit)) {
           out.push({
             kind: 'overtake', mine, other, nodeId: a.from, nodeLabel: labelOf(a.from),
             toNodeId: a.to, toNodeLabel: labelOf(a.to), mineSecond: a.enter, otherSecond: b.enter,
@@ -500,11 +530,27 @@ export function findPathConflicts(
   trajectories: readonly VehicleTrajectory[],
   bufferSeconds: number,
 ): PathConflict[] {
-  const moves = trajectories.filter((t) => t.kind === 'move');
+  const byNode = new Map<string, Set<VehicleTrajectory>>();
+  const order = new Map<VehicleTrajectory, number>();
+  for (const [index, trajectory] of trajectories.entries()) {
+    order.set(trajectory, index);
+    for (const { nodeId } of trajectory.visits) {
+      let occupants = byNode.get(nodeId);
+      if (!occupants) byNode.set(nodeId, occupants = new Set());
+      occupants.add(trajectory);
+    }
+  }
   const out: PathConflict[] = [];
   const seen = new Set<string>();
-  for (const mine of moves) {
-    for (const other of trajectories) {
+  for (const mine of trajectories) {
+    if (mine.kind !== 'move') continue;
+    const candidates = new Set<VehicleTrajectory>();
+    for (const { nodeId } of mine.visits) {
+      for (const other of byNode.get(nodeId) ?? []) {
+        if (other.timelineRow !== mine.timelineRow) candidates.add(other);
+      }
+    }
+    for (const other of [...candidates].sort((a, b) => order.get(a)! - order.get(b)!)) {
       if (other.blockId === mine.blockId) continue;
       if (other.kind === 'move') {
         const key = [mine.blockId, other.blockId].sort().join('|');
@@ -531,10 +577,15 @@ export function escapeShiftsFor(conflicts: readonly PathConflict[], bufferSecond
       const shift = alignDay(mineVisit.arriveSecond, otherVisit.arriveSecond);
       const oArrive = otherVisit.arriveSecond + shift;
       const oDepart = otherVisit.departSecond + shift;
-      // 往前：我離開這個點要比對方到達早一個緩衝
-      out.add(Math.floor(oArrive - bufferSeconds - mineVisit.departSecond));
-      // 往後：我到達這個點要比對方離開晚一個緩衝
-      out.add(Math.ceil(oDepart + bufferSeconds - mineVisit.arriveSecond));
+      const gap = (later: TrajectoryVisit) => occupancyGapSeconds({
+        berth: mineVisit.berth === true || otherVisit.berth === true,
+        bStops: later.departSecond - later.arriveSecond > 1e-6,
+        passSeconds: bufferSeconds,
+      });
+      // 往前：我離開這個點要比對方到達早一個間隔
+      out.add(Math.floor(oArrive - gap(otherVisit) - mineVisit.departSecond));
+      // 往後：我到達這個點要比對方離開晚一個間隔
+      out.add(Math.ceil(oDepart + gap(mineVisit) - mineVisit.arriveSecond));
     } else {
       const delta = conflict.otherSecond - conflict.mineSecond;
       out.add(Math.floor(delta - bufferSeconds));
@@ -550,7 +601,8 @@ export function describePathConflict(conflict: PathConflict, formatSecond: (seco
   if (conflict.kind === 'node') {
     return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} 經過「${conflict.nodeLabel}」，`
       + `${who(conflict.other)} ${formatSecond(conflict.otherSecond)} 也在那裡`
-      + `（間隔 ${Math.round(conflict.gapSeconds ?? 0)} 秒）`;
+      + `（間隔 ${Math.round(conflict.gapSeconds ?? 0)} 秒`
+      + `${conflict.requiredGapSeconds != null ? `，要 ${Math.round(conflict.requiredGapSeconds)} 秒` : ''}）`;
   }
   if (conflict.kind === 'overtake') {
     return `${who(conflict.mine)} 與 ${who(conflict.other)} 同向走「${conflict.nodeLabel}」→「${conflict.toNodeLabel}」，`

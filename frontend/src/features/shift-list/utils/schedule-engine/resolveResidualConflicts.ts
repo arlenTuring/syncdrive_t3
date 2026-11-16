@@ -718,6 +718,99 @@ export function rerouteTripInCopy(
 }
 
 /**
+ * 車上線時從一輪的中途加入（試驗功能，見 GenerateShiftScheduleInput.roundJoin）。
+ *
+ * 一輪原本固定從循環起點開始：車從整備位置出來，不管停在哪裡，都要先空車開到循環起點才載客。
+ * 整備位置離這一輪後面某一站比較近時，空車那一段常常比載客的那一段還長，還要佔用正線。
+ * 這裡在副本上把這一輪最前面 1 段、2 段……拿掉，車改成直接到下一段的起點站加入：
+ *
+ * - 留下來的各段時刻完全不動（別台車的班距不受影響）。
+ * - 拿掉的那幾段是少掉的載客班次，寫在留下來第一班的 roundJoinSkippedLegs，回傳時一併列出。
+ * - 只處理「整備之後的第一班」：前面緊接著整備，中間沒有別的載客班次。
+ * - 不寫任何站名：新的起點站由這一輪下一段的路線資料決定，到不到得了由出廠卡的尋路判斷。
+ *
+ * 每拿掉一種段數回傳一份副本，段數少的在前（少掉的班次少的先試）。
+ */
+export function joinRoundLaterInCopy(
+  timelines: Plan,
+  firstTripBlockId: string,
+): Array<{
+  timelines: Plan;
+  description: string;
+  timelineRow: number;
+  joinBlockId: string;
+  dropped: GeneratedScheduleBlock[];
+}> {
+  const timeline = timelines.find((item) => item.blocks.some((block) => block.id === firstTripBlockId));
+  if (!timeline) return [];
+  const sorted = [...timeline.blocks].sort(
+    (a, b) => a.plannedStartMinute - b.plannedStartMinute || a.id.localeCompare(b.id),
+  );
+  const firstIndex = sorted.findIndex((block) => block.id === firstTripBlockId);
+  const first = sorted[firstIndex];
+  if (!first || !isTrip(first) || !first.cycleChainId) return [];
+  // 前面要緊接著整備（往前找到的第一張實際任務是整備，不是載客）
+  let afterYard = false;
+  for (let index = firstIndex - 1; index >= 0; index -= 1) {
+    const block = sorted[index]!;
+    if (isTrip(block)) break;
+    if (block.source === 'template_bar' && YARD_STAY_TASK_TYPES.has(block.taskType)) {
+      afterYard = true;
+      break;
+    }
+  }
+  if (!afterYard) return [];
+  // 這一輪的各段（同一個 cycleChainId、時間連續）
+  const round: GeneratedScheduleBlock[] = [];
+  for (let index = firstIndex; index < sorted.length; index += 1) {
+    const block = sorted[index]!;
+    if (!isTrip(block)) {
+      if (block.source === 'template_bar') break;
+      continue;
+    }
+    if (block.cycleChainId !== first.cycleChainId) break;
+    round.push(block);
+  }
+  const alreadySkipped = first.roundJoinSkippedLegs ?? 0;
+  const out: ReturnType<typeof joinRoundLaterInCopy> = [];
+  for (let dropCount = 1; dropCount < round.length; dropCount += 1) {
+    const dropped = round.slice(0, dropCount);
+    const join = round[dropCount]!;
+    const droppedIds = new Set(dropped.map((block) => block.id));
+    const copy = clonePlan(timelines);
+    const target = copy.find((item) => item.row === timeline.row)!;
+    target.blocks = target.blocks
+      .filter((block) => {
+        if (droppedIds.has(block.id)) return false;
+        // 跟著被拿掉的班次走的附屬卡（站上暫停等）：落在被拿掉那幾段的時間範圍內、又不是模板任務
+        if (
+          block.source !== 'template_bar'
+          && !isTrip(block)
+          && block.plannedStartMinute >= first.plannedStartMinute - 1e-9
+          && block.plannedEndMinute <= join.plannedStartMinute + 1e-9
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((block) => (
+        block.id === join.id
+          ? { ...block, roundJoinSkippedLegs: alreadySkipped + dropCount }
+          : block
+      ));
+    const names = dropped.map((block) => `「${block.routeName ?? block.routeCode ?? block.label}」`).join('、');
+    out.push({
+      timelines: copy,
+      description: `這一輪前面 ${dropCount} 段不開（${names}），車直接從「${join.routeName ?? join.routeCode ?? join.label}」的起點站加入`,
+      timelineRow: timeline.row,
+      joinBlockId: join.id,
+      dropped,
+    });
+  }
+  return out;
+}
+
+/**
  * 停站換位：車跑完一趟停在某一站等下一班，那一站被別列車要用時，把「進站那一趟」與
  * 「下一班」一起換成停在同一區另一個停靠位的已允許路線。
  *

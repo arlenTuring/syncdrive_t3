@@ -67,6 +67,101 @@ it('缺少路線時不能略過站位檢查而通過發布', () => {
 });
 
 describe('schedulePublishCheck', () => {
+  it('充電卡改短後禁止發布，原定秒數也參與指紋', () => {
+    const plan = planWith([0]);
+    const block = plan.timelines[0]!.blocks[0]!;
+    block.taskType = 'charging';
+    block.requiredChargingSeconds = 300;
+    const fingerprint = buildPlanFingerprint(plan);
+    block.requiredChargingSeconds = 301;
+    assert.notEqual(buildPlanFingerprint(plan), fingerprint);
+    assert.equal(check(plan).publishBlockingByCode.MAINTENANCE_WORK_INSUFFICIENT, 1);
+    block.requiredChargingSeconds = 300;
+    assert.equal(check(plan).publishBlockingByCode.MAINTENANCE_WORK_INSUFFICIENT, undefined);
+  });
+  describe('應開載客服務完整（發車脈衝）', () => {
+    const pulse = (pulseId: string, status: 'assigned' | 'unserved' | 'no_vehicle' | 'no_service_window', departureSecond: number) => ({
+      pulseId,
+      departureSecond,
+      headwaySeconds: 360,
+      intervalId: 'slot-a',
+      intervalName: '離峰模式',
+      routeId: 'ab',
+      status,
+      ...(status === 'assigned' ? { assignedRow: 1, actualStartSecond: departureSecond, legCount: 1 } : {}),
+      ...(status === 'unserved' ? { reason: '時間線 1 展開的整輪交路腿數不完整' } : {}),
+      ...(status === 'no_vehicle' ? { reason: '沒有任何一列能合法承接', rowRejections: { 1: '最早可發延遲 490s，超過上限 210s' } } : {}),
+      ...(status === 'no_service_window' ? { reason: '這個時刻所有列都沒有正線視窗' } : {}),
+    });
+    /** 排班引擎產生的班表：班次帶交路識別與脈衝識別 */
+    function enginePlan(starts: number[]): GeneratedSchedulePlan {
+      const plan = planWith(starts);
+      plan.timelines.forEach((timeline, index) => {
+        const block = timeline.blocks[0]!;
+        block.cycleChainId = `cycle-${timeline.row}-${starts[index]! * 60}`;
+        block.servicePulseId = `p${index + 1}`;
+      });
+      return plan;
+    }
+
+    it('每個應開脈衝都有載客班次：通過', () => {
+      const plan = enginePlan([0, 60]);
+      plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600)];
+      const result = check(plan);
+      assert.equal(result.publishSafe, true);
+      assert.equal(result.publishBlockingByCode.UNSERVED_SERVICE_PULSE, undefined);
+    });
+
+    it('有脈衝沒車承接：擋發布，訊息帶出各列原因', () => {
+      const plan = enginePlan([0, 60]);
+      plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600), pulse('p3', 'unserved', 7200)];
+      const result = check(plan);
+      assert.equal(result.publishSafe, false);
+      assert.equal(result.publishBlockingByCode.UNSERVED_SERVICE_PULSE, 1);
+      const issue = result.blockingIssues.find((item) => item.code === 'UNSERVED_SERVICE_PULSE')!;
+      assert.equal(issue.severity, 'error');
+      assert.equal(issue.detail?.pulseId, 'p3');
+      assert.match(issue.message, /02:00:00/);
+    });
+
+    it('產生時有掛車、班次後來被刪掉：重驗抓得到，擋發布', () => {
+      const plan = enginePlan([0, 60]);
+      plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600)];
+      plan.timelines[1]!.blocks = [];
+      const result = check(plan);
+      assert.equal(result.publishSafe, false);
+      const issue = result.blockingIssues.find((item) => item.code === 'UNSERVED_SERVICE_PULSE')!;
+      assert.equal(issue.detail?.pulseId, 'p2');
+      assert.match(issue.message, /找不到/);
+    });
+
+    it('車不夠仍保留應開需求並擋發布', () => {
+      const plan = enginePlan([0, 60]);
+      plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600), pulse('p8', 'no_vehicle', 7200)];
+      const result = check(plan);
+      assert.equal(result.publishSafe, false);
+      assert.equal(result.publishBlockingByCode.UNSERVED_SERVICE_PULSE, 1);
+      assert.equal(result.blockingIssues.find((item) => item.code === 'UNSERVED_SERVICE_PULSE')?.detail?.pulseId, 'p8');
+    });
+
+    it('時間模板在那個時刻沒有安排任何一列跑正線：列在明細裡，但不算應開', () => {
+      const plan = enginePlan([0, 60]);
+      plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600), pulse('p9', 'no_service_window', 9000)];
+      assert.equal(check(plan).publishSafe, true);
+    });
+
+    it('排班引擎產生、卻沒有應開明細的舊班表：核對不了，擋發布', () => {
+      const plan = enginePlan([0, 60]);
+      const result = check(plan);
+      assert.equal(result.publishSafe, false);
+      assert.equal(result.publishBlockingByCode.SERVICE_DEMAND_UNVERIFIABLE, 1);
+    });
+
+    it('手動製作的班表沒有班距需求：不檢查脈衝', () => {
+      assert.equal(check(planWith([0, 60])).publishSafe, true);
+    });
+  });
+
   it('移動卡缺路網時不得略過路徑檢查而顯示通過', () => {
     const plan = planWith([0]);
     const card = plan.timelines[0]!.blocks[0]!;

@@ -57,9 +57,11 @@ function yieldWouldEraseWork(
   occupier: GeneratedScheduleBlock,
   maint: GeneratedScheduleBlock,
   options: MaintenanceYieldOptions,
+  /** 整備是隔天那一份時傳一天的分鐘數（日循環） */
+  dayOffsetMinutes = 0,
 ): boolean {
   const minimumMinutes = minimumYardWorkSeconds(maint.taskType, options.maintenanceBody) / 60;
-  return occupier.plannedEndMinute > maint.plannedEndMinute - minimumMinutes + 1e-9;
+  return occupier.plannedEndMinute > maint.plannedEndMinute + dayOffsetMinutes - minimumMinutes + 1e-9;
 }
 import { resolveContiguousYardBusyUntilMinute } from './maintenancePostTaskPolicy';
 import { MEANINGFUL_IDLE_GAP_SECONDS } from './stationBerthOccupancy';
@@ -180,13 +182,22 @@ export function applyMainlineMaintenanceEntryYield(
         // 但車從頭到尾都在路上、根本還沒進去整備，那正是讓渡要處理的情況。
         // 與整備同時起點（例保養尾接行檢 09:30）＝不得讓渡壓縮整備，改由 push 推過整串。
         const runStartMinute = resolveContinuousRunStartMinute(ordered, other, maint.id);
-        if (runStartMinute >= floorStartMinute - 1e-9) continue;
-        if (yieldWouldEraseWork(other, maint, options)) continue;
-        if (
-          other.plannedStartMinute < lockedEndMinute - 1e-9
-          && other.plannedEndMinute > floorStartMinute + 1e-9
-        ) {
-          nextStartMinute = Math.max(nextStartMinute, other.plannedEndMinute);
+        /*
+         * 日循環：00:00 開始的整備，前一晚跑過午夜的那一串（腿存成 24:0x）要對「隔天那一份」
+         * 讓渡。只看當天線性時間的話，派車時允許的跨夜讓渡在這裡對不上，下一步就把那幾腿
+         * 當成插進整備而刪掉（2026-11-10 實錄：23:56 脈衝的一輪被刪 4 班）。
+         */
+        for (const dayOffset of [0, SCHEDULE_DAY_MINUTES]) {
+          const floor = floorStartMinute + dayOffset;
+          const lockedEnd = lockedEndMinute + dayOffset;
+          if (runStartMinute >= floor - 1e-9) continue;
+          if (yieldWouldEraseWork(other, maint, options, dayOffset)) continue;
+          if (
+            other.plannedStartMinute < lockedEnd - 1e-9
+            && other.plannedEndMinute > floor + 1e-9
+          ) {
+            nextStartMinute = Math.max(nextStartMinute, other.plannedEndMinute - dayOffset);
+          }
         }
       }
 
@@ -245,7 +256,11 @@ export function pushPassengerPastPrecedingYard(
         // 根本還沒進去整備。該往後移的是整備開始時刻（applyMainlineMaintenanceEntryYield
         // 已在同一輪先做過），不是把正線推走——推走會讓班次落到整備結束之後、
         // 超出正線視窗而被撤掉，等於讓渡餘裕白設。
-        if (canOccupierYieldMaint(current, prev) && !yieldWouldEraseWork(current, prev, options)) {
+        const wrapsToNextDay = current.plannedStartMinute >= SCHEDULE_DAY_MINUTES - 1e-9;
+        if (
+          canOccupierYieldMaint(current, prev)
+          && !yieldWouldEraseWork(current, prev, options, wrapsToNextDay ? SCHEDULE_DAY_MINUTES : 0)
+        ) {
           const yardFloorMinute = Math.min(
             prev.plannedStartMinute,
             prev.anchorStartMinute,
@@ -256,6 +271,8 @@ export function pushPassengerPastPrecedingYard(
             prev.id,
           );
           if (runStartMinute < yardFloorMinute - 1e-9) continue;
+          // 日循環：跑過午夜的那一串對的是隔天那一份整備（見 applyMainlineMaintenanceEntryYield）
+          if (wrapsToNextDay && runStartMinute < yardFloorMinute + SCHEDULE_DAY_MINUTES - 1e-9) continue;
         }
 
         const clearMinute = earliestStartPastBlockerOnDayCycle(

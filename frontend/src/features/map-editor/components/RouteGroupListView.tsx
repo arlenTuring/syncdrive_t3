@@ -379,7 +379,7 @@ export function RouteGroupListView({
           {editMode ? t('mapEditor.routeGroupList.emptyEdit') : t('mapEditor.routeGroupList.emptyView')}
         </p>
       ) : (
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
           {sections.map(({ group, routes: groupRoutes }) => {
             const open = isGroupOpen(group.groupId)
             const groupRouteIds = groupRoutes.map((r) => r.routeId)

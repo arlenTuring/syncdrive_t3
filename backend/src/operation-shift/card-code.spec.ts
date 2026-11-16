@@ -110,7 +110,7 @@ describe('maintenance / transition card codes', () => {
     const plan = body([charging(2, 18 * 60 + 30, 'E1', '147'), charging(2, 18 * 60 + 30.5, 'E3', '149')]);
     const report = checkShiftCardCodes(plan);
     expect(report.conflicts).toHaveLength(1);
-    expect(describeCardCodeConflict(report.conflicts[0])).toBe('E021830：充電（第 2 列 18:30）／充電（第 2 列 18:30）');
+    expect(describeCardCodeConflict(report.conflicts[0])).toBe('E021830：充電（第 2 列 18:30）／充電（第 2 列 18:30:30）');
     expect(extractYardTasks(plan).tasks.map((t) => t.tripCode)).toEqual(['E021830', 'E021830']);
   });
 

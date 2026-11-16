@@ -91,7 +91,7 @@ describe('expanded plan conflicts', () => {
 
   it('same row + same minute + same code is listed with kind, row and time — nothing appended', () => {
     const result = check([block({ id: 'a', timelineRow: 2 }), block({ id: 'b', timelineRow: 2, plannedStartMinute: 18 * 60 + 30.5 })])
-    expect(result.lines).toEqual(['代號重複 E021830：充電（第 2 列 18:30）／充電（第 2 列 18:30）'])
+    expect(result.lines).toEqual(['代號重複 E021830：充電（第 2 列 18:30）／充電（第 2 列 18:30:30）'])
   })
 
   it('different minutes are fine; old shifts are not checked', () => {

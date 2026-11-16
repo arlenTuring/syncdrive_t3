@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { MapAreaObject, MapPixelOrigin, MapPixelSize } from '../types/area'
 import type { MapBasemapObject } from '../types/basemap'
+import type { PointTopology } from '../types/pointTopology'
 
 export type MapEditorSnapshot = {
   areas: MapAreaObject[]
@@ -11,6 +12,12 @@ export type MapEditorSnapshot = {
   selectedFacilityIds: string[]
   selectedBasemapId: string | null
   nextNumericId: number
+  /**
+   * 路網拓樸跟著區域一起記。刪設施時拓樸會自動移除對不到設施的點（syncPointTopologyWithAreas），
+   * 復原只還原區域的話，拓樸回不來，自動儲存就把空拓樸存進去
+   * （2026-11-11 實測：整張圖刪除再復原，路網拓樸變成 0 點 0 邊）。
+   */
+  pointTopology: PointTopology
 }
 
 const MAX_HISTORY = 50
@@ -25,6 +32,7 @@ function cloneSnapshot(s: MapEditorSnapshot): MapEditorSnapshot {
     selectedFacilityIds: [...s.selectedFacilityIds],
     selectedBasemapId: s.selectedBasemapId,
     nextNumericId: s.nextNumericId,
+    pointTopology: structuredClone(s.pointTopology),
   }
 }
 

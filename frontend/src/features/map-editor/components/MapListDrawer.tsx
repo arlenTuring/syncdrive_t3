@@ -354,7 +354,7 @@ export function MapListDrawer({
             >
               {panelOpen ? <KeyboardArrowLeft className="size-6" /> : <KeyboardArrowRight className="size-6" />}
             </button>
-            <div className="flex min-h-0 w-7 flex-1 flex-col gap-1 overflow-y-auto">
+            <div className="flex min-h-0 w-7 flex-1 flex-col gap-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
               <TabUnit
                 label={t('mapEditor.listDrawer.tabDocking')}
                 title={t('mapEditor.listDrawer.dockingList')}
@@ -419,7 +419,7 @@ export function MapListDrawer({
                 {panelTitle}
               </p>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
               {openTab === 'routes' ? (
                 <RoutePlanningPanel
                   areas={areas}

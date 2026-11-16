@@ -62,20 +62,42 @@ describe('validateYardWorkPreserved', () => {
     const errors: FeasibilityIssue[] = [];
     // 模板 60–80，讓渡後 task 記成 78 起 2 分鐘：實際剩 2 分鐘 > 一個刻度，沒有設定作業時長 → 通過
     validateYardWorkPreserved({
-      timelines: [{ row: 1, blocks: [block({ id: 'ch', plannedStartMinute: 78, plannedEndMinute: 80 })] }],
-      yardTasks: [task('ch', 'charging', 78, 2, 60)],
+      timelines: [{ row: 1, blocks: [block({ id: 'insp', taskType: 'inspection', plannedStartMinute: 78, plannedEndMinute: 80 })] }],
+      yardTasks: [task('insp', 'inspection', 78, 2, 60)],
       maintenanceBody: null,
       errors,
     });
     assert.equal(errors.length, 0);
     // 壓到零（開始＝結束）→ 錯誤
     validateYardWorkPreserved({
-      timelines: [{ row: 1, blocks: [block({ id: 'ch', plannedStartMinute: 80, plannedEndMinute: 80 })] }],
+      timelines: [{ row: 1, blocks: [block({ id: 'insp', taskType: 'inspection', plannedStartMinute: 80, plannedEndMinute: 80 })] }],
+      yardTasks: [task('insp', 'inspection', 78, 2, 60)],
+      maintenanceBody: null,
+      errors,
+    });
+    assert.equal(errors.length, 1);
+  });
+
+  it('充電不能縮短：比模板原長短就是錯誤（同樣用模板原起點核對）', () => {
+    const errors: FeasibilityIssue[] = [];
+    // 模板 60–80 共 20 分鐘，班表上只剩 78–80
+    validateYardWorkPreserved({
+      timelines: [{ row: 1, blocks: [block({ id: 'ch', plannedStartMinute: 78, plannedEndMinute: 80 })] }],
       yardTasks: [task('ch', 'charging', 78, 2, 60)],
       maintenanceBody: null,
       errors,
     });
     assert.equal(errors.length, 1);
+    assert.equal(errors[0]!.code, 'MAINTENANCE_WORK_INSUFFICIENT');
+    // 充滿模板原長 → 通過
+    const ok: FeasibilityIssue[] = [];
+    validateYardWorkPreserved({
+      timelines: [{ row: 1, blocks: [block({ id: 'ch', plannedStartMinute: 60, plannedEndMinute: 80 })] }],
+      yardTasks: [task('ch', 'charging', 60, 20)],
+      maintenanceBody: null,
+      errors: ok,
+    });
+    assert.equal(ok.length, 0);
   });
 });
 

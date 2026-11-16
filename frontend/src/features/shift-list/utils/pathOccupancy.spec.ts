@@ -31,6 +31,14 @@ function trajectory(
 const BUFFER = 60;
 
 describe('pathOccupancy', () => {
+  it('07:04:30 出場經過 T3U 時，驗證會抓到載客車的停留佔用', () => {
+    const exit = trajectory('M2→NWD', 2, 'move', [['156', 25_470]]);
+    const passenger = trajectory('passenger', 5, 'passenger', [['156', 25_290, 25_650]]);
+    const conflicts = conflictsBetween(exit, passenger, 30);
+    assert.equal(conflicts[0]?.kind, 'node');
+    assert.equal(conflicts[0]?.gapSeconds, -180);
+  });
+
   it('出場移動穿過別列車正在停靠的月台＝節點衝突（2026-11-08 OT062200 × ST2159）', () => {
     // 出場 22:00:30 出廠，22:01:30 經過 T3上行；別列車 22:01:30 到 T3上行、停到 22:02:10
     const exit = trajectory('exit', 6, 'move', [['H1', 79230], ['gate', 79260], ['T3u', 79290], ['N2W', 79455]]);
@@ -178,5 +186,51 @@ describe('0 秒相連的兩個停車位', () => {
     const tail = first!.visits[first!.visits.length - 1]!;
     assert.equal(tail.nodeId, 'end');
     assert.equal(tail.departSecond, 600);
+  });
+});
+
+describe('月台套站位規則（兩個 30 秒）', () => {
+  const berthVisit = (t: VehicleTrajectory, nodeId: string) => {
+    for (const visit of t.visits) if (visit.nodeId === nodeId) visit.berth = true;
+    return t;
+  };
+
+  it('s4：入廠車在月台掉頭，30 秒後載客車進同一個月台停靠——只差一個 30 秒，不成立', () => {
+    // 01:33:10 掉頭（5590）；載客車 01:33:40 到（5620）、停到 01:43:30（6210）
+    const move = berthVisit(trajectory('in', 3, 'move', [['gate', 5540], ['NWD', 5590], ['T3D', 5760]]), 'NWD');
+    const pax = berthVisit(trajectory('tn', 2, 'passenger', [['T3U', 5445], ['NWD', 5620, 6210]]), 'NWD');
+    const conflicts = conflictsBetween(move, pax, 30);
+    assert.equal(conflicts.length, 1);
+    assert.equal(conflicts[0]!.nodeId, 'NWD');
+    assert.equal(conflicts[0]!.requiredGapSeconds, 60);
+    // 往前需提早 30 秒，往後只需等到對方離站後 30 秒。
+    const shifts = escapeShiftsFor(conflicts, 30);
+    assert.ok(shifts.includes(-30), `候選 ${shifts.join(',')}`);
+    assert.ok(shifts.includes(6210 + 30 - 5590), `候選 ${shifts.join(',')}`);
+  });
+
+  it('移動車在載客車離站後 30 秒通過，交換檢查順序也合法', () => {
+    const pax = berthVisit(trajectory('pax', 2, 'passenger', [['NWD', 100, 700]]), 'NWD');
+    const move = berthVisit(trajectory('move', 3, 'move', [['NWD', 730]]), 'NWD');
+    assert.deepEqual(conflictsBetween(move, pax, 30), []);
+    assert.deepEqual(conflictsBetween(pax, move, 30), []);
+  });
+
+  it('差滿兩個 30 秒就成立', () => {
+    const move = berthVisit(trajectory('in', 3, 'move', [['gate', 5510], ['NWD', 5560], ['T3D', 5730]]), 'NWD');
+    const pax = berthVisit(trajectory('tn', 2, 'passenger', [['T3U', 5445], ['NWD', 5620, 6210]]), 'NWD');
+    assert.equal(conflictsBetween(move, pax, 30).length, 0);
+  });
+
+  it('月台上兩台都只是經過不停：維持一個 30 秒', () => {
+    const a = berthVisit(trajectory('a', 3, 'move', [['gate', 100], ['T3U', 150], ['x', 300]]), 'T3U');
+    const b = berthVisit(trajectory('b', 4, 'move', [['y', 0], ['T3U', 185], ['z', 400]]), 'T3U');
+    assert.equal(conflictsBetween(a, b, 30).length, 0);
+  });
+
+  it('不是月台的點（入口點、轉線點）就算對方停著，也維持一個 30 秒', () => {
+    const move = trajectory('in', 3, 'move', [['a', 100], ['gate', 150], ['b', 300]]);
+    const waiting = trajectory('w', 4, 'move', [['c', 0], ['gate', 185, 400]]);
+    assert.equal(conflictsBetween(move, waiting, 30).length, 0);
   });
 });

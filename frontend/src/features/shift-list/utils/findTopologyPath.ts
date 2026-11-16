@@ -179,6 +179,87 @@ export function findTopologyPath(
 /** 路網上一段邊的起訖（給資料檢查與報告用） */
 export type TopologyEdgeRef = { fromNodeId: string; toNodeId: string; fromLabel: string; toLabel: string };
 
+/** 同一份拓樸、同一組起訖的替代路徑只算一次（拓樸物件不變，結果就不變） */
+const alternativePathCache = new WeakMap<PointTopology, Map<string, TopologyPath[]>>();
+
+/**
+ * 由快到慢列出起訖之間最多 limit 條不重複經過節點的路徑（Yen 演算法）。
+ *
+ * 第一條就是 {@link findTopologyPath} 的最短路。後面幾條是替代路線：最短路在可用時間內
+ * 排不開時（例如必經的月台被折返車佔住），移動卡要能改走別條路，而不是直接判定排不出
+ * （2026-11-10 使用者：「NW下發1 會無解，所以給他另外一條 NW下發2 的路」）。
+ * 每一條都守同一套規則：方向照拓樸、設施只能當起訖、缺行駛時間的邊不能走。
+ */
+export function findTopologyPaths(
+  topology: PointTopology | null | undefined,
+  fromNodeId: string,
+  toNodeId: string,
+  limit = 4,
+): TopologyPath[] {
+  if (!topology || !fromNodeId || !toNodeId) return [];
+  const cacheKey = `${fromNodeId}>${toNodeId}#${limit}`;
+  let byTopology = alternativePathCache.get(topology);
+  const cached = byTopology?.get(cacheKey);
+  if (cached) return cached;
+
+  const first = findTopologyPath(topology, fromNodeId, toNodeId);
+  const found: TopologyPath[] = first ? [first] : [];
+  if (first && first.edges.length > 0) {
+    const keyOf = (nodeIds: readonly string[]) => nodeIds.join('>');
+    const seen = new Set([keyOf(first.nodeIds)]);
+    const candidates: Array<TopologyPath & { rawAvg: number }> = [];
+    while (found.length < limit) {
+      const last = found[found.length - 1]!;
+      for (let index = 0; index < last.nodeIds.length - 1; index += 1) {
+        const spurNodeId = last.nodeIds[index]!;
+        const rootNodeIds = last.nodeIds.slice(0, index + 1);
+        const rootKey = keyOf(rootNodeIds);
+        // 已找到、而且共用這段開頭的路徑，它們接下去走的那條邊先拿掉，逼出不同的走法
+        const removed = new Set<PointTopologyEdge>();
+        for (const path of found) {
+          if (keyOf(path.nodeIds.slice(0, index + 1)) === rootKey && path.edges[index]) removed.add(path.edges[index]!);
+        }
+        const spur = findTopologyPath(
+          { ...topology, edges: topology.edges.filter((edge) => !removed.has(edge)) },
+          spurNodeId,
+          toNodeId,
+          { blockedNodeIds: new Set(rootNodeIds.slice(0, -1)) },
+        );
+        if (!spur) continue;
+        const nodeIds = [...rootNodeIds.slice(0, -1), ...spur.nodeIds];
+        const key = keyOf(nodeIds);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const edges = [...last.edges.slice(0, index), ...spur.edges];
+        let minTotal = 0;
+        let avgTotal = 0;
+        for (const edge of edges) {
+          minTotal += edgeSeconds(edge, 'min');
+          avgTotal += edgeSeconds(edge, 'avg');
+        }
+        candidates.push({
+          nodeIds,
+          edges,
+          minSeconds: snapUpToClockAlignSeconds(minTotal),
+          avgSeconds: snapUpToClockAlignSeconds(avgTotal),
+          rawAvg: avgTotal,
+        });
+      }
+      if (candidates.length === 0) break;
+      candidates.sort((a, b) => a.rawAvg - b.rawAvg || a.edges.length - b.edges.length);
+      const { rawAvg, ...next } = candidates.shift()!;
+      void rawAvg;
+      found.push(next);
+    }
+  }
+  if (!byTopology) {
+    byTopology = new Map();
+    alternativePathCache.set(topology, byTopology);
+  }
+  byTopology.set(cacheKey, found);
+  return found;
+}
+
 function edgeRef(topology: PointTopology, edge: PointTopologyEdge): TopologyEdgeRef {
   const label = (id: string) => topology.nodes.find((node) => node.id === id)?.label?.trim() || id;
   return { fromNodeId: edge.fromNodeId, toNodeId: edge.toNodeId, fromLabel: label(edge.fromNodeId), toLabel: label(edge.toNodeId) };

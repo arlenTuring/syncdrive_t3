@@ -11,6 +11,34 @@ body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
 }
 
+/*
+ * 全系統捲軸樣式：細、半透明白色滑塊、透明軌道。
+ *
+ * 以前只有個別元件自己寫（[scrollbar-color:rgba(255,255,255,0.18)_transparent]
+ * [scrollbar-width:thin]），沒寫到的地方就是瀏覽器預設的白底粗捲軸（側邊選單、各清單頁）。
+ * 這裡設成全域預設；個別元件要隱藏或換色，寫在自己身上的 class／style 仍然優先。
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* 不支援 scrollbar-color 的瀏覽器（舊版 Safari）退回 WebKit 寫法，外觀相同 */
+@supports not (scrollbar-color: auto) {
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+
 @keyframes mqtt-flash {
   0%,
   100% {

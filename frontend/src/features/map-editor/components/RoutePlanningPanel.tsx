@@ -349,7 +349,7 @@ export function RoutePlanningPanel({
                     />
                   </button>
                   {pickerOpen ? (
-                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl">
+                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
                       {selectableStations.length > 0 ? (
                         <>
                           <RouteAppendOptionGroup
@@ -436,7 +436,7 @@ export function RoutePlanningPanel({
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
             <p className="mb-1.5 text-[10px] font-medium text-zinc-400">
               {t('mapEditor.routePlanning.stationOrder', { count: draft.stationIds.length })}
             </p>

@@ -143,6 +143,49 @@ describe('發布／部署前的獨立安全重驗', () => {
     });
   }
 
+  it('應開的發車脈衝沒有車開：後端重驗也擋（同一份規則），並指出是哪個脈衝', async () => {
+    const f = fixture({ secondTripMinute: 630, storedSafe: true });
+    const pulse = (pulseId: string, departureSecond: number, status: string) => ({
+      pulseId,
+      departureSecond,
+      headwaySeconds: 360,
+      intervalId: 'slot-a',
+      routeId: 'route-ab',
+      status,
+      ...(status === 'unserved' ? { reason: '沒有任何一列能合法承接' } : {}),
+    });
+    f.plan.timelines.forEach((timeline) => {
+      const block = timeline.blocks[0] as Record<string, unknown>;
+      block.cycleChainId = `cycle-${timeline.row}`;
+      block.servicePulseId = `p${timeline.row}`;
+    });
+    (f.plan as Record<string, unknown>).servicePulses = [
+      pulse('p1', 36000, 'assigned'),
+      pulse('p2', 37800, 'assigned'),
+      pulse('p3', 39600, 'unserved'),
+    ];
+    const result = runStoredShiftSafetyCheck(f.body, null);
+    expect(result.publishSafe).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toEqual(['UNSERVED_SERVICE_PULSE']);
+    expect(result.blockingIssues[0].message).toContain('11:00:00');
+    await expect(f.service.publishShift('shift')).rejects.toThrow('UNSERVED_SERVICE_PULSE');
+    expect(f.repo.save).not.toHaveBeenCalled();
+
+    (f.plan as Record<string, unknown>).servicePulses = [
+      pulse('p1', 36000, 'assigned'),
+      pulse('p2', 37800, 'assigned'),
+    ];
+    expect(runStoredShiftSafetyCheck(f.body, null).publishSafe).toBe(true);
+  });
+
+  it('排班引擎產生、卻沒有應開明細的舊班表：核對不了，要擋', () => {
+    const f = fixture({ secondTripMinute: 630 });
+    (f.plan.timelines[0].blocks[0] as Record<string, unknown>).cycleChainId = 'cycle-1';
+    const result = runStoredShiftSafetyCheck(f.body, null);
+    expect(result.publishSafe).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain('SERVICE_DEMAND_UNVERIFIABLE');
+  });
+
   it('有移動卡卻拿不到地圖路網：不能當作沒問題', () => {
     const f = fixture({ secondTripMinute: 630 });
     f.plan.timelines[0].blocks.push({

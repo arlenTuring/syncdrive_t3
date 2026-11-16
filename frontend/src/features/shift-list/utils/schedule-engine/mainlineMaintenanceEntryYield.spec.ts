@@ -484,3 +484,35 @@ describe('pushPassengerPastPrecedingYard', () => {
     assert.ok(timelines[0]!.blocks.find((item) => item.id === 'chg'));
   });
 });
+
+describe('跨午夜讓渡（日循環）', () => {
+  /** 23:56 起的一輪跑到 00:08:40；同一列 00:00–01:30 充電（隔天那一份） */
+  const legs = [
+    [23 * 60 + 56, 23 * 60 + 59.5],
+    [23 * 60 + 59.5, 24 * 60 + 2 + 40 / 60],
+    [24 * 60 + 2 + 40 / 60, 24 * 60 + 5 + 40 / 60],
+    [24 * 60 + 5 + 40 / 60, 24 * 60 + 8 + 40 / 60],
+  ] as const;
+  const timelines = () => [{
+    row: 1,
+    blocks: [
+      ...legs.map(([start, end], index) => block({ id: `p${index}`, taskType: 'passenger', plannedStartMinute: start, plannedEndMinute: end })),
+      block({ id: 'ch', taskType: 'charging', plannedStartMinute: 0, plannedEndMinute: 90, label: '充電' }),
+    ],
+  }];
+
+  it('跑過午夜的那一串對隔天的充電讓渡：充電開始延到那一串結束，結束不動', () => {
+    const yielded = applyMainlineMaintenanceEntryYield(timelines(), { maintenanceBody: null } as never);
+    const charging = yielded[0]!.blocks.find((item) => item.id === 'ch')!;
+    assert.ok(Math.abs(charging.plannedStartMinute - (8 + 40 / 60)) < 1e-6, `充電開始 ${charging.plannedStartMinute}`);
+    assert.equal(charging.plannedEndMinute, 90);
+  });
+
+  it('讓渡之後不再把那幾腿當成插進整備而刪掉', () => {
+    const yielded = applyMainlineMaintenanceEntryYield(timelines(), { maintenanceBody: null } as never);
+    const removed: string[] = [];
+    const pushed = pushPassengerPastPrecedingYard(yielded, { onPassengerRemoved: (id) => removed.push(id) } as never);
+    assert.deepEqual(removed, []);
+    assert.equal(pushed[0]!.blocks.filter((item) => item.taskType === 'passenger').length, 4);
+  });
+});

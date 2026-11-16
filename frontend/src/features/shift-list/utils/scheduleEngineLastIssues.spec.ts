@@ -53,11 +53,18 @@ describe('scheduleEngineLastIssues', () => {
     });
 
     assert.equal(snapshot.items.length, 4);
-    assert.equal(snapshot.items[0]!.layer, 'hard');
-    assert.equal(snapshot.items[0]!.tripCode, 'MA1403');
-    assert.equal(snapshot.items[1]!.tripCode, 'ME1503');
-    assert.equal(snapshot.items[2]!.layer, 'limit');
-    assert.equal(snapshot.items[3]!.layer, 'policy');
+    // 2026-11-10 起沒車開的脈衝擋發布，跟其他硬問題同一層（排在最前面）
+    assert.deepEqual(
+      snapshot.items.map((item) => [item.layer, item.code]),
+      [
+        ['hard', 'UNSERVED_SERVICE_PULSE'],
+        ['hard', 'TIMELINE_OVERLAP'],
+        ['hard', 'TIMELINE_OVERLAP'],
+        ['policy', 'STATION_BERTH_DELAYED'],
+      ],
+    );
+    assert.equal(snapshot.items[1]!.tripCode, 'MA1403');
+    assert.equal(snapshot.items[2]!.tripCode, 'ME1503');
     assert.equal(snapshot.acceptance.gatePassed, false);
     assert.equal(snapshot.acceptance.qualityPassed, false);
     assert.equal(snapshot.acceptance.policyNoiseCount, 1);

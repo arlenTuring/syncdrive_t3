@@ -64,7 +64,9 @@ export function trimIncompleteRotationCyclesOnTimelines(args: {
 
     const flushStretch = () => {
       if (stretch.length === 0) return;
-      const remainder = stretch.length % routeCount;
+      // 車上線時從一輪的中途加入：前面沒開的那幾段算進這一輪（見 roundJoinSkippedLegs）
+      const skippedLegs = stretch.reduce((sum, block) => sum + (block.roundJoinSkippedLegs ?? 0), 0);
+      const remainder = (stretch.length + skippedLegs) % routeCount;
       if (remainder > 0) {
         for (const block of stretch.slice(stretch.length - remainder)) {
           dropIds.add(block.id);

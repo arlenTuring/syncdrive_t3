@@ -8,6 +8,7 @@ import {
   conflictsForTrajectory,
   escapeShiftsFor,
   facilityAliases,
+  findPathConflicts,
   moveTrajectory,
   movePassBufferSeconds,
   resourceIdOf,
@@ -138,7 +139,9 @@ function shiftWindow(
     if (isParked(next)) {
       // 作業類整備（充電、保養、行檢）開頭最多讓渡設定的餘裕；待命與讓站暫停不是作業，
       // 晚一點進去只是少等一下，至少留一個刻度就好
-      const latestEnd = isWorkYardTaskType(next.taskType)
+      const latestEnd = next.taskType === 'charging'
+        ? minuteToSecond(next.plannedStartMinute)
+        : isWorkYardTaskType(next.taskType)
         ? Math.min(
           minuteToSecond(next.plannedStartMinute)
             + resolveMaintenanceEntrySlackSeconds(next.taskType as TaskTypeKey, slackBySection),
@@ -291,6 +294,8 @@ export function resolveMovePathConflicts(args: {
   const aliases = facilityAliases(timelines);
 
   let trajectories = collectTrajectories(timelines, args.selectedRoutes, topology);
+  const initialConflicts = findPathConflicts(trajectories, bufferSeconds);
+  if (initialConflicts.length === 0) return { timelines, repairs, unresolved: 0 };
   let violations = collectPlanViolations(ctx, timelines);
 
   /*
@@ -309,12 +314,9 @@ export function resolveMovePathConflicts(args: {
       const key = chain.cards.map((card) => card.id).join('+');
       if (!chainsByKey.has(key)) chainsByKey.set(key, { timeline, chain });
     };
-    for (const trajectory of trajectories) {
-      if (trajectory.kind !== 'move') continue;
-      const conflicts = conflictsForTrajectory(trajectory, trajectories, bufferSeconds);
-      if (conflicts.length === 0) continue;
-      addChain(trajectory);
-      for (const conflict of conflicts) if (conflict.other.kind === 'move') addChain(conflict.other);
+    for (const conflict of initialConflicts) {
+      addChain(conflict.mine);
+      if (conflict.other.kind === 'move') addChain(conflict.other);
     }
     const variables: Array<ShiftVariable & { timeline: GeneratedScheduleTimeline; chain: MoveChain }> = [];
     for (const [key, { timeline, chain }] of chainsByKey) {

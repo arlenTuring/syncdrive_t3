@@ -1,3 +1,4 @@
+import { PUBLISH_BLOCKING_CODES } from './scheduleAcceptance';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
@@ -165,6 +166,21 @@ function templateBody(tasks: ScheduleTask[], scheduleRowCount = 2, headwaySecond
   };
 }
 
+
+/**
+ * 這幾份測試資料只有少數幾台車、班距比跑一輪還短：時刻表訂的發車脈衝本來就有幾個沒車開。
+ * 2026-11-10 起沒車開的脈衝（UNSERVED_SERVICE_PULSE）擋發布，所以 report.ok 是 false；
+ * 這些測試驗的是別的行為，這裡明確寫出「除了沒車開的脈衝，沒有其他擋發布的問題」，
+ * 不是把那項檢查拿掉。
+ */
+function assertOnlyUnservedPulsesBlock(result: { report: { errors: { code: string }[]; warnings: { code: string }[] } }): void {
+  assert.deepEqual(result.report.errors.map((issue) => issue.code), []);
+  const blocking = result.report.warnings
+    .filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code as never))
+    .map((issue) => issue.code);
+  assert.ok(blocking.every((code) => code === 'UNSERVED_SERVICE_PULSE'), `其他擋發布的問題：${blocking.join(', ')}`);
+}
+
 describe('generateShiftSchedule', () => {
   it('expands passenger blocks with route physics and transition gaps', () => {
     // 正線視窗 10:00–10:10、班距 600s → 只有 10:00 一趟發車
@@ -216,7 +232,7 @@ describe('generateShiftSchedule', () => {
       passengerTimetableMode: 'template',
     });
 
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     const bars = result.plan!.timelines[0]!.blocks.filter(
       (block) => block.source === 'template_bar',
     );
@@ -386,7 +402,7 @@ describe('generateShiftSchedule', () => {
       passengerTimetableMode: 'template',
     });
 
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     const passengerBlocks = result.plan!.timelines[0]!.blocks.filter(
       (block) => block.source === 'template_bar',
     );
@@ -739,7 +755,7 @@ describe('generateShiftSchedule', () => {
       passengerTimetableMode: 'template',
     });
 
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     assert.ok(result.plan);
     assert.ok(
       result.report.warnings.some((issue) => issue.code === 'ROUTE_ROTATION_OVER_TURNAROUND'),
@@ -1319,7 +1335,7 @@ describe('rotation cycle completion（來回約束）', () => {
     });
 
     // 末站後接充電 ≠ 繼續佔正線末站；此情境仍應可完成來回
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     assert.ok(result.plan);
 
     for (const timeline of result.plan!.timelines) {
@@ -1431,7 +1447,7 @@ describe('rotation cycle completion（來回約束）', () => {
       },
       passengerTimetableMode: 'template',
     });
-    assert.equal(withSlack.report.ok, true);
+    assertOnlyUnservedPulsesBlock(withSlack);
     const startsWithSlack = withSlack.plan!.timelines[0]!.blocks
       .filter((block) => block.taskType === 'passenger')
       .map((block) => Math.round(block.plannedStartMinute * 60));
@@ -1465,7 +1481,7 @@ describe('rotation cycle completion（來回約束）', () => {
       },
       passengerTimetableMode: 'template',
     });
-    assert.equal(withoutSlack.report.ok, true);
+    assertOnlyUnservedPulsesBlock(withoutSlack);
     const startsNoSlack = withoutSlack.plan!.timelines[0]!.blocks
       .filter((block) => block.taskType === 'passenger')
       .map((block) => Math.round(block.plannedStartMinute * 60));
@@ -1537,7 +1553,7 @@ describe('rotation cycle completion（來回約束）', () => {
       });
 
     const withSlack = run('600');
-    assert.equal(withSlack.report.ok, true);
+    assertNoErrorsBesidesBerthOverlap(withSlack.report);
     const row1 = withSlack.plan!.timelines.find((timeline) => timeline.row === 1)!;
     const paxStarts = row1.blocks
       .filter((block) => block.taskType === 'passenger')
@@ -1723,7 +1739,7 @@ describe('rotation cycle completion（來回約束）', () => {
       },
       passengerTimetableMode: 'template',
     });
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     const starts = result.plan!.timelines[0]!.blocks
       .filter((block) => block.taskType === 'passenger')
       .map((block) => Math.round(block.plannedStartMinute * 60));
@@ -1866,7 +1882,7 @@ describe('rotation cycle completion（來回約束）', () => {
       passengerTimetableMode: 'template',
     });
 
-    assert.equal(result.report.ok, true);
+    assertOnlyUnservedPulsesBlock(result);
     assert.ok(
       !result.report.warnings.some((issue) => issue.code === 'HEADWAY_BELOW_TARGET'),
       `不應有班距警告：${result.report.warnings.map((issue) => issue.message).join('; ')}`,

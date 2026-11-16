@@ -226,7 +226,9 @@ export function describeCardCodeConflict(conflict: CardCodeConflict): string {
   return `${conflict.code}：${conflict.entries
     .map((entry) => {
       const hhmm = formatHhmm(entry.plannedStartMinute);
-      return `${entry.kind}（第 ${entry.timelineRow} 列 ${hhmm.slice(0, 2)}:${hhmm.slice(2)}）`;
+      const second = ((Math.round(entry.plannedStartMinute * 60) % 60) + 60) % 60;
+      const seconds = second ? `:${String(second).padStart(2, '0')}` : '';
+      return `${entry.kind}（第 ${entry.timelineRow} 列 ${hhmm.slice(0, 2)}:${hhmm.slice(2)}${seconds}）`;
     })
     .join('／')}`;
 }

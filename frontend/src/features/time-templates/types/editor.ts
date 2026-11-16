@@ -604,7 +604,38 @@ export function findScheduleTaskOverlap(
   });
 }
 
-/** 拉伸右緣時，不可延伸到同列其他任務的開始時間之前 */
+/**
+ * 同列其他任務在日循環上的三份拷貝（前一天、當天、後一天）。
+ *
+ * 條子可以跨午夜（結束記成 1440 以上），別的任務也可能跨午夜；把對方攤成三份拷貝，
+ * 下面兩支夾制就能用單純的線性比較，同時看得到「繞回去蓋住清晨那幾根」的情況。
+ */
+function otherTaskCopiesOnDayCycle(
+  taskId: string,
+  rowIndex: number,
+  tasks: ScheduleTask[],
+): Array<{ start: number; end: number }> {
+  const copies: Array<{ start: number; end: number }> = [];
+  for (const other of tasks) {
+    if (other.id === taskId || other.rowIndex !== rowIndex) continue;
+    for (const shift of [-SCHEDULE_DAY_MINUTES, 0, SCHEDULE_DAY_MINUTES]) {
+      copies.push({
+        start: other.startMinute + shift,
+        end: other.startMinute + other.durationMinutes + shift,
+      });
+    }
+  }
+  return copies;
+}
+
+/**
+ * 拉伸右緣時，不可延伸到同列其他任務的開始時間之前。
+ *
+ * 只處理<strong>縮右緣解得掉</strong>的重疊：對方從這根條子的開始之後才開始。
+ * 對方蓋住這根條子開頭的那種重疊，縮右緣解不掉，不在這裡處理——硬縮只會把條子壓到
+ * 最短，拖移時還會把原本要停靠的位置弄丟（2026-11-15 修正：往右拖撞到鄰居時沒有停在
+ * 鄰居前面）。
+ */
 export function clampRangeEndAwayFromOverlappingTasks(
   taskId: string,
   rowIndex: number,
@@ -613,35 +644,20 @@ export function clampRangeEndAwayFromOverlappingTasks(
   tasks: ScheduleTask[],
 ): number {
   let end = proposedEnd;
-  for (const other of tasks) {
-    if (other.id === taskId || other.rowIndex !== rowIndex) continue;
-    const otherStart = other.startMinute;
-    if (otherStart > start && end > otherStart) {
-      end = otherStart;
+  for (const other of otherTaskCopiesOnDayCycle(taskId, rowIndex, tasks)) {
+    if (other.start > start && end > other.start) {
+      end = other.start;
     }
-  }
-  /**
-   * 上面那圈只看得到「時間上排在後面」的任務。右緣可以跨午夜之後，
-   * 這根條子會繞回日循環開頭去<strong>蓋住清晨那幾根</strong>——它們的
-   * <code>startMinute</code> 比 <code>start</code> 小，上面那個條件永遠不成立，
-   * 於是重疊完全沒被擋住。用日循環版重疊判定再收一次。
-   */
-  while (
-    end > start + SCHEDULE_TASK_MIN_DURATION_MINUTES
-    && tasks.some((other) =>
-      other.id !== taskId
-      && other.rowIndex === rowIndex
-      && tasksOverlapOnDayCycle(
-        { startMinute: start, durationMinutes: end - start },
-        other,
-      ))
-  ) {
-    end -= 1;
   }
   return Math.max(start + SCHEDULE_TASK_MIN_DURATION_MINUTES, end);
 }
 
-/** 拉伸左緣時，不可延伸到同列其他任務的結束時間之後 */
+/**
+ * 拉伸左緣時，不可延伸到同列其他任務的結束時間之後。
+ *
+ * 與 {@link clampRangeEndAwayFromOverlappingTasks} 對稱：只處理對方在這根條子結束之前
+ * 就結束的重疊（縮左緣解得掉）。
+ */
 export function clampRangeStartAwayFromOverlappingTasks(
   taskId: string,
   rowIndex: number,
@@ -650,29 +666,10 @@ export function clampRangeStartAwayFromOverlappingTasks(
   tasks: ScheduleTask[],
 ): number {
   let start = proposedStart;
-  for (const other of tasks) {
-    if (other.id === taskId || other.rowIndex !== rowIndex) continue;
-    const otherEnd = other.startMinute + other.durationMinutes;
-    if (otherEnd < end && start < otherEnd) {
-      start = otherEnd;
+  for (const other of otherTaskCopiesOnDayCycle(taskId, rowIndex, tasks)) {
+    if (other.end < end && start < other.end) {
+      start = other.end;
     }
-  }
-  /**
-   * 右緣跨午夜之後，左緣也要用日循環判定收一次——理由與
-   * {@link clampRangeEndAwayFromOverlappingTasks} 對稱：這根條子的尾巴已經繞回
-   * 日循環開頭，上面那圈用線性的 <code>otherEnd &lt; end</code> 看不到被蓋住的那幾根。
-   */
-  while (
-    start < end - SCHEDULE_TASK_MIN_DURATION_MINUTES
-    && tasks.some((other) =>
-      other.id !== taskId
-      && other.rowIndex === rowIndex
-      && tasksOverlapOnDayCycle(
-        { startMinute: start, durationMinutes: end - start },
-        other,
-      ))
-  ) {
-    start += 1;
   }
   return Math.min(end - SCHEDULE_TASK_MIN_DURATION_MINUTES, start);
 }
@@ -748,6 +745,11 @@ export type ScheduleTask = {
    */
   templateStartMinute?: number;
   /**
+   * 這個整備最多可以被正線佔掉開頭幾秒（含進場移動）。來源是整備任務設定的
+   * 「正線優先讓渡餘裕」，超過一小時的整備取「一整輪」與設定值較大者。排班引擎填入。
+   */
+  yieldAllowanceSeconds?: number;
+  /**
    * 掛車階段規劃這一趟時所用的路線 instance。
    *
    * <strong>為什麼要記下來：時刻是依「某一條特定路線的佔用秒數」算出來的。</strong>
@@ -786,6 +788,8 @@ export type ScheduleTask = {
    * 交路的班距基準在起班那一刻就定了，不會因為後面哪一腿被挪動而改變。
    */
   cycleHeadwayTargetSeconds?: number;
+  /** 承接的班距脈衝識別（見 schedule-engine 的 ServicePulseRecord）；同一輪每一腿都相同 */
+  servicePulseId?: string;
 };
 
 /** Figma TaskBar colors — opaque bg so bars don't shift hue over the grid. */

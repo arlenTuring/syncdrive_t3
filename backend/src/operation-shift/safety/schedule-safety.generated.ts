@@ -32,6 +32,7 @@ var GROUP_TITLE = {
   HEADWAY_BELOW_TARGET: "\u73ED\u8DDD\u4F4E\u65BC\u76EE\u6A19",
   HEADWAY_PHASE_EVENED: "\u5DF2\u8ABF\u6574\u767C\u8ECA\u9593\u9694",
   UNSERVED_SERVICE_PULSE: "\u76EE\u6A19\u767C\u8ECA\u6642\u523B\u672A\u6392\u5230\u8ECA",
+  SERVICE_DEMAND_UNVERIFIABLE: "\u7F3A\u61C9\u958B\u670D\u52D9\u660E\u7D30\uFF0C\u7121\u6CD5\u6838\u5C0D\u8F09\u5BA2\u670D\u52D9",
   INSUFFICIENT_TIMELINES: "\u6642\u9593\u7DDA\u5217\u6578\u4E0D\u8DB3",
   RECOVERY_INSUFFICIENT: "\u6062\u5FA9\u7A7A\u6A94\u4E0D\u8DB3",
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: "\u63DB\u7DDA\u7A7A\u6A94\u4E0D\u8DB3",
@@ -57,6 +58,7 @@ var GROUP_TITLE = {
   MAINTENANCE_FACILITY_YIELDED: "\u5DF2\u8ABF\u6574\u505C\u653E\u4F4D\u7F6E",
   MAINTENANCE_ENTRY_EARLY_BLOCKED: "\u63D0\u65E9\u9032\u5EE0\u88AB\u64CB\uFF0C\u8ECA\u5728\u7AD9\u4F4D\u4E0A\u591A\u7B49",
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: "\u5DF2\u6539\u6D3E\u8DEF\u7DDA\uFF0C\u914D\u5408\u8ECA\u8F1B\u5BE6\u969B\u505C\u653E\u4F4D\u7F6E",
+  ROUND_JOINED_MIDWAY: "\u8ECA\u4E0A\u7DDA\u6642\u5F9E\u4E00\u8F2A\u7684\u4E2D\u9014\u52A0\u5165",
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: "\u5DF2\u6539\u6D3E\u8DEF\u7DDA\uFF0C\u8B93\u8ECA\u958B\u5230\u9032\u5F97\u4E86\u5EE0\u7684\u90A3\u4E00\u7AD9",
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: "\u51FA\u5EE0\u5361\u8981\u7A7A\u8DD1\u4E00\u6BB5\uFF08\u8ECA\u4E0D\u5728\u4E0B\u4E00\u73ED\u7684\u8D77\u9EDE\uFF09",
   GEOMETRY_NOT_CONVERGED: "\u672C\u6B21\u8A66\u7B97\u5C1A\u672A\u6392\u59A5",
@@ -90,6 +92,7 @@ var DOC_ANCHOR = {
   HEADWAY_BELOW_TARGET: { id: "s5", label: "\xA75 \u639B\u8ECA\u6C7A\u7B56\uFF08\u8108\u885D\uFF09" },
   HEADWAY_PHASE_EVENED: { id: "s5", label: "\xA75 \u639B\u8ECA\u6C7A\u7B56\uFF08\u8108\u885D\uFF09" },
   UNSERVED_SERVICE_PULSE: { id: "s5", label: "\xA75 \u639B\u8ECA\u6C7A\u7B56\uFF08\u8108\u885D\uFF09" },
+  SERVICE_DEMAND_UNVERIFIABLE: { id: "s5", label: "\xA75 \u639B\u8ECA\u6C7A\u7B56\uFF08\u8108\u885D\uFF09" },
   INSUFFICIENT_TIMELINES: { id: "s14", label: "\xA714 \u7AEF\u5230\u7AEF\u7BC4\u4F8B\uFF08\u8ECA\u968A\u4E0B\u9650\uFF09" },
   RECOVERY_INSUFFICIENT: { id: "s1", label: "\xA71 \u6838\u5FC3\u539F\u5247\uFF08S1\u2013S4 \u9598\u9580\uFF09" },
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: { id: "s1", label: "\xA71 \u6838\u5FC3\u539F\u5247\uFF08S1\u2013S4 \u9598\u9580\uFF09" },
@@ -115,6 +118,7 @@ var DOC_ANCHOR = {
   MAINTENANCE_FACILITY_YIELDED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: { id: "s7", label: "\xA77 \u8DEF\u7DDA\u95DC\u806F\u5716" },
+  ROUND_JOINED_MIDWAY: { id: "s7", label: "\xA77 \u8DEF\u7DDA\u95DC\u806F\u5716" },
   ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   ROUTE_ORIGIN_AWAY_FROM_VEHICLE: { id: "s7", label: "\xA77 \u8DEF\u7DDA\u95DC\u806F\u5716" },
   GEOMETRY_NOT_CONVERGED: { id: "s3", label: "\xA73 \u6D41\u6C34\u7DDA" },
@@ -215,7 +219,11 @@ var DEFAULT_META = {
   },
   UNSERVED_SERVICE_PULSE: {
     kind: "limit",
-    guidance: "\u9019\u500B\u76EE\u6A19\u767C\u8ECA\u6642\u523B\u672A\u6392\u5230\u8ECA\u3002\u8ACB\u67E5\u770B\u76F8\u9130\u73ED\u6B21\u3001\u8ECA\u8F1B\u53EF\u7528\u6642\u9593\u8207\u6574\u5099\u5B89\u6392\u3002"
+    guidance: "\u6642\u523B\u8868\u8A02\u7684\u9019\u500B\u767C\u8ECA\u8108\u885D\u6C92\u6709\u8ECA\u958B\uFF0C\u8F09\u5BA2\u670D\u52D9\u4E0D\u5B8C\u6574\uFF0C\u64CB\u767C\u5E03\u3002\u8A0A\u606F\u8207\u660E\u7D30\u5BEB\u8457\u5404\u5217\u4E0D\u80FD\u627F\u63A5\u7684\u539F\u56E0\uFF1B\u8ACB\u67E5\u770B\u76F8\u9130\u73ED\u6B21\u3001\u8ECA\u8F1B\u53EF\u7528\u6642\u9593\u8207\u6574\u5099\u5B89\u6392\u3002"
+  },
+  SERVICE_DEMAND_UNVERIFIABLE: {
+    kind: "actionable",
+    guidance: "\u9019\u4EFD\u73ED\u8868\u6C92\u6709\u8A18\u9304\u300C\u61C9\u958B\u7684\u767C\u8ECA\u8108\u885D\u300D\u660E\u7D30\uFF08\u8F03\u820A\u7248\u672C\u7522\u751F\u7684\u73ED\u8868\uFF09\uFF0C\u7121\u6CD5\u78BA\u8A8D\u8F09\u5BA2\u670D\u52D9\u662F\u5426\u5B8C\u6574\uFF0C\u64CB\u767C\u5E03\u3002\u8ACB\u91CD\u65B0\u7522\u751F\u73ED\u8868\u3002"
   },
   INSUFFICIENT_TIMELINES: {
     kind: "actionable",
@@ -313,6 +321,10 @@ var DEFAULT_META = {
     kind: "actionable",
     guidance: "\u51FA\u5EE0\u5361\u6703\u628A\u8ECA\u5F9E\u6574\u5099\u4F4D\u7F6E\u958B\u5230\u4E0B\u4E00\u73ED\u7684\u8D77\u9EDE\u2014\u2014\u9019\u662F\u6B63\u5E38\u6A5F\u5236\uFF0C\u4E0D\u662F\u932F\u8AA4\u3002\u9019\u5247\u53EA\u662F\u628A\u4EE3\u50F9\u8B1B\u51FA\u4F86\uFF08\u7A7A\u8DD1\u591A\u4E45\u3001\u9014\u7D93\u54EA\u4E9B\u9EDE\uFF09\u8B93\u4F60\u5224\u65B7\u503C\u4E0D\u503C\u5F97\u3002\u60F3\u7701\u6389\u7684\u8A71\uFF0C\u65B9\u5411\u662F\u8B93\u8ECA\u4E00\u958B\u59CB\u5C31\u505C\u5F97\u96E2\u4E0B\u4E00\u73ED\u8D77\u9EDE\u66F4\u8FD1\uFF0C\u800C\u4E0D\u662F\u786C\u88DC\u4E00\u689D\u8DEF\u7DDA\u3002"
   },
+  ROUND_JOINED_MIDWAY: {
+    kind: "policy",
+    guidance: "\u8ECA\u5F9E\u6574\u5099\u4F4D\u7F6E\u51FA\u4F86\uFF0C\u96E2\u9019\u4E00\u8F2A\u5F8C\u9762\u67D0\u4E00\u7AD9\u6BD4\u8F03\u8FD1\uFF0C\u5C31\u76F4\u63A5\u5F9E\u90A3\u4E00\u7AD9\u52A0\u5165\uFF0C\u4E0D\u5148\u7A7A\u8ECA\u958B\u56DE\u5FAA\u74B0\u8D77\u9EDE\u3002\u4E4B\u5F8C\u5404\u6BB5\u6642\u523B\u4E0D\u8B8A\uFF1B\u524D\u9762\u6C92\u958B\u7684\u90A3\u5E7E\u6BB5\u662F\u5C11\u6389\u7684\u8F09\u5BA2\u73ED\u6B21\uFF0C\u8A0A\u606F\u88E1\u6709\u5217\u51FA\u3002"
+  },
   ROUTE_ALIGNED_TO_VEHICLE_LOCATION: {
     kind: "policy",
     guidance: "\u8ECA\u505C\u7684\u4F4D\u7F6E\u8DDF\u539F\u672C\u6307\u6D3E\u7684\u8DEF\u7DDA\u8D77\u9EDE\u4E0D\u540C\uFF0C\u5DF2\u6539\u6210\u540C\u7D42\u9EDE\u3001\u5F9E\u8ECA\u6240\u5728\u4F4D\u7F6E\u51FA\u767C\u7684\u90A3\u4E00\u689D\uFF0C\u7701\u6389\u4E00\u6BB5\u7A7A\u8DD1\u3002\u7D42\u9EDE\u8207\u767C\u8ECA\u6642\u523B\u90FD\u4E0D\u52D5\uFF0C\u4EA4\u8DEF\u5F8C\u9762\u4E0D\u53D7\u5F71\u97FF\u3002\u9019\u662F\u6700\u4F73\u5316\u7D50\u679C\u4E0D\u662F\u554F\u984C\uFF1B\u4E0D\u60F3\u8B93\u67D0\u689D\u8DEF\u7DDA\u88AB\u9019\u6A23\u7528\uFF0C\u628A\u5B83\u5F9E\u95DC\u806F\u5716\u7684\u5F8C\u7E7C\u62FF\u6389\u3002"
@@ -390,7 +402,11 @@ var PUBLISH_BLOCKING_CODES = /* @__PURE__ */ new Set([
   // 搜尋預算用盡時仍有安全問題：沒搜完，不能當成安全
   "SCHEDULE_SEARCH_INCOMPLETE",
   // 整備被刪或壓到低於最低工作時間：不能靠刪任務排出表面沒衝突的班表
-  "MAINTENANCE_WORK_INSUFFICIENT"
+  "MAINTENANCE_WORK_INSUFFICIENT",
+  // 時刻表訂的發車脈衝沒有車開：載客服務不完整，不能靠少開班次排出表面沒衝突的班表
+  "UNSERVED_SERVICE_PULSE",
+  // 沒有應開服務明細就核對不了載客服務是否完整
+  "SERVICE_DEMAND_UNVERIFIABLE"
 ]);
 
 // src/features/shift-list/utils/stationLegTravel.ts
@@ -1364,6 +1380,17 @@ function findFacilityOccupancyCollisions(occupancies, protectionSeconds) {
   return collisions;
 }
 
+// src/features/shift-list/utils/junctionShift.ts
+function traversalOvertakes(aEnter, aExit, bEnter, bExit) {
+  return aEnter < bEnter && aExit > bExit || aEnter > bEnter && aExit < bExit;
+}
+function occupancyGapSeconds(args) {
+  return args.berth && args.bStops ? berthGapSeconds(args.passSeconds) : args.passSeconds;
+}
+function berthGapSeconds(passSeconds) {
+  return passSeconds * 2;
+}
+
 // src/features/shift-list/types/create.ts
 function resolveSelectedRouteInstanceId(route) {
   const id = route.instanceId?.trim();
@@ -1638,6 +1665,7 @@ function indexTopology(topology) {
   const resourceLabel = new Map(
     topology.nodes.map((node) => [node.id, labelById.get(node.id) ?? node.id])
   );
+  const berthNodes = new Set(topology.nodes.filter((node) => node.kind === "docking").map((node) => node.id));
   const index = {
     labelById,
     nodeIdByLabel,
@@ -1646,7 +1674,8 @@ function indexTopology(topology) {
     edgeByPair,
     resourceOf,
     resourceLabel,
-    zeroLinked
+    zeroLinked,
+    berthNodes
   };
   indexCache.set(topology, index);
   return index;
@@ -1664,7 +1693,7 @@ function toResources(visits, index) {
       last.departSecond = Math.max(last.departSecond, visit.departSecond);
       continue;
     }
-    out.push({ ...visit, nodeId: resource, nodeLabel: label });
+    out.push({ ...visit, nodeId: resource, nodeLabel: label, ...index.berthNodes.has(resource) ? { berth: true } : {} });
   }
   return out;
 }
@@ -1689,6 +1718,17 @@ function moveCardOwnSegment(block, ids, topology) {
   return [from, to];
 }
 function moveTrajectory(block, timelineRow, topology, startSecondOverride, aliases) {
+  const visits = moveOwnVisits(block, topology, startSecondOverride, aliases);
+  if (!visits) return null;
+  return {
+    blockId: block.id,
+    timelineRow,
+    kind: "move",
+    label: block.label ?? block.id,
+    visits: toResources(visits, indexTopology(topology))
+  };
+}
+function moveOwnVisits(block, topology, startSecondOverride, aliases) {
   if (block.taskType !== "dispatch") return null;
   let labels = block.yardMoveViaLabels ?? [];
   if (labels.length < 2) return null;
@@ -1725,18 +1765,12 @@ function moveTrajectory(block, timelineRow, topology, startSecondOverride, alias
   for (let i = 1; i < ids.length; i += 1) {
     const edge = edgeBetween(index, ids[i - 1], ids[i]);
     if (!edge || !edgeHasTravelTime(edge)) return null;
-    instant += edgeSeconds(edge, "avg");
+    instant += edgeSeconds(edge, block.yardMovePace === "min" ? "min" : "avg");
     visits.push({ nodeId: ids[i], nodeLabel: labels[i].trim(), arriveSecond: instant, departSecond: instant });
   }
   const last = visits[visits.length - 1];
   if (endSecond > last.arriveSecond) last.departSecond = endSecond;
-  return {
-    blockId: block.id,
-    timelineRow,
-    kind: "move",
-    label: block.label ?? block.id,
-    visits: toResources(visits, index)
-  };
+  return visits;
 }
 function passengerTrajectory(block, timelineRow, selectedRoutes, topology) {
   if (block.taskType !== "passenger") return null;
@@ -1852,7 +1886,7 @@ function conflictsBetween(mine, other, bufferSeconds) {
   const shift = alignDay((mStart + mEnd) / 2, (oStart0 + oEnd0) / 2);
   const oStart = oStart0 + shift;
   const oEnd = oEnd0 + shift;
-  if (oStart - mEnd >= bufferSeconds || mStart - oEnd >= bufferSeconds) return [];
+  if (oStart - mEnd >= 2 * bufferSeconds || mStart - oEnd >= 2 * bufferSeconds) return [];
   const out = [];
   for (const a of mine.visits) {
     for (const raw of other.visits) {
@@ -1860,7 +1894,13 @@ function conflictsBetween(mine, other, bufferSeconds) {
       const bArrive = raw.arriveSecond + shift;
       const bDepart = raw.departSecond + shift;
       const gap = Math.max(bArrive - a.departSecond, a.arriveSecond - bDepart);
-      if (gap < bufferSeconds - 1e-9) {
+      const laterStops = bArrive - a.departSecond >= a.arriveSecond - bDepart ? bDepart - bArrive > 1e-6 : a.departSecond - a.arriveSecond > 1e-6;
+      const required = occupancyGapSeconds({
+        berth: a.berth === true || raw.berth === true,
+        bStops: laterStops,
+        passSeconds: bufferSeconds
+      });
+      if (gap < required - 1e-9) {
         out.push({
           kind: "node",
           mine,
@@ -1869,7 +1909,8 @@ function conflictsBetween(mine, other, bufferSeconds) {
           nodeLabel: a.nodeLabel,
           mineSecond: a.arriveSecond,
           otherSecond: bArrive,
-          gapSeconds: gap
+          gapSeconds: gap,
+          requiredGapSeconds: required
         });
       }
     }
@@ -1880,9 +1921,7 @@ function conflictsBetween(mine, other, bufferSeconds) {
   for (const a of mineEdges) {
     for (const b of otherEdges) {
       if (a.from === b.from && a.to === b.to) {
-        const enterOrder = Math.sign(a.enter - b.enter);
-        const exitOrder = Math.sign(a.exit - b.exit);
-        if (enterOrder !== 0 && exitOrder !== 0 && enterOrder !== exitOrder) {
+        if (traversalOvertakes(a.enter, a.exit, b.enter, b.exit)) {
           out.push({
             kind: "overtake",
             mine,
@@ -1915,11 +1954,27 @@ function conflictsBetween(mine, other, bufferSeconds) {
   return out;
 }
 function findPathConflicts(trajectories, bufferSeconds) {
-  const moves = trajectories.filter((t) => t.kind === "move");
+  const byNode = /* @__PURE__ */ new Map();
+  const order = /* @__PURE__ */ new Map();
+  for (const [index, trajectory] of trajectories.entries()) {
+    order.set(trajectory, index);
+    for (const { nodeId } of trajectory.visits) {
+      let occupants = byNode.get(nodeId);
+      if (!occupants) byNode.set(nodeId, occupants = /* @__PURE__ */ new Set());
+      occupants.add(trajectory);
+    }
+  }
   const out = [];
   const seen = /* @__PURE__ */ new Set();
-  for (const mine of moves) {
-    for (const other of trajectories) {
+  for (const mine of trajectories) {
+    if (mine.kind !== "move") continue;
+    const candidates = /* @__PURE__ */ new Set();
+    for (const { nodeId } of mine.visits) {
+      for (const other of byNode.get(nodeId) ?? []) {
+        if (other.timelineRow !== mine.timelineRow) candidates.add(other);
+      }
+    }
+    for (const other of [...candidates].sort((a, b) => order.get(a) - order.get(b))) {
       if (other.blockId === mine.blockId) continue;
       if (other.kind === "move") {
         const key = [mine.blockId, other.blockId].sort().join("|");
@@ -1934,7 +1989,7 @@ function findPathConflicts(trajectories, bufferSeconds) {
 function describePathConflict(conflict, formatSecond) {
   const who = (t) => `\u6642\u9593\u7DDA ${t.timelineRow}\u300C${t.label}\u300D`;
   if (conflict.kind === "node") {
-    return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} \u7D93\u904E\u300C${conflict.nodeLabel}\u300D\uFF0C${who(conflict.other)} ${formatSecond(conflict.otherSecond)} \u4E5F\u5728\u90A3\u88E1\uFF08\u9593\u9694 ${Math.round(conflict.gapSeconds ?? 0)} \u79D2\uFF09`;
+    return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} \u7D93\u904E\u300C${conflict.nodeLabel}\u300D\uFF0C${who(conflict.other)} ${formatSecond(conflict.otherSecond)} \u4E5F\u5728\u90A3\u88E1\uFF08\u9593\u9694 ${Math.round(conflict.gapSeconds ?? 0)} \u79D2${conflict.requiredGapSeconds != null ? `\uFF0C\u8981 ${Math.round(conflict.requiredGapSeconds)} \u79D2` : ""}\uFF09`;
   }
   if (conflict.kind === "overtake") {
     return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u540C\u5411\u8D70\u300C${conflict.nodeLabel}\u300D\u2192\u300C${conflict.toNodeLabel}\u300D\uFF0C\u5F8C\u9032\u7684\u8ECA\u8981\u5148\u51FA\uFF0C\u7B49\u65BC\u8981\u7A7F\u904E\u524D\u8ECA`;
@@ -2009,7 +2064,7 @@ function collectMoveJunctionPasses(timelines, topology, onMissingTravelTime) {
           });
           break;
         }
-        instant += edgeSeconds(edge, "avg");
+        instant += edgeSeconds(edge, block.yardMovePace === "min" ? "min" : "avg");
         if (index === to && !isSharedPoint(ids[index])) break;
         passes.push({
           nodeId: ids[index],
@@ -2491,7 +2546,7 @@ function validateMovePathConflicts(args) {
         timelineRow: conflict.mine.timelineRow,
         otherTimelineRow: conflict.other.timelineRow,
         gapSeconds: conflict.gapSeconds != null ? Math.round(conflict.gapSeconds) : void 0,
-        shortfallSeconds: conflict.gapSeconds != null ? Math.max(0, bufferSeconds - conflict.gapSeconds) : bufferSeconds
+        shortfallSeconds: conflict.gapSeconds != null ? Math.max(0, (conflict.requiredGapSeconds ?? bufferSeconds) - conflict.gapSeconds) : bufferSeconds
       }
     });
   }
@@ -2545,6 +2600,53 @@ function validateMoveJunctionConflicts(args) {
     });
   }
 }
+function validateServicePulseCoverage(args) {
+  const { plan, issues, onlyAssigned = false } = args;
+  const passengerBlocks = plan.timelines.flatMap((timeline) => timeline.blocks.filter((block) => block.taskType === "passenger"));
+  const pulses = plan.servicePulses;
+  if (!pulses) {
+    const engineGenerated = passengerBlocks.some((block) => block.cycleChainId != null);
+    if (engineGenerated) {
+      pushIssue(issues, {
+        code: "SERVICE_DEMAND_UNVERIFIABLE",
+        severity: "error",
+        message: "\u9019\u4EFD\u73ED\u8868\u6C92\u6709\u61C9\u958B\u670D\u52D9\u660E\u7D30\uFF08\u8F03\u820A\u7248\u672C\u7522\u751F\uFF09\uFF0C\u7121\u6CD5\u6838\u5C0D\u6642\u523B\u8868\u8A02\u7684\u73ED\u6B21\u662F\u5426\u90FD\u6709\u8ECA\u958B\uFF1B\u8ACB\u91CD\u65B0\u7522\u751F\u73ED\u8868\u3002"
+      });
+    }
+    return;
+  }
+  const servedPulseIds = /* @__PURE__ */ new Set();
+  for (const block of passengerBlocks) {
+    if (block.servicePulseId) servedPulseIds.add(block.servicePulseId);
+  }
+  for (const pulse of pulses) {
+    if (pulse.status === "no_service_window") continue;
+    if (onlyAssigned && pulse.status !== "assigned") continue;
+    if (servedPulseIds.has(pulse.pulseId)) continue;
+    pushIssue(issues, {
+      code: "UNSERVED_SERVICE_PULSE",
+      severity: onlyAssigned ? "warning" : "error",
+      message: `\u73ED\u8DDD\u9700\u6C42 ${formatScheduleClockHms(secondToMinute(pulse.departureSecond))} \u6C92\u6709\u8ECA\u958B\uFF1A${describeUnservedPulse(pulse)}`,
+      detail: {
+        pulseId: pulse.pulseId,
+        departureSecond: pulse.departureSecond,
+        headwaySeconds: pulse.headwaySeconds,
+        intervalId: pulse.intervalId,
+        intervalName: pulse.intervalName,
+        routeId: pulse.routeId,
+        status: pulse.status,
+        reason: pulse.reason,
+        ...pulse.rowRejections ? { rowRejections: pulse.rowRejections } : {}
+      }
+    });
+  }
+}
+function describeUnservedPulse(pulse) {
+  if (pulse.status === "assigned") {
+    return `\u7522\u751F\u6642\u639B\u5728\u6642\u9593\u7DDA ${pulse.assignedRow}\uFF0C\u4F46\u73ED\u8868\u4E0A\u627E\u4E0D\u5230\u9019\u4E00\u8F2A\u7684\u8F09\u5BA2\u73ED\u6B21\uFF08\u88AB\u522A\u9664\u6216\u6539\u6389\uFF09`;
+  }
+  return pulse.reason ?? "\u6C92\u6709\u4EFB\u4F55\u4E00\u5217\u80FD\u5408\u6CD5\u627F\u63A5";
+}
 
 // src/features/shift-list/utils/schedulePublishCheck.ts
 function buildPlanFingerprint(plan) {
@@ -2558,6 +2660,7 @@ function buildPlanFingerprint(plan) {
           block.id,
           block.plannedStartMinute,
           block.plannedEndMinute,
+          block.requiredChargingSeconds ?? "",
           block.taskType,
           block.source,
           block.routeId ?? "",
@@ -2613,6 +2716,17 @@ function runSchedulePublishCheck(args) {
   const warnings = [];
   for (const timeline of plan.timelines) {
     for (const block of timeline.blocks) {
+      if (block.taskType === "charging" && block.requiredChargingSeconds != null) {
+        const remaining = Math.round((block.plannedEndMinute - block.plannedStartMinute) * 60);
+        if (remaining < block.requiredChargingSeconds) {
+          errors.push({
+            code: "MAINTENANCE_WORK_INSUFFICIENT",
+            severity: "error",
+            message: `\u6642\u9593\u7DDA ${timeline.row}\uFF1A\u5145\u96FB\u53EA\u5269 ${remaining} \u79D2\uFF0C\u4F4E\u65BC\u539F\u5B9A ${block.requiredChargingSeconds} \u79D2\u3002`,
+            detail: { timelineRow: timeline.row, blockId: block.id, remainingWorkSeconds: remaining, requiredWorkSeconds: block.requiredChargingSeconds }
+          });
+        }
+      }
       if (block.taskType !== "passenger") continue;
       const route = resolveRouteForBlock(block, selectedRoutes);
       if (!route || (route.stationIds?.length ?? 0) < 2) {
@@ -2625,6 +2739,7 @@ function runSchedulePublishCheck(args) {
       }
     }
   }
+  validateServicePulseCoverage({ plan, issues: errors });
   validateTimelineOverlaps(plan.timelines, errors);
   validateStationTimingsWithinBlocks(plan.timelines, selectedRoutes, errors);
   if (!topology?.nodes.length && plan.timelines.some((timeline) => timeline.blocks.some((block) => block.taskType === "dispatch" && block.travelSeconds > 0))) {

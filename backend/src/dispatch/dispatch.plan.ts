@@ -113,6 +113,48 @@ export type DispatchStation = {
   dwellSeconds: number;
 };
 
+/**
+ * 空車移動的站序：起點 → 途經點 → 終點。
+ *
+ * 一般移動不帶站序（空陣列），路徑由車端自己規劃。排班引擎走的不是唯一最短路時，
+ * 移動卡會帶途經點（YardMove.via）：照協議放進 stations[]（role＝intermediate），
+ * 車端照站序規劃，才會走排班檢查過的那一條路。缺起點或終點時不帶，維持只給兩端。
+ */
+function movementStations(move: YardMove, departAt: number, arriveAt: number): DispatchStation[] {
+  if (move.via.length === 0 || !move.origin || !move.destination) return [];
+  const stations: DispatchStation[] = [{
+    order: 1,
+    stationId: move.origin.id,
+    stationName: move.origin.name,
+    role: 'origin',
+    arriveAt: null,
+    departAt,
+    dwellSeconds: 0,
+  }];
+  for (const stop of move.via) {
+    const at = departAt + Math.round(stop.offsetSeconds) * 1000;
+    stations.push({
+      order: stations.length + 1,
+      stationId: stop.stationId,
+      stationName: stop.name,
+      role: 'intermediate',
+      arriveAt: at,
+      departAt: at,
+      dwellSeconds: 0,
+    });
+  }
+  stations.push({
+    order: stations.length + 1,
+    stationId: move.destination.id,
+    stationName: move.destination.name,
+    role: 'terminal',
+    arriveAt,
+    departAt: null,
+    dwellSeconds: 0,
+  });
+  return stations;
+}
+
 /** 當地零點。班表秒數要落到絕對時刻時的基準。 */
 export function localMidnight(reference: number): number {
   const date = new Date(reference);
@@ -326,7 +368,7 @@ export function planYardMoves(args: {
       destination: move.destination
         ? { ...move.destination, arriveAt, departAt: null }
         : null,
-      stations: [],
+      stations: movementStations(move, departAt, arriveAt),
     });
   }
 

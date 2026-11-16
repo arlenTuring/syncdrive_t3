@@ -24,6 +24,8 @@ export function createEmptyManualSchedulePlan(args: {
       row: index + 1,
       blocks: [],
     })),
+    // 手動製作沒有時刻表班距脈衝：應開服務就是使用者自己畫的班次
+    servicePulses: [],
   };
 }
 
