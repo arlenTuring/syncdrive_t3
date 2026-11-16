@@ -1506,7 +1506,8 @@ export function insertMaintenanceTransferCards(args: {
       if (!YARD_TASK_TYPES.has(block.taskType)) continue;
       const nodeId = block.yardFacilityNodeId;
       if (!nodeId || yardBlockFacility.has(block.id)) continue;
-      if (block.yardFacilityStationId) {
+      if (block.yardFacilityStationId || block.yardFacilityPinned) {
+        // 指定不重挑的（yardFacilityPinned）：呼叫端已經照這個位置安排了前後的班次
         assignYardFacility(block, nodeId, block.yardFacilityLabel ?? nodeId);
       } else if (!decideOnly) {
         block.yardFacilityNodeId = undefined;

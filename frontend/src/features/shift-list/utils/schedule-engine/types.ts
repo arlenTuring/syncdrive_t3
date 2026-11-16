@@ -198,13 +198,19 @@ export type GeneratedScheduleBlock = {
    */
   yardMovePace?: 'min';
   /**
-   * 這一班是車上線後的第一班，而且是從這一輪的中途加入：前面有幾段沒有開（試驗功能，
-   * 見 GenerateShiftScheduleInput.roundJoin）。
+   * 這一班是車上線後的第一班，而且是從這一輪的中途加入：前面有幾段沒有開（
+   * 見 roundJoin.ts）。
    *
    * 一輪原本固定從循環起點開始；車停的整備位置離另一個站比較近時，可以直接從那一站加入這一輪，
    * 之後各段時刻不變。沒開的那幾段就是少掉的載客班次，「一輪要跑完」的檢查把它們算進來。
    */
   roundJoinSkippedLegs?: number;
+  /**
+   * 這張整備卡的位置（yardFacilityNodeId）不要重挑。出入廠排卡時，停設施格的整備原本會依當時的
+   * 時刻重新挑位置；呼叫端已經照某個位置安排了前後班次時（例如把從中途加入少開的班次加回來，
+   * 前提是車留在它實際停的地方）標上這個，位置就照寫好的用。位置被別台車佔用時照樣由驗證回報。
+   */
+  yardFacilityPinned?: boolean;
   /**
    * 這張移動卡必須經過的途經點（不含起訖），只在引擎走的<strong>不是唯一最短路</strong>時才有。
    *
@@ -347,7 +353,7 @@ export type FeasibilityViolationCode =
   /** 本來可以提早進廠，設施被佔只好晚進；代價是車在站位上多等（警告） */
   | 'MAINTENANCE_ENTRY_EARLY_BLOCKED'
   | 'ROUTE_ALIGNED_TO_VEHICLE_LOCATION'
-  /** 車上線時從一輪的中途加入，前面幾段沒有開（試驗功能，警告） */
+  /** 車上線時從一輪的中途加入，前面幾段沒有開（警告） */
   | 'ROUND_JOINED_MIDWAY'
   /** 進廠前那一趟改開到進得了廠的那一站（警告） */
   | 'ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY'

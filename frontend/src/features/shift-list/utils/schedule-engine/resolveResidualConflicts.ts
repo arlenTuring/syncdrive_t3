@@ -718,7 +718,7 @@ export function rerouteTripInCopy(
 }
 
 /**
- * 車上線時從一輪的中途加入（試驗功能，見 GenerateShiftScheduleInput.roundJoin）。
+ * 車上線時從一輪的中途加入（見 roundJoin.ts）。
  *
  * 一輪原本固定從循環起點開始：車從整備位置出來，不管停在哪裡，都要先空車開到循環起點才載客。
  * 整備位置離這一輪後面某一站比較近時，空車那一段常常比載客的那一段還長，還要佔用正線。

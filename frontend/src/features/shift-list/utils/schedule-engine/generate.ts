@@ -90,11 +90,15 @@ import {
 import { tagYardDispatchTrips, scrubMidMainlineDispatchArtifacts } from './tagYardDispatchTrips';
 import { pushIssue } from './feasibilityIssueMeta';
 import type { PlanEvaluationContext } from './evaluatePlan';
-import { applyRoundJoinAtYardExit, listOnlineBoundaries, roundJoinNote } from './roundJoin';
+import {
+  applyRoundJoinAtYardExit,
+  reconcileRoundJoinWithYardLocations,
+  type RoundJoinDroppedStore,
+} from './roundJoin';
+import { avoidYardExchangeSwap } from './yardExchangeSwap';
 import {
   DEFAULT_RESIDUAL_REPAIR_BUDGET,
   type ResidualRepairBudget,
-  joinRoundLaterInCopy,
   rerouteBerthPairInCopy,
   rerouteTripInCopy,
   resolveResidualConflicts,
@@ -152,16 +156,6 @@ export type GenerateShiftScheduleInput = {
   preferCirculatingVehicles?: boolean;
   /** 待命提早結束接班（預設關，原因見 NormalizeInputArgs.allowStandbyEarlyRelease） */
   standbyEarlyRelease?: boolean;
-  /**
-   * 車上線時可以從一輪的中途加入（試驗功能，預設關）。
-   *
-   * 一輪原本固定從循環起點開始，車從整備位置出來一律先空車開到循環起點。打開後，車可以直接到
-   * 這一輪後面某一段的起點站加入，前面沒開的那幾段就是少掉的載客班次（之後各段時刻不變）。
-   * - 'onFailure'：只有出廠卡排不出來時才這樣做（少掉的班次最少）。
-   * - 'always'：只要到那一站的空車路程比到循環起點短、又沒有帶來新的問題，就這樣做。
-   * 候選由路線資料與路網推出來，不寫任何站名。2026-11-16 使用者要求評估，見總表第 28 節。
-   */
-  roundJoin?: 'off' | 'onFailure' | 'always';
 };
 
 /**
@@ -757,12 +751,20 @@ function generateShiftScheduleOnce(
     decideOnly: true,
   });
 
-  if (input.roundJoin === 'always') {
+  /*
+   * 車上線時從離整備位置最近的那一段加入這一輪（2026-11-16 使用者：「不管往下走還是往上走都是一種
+   * 運能」「最重大的意義就是要讓整個班表都可以正常順利運行優先」）。一輪原本固定從循環起點開始，
+   * 車從整備位置出來一律先空車開到循環起點；現在空車開到後面某一段的起點站比較近就從那一段加入，
+   * 前面沒開的那幾段是少掉的載客班次（之後各段時刻不變）。不寫站名，見總表第 28～30 節。
+   */
+  const roundJoinDropped: RoundJoinDroppedStore = new Map();
+  {
     timelines = applyRoundJoinAtYardExit({
       timelines,
       topology: engineInput.pointTopology,
       selectedRoutes: routesForBerth,
       warnings,
+      dropped: roundJoinDropped,
     });
   }
 
@@ -837,6 +839,21 @@ function generateShiftScheduleOnce(
     topology: engineInput.pointTopology,
     yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
   };
+
+  /*
+   * 對向交換：上線的車跟離線的車同一段時間要去對方的位置，先把上線車改到另一個月台。使用者
+   * 2026-11-16：「不應該讓兩台車在一個時間內要抵達對方在的地方」。見 avoidYardExchangeSwap。
+   */
+  {
+    const avoided = avoidYardExchangeSwap({
+      timelines,
+      topology: engineInput.pointTopology,
+      ctx: evaluationContext,
+      warnings,
+    });
+    timelines = avoided.timelines;
+    engineTrace('exchange-swap', { swaps: avoided.swaps, rerouted: avoided.rerouted });
+  }
   const snapshotOf = (
     candidate: GeneratedSchedulePlan['timelines'],
   ): GeneratedSchedulePlan['timelines'] =>
@@ -1033,6 +1050,8 @@ function generateShiftScheduleOnce(
         attributes: engineInput.attributes,
         minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
         collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+        // 照班表準時、不提早衝：往前拉最多拉回班表時刻（總表第 29 節）
+        notBeforeTimetable: true,
       }));
 
     // 班距太擠 → 把後車往後推；推不夠再借前車的既有餘裕
@@ -1726,59 +1745,59 @@ function generateShiftScheduleOnce(
     triedNotes.set(blockId ?? '', list);
   };
   /*
-   * 車上線時從一輪的中途加入（試驗功能，input.roundJoin: 'onFailure'；預設關）。
+   * 上線站跟著最後的整備位置走（見 reconcileRoundJoinWithYardLocations）。
    *
-   * 換月台之後還排不出來的出廠卡，在副本上把這一輪最前面幾段拿掉，車直接到下一段的起點站加入。
-   * 採用條件跟搜尋相同：必要轉場失敗真的變少，而且沒有新增任何硬錯誤或安全問題。
-   * 少掉的班次寫成 ROUND_JOINED_MIDWAY（警告），逐筆列出。
-   * （'always' 在整備位置定案後就處理，見 applyRoundJoinAtYardExit。）
+   * 出入廠排完才知道每一張整備卡最後停在哪。車實際停得離後面某一段的起點站比較近、卻還要趕回
+   * 循環起點的，改從那一段加入：先整批改、重排一次；整批沒有比較好就逐筆試。採用條件跟搜尋相同：
+   * 必要轉場失敗沒有變多，而且沒有新增任何硬錯誤或安全問題。
+   *
+   * 反方向（車實際停在循環起點旁邊，把少開的班次加回來）這裡<strong>不做</strong>。2026-11-16 實測
+   * 900 秒：加回來的那一班要從循環起點的月台發車，多半先撞上離線那台車剛到的月台，要等後面的
+   * 「新車第一班換月台」才排得開；在這裡逐筆重排一次十幾秒，五筆全被拒絕、搜尋時間被用掉大半，
+   * 擋發布反而從 3 條變 7 條。順利運行優先，少開的那幾班留給之後另外處理。
    */
-  const runRoundJoinPass = () => {
-    const tried = new Set<string>();
-    let budgetLeft = true;
-    for (let guard = 0; guard < 64 && budgetLeft; guard += 1) {
-      let adopted: PostState | null = null;
-      const failedYardIds = new Set<string>();
-      for (const skip of state.post.transfer.skipped) {
-        if (skip.transferKind !== 'exit' || skip.necessity === 'not_needed' || skip.onlyMissingData) continue;
-        if (skip.blockId) failedYardIds.add(skip.blockId);
+  {
+    const tryReconcile = (onlyYardBlockIds?: ReadonlySet<string>): 'none' | 'adopted' | 'rejected' | 'out-of-budget' => {
+      const fixed = reconcileRoundJoinWithYardLocations({
+        pre: state.pre,
+        located: state.post.timelines,
+        topology: engineInput.pointTopology,
+        selectedRoutes: routesForBerth,
+        warnings,
+        dropped: roundJoinDropped,
+        onlyYardBlockIds,
+        restoreDroppedTrips: false,
+      });
+      if (fixed.changes.length === 0) return 'none';
+      const screened = screenRequired(fixed.timelines, state.reservations);
+      if (screened === null) return 'out-of-budget';
+      if (screened > state.post.required) return 'rejected';
+      const result = searchPostLoop(fixed.timelines, state.reservations);
+      if (!result) return 'out-of-budget';
+      if (result.required > state.post.required) return 'rejected';
+      if (!noNewProblems(state.post.violations, result.violations).ok) return 'rejected';
+      state = { ...state, pre: fixed.timelines, post: result };
+      warnings.length = 0;
+      warnings.push(...fixed.warnings);
+      return 'adopted';
+    };
+    const whole = tryReconcile();
+    if (whole === 'rejected') {
+      // 整批沒有比較好：逐筆試，能改幾筆算幾筆
+      const pending = reconcileRoundJoinWithYardLocations({
+        pre: state.pre,
+        located: state.post.timelines,
+        topology: engineInput.pointTopology,
+        selectedRoutes: routesForBerth,
+        warnings,
+        dropped: roundJoinDropped,
+        restoreDroppedTrips: false,
+      }).changes;
+      for (const change of pending) {
+        if (tryReconcile(new Set([change.yardBlockId])) === 'out-of-budget') break;
       }
-      for (const boundary of listOnlineBoundaries(state.pre)) {
-        if (adopted || !budgetLeft) break;
-        if (!failedYardIds.has(boundary.yard.id)) continue;
-        for (const item of joinRoundLaterInCopy(state.pre, boundary.first.id)) {
-          const key = `${boundary.yard.id}|${boundary.first.id}|${item.dropped.length}`;
-          if (tried.has(key)) continue;
-          tried.add(key);
-          const screened = screenRequired(item.timelines, state.reservations);
-          if (screened === null) { budgetLeft = false; break; }
-          if (screened >= state.post.required) continue;
-          const result = searchPostLoop(item.timelines, state.reservations);
-          if (!result) { budgetLeft = false; break; }
-          if (result.required >= state.post.required) continue;
-          if (!noNewProblems(state.post.violations, result.violations).ok) continue;
-          adopted = {
-            pre: item.timelines,
-            reservations: state.reservations,
-            post: result,
-            notes: [
-              ...state.notes,
-              roundJoinNote({
-                timelineRow: item.timelineRow,
-                joinBlockId: item.joinBlockId,
-                description: item.description,
-                dropped: item.dropped,
-                why: '整備後的出廠卡排不出來',
-              }),
-            ],
-          };
-          break;
-        }
-      }
-      if (!adopted) break;
-      state = adopted;
     }
-  };
+  }
   /*
    * 新車第一班換月台（在耗時的搜尋之前，逐筆直接試）。
    *
@@ -1842,7 +1861,6 @@ function generateShiftScheduleOnce(
       state = adopted;
     }
   }
-  if (input.roundJoin === 'onFailure') runRoundJoinPass();
   const maxRounds = state.post.required;
   /** 試過不行的（移動卡, 候選）；下一輪排到最後再試 */
   const failedCandidates = new Set<string>();
@@ -2371,6 +2389,117 @@ function generateShiftScheduleOnce(
         },
       }],
     };
+  }
+
+  /*
+   * 把白白少開的班次加回來。
+   *
+   * 車最後停的位置離循環起點一樣近或更近、卻還是從中途加入的：空車開過去的那一段本來就是那一班的
+   * 路，直接載客。放在搜尋全部跑完之後做：順利運行優先，加回來之後必要轉場失敗不能變多、不能有
+   * 任何新的硬錯誤或安全問題。加回來的那一班如果會跟離線的車互相要去
+   * 對方的位置，先照 avoidYardExchangeSwap 改到另一個月台。先整批試，整批不行再逐筆試。
+   */
+  {
+    const tryRestore = (onlyYardBlockIds?: ReadonlySet<string>): 'none' | 'adopted' | 'rejected' | 'out-of-budget' => {
+      const fixed = reconcileRoundJoinWithYardLocations({
+        pre: state.pre,
+        located: state.post.timelines,
+        topology: engineInput.pointTopology,
+        selectedRoutes: routesForBerth,
+        warnings,
+        dropped: roundJoinDropped,
+        onlyYardBlockIds,
+        joinNearer: false,
+      });
+      if (fixed.changes.length === 0) return 'none';
+      const traceRestore = (outcome: string, extra: Record<string, unknown> = {}) =>
+        engineTrace('round-join-restore', { outcome, rows: fixed.changes.map((change) => change.timelineRow), ...extra });
+      let candidate = fixed.timelines;
+      /*
+       * 車留在它實際停的地方：加回來之後引擎會重新挑整備位置，可能又把車排到別處（2026-11-16
+       * 實測五筆都是這樣：先是排回離循環起點遠的那一區，擋掉那一區之後又排到正線月台上，結果都要
+       * 空車趕回循環起點、排不出出廠卡）。所以把這張整備卡的位置寫成實際停的地方、標記不重挑。
+       */
+      const pinnedBay = new Map(fixed.changes.map((change) => [change.yardBlockId, change.bayNodeId] as const));
+      candidate = candidate.map((timeline) => ({
+        ...timeline,
+        blocks: timeline.blocks.map((block) => {
+          const bayNodeId = pinnedBay.get(block.id);
+          if (!bayNodeId) return block;
+          return {
+            ...block,
+            yardFacilityNodeId: bayNodeId,
+            yardFacilityLabel: engineInput.pointTopology?.nodes.find((node) => node.id === bayNodeId)?.label ?? bayNodeId,
+            yardFacilityPinned: true,
+          };
+        }),
+      }));
+      // 加回來的那一班會不會跟離線的車互相要去對方的位置（用實際停的位置判斷）
+      {
+        candidate = avoidYardExchangeSwap({
+          timelines: candidate,
+          topology: engineInput.pointTopology,
+          ctx: evaluationContext,
+          warnings: fixed.warnings,
+          onlyFirstTripIds: new Set(fixed.changes.map((change) => change.firstTripId)),
+        }).timelines;
+      }
+      const avoid = state.avoidYardSpots;
+      /*
+       * 整批那一次不看搜尋剩下多少時間：搜尋常把時限用完（2026-11-16 實測同一份輸入，有一次剩 30 多秒、
+       * 加得回來，另一次用完、沒加回來，載客班次差 5 班）。整批只多做一次篩選加一次完整重排，時間有上限；
+       * 逐筆試仍然只用剩下的時間。
+       */
+      const overrun = onlyYardBlockIds === undefined;
+      const screened = screenRequired(candidate, state.reservations, avoid)
+        ?? (overrun ? runPostLoop(candidate, state.reservations, avoid, true).required : null);
+      if (screened === null) { traceRestore('out-of-budget'); return 'out-of-budget'; }
+      if (screened > state.post.required) {
+        traceRestore('rejected', {
+          why: 'transfers',
+          required: screened,
+          was: state.post.required,
+          // 只在追蹤開啟時多算一次，列出是哪幾張卡排不出來
+          reasons: engineTraceEnabled()
+            ? runPostLoop(candidate, state.reservations, avoid, true).transfer.skipped
+              .filter((skip) => skip.necessity !== 'not_needed')
+              .map((skip) => `時間線 ${skip.timelineRow} ${skip.transferKind}：${skip.reason}`)
+            : undefined,
+        });
+        return 'rejected';
+      }
+      const result = searchPostLoop(candidate, state.reservations, avoid)
+        ?? (overrun ? runPostLoop(candidate, state.reservations, avoid) : null);
+      if (!result) { traceRestore('out-of-budget'); return 'out-of-budget'; }
+      if (result.required > state.post.required) {
+        traceRestore('rejected', { why: 'transfers', required: result.required, was: state.post.required });
+        return 'rejected';
+      }
+      const check = noNewProblems(state.post.violations, result.violations);
+      if (!check.ok) {
+        traceRestore('rejected', { why: 'new-problems', introduced: check.introduced.map((item) => item.code) });
+        return 'rejected';
+      }
+      traceRestore('adopted');
+      state = { ...state, pre: candidate, post: result, avoidYardSpots: avoid };
+      warnings.length = 0;
+      warnings.push(...fixed.warnings);
+      return 'adopted';
+    };
+    if (tryRestore() === 'rejected') {
+      const pending = reconcileRoundJoinWithYardLocations({
+        pre: state.pre,
+        located: state.post.timelines,
+        topology: engineInput.pointTopology,
+        selectedRoutes: routesForBerth,
+        warnings,
+        dropped: roundJoinDropped,
+        joinNearer: false,
+      }).changes;
+      for (const change of pending) {
+        if (tryRestore(new Set([change.yardBlockId])) === 'out-of-budget') break;
+      }
+    }
   }
 
   const post = state.post;

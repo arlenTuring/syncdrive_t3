@@ -88,6 +88,18 @@ export function sameRowPrecedingYardEndSecond(
   return latestEnd;
 }
 
+const DAY_SECONDS = 24 * 3600;
+
+/**
+ * 這一班的班表時刻（秒），換到跟目前發車時刻同一天的座標。跨日的班次，班表時刻與目前時刻可能
+ * 差一整天的記法，取離目前時刻最近的那一個。
+ */
+function timetableSecondNear(block: GeneratedScheduleBlock, currentStartSecond: number): number | null {
+  if (!Number.isFinite(block.anchorStartMinute)) return null;
+  const anchor = minuteToSecond(block.anchorStartMinute);
+  return anchor + Math.round((currentStartSecond - anchor) / DAY_SECONDS) * DAY_SECONDS;
+}
+
 /**
  * 把同 routeId、跨時間線的正線發車往目標班距靠攏（只往前拉、不往後推）。
  */
@@ -99,6 +111,11 @@ export function densifyRouteHeadwaysAfterBerth(args: {
   minimumRecoveryTimeSeconds?: number;
   /** 碰撞保護時間（秒）；預設 0＝維持舊行為 */
   collisionProtectionSeconds?: number;
+  /**
+   * 往前拉最多拉回班表時刻（anchorStartMinute），不比班表早發。預設關＝維持舊行為。
+   * 補密的本意是把被站位延後的班次拉回來；比班表早發只是把等待從這一站搬到下一站。
+   */
+  notBeforeTimetable?: boolean;
 }): GeneratedSchedulePlan['timelines'] {
   const {
     selectedRoutes,
@@ -106,6 +123,7 @@ export function densifyRouteHeadwaysAfterBerth(args: {
     attributes,
     minimumRecoveryTimeSeconds = 0,
     collisionProtectionSeconds = 0,
+    notBeforeTimetable = false,
   } = args;
   const timelines = args.timelines.map((timeline) => ({
     ...timeline,
@@ -185,6 +203,10 @@ export function densifyRouteHeadwaysAfterBerth(args: {
       const yardEnd = sameRowPrecedingYardEndSecond(timelines, later, candidate);
       if (yardEnd != null) {
         candidate = Math.max(candidate, snapUpToClockAlignSeconds(yardEnd));
+      }
+      if (notBeforeTimetable) {
+        const timetable = timetableSecondNear(later, laterStart);
+        if (timetable != null) candidate = Math.max(candidate, snapUpToClockAlignSeconds(timetable));
       }
       if (candidate >= laterStart - 1e-9) continue;
 

@@ -255,4 +255,62 @@ describe('densifyRouteHeadwaysAfterBerth', () => {
       'dispatch trip must not be pulled forward to satisfy headway',
     );
   });
+
+  it('打開「不比班表早發」：被延後的班次只拉回班表時刻，本來就準點的不動', () => {
+    const tn = route();
+    const peak = {
+      intervals: [
+        { id: 'peak', name: '尖峰', startTime: '07:00', endTime: '10:00', attributeId: 'pk', isDraft: false },
+      ],
+      attributes: [
+        { id: 'pk', name: '尖峰', color: '#f00', headwaySeconds: 180, capacityPphpd: 1400, isDraft: false },
+      ],
+    };
+    // 目標班距 180 秒。b 的班表時刻在 a 之後 300 秒，被站位延後到 400 秒；
+    // c 的班表時刻就在 b 的班表時刻之後 300 秒，沒有被延後。
+    const build = () => [
+      {
+        row: 1,
+        blocks: [block({ id: 'a', timelineRow: 1, plannedStartMinute: 8 * 60, plannedEndMinute: 8 * 60 + 3 })],
+      },
+      {
+        row: 2,
+        blocks: [
+          block({
+            id: 'b',
+            timelineRow: 2,
+            anchorStartMinute: 8 * 60 + 5,
+            plannedStartMinute: 8 * 60 + 400 / 60,
+            plannedEndMinute: 8 * 60 + 400 / 60 + 3,
+          }),
+        ],
+      },
+      {
+        row: 3,
+        blocks: [block({ id: 'c', timelineRow: 3, plannedStartMinute: 8 * 60 + 10, plannedEndMinute: 8 * 60 + 13 })],
+      },
+    ];
+    const startSecond = (timelines: ReturnType<typeof build>, id: string) =>
+      Math.round(timelines.flatMap((t) => t.blocks).find((x) => x.id === id)!.plannedStartMinute * 60) - 8 * 3600;
+
+    const held = densifyRouteHeadwaysAfterBerth({
+      timelines: build(),
+      selectedRoutes: [tn],
+      ...peak,
+      minimumRecoveryTimeSeconds: 0,
+      notBeforeTimetable: true,
+    });
+    assert.equal(startSecond(held, 'b'), 300, '被延後的班次拉回班表時刻，不再往前');
+    assert.equal(startSecond(held, 'c'), 600, '準點的班次不動');
+
+    // 沒打開時維持舊行為：一路拉到目標班距，比班表早發
+    const legacy = densifyRouteHeadwaysAfterBerth({
+      timelines: build(),
+      selectedRoutes: [tn],
+      ...peak,
+      minimumRecoveryTimeSeconds: 0,
+    });
+    assert.equal(startSecond(legacy, 'b'), 180);
+    assert.equal(startSecond(legacy, 'c'), 360);
+  });
 });

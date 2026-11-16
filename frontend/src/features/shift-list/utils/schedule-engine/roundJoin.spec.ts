@@ -3,7 +3,12 @@ import { describe, it } from 'node:test';
 import type { PointTopology } from '../../../map-editor/types/pointTopology';
 import type { ShiftScheduleSelectedRoute } from '../../types/create';
 import { joinRoundLaterInCopy } from './resolveResidualConflicts';
-import { applyRoundJoinAtYardExit, listOnlineBoundaries } from './roundJoin';
+import {
+  applyRoundJoinAtYardExit,
+  listOnlineBoundaries,
+  reconcileRoundJoinWithYardLocations,
+  type RoundJoinDroppedStore,
+} from './roundJoin';
 import type { FeasibilityIssue, GeneratedScheduleBlock, GeneratedSchedulePlan } from './types';
 import { validateRotationCyclesComplete } from './validate';
 
@@ -173,5 +178,59 @@ describe('車上線時從一輪的中途加入', () => {
       boundaries.map((item) => [item.row, item.yard.id, item.first.id]),
       [[1, 'yard-1', 'trip-1-0-a'], [2, 'yard-2', 'trip-2-0-a']],
     );
+  });
+
+  it('上線站跟著最後的整備位置走：位置換了，該加回來的加回來、該從中途加入的改從中途加入', () => {
+    const warnings: FeasibilityIssue[] = [];
+    const dropped: RoundJoinDroppedStore = new Map();
+    // 第一次定案：時間線 1 停 Y（靠近 B 站）→ 從 B 站加入；時間線 2 停 X（靠近 A 站）→ 不動
+    const joined = applyRoundJoinAtYardExit({ timelines: plan(), topology, selectedRoutes: routes, warnings, dropped });
+    assert.equal(tripIds(joined, 1).length, 7);
+    assert.equal(tripIds(joined, 2).length, 4);
+
+    // 排完出入廠，兩台的位置對調了：時間線 1 實際停 X，時間線 2 實際停 Y
+    const located = joined.map((timeline) => ({
+      ...timeline,
+      blocks: timeline.blocks.map((block) => (
+        block.id === 'yard-1' ? { ...block, yardFacilityNodeId: 'yard-x' }
+          : block.id === 'yard-2' ? { ...block, yardFacilityNodeId: 'yard-y' }
+            : block
+      )),
+    }));
+    const fixed = reconcileRoundJoinWithYardLocations({
+      pre: joined, located, topology, selectedRoutes: routes, warnings, dropped,
+    });
+    assert.deepEqual(
+      fixed.changes.map((change) => [change.timelineRow, change.kind]),
+      [[1, 'unjoin'], [2, 'join']],
+    );
+    // 時間線 1：少開的那一班加回來，整輪從 A 站開，時刻跟原本一樣
+    assert.deepEqual(tripIds(fixed.timelines, 1).slice(0, 2), ['trip-1-0-a', 'trip-1-0-b']);
+    assert.equal(tripIds(fixed.timelines, 1).length, 8);
+    const row1 = fixed.timelines.find((timeline) => timeline.row === 1)!.blocks;
+    assert.equal(row1.find((block) => block.id === 'trip-1-0-a')!.plannedStartMinute, 60);
+    assert.equal(row1.find((block) => block.id === 'trip-1-0-b')!.roundJoinSkippedLegs, undefined);
+    // 時間線 2：改從 B 站加入
+    assert.deepEqual(tripIds(fixed.timelines, 2), ['trip-2-0-b', 'trip-2-0-c', 'trip-2-0-d']);
+    // 警告跟著換：時間線 1 的拿掉，時間線 2 的補上
+    assert.deepEqual(
+      fixed.warnings.map((issue) => (issue.detail as { timelineRow: number }).timelineRow),
+      [2],
+    );
+    // 「一輪要跑完」的檢查仍然通過
+    const errors: FeasibilityIssue[] = [];
+    validateRotationCyclesComplete(fixed.timelines, STATIONS.length, errors);
+    assert.deepEqual(errors, []);
+    // 傳進來的版面與警告沒有被改到
+    assert.equal(tripIds(joined, 1).length, 7);
+    assert.equal(warnings.length, 1);
+
+    // 位置沒換就什麼都不改；可以只處理指定的那一張整備卡
+    assert.deepEqual(reconcileRoundJoinWithYardLocations({
+      pre: joined, located: joined, topology, selectedRoutes: routes, warnings, dropped,
+    }).changes, []);
+    assert.deepEqual(reconcileRoundJoinWithYardLocations({
+      pre: joined, located, topology, selectedRoutes: routes, warnings, dropped, onlyYardBlockIds: new Set(['yard-2']),
+    }).changes.map((change) => change.timelineRow), [2]);
   });
 });
