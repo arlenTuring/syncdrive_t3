@@ -153,9 +153,9 @@ export function LogPage({ category }: { category: LogCategory }) {
   };
 
   const columns: Column<LogItem>[] = [
-    { key: 'id', header: '日誌編號', className: 'w-32', render: (row) => <span className="font-mono text-xs text-zinc-400" title={row.id}>{row.id.slice(0, 8)}</span> },
+    { key: 'id', header: '日誌編號', className: 'w-32', render: (row) => <span className="font-mono text-body-xs text-text-tertiary" title={row.id}>{row.id.slice(0, 8)}</span> },
     { key: 'time', header: '時間', sortKey: 'occurred_at', className: 'w-44', render: (row) => <span className="tabular-nums">{formatDateTime(row.occurredAt, tz)}</span> },
-    { key: 'ip', header: '來源 IP', className: 'w-32', render: (row) => row.sourceIp ?? <span className="text-zinc-500">—</span> },
+    { key: 'ip', header: '來源 IP', className: 'w-32', render: (row) => row.sourceIp ?? <span className="text-text-quaternary">—</span> },
     { key: 'type', header: '日誌類型', className: 'w-36', render: (row) => row.typeLabel },
     {
       key: 'operator',
@@ -164,16 +164,16 @@ export function LogPage({ category }: { category: LogCategory }) {
       render: (row) => (
         <div>
           <div className="truncate">{row.operator.name ?? `未知（${row.operator.id ?? '—'}）`}</div>
-          {row.operator.nameSource === 'current' ? <div className="text-xs text-zinc-500">目前名稱</div> : null}
+          {row.operator.nameSource === 'current' ? <div className="text-body-xs text-text-quaternary">目前名稱</div> : null}
         </div>
       ),
     },
-    { key: 'content', header: '內容', render: (row) => <div className="line-clamp-2 text-zinc-300" title={row.content}>{row.content}</div> },
+    { key: 'content', header: '內容', render: (row) => <div className="line-clamp-2 text-text-secondary" title={row.content}>{row.content}</div> },
     { key: 'result', header: '結果', className: 'w-20', render: (row) => <Badge tone={row.result === 'SUCCESS' ? 'green' : row.result === 'REJECTED' ? 'amber' : 'red'}>{row.resultLabel}</Badge> },
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-text-primary">
       <div className="flex flex-wrap items-end gap-3">
         <RangeFilter value={draft.range} onChange={(range) => setDraft({ ...draft, range })} timeZone={tz} error={rangeError} />
         {FIELDS[category].map((field) =>
@@ -185,7 +185,7 @@ export function LogPage({ category }: { category: LogCategory }) {
         )}
         <QueryActions onSearch={search} onReset={reset} onExport={() => void doExport()} exporting={exporting} canExport={auth.can(`logs.${category}.export`)} />
       </div>
-      <p className="text-xs text-zinc-400">
+      <p className="text-body-xs text-text-tertiary">
         查詢區間：{data ? `${formatDateTime(data.range.from, tz)} 至 ${formatDateTime(data.range.to - 1, tz)}` : '—'}（{timeZoneLabel(tz)}）；日誌唯讀，查詢不會產生新的日誌
       </p>
       <DataTable

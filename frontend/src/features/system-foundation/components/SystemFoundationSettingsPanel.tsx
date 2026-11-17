@@ -43,13 +43,14 @@ import { BackupSettings } from './BackupSettings'
 import { DataRetentionSettings } from './DataRetentionSettings'
 import { useAdminModePreference } from '../../schedule-management/utils/adminModePreference'
 import { useSupervisorApprovalPreference } from '../../schedule-management/utils/supervisorApprovalPreference'
+import { Button } from '../../../components/ui';
 
 /** 一組全域參數：標題與用途放在上方，讓人知道這些值給哪裡用 */
 function ParamGroup({ title, usage, children }: { title: string; usage: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-[13px] font-semibold text-zinc-200">{title}</h3>
-      <p className="mb-3 mt-0.5 text-[12px] text-zinc-500">用途：{usage}</p>
+      <h3 className="text-body-s-bold text-text-primary">{title}</h3>
+      <p className="mb-3 mt-0.5 text-body-xs text-text-quaternary">用途：{usage}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
     </section>
   )
@@ -57,7 +58,7 @@ function ParamGroup({ title, usage, children }: { title: string; usage: string; 
 
 function SectionTitle({ children }: { children: string }) {
   return (
-    <h2 className="mb-5 text-[15px] font-semibold text-zinc-50">{children}</h2>
+    <h2 className="mb-5 text-body-m-bold text-text-primary">{children}</h2>
   )
 }
 
@@ -176,7 +177,7 @@ export function SystemFoundationSettingsPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
-      <aside className="flex w-[220px] shrink-0 flex-col gap-0.5 overflow-y-auto rounded-2xl border border-zinc-800/80 bg-[#141416] p-2">
+      <aside className="flex w-[220px] shrink-0 flex-col gap-0.5 overflow-y-auto rounded-2xl border border-border-quaternary bg-surface-popup p-2">
         {FOUNDATION_SECTIONS.map((item) => {
           const active = section === item.id
           return (
@@ -184,10 +185,10 @@ export function SystemFoundationSettingsPanel() {
               key={item.id}
               type="button"
               onClick={() => setSection(item.id)}
-              className={`rounded-lg px-3 py-2.5 text-left text-[13px] transition ${
+              className={`rounded-lg px-3 py-2.5 text-left text-body-s transition ${
                 active
-                  ? 'bg-[#1a3a5c] font-medium text-sky-300'
-                  : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+                  ? 'bg-link-tonal font-medium text-text-theme'
+                  : 'text-text-tertiary hover:bg-link-standard hover:text-text-primary'
               }`}
             >
               {t(`systemFoundation.sections.${item.id}`)}
@@ -196,21 +197,17 @@ export function SystemFoundationSettingsPanel() {
         })}
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#141416] p-5">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-popup p-5">
         {loading ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+          <div className="flex flex-1 items-center justify-center text-body-s text-text-quaternary">
             {t('systemFoundation.loadingSettings')}
           </div>
         ) : loadError ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3">
-            <p className="text-sm text-rose-300">{loadError}</p>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="rounded-lg bg-zinc-800 px-4 py-2 text-[13px] text-zinc-200 hover:bg-zinc-700"
-            >
+            <p className="text-body-s text-status-error-emphasis">{loadError}</p>
+            <Button hierarchy="subordinate" variant="tonal" onPress={() => void load()}>
               {t('common.retry')}
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -303,12 +300,12 @@ export function SystemFoundationSettingsPanel() {
                         }
                       />
                     </div>
-                    <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-3 text-[13px]">
+                    <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3 text-body-s">
                       <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                        <span className="text-zinc-400">
+                        <span className="text-text-tertiary">
                           {t('systemFoundation.ntp.lastSync')}
                         </span>
-                        <span className="tabular-nums text-zinc-200">
+                        <span className="tabular-nums text-text-primary">
                           {formatNtpSyncTime(
                             draft.ntp.lastSyncAt,
                             draft.locale.timeZone,
@@ -317,15 +314,15 @@ export function SystemFoundationSettingsPanel() {
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                        <span className="text-zinc-400">{t('systemFoundation.ntp.currentOffset')}</span>
+                        <span className="text-text-tertiary">{t('systemFoundation.ntp.currentOffset')}</span>
                         <span
                           className={`tabular-nums ${
                             draft.ntp.currentOffsetMs == null
-                              ? 'text-zinc-500'
+                              ? 'text-text-quaternary'
                               : Math.abs(draft.ntp.currentOffsetMs) <=
                                   draft.ntp.maxDriftMs
-                                ? 'text-emerald-400'
-                                : 'text-amber-400'
+                                ? 'text-status-success'
+                                : 'text-status-warning'
                           }`}
                         >
                           {draft.ntp.currentOffsetMs == null
@@ -360,21 +357,21 @@ export function SystemFoundationSettingsPanel() {
               {section === 'ssl' ? (
                 <>
                   <div className="mb-5 flex items-start justify-between gap-3">
-                    <h2 className="text-[15px] font-semibold text-zinc-50">
+                    <h2 className="text-body-m-bold text-text-primary">
                       {sectionLabel}
                     </h2>
                     <span
-                      className={`inline-flex items-center gap-1.5 text-[12px] ${
+                      className={`inline-flex items-center gap-1.5 text-body-xs ${
                         certStatus?.protected
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
+                          ? 'text-status-success'
+                          : 'text-status-warning'
                       }`}
                     >
                       <span
                         className={`size-1.5 rounded-full ${
                           certStatus?.protected
-                            ? 'bg-emerald-400'
-                            : 'bg-amber-400'
+                            ? 'bg-status-success'
+                            : 'bg-status-warning'
                         }`}
                       />
                       {certStatus?.protected
@@ -384,12 +381,12 @@ export function SystemFoundationSettingsPanel() {
                   </div>
                   <div className="space-y-5">
                     {certLoadError ? (
-                      <p className="text-[12px] text-rose-300">{certLoadError}</p>
+                      <p className="text-body-xs text-status-error-emphasis">{certLoadError}</p>
                     ) : null}
 
                     <div>
                       <div className="mb-3 flex items-center justify-between gap-2">
-                        <h3 className="text-[13px] font-medium text-zinc-200">
+                        <h3 className="text-body-s-bold text-text-primary">
                           {t('systemFoundation.ssl.activeInfo')}
                         </h3>
                         <div className="flex items-center gap-3">
@@ -399,7 +396,7 @@ export function SystemFoundationSettingsPanel() {
                                   certStatus.expiresAt,
                                 )
                                 return days == null ? null : (
-                                  <span className="text-[12px] text-emerald-400">
+                                  <span className="text-body-xs text-status-success">
                                     {t('systemFoundation.ssl.daysLeft', {
                                       days: days.toLocaleString('en-US'),
                                     })}
@@ -407,42 +404,38 @@ export function SystemFoundationSettingsPanel() {
                                 )
                               })()
                             : null}
-                          <button
-                            type="button"
-                            onClick={() => void loadCertificateStatus()}
-                            className="text-[12px] text-zinc-400 hover:text-zinc-200"
-                          >
+                          <Button hierarchy="subordinate" variant="text" onPress={() => void loadCertificateStatus()}>
                             {t('systemFoundation.ssl.reloadStatus')}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                       {!certStatus?.certificatePresent ? (
-                        <p className="rounded-xl border border-dashed border-zinc-700 bg-[#101012] px-4 py-6 text-center text-[13px] text-zinc-500">
+                        <p className="rounded-xl border border-dashed border-border-quaternary bg-surface-sub-background px-4 py-6 text-center text-body-s text-text-quaternary">
                           {t('systemFoundation.ssl.noCert')}
                         </p>
                       ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                          <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-3">
-                            <p className="text-[11px] text-zinc-500">
+                          <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3">
+                            <p className="text-body-xs text-text-quaternary">
                               {t('systemFoundation.ssl.boundDomain')}
                             </p>
-                            <p className="mt-1.5 truncate text-[13px] text-sky-400">
+                            <p className="mt-1.5 truncate text-body-s text-text-theme">
                               {certStatus.boundDomain ?? '—'}
                             </p>
                           </div>
-                          <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-3">
-                            <p className="text-[11px] text-zinc-500">
+                          <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3">
+                            <p className="text-body-xs text-text-quaternary">
                               {t('systemFoundation.ssl.issuer')}
                             </p>
-                            <p className="mt-1.5 truncate text-[13px] text-zinc-100">
+                            <p className="mt-1.5 truncate text-body-s text-text-primary">
                               {certStatus.issuer ?? '—'}
                             </p>
                           </div>
-                          <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-3">
-                            <p className="text-[11px] text-zinc-500">
+                          <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3">
+                            <p className="text-body-xs text-text-quaternary">
                               {t('systemFoundation.ssl.expiresAt')}
                             </p>
-                            <p className="mt-1.5 truncate text-[13px] tabular-nums text-zinc-100">
+                            <p className="mt-1.5 truncate text-body-s tabular-nums text-text-primary">
                               {certStatus.expiresAt
                                 ? formatSslExpiresAtUtc(certStatus.expiresAt)
                                 : '—'}
@@ -452,25 +445,25 @@ export function SystemFoundationSettingsPanel() {
                       )}
                       {certStatus?.certificatePresent &&
                       !certStatus.keyMatchesCertificate ? (
-                        <p className="mt-2 text-[12px] text-amber-400">
+                        <p className="mt-2 text-body-xs text-status-warning">
                           {certStatus.privateKeyPresent
                             ? t('systemFoundation.ssl.keyMismatch')
                             : t('systemFoundation.ssl.keyMissing')}
                         </p>
                       ) : null}
                       {certStatus?.fingerprintSha256 ? (
-                        <p className="mt-2 break-all text-[11px] text-zinc-500">
+                        <p className="mt-2 break-all text-body-xs text-text-quaternary">
                           {t('systemFoundation.ssl.fingerprint')}:{' '}
                           {certStatus.fingerprintSha256}
                         </p>
                       ) : null}
                     </div>
 
-                    <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-4">
-                      <h3 className="text-[13px] font-medium text-zinc-200">
+                    <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-4">
+                      <h3 className="text-body-s-bold text-text-primary">
                         {t('systemFoundation.ssl.rotateTitle')}
                       </h3>
-                      <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                      <p className="mt-1 text-body-xs text-text-quaternary">
                         {t('systemFoundation.ssl.rotateHint')}
                       </p>
                       <div className="mt-4 space-y-3">
@@ -481,7 +474,7 @@ export function SystemFoundationSettingsPanel() {
                           <input
                             type="file"
                             accept=".crt,.pem,.cer,.cert,text/plain"
-                            className="mb-2 block w-full text-[12px] text-zinc-400 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-[12px] file:text-zinc-200"
+                            className="mb-2 block w-full text-body-xs text-text-tertiary file:mr-3 file:rounded-md file:border-0 file:bg-surface-secondary file:px-3 file:py-1.5 file:text-body-xs file:text-text-primary"
                             onChange={(e) =>
                               readPemFile(e.target.files?.[0], 'cert')
                             }
@@ -493,7 +486,7 @@ export function SystemFoundationSettingsPanel() {
                             placeholder={t(
                               'systemFoundation.ssl.pastePlaceholder',
                             )}
-                            className="w-full rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 py-2 font-mono text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-500/70"
+                            className="w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 font-mono text-body-xs text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
                             spellCheck={false}
                             autoComplete="off"
                           />
@@ -505,7 +498,7 @@ export function SystemFoundationSettingsPanel() {
                           <input
                             type="file"
                             accept=".key,.pem,text/plain"
-                            className="mb-2 block w-full text-[12px] text-zinc-400 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-[12px] file:text-zinc-200"
+                            className="mb-2 block w-full text-body-xs text-text-tertiary file:mr-3 file:rounded-md file:border-0 file:bg-surface-secondary file:px-3 file:py-1.5 file:text-body-xs file:text-text-primary"
                             onChange={(e) =>
                               readPemFile(e.target.files?.[0], 'key')
                             }
@@ -517,28 +510,24 @@ export function SystemFoundationSettingsPanel() {
                             placeholder={t(
                               'systemFoundation.ssl.pastePlaceholder',
                             )}
-                            className="w-full rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 py-2 font-mono text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-500/70"
+                            className="w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 font-mono text-body-xs text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
                             spellCheck={false}
                             autoComplete="off"
                           />
                         </label>
                         {rotateError ? (
-                          <p className="text-[12px] text-rose-300">
+                          <p className="text-body-xs text-status-error-emphasis">
                             {rotateError}
                           </p>
                         ) : null}
-                        <button
-                          type="button"
-                          disabled={
-                            rotating || !certPem.trim() || !keyPem.trim()
-                          }
-                          onClick={onRotateCertificate}
-                          className="rounded-lg bg-[#2B7FFF] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-[#1f6fe0] disabled:opacity-50"
+                        <Button
+                          disabled={rotating || !certPem.trim() || !keyPem.trim()}
+                          onPress={onRotateCertificate}
                         >
                           {rotating
                             ? t('systemFoundation.ssl.rotating')
                             : t('systemFoundation.ssl.rotate')}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -606,8 +595,8 @@ export function SystemFoundationSettingsPanel() {
                 <>
                   <SectionTitle>{sectionLabel}</SectionTitle>
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-3">
-                      <p className="mb-2 text-[12px] text-zinc-500">{t('systemFoundation.security.mechanism')}</p>
+                    <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3">
+                      <p className="mb-2 text-body-xs text-text-quaternary">{t('systemFoundation.security.mechanism')}</p>
                       <ToggleRow
                         label={t('systemFoundation.security.dualConfirm')}
                         checked={draft.security.dualConfirmEnabled}
@@ -623,8 +612,8 @@ export function SystemFoundationSettingsPanel() {
                       />
                     </div>
 
-                    <div className="rounded-xl border border-zinc-800 bg-[#101012] px-4 py-4">
-                      <p className="mb-3 text-[12px] text-zinc-500">
+                    <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-4">
+                      <p className="mb-3 text-body-xs text-text-quaternary">
                         {t('systemFoundation.security.auditLimits')}
                       </p>
                       <div className="space-y-4">
@@ -761,7 +750,7 @@ export function SystemFoundationSettingsPanel() {
                         }
                       />
                     </div>
-                    <div className="grid grid-cols-1 gap-4 border-t border-zinc-800 pt-4 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 border-t border-border-quaternary pt-4 md:grid-cols-2">
                       <TextField
                         label={t('systemFoundation.mqtt.username')}
                         value={draft.mqtt.username}
@@ -851,7 +840,7 @@ export function SystemFoundationSettingsPanel() {
               {section === 'operation' ? (
                 <>
                   <SectionTitle>{sectionLabel}</SectionTitle>
-                  <p className="mb-4 text-[12px] text-zinc-500">
+                  <p className="mb-4 text-body-xs text-text-quaternary">
                     {t('systemFoundation.operation.hint')}
                   </p>
                   <div className="max-w-xl space-y-4">
@@ -861,7 +850,7 @@ export function SystemFoundationSettingsPanel() {
                         checked={adminMode}
                         onChange={setAdminMode}
                       />
-                      <p className="text-[12px] text-zinc-500">{t('shell.switchAdminHint')}</p>
+                      <p className="text-body-xs text-text-quaternary">{t('shell.switchAdminHint')}</p>
                     </div>
                     <div>
                       <ToggleRow
@@ -869,7 +858,7 @@ export function SystemFoundationSettingsPanel() {
                         checked={supervisorApproval}
                         onChange={setSupervisorApproval}
                       />
-                      <p className="text-[12px] text-zinc-500">{t('shell.supervisorApprovalHint')}</p>
+                      <p className="text-body-xs text-text-quaternary">{t('shell.supervisorApprovalHint')}</p>
                     </div>
                   </div>
                 </>

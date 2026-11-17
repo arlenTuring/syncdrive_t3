@@ -5,10 +5,15 @@ import { IconButton } from '../button/Button';
 import { cn } from '../cn';
 import { DIALOG_OVERLAY_CLASS, DIALOG_PANEL_CLASS, DIALOG_WIDTHS, type DialogSize } from '../variants';
 
+/** 開著的對話框（後開的在最後）：只有最上層處理 Escape，子對話框不會連帶關掉主對話框 */
+const openDialogs: symbol[] = [];
+
 const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 export type DialogProps = {
   title: ReactNode;
+  /** 標題上方的圖示（例如警告） */
+  icon?: ReactNode;
   /** 標題下方的說明 */
   description?: ReactNode;
   onClose: () => void;
@@ -43,6 +48,7 @@ export type DialogProps = {
  */
 export function Dialog({
   title,
+  icon,
   description,
   onClose,
   footer,
@@ -64,21 +70,42 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
 
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    closeRef.current = onClose;
+    busyRef.current = busy;
+  });
+
   useEffect(() => {
     previous.current = document.activeElement as HTMLElement | null;
-    const target = initialFocusRef?.current ?? panel.current?.querySelector<HTMLElement>(`[data-dialog-body] :is(${FOCUSABLE})`) ?? panel.current?.querySelector<HTMLElement>(FOCUSABLE);
+    const target = initialFocusRef?.current
+      ?? panel.current?.querySelector<HTMLElement>('[data-autofocus]')
+      ?? panel.current?.querySelector('[data-dialog-body]')?.querySelector<HTMLElement>(FOCUSABLE)
+      ?? panel.current?.querySelector<HTMLElement>(FOCUSABLE);
     target?.focus();
-    return () => previous.current?.focus?.();
+    const self = Symbol('dialog');
+    openDialogs.push(self);
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || openDialogs[openDialogs.length - 1] !== self) return;
+      // 日期時間、下拉等浮動面板開著時，Escape 先交給它關閉
+      if (document.querySelector('[data-anchored-popover]')) return;
+      // 拿起中的拖曳項目等自己處理 Escape（取消移動），不關閉對話框
+      if ((document.activeElement as HTMLElement | null)?.closest?.('[data-captures-escape="true"]')) return;
+      event.stopPropagation();
+      if (!busyRef.current) closeRef.current();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => {
+      window.removeEventListener('keydown', onEscape, true);
+      openDialogs.splice(openDialogs.indexOf(self), 1);
+      if (previous.current?.isConnected) previous.current.focus();
+    };
     // 只在開啟時聚焦一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      if (!busy) onClose();
-      return;
-    }
     if (event.key !== 'Tab') return;
     const focusable = [...(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
     if (focusable.length === 0) return;
@@ -111,7 +138,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className={cn(DIALOG_OVERLAY_CLASS, layer === 'system' ? 'z-[1000]' : 'z-[100]')}
+      className={cn(DIALOG_OVERLAY_CLASS, layer === 'system' ? 'z-[1000]' : 'z-[230]')}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && closeOnBackdrop && !busy) onClose();
@@ -128,6 +155,7 @@ export function Dialog({
       >
         <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
           <div className="min-w-0 flex-1">
+            {icon}
             <h2 id={titleId} className="text-headline-4 text-text-primary">{title}</h2>
             {description ? <p id={descriptionId} className="mt-1 text-body-s text-text-tertiary">{description}</p> : null}
           </div>

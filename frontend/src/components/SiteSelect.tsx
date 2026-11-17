@@ -101,7 +101,7 @@ export function SiteSelect({
         aria-labelledby={ariaLabelledBy}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={cn(size ? fieldClass({ size }) : 'min-h-8 disabled:cursor-not-allowed disabled:opacity-50', 'flex items-center justify-between gap-2 text-left', className)}
+        className={cn(size ? fieldClass({ size, fullWidth: false }) : 'min-h-8 disabled:cursor-not-allowed disabled:opacity-50', 'flex items-center justify-between gap-2 text-left', className)}
         style={style}
         onFocus={(event) => onFocus?.(event as never)}
         onBlur={(event) => onBlur?.(event as never)}

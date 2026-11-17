@@ -27,6 +27,8 @@ import {
   resolveWarnThreshold,
   type MonitoringThresholdSettings,
 } from './thresholdSettings'
+import { Button, IconButton, SegmentedControl, Tabs } from '../../components/ui';
+import { HEALTH_SERIES_COLOR } from './components/healthSeriesColors';
 
 type TabKey = 'health' | 'settings' | 'advanced'
 
@@ -102,45 +104,28 @@ export function SystemFoundationPage({
         tab === 'health' ? 'overflow-auto' : 'overflow-hidden'
       }`}
     >
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800/80">
-        <div className="flex items-center gap-1">
-          {(
-            [
-              { id: 'health' as const, label: t('systemFoundation.tabHealth') },
-              { id: 'settings' as const, label: t('systemFoundation.tabSettings') },
-              { id: 'advanced' as const, label: t('systemFoundation.tabAdvanced') },
-            ]
-          ).map((item) => {
-            const active = tab === item.id
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={`relative px-4 py-2.5 text-[13px] transition ${
-                  active
-                    ? 'font-medium text-sky-400'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {item.label}
-                {active ? (
-                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-sky-400" />
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border-quaternary">
+        <Tabs
+          label={t('systemFoundation.title', { defaultValue: '系統基礎模組' })}
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'health' as const, label: t('systemFoundation.tabHealth') },
+            { id: 'settings' as const, label: t('systemFoundation.tabSettings') },
+            { id: 'advanced' as const, label: t('systemFoundation.tabAdvanced') },
+          ]}
+        />
         {tab === 'health' ? (
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+          <Button
+            hierarchy="subordinate"
+            variant="standard"
+            className="mb-1"
+            onPress={() => void refresh()}
             title={t('systemFoundation.refreshNow')}
+            leadingIcon={<RefreshCw className={loading ? 'animate-spin' : undefined} />}
           >
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
             {t('common.refresh')}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -151,37 +136,36 @@ export function SystemFoundationPage({
       ) : (
         <>
           {error ? (
-            <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-4 py-3 text-[13px] text-rose-200">
+            <div className="rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
               {error}
             </div>
           ) : null}
 
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-medium text-zinc-300">
+              <h2 className="text-body-s-bold text-text-secondary">
                 {t('systemFoundation.liveResources')}
               </h2>
-              <button
-                type="button"
-                onClick={() => setThresholdOpen(true)}
-                className="inline-flex size-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 transition hover:bg-zinc-700 hover:text-white"
-                title={t('systemFoundation.filterThresholds')}
-                aria-label={t('systemFoundation.filterThresholds')}
-              >
-                <Filter className="size-4" aria-hidden />
-              </button>
+              <IconButton
+                size="small"
+                hierarchy="subordinate"
+                variant="tonal"
+                onPress={() => setThresholdOpen(true)}
+                label={t('systemFoundation.filterThresholds')}
+                icon={<Filter />}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
               <MetricCard
                 label={t('systemFoundation.health.cpuUsage')}
                 value={fmtPercent(host?.cpuUsagePercent ?? null)}
-                accent="#3b82f6"
+                accent={HEALTH_SERIES_COLOR.cpuUsagePercent}
                 percent={host?.cpuUsagePercent ?? null}
               />
               <MetricCard
                 label={t('systemFoundation.health.cpuTemp')}
                 value={fmtTemp(host?.cpuTempC ?? null)}
-                accent="#22d3ee"
+                accent={HEALTH_SERIES_COLOR.cpuTempC}
                 percent={
                   host?.cpuTempC != null
                     ? Math.min(100, (host.cpuTempC / 100) * 100)
@@ -191,13 +175,13 @@ export function SystemFoundationPage({
               <MetricCard
                 label={t('systemFoundation.health.memoryUsage')}
                 value={fmtPercent(host?.memoryUsagePercent ?? null)}
-                accent="#22c55e"
+                accent={HEALTH_SERIES_COLOR.memoryUsagePercent}
                 percent={host?.memoryUsagePercent ?? null}
               />
               <MetricCard
                 label={t('systemFoundation.health.diskFree')}
                 value={fmtPercent(host?.diskFreePercent ?? null)}
-                accent="#a855f7"
+                accent={HEALTH_SERIES_COLOR.diskFreePercent}
                 percent={host?.diskFreePercent ?? null}
                 barMode="free"
               />
@@ -210,7 +194,7 @@ export function SystemFoundationPage({
           </section>
 
           <section>
-            <h2 className="mb-3 text-[13px] font-medium text-zinc-300">
+            <h2 className="mb-3 text-body-s-bold text-text-secondary">
               {t('systemFoundation.health.coreServices')}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -233,50 +217,40 @@ export function SystemFoundationPage({
                 )
               })}
               {!snapshot?.services?.length && !error ? (
-                <div className="col-span-full rounded-xl border border-zinc-800/80 bg-[#141416] px-4 py-8 text-center text-sm text-zinc-500">
+                <div className="col-span-full rounded-xl border border-border-quaternary bg-surface-popup px-4 py-8 text-center text-body-s text-text-quaternary">
                   {t('systemFoundation.health.loadingServices')}
                 </div>
               ) : null}
             </div>
           </section>
 
-          <section className="min-h-[340px] rounded-2xl border border-zinc-800/80 bg-[#141416] p-4">
+          <section className="min-h-[340px] rounded-2xl border border-border-quaternary bg-surface-popup p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[13px] font-medium text-zinc-300">
+              <h2 className="text-body-s-bold text-text-secondary">
                 {t('systemFoundation.health.historyTrend')}
               </h2>
-              <div className="flex items-center gap-1 rounded-lg bg-zinc-900/80 p-0.5">
-                {RANGE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setRange(opt.id)}
-                    className={`rounded-md px-3 py-1.5 text-[12px] transition ${
-                      range === opt.id
-                        ? 'bg-zinc-700 text-white'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    {t(opt.labelKey)}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label={t('systemFoundation.health.historyTrend')}
+                value={range}
+                onChange={setRange}
+                options={RANGE_OPTIONS.map((opt) => ({ id: opt.id, label: t(opt.labelKey) }))}
+              />
             </div>
-            <div className="mb-2 flex flex-wrap items-center gap-4 text-[11px] text-zinc-400">
+            <div className="mb-2 flex flex-wrap items-center gap-4 text-body-xs text-text-tertiary">
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#3b82f6]" />{' '}
+                <span className="size-2 rounded-full" style={{ background: HEALTH_SERIES_COLOR.cpuUsagePercent }} />{' '}
                 {t('systemFoundation.health.cpuUsage')}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#22d3ee]" />{' '}
+                <span className="size-2 rounded-full" style={{ background: HEALTH_SERIES_COLOR.cpuTempC }} />{' '}
                 {t('systemFoundation.health.cpuTemp')}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#22c55e]" />{' '}
+                <span className="size-2 rounded-full" style={{ background: HEALTH_SERIES_COLOR.memoryUsagePercent }} />{' '}
                 {t('systemFoundation.health.memoryUsage')}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#a855f7]" />{' '}
+                <span className="size-2 rounded-full" style={{ background: HEALTH_SERIES_COLOR.diskFreePercent }} />{' '}
                 {t('systemFoundation.health.diskFree')}
               </span>
             </div>

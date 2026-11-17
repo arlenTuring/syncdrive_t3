@@ -82,6 +82,60 @@ export const CLASS_MAP = {
   'focus:border-blue-500': 'focus:border-border-theme',
   'focus:border-sky-500': 'focus:border-border-theme',
   'border-red-500/20': 'border-border-danger-light',
+  // 狀態色（第二批補充）
+  'text-rose-200': 'text-status-error-emphasis',
+  'text-rose-300': 'text-status-error-emphasis',
+  'text-rose-400': 'text-status-error-emphasis',
+  'text-emerald-200': 'text-status-success',
+  'text-amber-100': 'text-status-warning',
+  'text-amber-200': 'text-status-warning',
+  'text-sky-200': 'text-text-theme',
+  'bg-rose-950/50': 'bg-status-error-light',
+  'bg-red-500/20': 'bg-status-error-light',
+  'bg-amber-950/30': 'bg-status-warning-light',
+  'bg-amber-500/10': 'bg-status-warning-light',
+  'bg-emerald-500/10': 'bg-status-success-light',
+  'bg-emerald-400': 'bg-status-success',
+  'bg-amber-400': 'bg-status-warning',
+  'bg-sky-400': 'bg-border-theme',
+  'bg-sky-500/5': 'bg-surface-theme-light',
+  'bg-sky-500/10': 'bg-surface-theme',
+  'hover:bg-sky-500/10': 'hover:bg-surface-theme',
+  'border-rose-500/40': 'border-border-danger-light',
+  'border-rose-700': 'border-border-danger-light',
+  'border-rose-800': 'border-border-danger-light',
+  'border-red-400/40': 'border-border-danger-light',
+  'border-red-500/30': 'border-border-danger-light',
+  'border-amber-500/30': 'border-status-warning-light',
+  'border-amber-800': 'border-status-warning-light',
+  'border-amber-900': 'border-status-warning-light',
+  'border-emerald-500/30': 'border-status-success-light',
+  'border-emerald-800': 'border-status-success-light',
+  'border-sky-400': 'border-border-theme',
+  'border-sky-500': 'border-border-theme',
+  'border-sky-500/30': 'border-border-theme-light-trn',
+  'border-sky-700': 'border-border-theme-light',
+  'border-sky-800': 'border-border-theme-light',
+  'focus:border-sky-500/70': 'focus:border-border-theme',
+  'focus:ring-sky-500': 'focus:ring-border-theme',
+  // 深色底（第二批補充）
+  'bg-[#101012]': 'bg-surface-sub-background',
+  'bg-[#1a1a1d]': 'bg-surface-primary',
+  'bg-[#1c1c1f]': 'bg-surface-primary',
+  'bg-[#232730]': 'bg-surface-secondary',
+  'bg-[#2a2e37]': 'bg-link-standard-hover',
+  'hover:bg-[#323743]': 'hover:bg-link-standard-pressed',
+  'bg-zinc-900/60': 'bg-surface-primary',
+  'bg-zinc-900/80': 'bg-surface-primary',
+  'bg-zinc-950/95': 'bg-surface-popup',
+  'bg-zinc-700': 'bg-link-standard-hover',
+  'bg-zinc-700/40': 'bg-link-standard',
+  'bg-zinc-700/80': 'bg-link-standard-hover',
+  'border-zinc-600/50': 'border-border-quaternary',
+  'border-zinc-900': 'border-border-quaternary',
+  'hover:border-zinc-600': 'hover:border-border-tertiary',
+  'fill-zinc-500': 'fill-text-quaternary',
+  'text-[28px]': 'text-headline-2',
   // 陰影
   'shadow-black/50': 'shadow-black-50',
   // 字級（設計稿沒有的字級改成最接近的；固定尺寸容器要人工確認）
@@ -121,6 +175,19 @@ export function migrate(text) {
     if (!(cls in CLASS_MAP) || `${prefix}${cls}` in CLASS_MAP) return whole;
     hits[`${prefix}${cls}`] = (hits[`${prefix}${cls}`] ?? 0) + 1;
     return `${prefix}${CLASS_MAP[cls]}`;
+  });
+  // 設計字級＋另加字重：body 字級改用 -bold，標題類拿掉多的字重；字距、行高由字級決定
+  out = out.replace(/(['"`])((?:(?!\1)[^\n])*?)\1/g, (whole, quote, body) => {
+    const size = body.match(/(?<![\w:-])text-(body-(?:l|m|s|xs)|headline-[1-5]|display-[lsm]|caption-[123])(-bold)?(?![\w-])/);
+    if (!size) return whole;
+    let next = body;
+    if (/(?<![\w:-])font-(?:medium|semibold|bold)(?![\w-])/.test(next)) {
+      next = next.replace(/\s*(?<![\w:-])font-(?:medium|semibold|bold)(?![\w-])/g, '');
+      if (size[1].startsWith('body-') && !size[2]) next = next.replace(size[0], `${size[0]}-bold`);
+    }
+    next = next.replace(/\s*(?<![\w:-])(?:tracking-(?:tight|tighter|wide|wider|widest|normal)|leading-(?:\d+|tight|snug|normal|relaxed|none))(?![\w-])/g, '');
+    if (next !== body) hits['字重／字距整理'] = (hits['字重／字距整理'] ?? 0) + 1;
+    return `${quote}${next.trimStart() === next ? next : next.trimStart()}${quote}`;
   });
   return { text: out, hits };
 }

@@ -36,7 +36,7 @@ export function ReportFlow({ event, timeZone, onClose, onReported }: { event: Ev
     return (
       <Dialog
         title="確認送出此事件回報？"
-        icon={<span className="mb-4 flex size-10 items-center justify-center rounded-full bg-amber-400 text-2xl font-bold text-[#1b1b1f]" aria-hidden>!</span>}
+        icon={<span className="mb-4 flex size-10 items-center justify-center rounded-full bg-status-warning text-headline-3 text-text-invert" aria-hidden>!</span>}
         width="max-w-xl"
         onClose={busy ? undefined : onClose}
         footer={
@@ -46,16 +46,16 @@ export function ReportFlow({ event, timeZone, onClose, onReported }: { event: Ev
           </>
         }
       >
-        <p className="flex items-center gap-2 text-sm font-medium text-amber-400">
+        <p className="flex items-center gap-2 text-body-s-bold text-status-warning">
           <AlertTriangle className="size-5 shrink-0" />
           注意：回報送出後將同步至系統，無法再進行修改或撤回！
         </p>
-        <dl className="mt-5 space-y-4 rounded-2xl bg-[#222329] px-5 py-4 text-sm">
-          <div className="grid grid-cols-[7rem_1fr] items-center"><dt className="text-zinc-400">嚴重度</dt><dd><SeverityBadge severity={event.severity} /></dd></div>
-          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-zinc-400">載具編號</dt><dd>{event.vehicleCode ?? event.sourceName ?? '—'}</dd></div>
-          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-zinc-400">事件類型</dt><dd>{event.eventLabel}</dd></div>
-          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-zinc-400">事件編號</dt><dd className="tabular-nums">{event.id}</dd></div>
-          <div className="grid grid-cols-[7rem_1fr] border-t border-zinc-700 pt-4"><dt className="text-zinc-400">回報內容</dt><dd className="break-words whitespace-pre-wrap">{trimmed}</dd></div>
+        <dl className="mt-5 space-y-4 rounded-2xl bg-surface-secondary px-5 py-4 text-body-s">
+          <div className="grid grid-cols-[7rem_1fr] items-center"><dt className="text-text-tertiary">嚴重度</dt><dd><SeverityBadge severity={event.severity} /></dd></div>
+          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-text-tertiary">載具編號</dt><dd>{event.vehicleCode ?? event.sourceName ?? '—'}</dd></div>
+          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-text-tertiary">事件類型</dt><dd>{event.eventLabel}</dd></div>
+          <div className="grid grid-cols-[7rem_1fr]"><dt className="text-text-tertiary">事件編號</dt><dd className="tabular-nums">{event.id}</dd></div>
+          <div className="grid grid-cols-[7rem_1fr] border-t border-border-quaternary pt-4"><dt className="text-text-tertiary">回報內容</dt><dd className="break-words whitespace-pre-wrap">{trimmed}</dd></div>
         </dl>
         {error ? <ErrorLine text={error} /> : null}
       </Dialog>
@@ -74,18 +74,18 @@ export function ReportFlow({ event, timeZone, onClose, onReported }: { event: Ev
         </>
       }
     >
-      <div className="rounded-2xl border border-[#2c3e55] bg-[#1f2128] px-6 py-4">
+      <div className="rounded-2xl border border-border-theme-light-trn bg-surface-theme-light px-6 py-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-3 text-sm"><SeverityBadge severity={event.severity} />{event.vehicleCode ?? event.sourceName ?? '—'}</span>
-          <span className="text-xs text-zinc-300">#事件編號 {event.id}</span>
+          <span className="flex items-center gap-3 text-body-s"><SeverityBadge severity={event.severity} />{event.vehicleCode ?? event.sourceName ?? '—'}</span>
+          <span className="text-body-xs text-text-secondary">#事件編號 {event.id}</span>
         </div>
         <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="text-sm">{event.eventLabel}</span>
-          <span className="text-xs tabular-nums text-zinc-400">{formatDateTime(event.occurredAt, timeZone)}</span>
+          <span className="text-body-s">{event.eventLabel}</span>
+          <span className="text-body-xs tabular-nums text-text-tertiary">{formatDateTime(event.occurredAt, timeZone)}</span>
         </div>
       </div>
       <label className="mt-6 block">
-        <span className="mb-2 block px-1 text-sm text-zinc-400">回報內容</span>
+        <span className="mb-2 block px-1 text-body-s text-text-tertiary">回報內容</span>
         <textarea
           data-autofocus
           rows={3}
@@ -93,9 +93,9 @@ export function ReportFlow({ event, timeZone, onClose, onReported }: { event: Ev
           onChange={(input) => setNote([...input.target.value].slice(0, REPORT_NOTE_MAX).join(''))}
           placeholder="請輸入"
           aria-label={`事件 ${event.id} 回報內容`}
-          className="w-full resize-y rounded-lg bg-[#232730] px-3 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500"
+          className="w-full resize-y rounded-lg bg-surface-secondary px-3 py-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
         />
-        <span className="mt-1 block px-1 text-xs text-zinc-400">{length(note)}/{REPORT_NOTE_MAX}</span>
+        <span className="mt-1 block px-1 text-body-xs text-text-tertiary">{length(note)}/{REPORT_NOTE_MAX}</span>
       </label>
     </Dialog>
   );

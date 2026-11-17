@@ -58,7 +58,7 @@ export function SiteMultiSelect({
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={cn(fieldClass(), 'flex h-auto min-h-10 items-center justify-between gap-2 text-left', className)}
+        className={cn(fieldClass({ fullWidth: !className }), 'flex h-auto min-h-[34px] items-center justify-between gap-2 text-left', className)}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {

@@ -108,7 +108,7 @@ export function SiteDateTimeInput({
         aria-expanded={open}
         data-site-datetime-value={current}
         onClick={() => setOpen((currentOpen) => !currentOpen)}
-        className={cn(size ? fieldClass({ size }) : 'disabled:cursor-not-allowed disabled:opacity-50', 'flex min-w-0 items-center justify-between gap-2 text-left', className)}
+        className={cn(size ? fieldClass({ size, fullWidth: false }) : 'disabled:cursor-not-allowed disabled:opacity-50', 'flex min-w-0 items-center justify-between gap-2 text-left', className)}
       >
         <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
         {timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}

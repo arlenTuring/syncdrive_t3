@@ -36,7 +36,7 @@ export function EventManagementPage() {
   }, [refresh]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col p-5 text-text-primary">
       <LiveEventsPage refreshSignal={refreshSignal} onChanged={refresh} />
     </div>
   );

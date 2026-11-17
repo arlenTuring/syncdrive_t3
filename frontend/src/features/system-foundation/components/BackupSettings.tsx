@@ -7,6 +7,7 @@ import {
   type BackupLocation, type BackupRun, type BackupSettingsValue, type BackupStatus,
 } from '../api/dataAdminApi'
 import { systemConfirm } from '../../../lib/systemDialog'
+import { Button, Checkbox, Switch, fieldClass } from '../../../components/ui';
 
 const POLL_MS = 3_000
 const OVERDUE_MS = 2 * 86_400_000
@@ -26,27 +27,25 @@ const duration = (run: BackupRun) => {
 }
 const STATUS_LABEL: Record<BackupRun['status'], string> = { running: '備份中', success: '成功', failed: '失敗', stopped: '已停止' }
 
-const sectionTitle = 'text-[13px] font-semibold text-zinc-200'
-const card = 'space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-3 text-[13px]'
-const input = 'rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200'
-const secondaryButton = 'rounded border border-zinc-700 px-3 py-1 text-zinc-300 disabled:opacity-50'
-const primaryButton = 'rounded border border-sky-700 px-3 py-1 text-sky-300 disabled:opacity-50'
+const sectionTitle = 'text-body-s-bold text-text-primary'
+const card = 'space-y-3 rounded-lg border border-border-quaternary bg-surface-primary px-3 py-3 text-body-s'
+const input = fieldClass({ size: 'sm' })
 
 function LocationField({ label, value, disabled, onChange, onCheck, result }: {
   label: string; value: string; disabled: boolean; onChange: (value: string) => void; onCheck: () => void; result?: BackupLocation | string
 }) {
   return (
     <div>
-      <div className="mb-1 text-[12px] text-zinc-400">{label}</div>
+      <div className="mb-1 text-body-xs text-text-tertiary">{label}</div>
       <div className="flex flex-wrap items-center gap-2">
-        <input aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className={`${input} min-w-[260px] flex-1 font-mono text-[12px]`} />
-        <button type="button" disabled={disabled} onClick={onCheck} className={secondaryButton}>檢查位置</button>
+        <input aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className={`${input} min-w-[260px] flex-1 font-mono text-body-xs`} />
+        <Button hierarchy="subordinate" variant="outlined" disabled={disabled} onPress={onCheck}>檢查位置</Button>
       </div>
-      {typeof result === 'string' ? <p role="alert" className="mt-1 text-[12px] text-red-300">{result}</p> : null}
+      {typeof result === 'string' ? <p role="alert" className="mt-1 text-body-xs text-status-error-emphasis">{result}</p> : null}
       {result && typeof result !== 'string' ? (
-        <p className="mt-1 text-[12px] text-zinc-400">
+        <p className="mt-1 text-body-xs text-text-tertiary">
           可寫入，剩餘 {size(result.freeBytes)}／共 {size(result.totalBytes)}
-          {result.sameDiskAsSystem ? <span className="text-amber-300">。這裡與系統在同一顆磁碟，磁碟損壞時備份會一起遺失，建議改放 NAS 或獨立磁碟。</span> : null}
+          {result.sameDiskAsSystem ? <span className="text-status-warning">。這裡與系統在同一顆磁碟，磁碟損壞時備份會一起遺失，建議改放 NAS 或獨立磁碟。</span> : null}
         </p>
       ) : null}
     </div>
@@ -134,7 +133,7 @@ export function BackupSettings() {
     })
   }
 
-  if (!status || !draft) return error ? <p role="alert" className="text-[12px] text-red-300">{error}</p> : <p className="text-[12px] text-zinc-500">載入中…</p>
+  if (!status || !draft) return error ? <p role="alert" className="text-body-xs text-status-error-emphasis">{error}</p> : <p className="text-body-xs text-text-quaternary">載入中…</p>
 
   const lastSuccess = status.runs.find((run) => run.status === 'success')
   const lastAuto = status.runs.find((run) => run.trigger === 'auto' && run.status === 'success')
@@ -142,16 +141,16 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
-      {error ? <p role="alert" className="text-[12px] text-red-300">{error}</p> : null}
-      {!status.tools.available ? <p role="alert" className="text-[12px] text-red-300">後端找不到 PostgreSQL 備份工具，目前無法備份：{status.tools.error}</p> : null}
-      {overdue ? <p role="alert" className="text-[12px] text-amber-300">自動備份已開啟，但超過兩天沒有成功的自動備份，請查看下方紀錄。</p> : null}
+      {error ? <p role="alert" className="text-body-xs text-status-error-emphasis">{error}</p> : null}
+      {!status.tools.available ? <p role="alert" className="text-body-xs text-status-error-emphasis">後端找不到 PostgreSQL 備份工具，目前無法備份：{status.tools.error}</p> : null}
+      {overdue ? <p role="alert" className="text-body-xs text-status-warning">自動備份已開啟，但超過兩天沒有成功的自動備份，請查看下方紀錄。</p> : null}
 
       <section className="space-y-2">
         <h3 className={sectionTitle}>目前狀態</h3>
         <div className={`${card} grid gap-2 sm:grid-cols-3`}>
-          <div><div className="text-[12px] text-zinc-500">最近成功備份</div><div className="text-zinc-200">{date(lastSuccess?.started_at)}</div></div>
-          <div><div className="text-[12px] text-zinc-500">下次自動備份</div><div className="text-zinc-200">{status.settings.autoEnabled ? date(status.settings.nextRunAt) : '未開啟'}</div></div>
-          <div><div className="text-[12px] text-zinc-500">資料庫大小</div><div className="text-zinc-200">{size(status.databaseBytes)}</div></div>
+          <div><div className="text-body-xs text-text-quaternary">最近成功備份</div><div className="text-text-primary">{date(lastSuccess?.started_at)}</div></div>
+          <div><div className="text-body-xs text-text-quaternary">下次自動備份</div><div className="text-text-primary">{status.settings.autoEnabled ? date(status.settings.nextRunAt) : '未開啟'}</div></div>
+          <div><div className="text-body-xs text-text-quaternary">資料庫大小</div><div className="text-text-primary">{size(status.databaseBytes)}</div></div>
         </div>
       </section>
 
@@ -160,8 +159,8 @@ export function BackupSettings() {
         <div className={card}>
           <LocationField label="手動備份儲存位置（後端主機上的路徑）" value={draft.manualDir} disabled={busy} onChange={(manualDir) => update({ manualDir })} onCheck={() => void checkLocation('manualDir')} result={locations.manualDir} />
           <div className="flex items-center gap-3">
-            <button type="button" disabled={busy || !!running || !status.tools.available} onClick={() => void backupNow()} className={primaryButton}>立即備份</button>
-            {running ? <span className="text-sky-300">備份中，可離開此頁</span> : <span className="text-[12px] text-zinc-500">系統可照常運作；資料庫備份不需停機。</span>}
+            <Button variant="outlined" disabled={busy || !!running || !status.tools.available} onPress={() => void backupNow()}>立即備份</Button>
+            {running ? <span className="text-text-theme">備份中，可離開此頁</span> : <span className="text-body-xs text-text-quaternary">系統可照常運作；資料庫備份不需停機。</span>}
           </div>
         </div>
       </section>
@@ -169,14 +168,14 @@ export function BackupSettings() {
       <section className="space-y-2">
         <h3 className={sectionTitle}>自動備份</h3>
         <div className={card}>
-          <label className="block text-zinc-300">
-            <input type="checkbox" className="mr-1" checked={draft.autoEnabled} onChange={(e) => update({ autoEnabled: e.target.checked })} />
+          <label className="flex items-center gap-2 text-text-secondary">
+            <Switch checked={draft.autoEnabled} aria-label="開啟自動備份" onCheckedChange={(autoEnabled) => update({ autoEnabled })} />
             開啟自動備份
           </label>
           {draft.autoEnabled ? (
             <>
               <LocationField label="自動備份儲存位置（後端主機上的路徑）" value={draft.autoDir} disabled={busy} onChange={(autoDir) => update({ autoDir })} onCheck={() => void checkLocation('autoDir')} result={locations.autoDir} />
-              <div className="flex flex-wrap items-center gap-5 text-zinc-400">
+              <div className="flex flex-wrap items-center gap-5 text-text-tertiary">
                 <label>每天<input aria-label="自動備份時間" type="time" value={draft.autoTime} onChange={(e) => update({ autoTime: e.target.value })} className={`${input} mx-1.5`} />執行</label>
                 <span className="inline-flex items-center gap-1.5">
                   <label>保留最近<input aria-label="自動備份保留天數" type="number" min={1} max={365} value={draft.keepCount} onChange={(e) => update({ keepCount: Number(e.target.value) })} className={`${input} mx-1.5 w-20`} />天</label>
@@ -185,61 +184,58 @@ export function BackupSettings() {
                   </HelpTip>
                 </span>
               </div>
-              <p className="text-[12px] text-zinc-500">備份失敗時會寫入事件管理。</p>
+              <p className="text-body-xs text-text-quaternary">備份失敗時會寫入事件管理。</p>
             </>
-          ) : <p className="text-[12px] text-zinc-500">目前不會自動備份，只有按「立即備份」或部署時才有備份。</p>}
+          ) : <p className="text-body-xs text-text-quaternary">目前不會自動備份，只有按「立即備份」或部署時才有備份。</p>}
         </div>
       </section>
 
       <section className="space-y-2">
         <h3 className={sectionTitle}>備份內容</h3>
         <div className={card}>
-          <label className="block text-zinc-300">
-            <input type="checkbox" className="mr-1" checked={draft.includeFiles} onChange={(e) => update({ includeFiles: e.target.checked })} />
-            包含圖資、媒體與金鑰檔
-          </label>
-          <p className="text-[12px] text-zinc-500">資料庫一律備份。圖資不在資料庫內，取消勾選後只靠這份備份無法完整還原。監控錄影不進備份。備份含帳號與金鑰資料，請管好存放位置的權限。</p>
+          <Checkbox label="包含圖資、媒體與金鑰檔" labelClassName="text-body-s text-text-secondary" checked={draft.includeFiles} onCheckedChange={(includeFiles) => update({ includeFiles })} />
+          <p className="text-body-xs text-text-quaternary">資料庫一律備份。圖資不在資料庫內，取消勾選後只靠這份備份無法完整還原。監控錄影不進備份。備份含帳號與金鑰資料，請管好存放位置的權限。</p>
         </div>
       </section>
 
       <div className="flex justify-end">
-        <button type="button" disabled={busy || !dirty} onClick={() => void save()} className={primaryButton}>儲存設定</button>
+        <Button disabled={busy || !dirty} onPress={() => void save()}>儲存設定</Button>
       </div>
 
       <section className="space-y-2">
         <h3 className={sectionTitle}>備份紀錄</h3>
-        <div className="overflow-auto rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px]">
-          <table className="w-full text-left text-zinc-300">
-            <thead className="text-zinc-500"><tr><th className="py-1 font-normal">開始時間</th><th className="font-normal">方式</th><th className="font-normal">狀態</th><th className="font-normal">大小</th><th className="font-normal">位置</th><th /></tr></thead>
+        <div className="overflow-auto rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 text-body-xs">
+          <table className="w-full text-left text-text-secondary">
+            <thead className="text-text-quaternary"><tr><th className="py-1 font-normal">開始時間</th><th className="font-normal">方式</th><th className="font-normal">狀態</th><th className="font-normal">大小</th><th className="font-normal">位置</th><th /></tr></thead>
             <tbody>
               {status.runs.map((run) => (
-                <tr key={run.id} className="border-t border-zinc-800 align-top">
+                <tr key={run.id} className="border-t border-border-quaternary align-top">
                   <td className="py-1.5 whitespace-nowrap pr-3">{date(run.started_at)}</td>
                   <td className="whitespace-nowrap pr-3">{run.trigger === 'auto' ? '自動' : '手動'}</td>
                   <td className="pr-3">
-                    <span className={run.status === 'success' ? 'text-emerald-400' : run.status === 'failed' ? 'text-red-300' : 'text-zinc-300'}>{STATUS_LABEL[run.status]}</span>
+                    <span className={run.status === 'success' ? 'text-status-success' : run.status === 'failed' ? 'text-status-error-emphasis' : 'text-text-secondary'}>{STATUS_LABEL[run.status]}</span>
                     {run.status === 'success' ? ` ${run.verified ? '已驗證可讀取' : ''} ${duration(run)}` : ''}
-                    {run.files_exist === false ? <div className="text-amber-300">檔案已不在此位置</div> : null}
-                    {run.error ? <div className="text-zinc-500">{run.error}</div> : null}
+                    {run.files_exist === false ? <div className="text-status-warning">檔案已不在此位置</div> : null}
+                    {run.error ? <div className="text-text-quaternary">{run.error}</div> : null}
                   </td>
                   <td className="whitespace-nowrap pr-3">{size(run.database_bytes == null ? null : Number(run.database_bytes) + Number(run.files_bytes ?? 0))}</td>
                   <td className="break-all pr-3 font-mono">{run.dir}/{run.name}</td>
                   <td className="whitespace-nowrap">
                     {run.status === 'running'
-                      ? <button type="button" disabled={busy} onClick={() => void stop(run)} className="text-amber-300 disabled:opacity-50">停止</button>
-                      : <button type="button" disabled={busy} onClick={() => void remove(run)} className="text-red-300 disabled:opacity-50">刪除</button>}
+                      ? <Button hierarchy="danger" variant="text" disabled={busy} onPress={() => void stop(run)}>停止</Button>
+                      : <Button hierarchy="danger" variant="text" disabled={busy} onPress={() => void remove(run)}>刪除</Button>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {status.runs.length === 0 ? <div className="py-3 text-zinc-500">尚無備份紀錄</div> : null}
+          {status.runs.length === 0 ? <div className="py-3 text-text-quaternary">尚無備份紀錄</div> : null}
         </div>
       </section>
 
       <section className="space-y-2">
         <h3 className={sectionTitle}>還原</h3>
-        <div className={`${card} text-zinc-400`}>
+        <div className={`${card} text-text-tertiary`}>
           還原會覆蓋現有資料且必須停機，所以不在頁面上提供按鈕，請由維運人員依 deploy/README.md 的「從系統備份還原」操作。
         </div>
       </section>

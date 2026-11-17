@@ -161,7 +161,7 @@ export function HistoryEventsPage() {
       render: (row) => (
         <div>
           <div className="tabular-nums">{formatDateTime(row.occurredAt, tz)}</div>
-          {row.occurredAtValid === false ? <div className="text-xs text-amber-300">來源未提供時間，以接收時間代替</div> : null}
+          {row.occurredAtValid === false ? <div className="text-body-xs text-status-warning">來源未提供時間，以接收時間代替</div> : null}
         </div>
       ),
     },
@@ -174,12 +174,12 @@ export function HistoryEventsPage() {
         row.vehicleCode ? (
           <div>
             <div>{row.vehicleCode}</div>
-            {row.sourceName && row.sourceName !== row.vehicleCode ? <div className="text-xs text-zinc-500">{row.sourceName}</div> : null}
+            {row.sourceName && row.sourceName !== row.vehicleCode ? <div className="text-body-xs text-text-quaternary">{row.sourceName}</div> : null}
           </div>
         ) : (
           <div>
-            <div className="text-zinc-500">不適用</div>
-            <div className="text-xs text-zinc-400">{row.sourceName ?? row.sourceId}</div>
+            <div className="text-text-quaternary">不適用</div>
+            <div className="text-body-xs text-text-tertiary">{row.sourceName ?? row.sourceId}</div>
           </div>
         ),
     },
@@ -191,7 +191,7 @@ export function HistoryEventsPage() {
       render: (row) => (
         <div>
           <div>{row.eventLabel}</div>
-          <div className="text-xs text-zinc-500">{row.eventCode}{row.origin === 'CENTER' ? '（中心端衍生）' : ''}</div>
+          <div className="text-body-xs text-text-quaternary">{row.eventCode}{row.origin === 'CENTER' ? '（中心端衍生）' : ''}</div>
         </div>
       ),
     },
@@ -202,20 +202,20 @@ export function HistoryEventsPage() {
       className: 'w-24',
       render: (row) => {
         const style = getSeverityStyle(row.severity);
-        return <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" style={{ background: style.stripBg, color: style.stripText }}>{options?.severities.find((s) => s.value === row.severity)?.label ?? row.severity}</span>;
+        return <span className="inline-flex rounded-md px-2 py-0.5 text-body-xs-bold" style={{ background: style.stripBg, color: style.stripText }}>{options?.severities.find((s) => s.value === row.severity)?.label ?? row.severity}</span>;
       },
     },
-    { key: 'summary', header: '摘要', render: (row) => <div className="line-clamp-2 text-zinc-300" title={row.summary}>{row.summary || '—'}</div> },
+    { key: 'summary', header: '摘要', render: (row) => <div className="line-clamp-2 text-text-secondary" title={row.summary}>{row.summary || '—'}</div> },
   ];
 
   const filters = options;
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-text-primary">
       <div className="flex flex-wrap items-end gap-3" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(); } }}>
         <RangeFilter compact value={draft.range} onChange={(range) => setDraft({ ...draft, range })} timeZone={tz} error={!draft.eventRecordId.trim() ? rangeError : null} />
         <FilterField label="事件 ID">
-          <input type="text" inputMode="numeric" aria-label="事件 ID" placeholder="輸入事件 ID" maxLength={19} value={draft.eventRecordId} onChange={(event) => { setDraft({ ...draft, eventRecordId: event.target.value }); setRangeError(null); }} className="h-10 w-44 rounded-xl bg-[#222831] px-3 font-mono text-sm text-zinc-100 outline-none placeholder:font-sans placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500" />
-          {draft.eventRecordId.trim() && rangeError ? <span role="alert" className="text-xs text-red-400">{rangeError}</span> : null}
+          <input type="text" inputMode="numeric" aria-label="事件 ID" placeholder="輸入事件 ID" maxLength={19} value={draft.eventRecordId} onChange={(event) => { setDraft({ ...draft, eventRecordId: event.target.value }); setRangeError(null); }} className="h-10 w-44 rounded-xl bg-surface-secondary px-3 font-mono text-body-s text-text-primary outline-none placeholder:font-sans placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme" />
+          {draft.eventRecordId.trim() && rangeError ? <span role="alert" className="text-body-xs text-status-error-emphasis">{rangeError}</span> : null}
         </FilterField>
         <SelectFilter label="載具" value={draft.vehicleCode} onChange={(v) => setDraft({ ...draft, vehicleCode: v })}
           options={(filters?.vehicles ?? []).map((v) => ({ value: v.vehicleCode, label: `${v.vehicleCode}${v.displayName !== v.vehicleCode ? ` ${v.displayName}` : ''}${v.active ? '' : '（已移除）'}` }))} />
@@ -223,14 +223,14 @@ export function HistoryEventsPage() {
         <QueryActions searchLabel="查詢" onSearch={search} onReset={reset} onExport={() => void doExport()} exporting={exporting} canExport={auth.can('events.events.export')} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+      <div className="flex flex-wrap items-center gap-3 text-body-xs text-text-tertiary">
         <span>
           {data?.range ? <>查詢區間：{formatDateTime(data.range.from, tz)} 至 {formatDateTime(data.range.to - 1, tz)}（{timeZoneLabel(tz)}）</> : applied?.eventRecordId ? <>精確事件 ID：<span className="select-all font-mono">{applied.eventRecordId}</span></> : <>查詢區間：—（{timeZoneLabel(tz)}）</>}
         </span>
       </div>
 
       {!applied ? (
-        <div className="flex min-h-56 flex-1 items-center justify-center rounded-2xl border border-zinc-800 text-sm text-zinc-500">請設定條件後按查詢</div>
+        <div className="flex min-h-56 flex-1 items-center justify-center rounded-2xl border border-border-quaternary text-body-s text-text-quaternary">請設定條件後按查詢</div>
       ) : (
         <>
           <DataTable

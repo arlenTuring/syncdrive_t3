@@ -22,7 +22,7 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
       {error ? (
         <ErrorLine text={`載入失敗：${error}`} />
       ) : !log ? (
-        <p className="py-10 text-center text-zinc-500">載入中…</p>
+        <p className="py-10 text-center text-text-quaternary">載入中…</p>
       ) : (
         <div className="space-y-5">
           <dl>
@@ -32,12 +32,12 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
             <DetailRow label="日誌類型">{log.typeLabel}（{log.type}）</DetailRow>
             <DetailRow label={category === 'authentication' ? '帳號' : '操作者'}>
               {log.operator.name ?? '未知'}
-              <span className="ml-2 text-xs text-zinc-500">{log.operator.id}・{NAME_SOURCE[log.operator.nameSource]}</span>
+              <span className="ml-2 text-body-xs text-text-quaternary">{log.operator.id}・{NAME_SOURCE[log.operator.nameSource]}</span>
             </DetailRow>
             {log.target ? (
               <DetailRow label={category === 'permissions' ? '被異動對象' : '目標'}>
                 {log.target.typeLabel}「{log.target.name ?? log.target.id ?? '—'}」
-                <span className="ml-2 text-xs text-zinc-500">{log.target.id}・{NAME_SOURCE[log.target.nameSource]}</span>
+                <span className="ml-2 text-body-xs text-text-quaternary">{log.target.id}・{NAME_SOURCE[log.target.nameSource]}</span>
               </DetailRow>
             ) : null}
             <DetailRow label="內容">{log.content}</DetailRow>
@@ -50,20 +50,20 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
 
           {category === 'permissions' && log.changes ? (
             <section>
-              <h3 className="mb-2 text-sm font-medium">異動前後差異</h3>
+              <h3 className="mb-2 text-body-s-bold">異動前後差異</h3>
               {log.changes.length ? (
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-body-s">
                   {log.changes.map((change) => (
-                    <li key={change.field} className="rounded-lg bg-[#232730] p-3">
-                      <div className="text-xs text-zinc-400">{change.field}</div>
+                    <li key={change.field} className="rounded-lg bg-surface-secondary p-3">
+                      <div className="text-body-xs text-text-tertiary">{change.field}</div>
                       {change.added || change.removed ? (
                         <>
-                          {change.added?.map((item) => <div key={`a${item.id}`} className="text-emerald-300">＋ {item.label} <span className="text-xs text-zinc-500">{item.id}</span></div>)}
-                          {change.removed?.map((item) => <div key={`r${item.id}`} className="text-red-300">－ {item.label} <span className="text-xs text-zinc-500">{item.id}</span></div>)}
-                          {!change.added?.length && !change.removed?.length ? <div className="text-zinc-500">沒有變化</div> : null}
+                          {change.added?.map((item) => <div key={`a${item.id}`} className="text-status-success">＋ {item.label} <span className="text-body-xs text-text-quaternary">{item.id}</span></div>)}
+                          {change.removed?.map((item) => <div key={`r${item.id}`} className="text-status-error-emphasis">－ {item.label} <span className="text-body-xs text-text-quaternary">{item.id}</span></div>)}
+                          {!change.added?.length && !change.removed?.length ? <div className="text-text-quaternary">沒有變化</div> : null}
                         </>
                       ) : (
-                        <div className="text-zinc-200">
+                        <div className="text-text-primary">
                           {change.before === null || change.before === undefined ? '（無）' : JSON.stringify(change.before)} → {change.after === null || change.after === undefined ? '（無）' : JSON.stringify(change.after)}
                         </div>
                       )}
@@ -71,13 +71,13 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500">沒有記錄差異內容</p>
+                <p className="text-body-s text-text-quaternary">沒有記錄差異內容</p>
               )}
             </section>
           ) : null}
           {(category === 'system' || category === 'operations') && log.detail !== undefined ? (
             <section>
-              <h3 className="mb-2 text-sm font-medium">異動摘要（已遮蔽敏感欄位）</h3>
+              <h3 className="mb-2 text-body-s-bold">異動摘要（已遮蔽敏感欄位）</h3>
               <JsonBlock value={log.detail} />
             </section>
           ) : null}

@@ -29,20 +29,22 @@ export function buttonAttributes(hierarchy: ButtonHierarchy = 'superior', varian
 export type FieldSize = 'sm' | 'md';
 
 const FIELD_BASE =
-  'w-full min-w-0 rounded-lg border border-border-quaternary bg-surface-secondary text-text-primary outline-none transition-colors '
+  'min-w-0 rounded-lg border border-border-quaternary bg-surface-secondary text-text-primary outline-none transition-colors '
   + 'placeholder:text-text-quaternary hover:border-border-tertiary focus:border-border-theme '
   + 'disabled:cursor-not-allowed disabled:border-border-disabled disabled:bg-surface-disabled disabled:text-text-disabled';
 
+/** md 跟 T3 按鈕同高（34），同一列的欄位與按鈕對齊；輸入框規格到了再依規格調整 */
 const FIELD_SIZES: Record<FieldSize, string> = {
   sm: 'h-8 px-2.5 text-body-s',
-  md: 'h-10 px-3 text-body-s',
+  md: 'h-[34px] px-3 text-body-s',
 };
 
-/** 文字、數字、日期、select 共用的輸入框外觀；invalid 時框線轉錯誤色 */
-export function fieldClass(options: { size?: FieldSize; invalid?: boolean; multiline?: boolean } = {}): string {
-  const { size = 'md', invalid = false, multiline = false } = options;
+/** 文字、數字、日期、select 共用的輸入框外觀；invalid 時框線轉錯誤色。fullWidth=false 時寬度由呼叫端決定 */
+export function fieldClass(options: { size?: FieldSize; invalid?: boolean; multiline?: boolean; fullWidth?: boolean } = {}): string {
+  const { size = 'md', invalid = false, multiline = false, fullWidth = true } = options;
   return cn(
     FIELD_BASE,
+    fullWidth && 'w-full',
     multiline ? 'min-h-24 px-3 py-2 text-body-s' : FIELD_SIZES[size],
     invalid && 'border-border-danger-light focus:border-status-error',
   );

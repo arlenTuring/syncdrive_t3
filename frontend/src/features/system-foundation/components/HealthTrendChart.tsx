@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { tokenVar } from '../../../styles/tokens'
 import type { HistoryPoint } from '../api/systemHealthApi'
+import { HEALTH_ALERT_COLOR, HEALTH_SERIES_COLOR } from './healthSeriesColors'
 
 const SERIES_META = [
-  { key: 'cpuUsagePercent' as const, labelKey: 'systemFoundation.health.cpuUsage', color: '#3b82f6', unit: '%' },
-  { key: 'cpuTempC' as const, labelKey: 'systemFoundation.health.cpuTemp', color: '#22d3ee', unit: '°C' },
-  { key: 'memoryUsagePercent' as const, labelKey: 'systemFoundation.health.memoryUsage', color: '#22c55e', unit: '%' },
+  { key: 'cpuUsagePercent' as const, labelKey: 'systemFoundation.health.cpuUsage', color: HEALTH_SERIES_COLOR.cpuUsagePercent, unit: '%' },
+  { key: 'cpuTempC' as const, labelKey: 'systemFoundation.health.cpuTemp', color: HEALTH_SERIES_COLOR.cpuTempC, unit: '°C' },
+  { key: 'memoryUsagePercent' as const, labelKey: 'systemFoundation.health.memoryUsage', color: HEALTH_SERIES_COLOR.memoryUsagePercent, unit: '%' },
   {
     key: 'diskFreePercent' as const,
     labelKey: 'systemFoundation.health.diskFree',
-    color: '#a855f7',
+    color: HEALTH_SERIES_COLOR.diskFreePercent,
     unit: '%',
   },
 ]
@@ -136,14 +138,14 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
               x2={pad.left + plotW}
               y1={yAt(v)}
               y2={yAt(v)}
-              stroke="#27272a"
+              style={{ stroke: tokenVar('border-quaternary') }}
               strokeWidth={1}
             />
             <text
               x={pad.left - 8}
               y={yAt(v) + 4}
               textAnchor="end"
-              className="fill-zinc-500"
+              className="fill-text-quaternary"
               fontSize={11}
             >
               {v}
@@ -157,7 +159,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
             x={xAt(tick.t)}
             y={height - 10}
             textAnchor="middle"
-            className="fill-zinc-500"
+            className="fill-text-quaternary"
             fontSize={11}
           >
             {tick.label}
@@ -170,7 +172,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
               key={s.key}
               d={s.d}
               fill="none"
-              stroke={s.color}
+              style={{ stroke: s.color }}
               strokeWidth={2}
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -185,7 +187,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
               x2={xAt(Date.parse(points[hoverIdx].at))}
               y1={pad.top}
               y2={pad.top + plotH}
-              stroke="#52525b"
+              style={{ stroke: tokenVar('border-primary') }}
               strokeDasharray="4 4"
             />
             {series.map((s) => {
@@ -199,8 +201,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
                   cx={xAt(Date.parse(points[hoverIdx].at))}
                   cy={yAt(v)}
                   r={4}
-                  fill={alert ? '#ef4444' : s.color}
-                  stroke="#09090b"
+                  style={{ fill: alert ? HEALTH_ALERT_COLOR : s.color, stroke: tokenVar('surface-sub-background') }}
                   strokeWidth={1.5}
                 />
               )
@@ -211,7 +212,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
 
       {hoverPoint ? (
         <div
-          className="pointer-events-none absolute z-10 min-w-[200px] rounded-lg border border-zinc-700 bg-zinc-950/95 px-3 py-2 text-[12px] shadow-xl"
+          className="pointer-events-none absolute z-10 min-w-[200px] rounded-lg border border-border-quaternary bg-surface-popup px-3 py-2 text-body-xs shadow-xl"
           style={{
             left: Math.min(
               width - 220,
@@ -233,13 +234,13 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
               <div
                 key={s.key}
                 className={`flex items-center justify-between gap-4 py-0.5 ${
-                  alert ? 'font-medium text-red-400' : 'text-zinc-200'
+                  alert ? 'font-medium text-status-error-emphasis' : 'text-text-primary'
                 }`}
               >
                 <span className="flex items-center gap-1.5">
                   <span
                     className="inline-block size-2 rounded-full"
-                    style={{ background: alert ? '#ef4444' : s.color }}
+                    style={{ background: alert ? HEALTH_ALERT_COLOR : s.color }}
                   />
                   {s.label}
                 </span>
@@ -262,7 +263,7 @@ export function HealthTrendChart({ points, memoryWarnPercent }: Props) {
       ) : null}
 
       {!points.length ? (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">
+        <div className="absolute inset-0 flex items-center justify-center text-body-s text-text-quaternary">
           {t('systemFoundation.health.noHistory')}
         </div>
       ) : null}

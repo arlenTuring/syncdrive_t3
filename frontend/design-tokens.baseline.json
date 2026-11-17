@@ -494,60 +494,7 @@
     "rgb": 6
   },
   "features/event-log-shared/ui.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 54,
-    "button": 6
-  },
-  "features/event-management/eventBadges.tsx": {
-    "hex": 8,
-    "arbitrary": 8,
-    "palette": 2
-  },
-  "features/event-management/EventDetailDialog.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 19,
-    "button": 2
-  },
-  "features/event-management/EventManagementPage.tsx": {
     "palette": 1
-  },
-  "features/event-management/EventReplayDialog.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 18,
-    "button": 1
-  },
-  "features/event-management/EventTypesDialog.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 27,
-    "button": 5
-  },
-  "features/event-management/HistoryEventsPage.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 14
-  },
-  "features/event-management/LiveEventsPage.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 24,
-    "button": 7
-  },
-  "features/event-management/ReportDialogs.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 15
-  },
-  "features/log-management/LogDetailDialog.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 11
-  },
-  "features/log-management/LogPage.tsx": {
-    "palette": 6
   },
   "features/maintenance-tasks/components/CreateMaintenanceTaskPage.tsx": {
     "hex": 11,
@@ -1030,10 +977,9 @@
     "selection": 1
   },
   "features/media-groups/dialogs.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 32,
-    "button": 3
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 13
   },
   "features/media-groups/MediaGroupsPage.tsx": {
     "hex": 3,
@@ -1399,65 +1345,24 @@
     "arbitrary": 14,
     "rgb": 7
   },
-  "features/system-foundation/components/AdvancedManagementPanel.tsx": {
-    "palette": 8,
+  "features/system-foundation/components/DataManagementPanel.tsx": {
     "button": 1
   },
-  "features/system-foundation/components/BackupSettings.tsx": {
-    "arbitrary": 19,
-    "palette": 47,
-    "button": 5,
-    "selection": 2
-  },
-  "features/system-foundation/components/DataManagementPanel.tsx": {
-    "arbitrary": 2,
-    "palette": 93,
-    "button": 13
-  },
   "features/system-foundation/components/DataRetentionPanel.tsx": {
-    "arbitrary": 2,
-    "palette": 37,
-    "button": 6
-  },
-  "features/system-foundation/components/DataRetentionSettings.tsx": {
-    "arbitrary": 6,
-    "palette": 17,
-    "button": 2,
-    "selection": 1
+    "palette": 1,
+    "button": 1
   },
   "features/system-foundation/components/HealthMetricCards.tsx": {
-    "hex": 3,
-    "arbitrary": 10,
-    "palette": 19
-  },
-  "features/system-foundation/components/HealthTrendChart.tsx": {
-    "hex": 9,
-    "arbitrary": 1,
-    "palette": 7
+    "arbitrary": 1
   },
   "features/system-foundation/components/SettingsFormControls.tsx": {
-    "hex": 8,
-    "arbitrary": 23,
-    "palette": 44,
-    "button": 7
+    "button": 5
   },
   "features/system-foundation/components/SystemFoundationSettingsPanel.tsx": {
-    "hex": 15,
-    "arbitrary": 51,
-    "palette": 71,
-    "button": 4
+    "button": 1
   },
   "features/system-foundation/components/ThresholdSettingsDialog.tsx": {
-    "hex": 7,
-    "arbitrary": 24,
-    "palette": 58,
-    "button": 12
-  },
-  "features/system-foundation/SystemFoundationPage.tsx": {
-    "hex": 10,
-    "arbitrary": 14,
-    "palette": 27,
-    "button": 4
+    "button": 5
   },
   "features/time-templates/components/AttributeColorPalette.tsx": {
     "hex": 3,

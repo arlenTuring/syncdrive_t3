@@ -2,11 +2,11 @@ import { SiteDateTimeInput } from '../../../components/SiteDateTimeInput';
 import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Clock, UserRound, X } from 'lucide-react'
-import { Checkbox, Switch } from '../../../components/ui'
+import { ChevronDown, UserRound, X } from 'lucide-react'
+import { Button, Checkbox, CheckboxIndicator, cn, MENU_PANEL_CLASS, menuItemClass, Switch, TextInput } from '../../../components/ui'
 
 export function FieldLabel({ children }: { children: ReactNode }) {
-  return <span className="mb-1.5 block text-[12px] text-zinc-400">{children}</span>
+  return <span className="mb-1.5 block text-body-xs text-text-tertiary">{children}</span>
 }
 
 export function SelectField({
@@ -23,20 +23,13 @@ export function SelectField({
   return (
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <div className="relative">
-        <SiteSelect
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-11 w-full appearance-none rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 pr-9 text-[13px] text-zinc-100 outline-none focus:border-sky-500/70"
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </SiteSelect>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-      </div>
+      <SiteSelect value={value} onChange={(e) => onChange(e.target.value)} size="md" className="w-full">
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </SiteSelect>
     </label>
   )
 }
@@ -57,13 +50,12 @@ export function TextField({
   return (
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <input
+      <TextInput
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={type === 'password' ? 'new-password' : undefined}
-        className="h-11 w-full rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-500/70"
       />
     </label>
   )
@@ -95,7 +87,7 @@ export function NumberStepperField({
   return (
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <div className="flex h-11 items-stretch overflow-hidden rounded-lg border border-zinc-700 bg-[#1c1c1f]">
+      <div className="flex h-[34px] items-stretch overflow-hidden rounded-lg border border-border-quaternary bg-surface-secondary focus-within:border-border-theme">
         <input
           type="number"
           value={Number.isFinite(value) ? value : 0}
@@ -106,29 +98,29 @@ export function NumberStepperField({
             const n = Number(e.target.value)
             onChange(Number.isFinite(n) ? clamp(n) : 0)
           }}
-          className="min-w-0 flex-1 bg-transparent px-3 text-[13px] text-zinc-100 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="min-w-0 flex-1 bg-transparent px-3 text-body-s text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {unit ? (
-          <span className="flex items-center pr-2 text-[12px] text-zinc-500">
+          <span className="flex items-center pr-2 text-body-xs text-text-quaternary">
             {unit}
           </span>
         ) : null}
-        <div className="flex w-7 flex-col border-l border-zinc-700">
+        <div className="flex w-7 flex-col border-l border-border-quaternary">
           <button
             type="button"
-            className="flex flex-1 items-center justify-center text-zinc-400 hover:bg-zinc-800"
+            className="flex flex-1 items-center justify-center text-text-tertiary hover:bg-link-standard-hover"
             onClick={() => onChange(clamp(value + step))}
             aria-label="增加"
           >
-            <span className="text-[10px] leading-none">▴</span>
+            <span className="text-caption-2">▴</span>
           </button>
           <button
             type="button"
-            className="flex flex-1 items-center justify-center border-t border-zinc-700 text-zinc-400 hover:bg-zinc-800"
+            className="flex flex-1 items-center justify-center border-t border-border-quaternary text-text-tertiary hover:bg-link-standard-hover"
             onClick={() => onChange(clamp(value - step))}
             aria-label="減少"
           >
-            <span className="text-[10px] leading-none">▾</span>
+            <span className="text-caption-2">▾</span>
           </button>
         </div>
       </div>
@@ -148,15 +140,7 @@ export function TimeField({
   return (
     <label className="block min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <div className="relative">
-        <SiteDateTimeInput
-          type="time"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-11 w-full rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 pr-10 text-[13px] text-zinc-100 outline-none focus:border-sky-500/70 [color-scheme:dark]"
-        />
-        <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-      </div>
+      <SiteDateTimeInput type="time" value={value} onChange={(e) => onChange(e.target.value)} size="md" className="w-full" />
     </label>
   )
 }
@@ -239,23 +223,23 @@ export function ChipMultiSelectField({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-zinc-700 bg-[#1c1c1f] px-3 py-2 text-left transition hover:border-zinc-600"
+          className="flex min-h-[34px] w-full items-center gap-2 rounded-lg border border-border-quaternary bg-surface-secondary px-3 py-1 text-left transition hover:border-border-tertiary"
         >
           <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
             {selected.length === 0 ? (
-              <span className="text-[13px] text-zinc-500">{placeholder}</span>
+              <span className="text-body-s text-text-quaternary">{placeholder}</span>
             ) : (
               selected.map((item) => (
                 <span
                   key={item.id}
-                  className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-1 text-[12px] text-zinc-100"
+                  className="inline-flex items-center gap-1 rounded-md bg-surface-secondary px-2 py-1 text-body-xs text-text-primary"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <UserRound className="size-3.5 text-zinc-400" />
+                  <UserRound className="size-3.5 text-text-tertiary" />
                   {item.name}
                   <button
                     type="button"
-                    className="ml-0.5 rounded p-0.5 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-200"
+                    className="ml-0.5 rounded p-0.5 text-text-quaternary hover:bg-link-standard-hover hover:text-text-primary"
                     aria-label={`移除 ${item.name}`}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -268,20 +252,20 @@ export function ChipMultiSelectField({
               ))
             )}
           </div>
-          <ChevronDown className="size-4 shrink-0 text-zinc-500" />
+          <ChevronDown className="size-4 shrink-0 text-text-quaternary" />
         </button>
 
         {open ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-lg border border-zinc-700 bg-[#1a1a1d] py-1 shadow-xl">
+          <div className={cn(MENU_PANEL_CLASS, 'absolute left-0 right-0 top-[calc(100%+4px)] z-20')}>
             {options.map((item) => {
               const checked = selectedIds.includes(item.id)
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-white/5 ${
-                    checked ? 'text-sky-300' : 'text-zinc-200'
-                  }`}
+                  role="option"
+                  aria-selected={checked}
+                  className={menuItemClass(checked)}
                   onClick={() => {
                     onChange(
                       checked
@@ -290,13 +274,9 @@ export function ChipMultiSelectField({
                     )
                   }}
                 >
-                  <UserRound className="size-3.5 text-zinc-500" />
+                  <CheckboxIndicator checked={checked} />
+                  <UserRound className="size-3.5 text-text-quaternary" />
                   {item.name}
-                  {checked ? (
-                    <span className="ml-auto text-[11px] text-sky-400">
-                      已選
-                    </span>
-                  ) : null}
                 </button>
               )
             })}
@@ -320,28 +300,18 @@ export function SettingsFooter({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="mt-auto flex items-center justify-end gap-3 border-t border-zinc-800/80 pt-4">
+    <div className="mt-auto flex items-center justify-end gap-3 border-t border-border-quaternary pt-4">
       {error ? (
-        <p className="mr-auto max-w-[50%] truncate text-[12px] text-rose-300">
+        <p className="mr-auto max-w-[50%] truncate text-body-xs text-status-error-emphasis">
           {error}
         </p>
       ) : null}
-      <button
-        type="button"
-        onClick={onCancel}
-        disabled={saving}
-        className="rounded-lg px-4 py-2 text-[13px] text-zinc-300 transition hover:bg-zinc-800 hover:text-white disabled:opacity-50"
-      >
+      <Button hierarchy="subordinate" variant="tonal" onPress={onCancel} disabled={saving}>
         {t('common.cancel')}
-      </button>
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="rounded-lg bg-[#2B7FFF] px-5 py-2 text-[13px] font-medium text-white transition hover:bg-[#1f6fe0] disabled:opacity-50"
-      >
+      </Button>
+      <Button onPress={onSave} disabled={saving}>
         {saving ? t('common.saving') : t('common.save')}
-      </button>
+      </Button>
     </div>
   )
 }

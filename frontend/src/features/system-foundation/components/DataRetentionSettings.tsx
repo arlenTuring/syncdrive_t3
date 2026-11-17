@@ -7,6 +7,7 @@ import {
   type CleanupCategory, type RetentionPolicy,
 } from '../api/dataAdminApi'
 import { systemConfirm } from '../../../lib/systemDialog'
+import { Button, Switch } from '../../../components/ui';
 
 const DAY_MS = 86_400_000
 const HOUR_MS = 3_600_000
@@ -21,18 +22,17 @@ const GROUPS: Array<{ title: string; categories: string[] }> = [
 
 function Row({ title, note, children }: { title: string; note: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5 text-[13px]">
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2.5 text-body-s">
       <div className="min-w-[220px] flex-1">
-        <div className="font-medium text-zinc-200">{title}</div>
-        <div className="mt-0.5 text-[12px] text-zinc-500">{note}</div>
+        <div className="font-medium text-text-primary">{title}</div>
+        <div className="mt-0.5 text-body-xs text-text-quaternary">{note}</div>
       </div>
       {children}
     </div>
   )
 }
 
-const numberInput = 'w-20 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200'
-const saveButton = 'rounded border border-sky-700 px-3 py-1 text-sky-300 disabled:opacity-50'
+const numberInput = 'w-20 rounded border border-border-quaternary bg-surface-primary px-2 py-1 text-text-primary'
 
 /**
  * 各種資料保存天數集中在這裡。資料庫類別寫 data_retention_policies（後端排程依此清理），
@@ -123,12 +123,12 @@ export function DataRetentionSettings() {
         title={info?.label ?? category}
         note={`${info?.impact ?? ''}最近成功 ${date(policy.last_success_at)}`}
       >
-        <label className="text-zinc-300">
-          <input type="checkbox" className="mr-1" checked={draft.enabled} onChange={(e) => update({ enabled: e.target.checked })} />
+        <label className="inline-flex items-center gap-2 text-text-secondary">
+          <Switch checked={draft.enabled} aria-label="自動清理" onCheckedChange={(enabled) => update({ enabled })} />
           自動清理
         </label>
         {draft.enabled ? (
-          <label className="text-zinc-400">
+          <label className="text-text-tertiary">
             保存
             <input
               aria-label={`${info?.label ?? category}保存數量`}
@@ -141,26 +141,26 @@ export function DataRetentionSettings() {
             {draft.retentionUnit === 'day' ? '天' : '小時'}
           </label>
         ) : (
-          <span className="text-zinc-500">永久保存</span>
+          <span className="text-text-quaternary">永久保存</span>
         )}
-        <button type="button" disabled={busy} onClick={() => void savePolicy(policy)} className={saveButton}>儲存</button>
+        <Button variant="outlined" disabled={busy} onPress={() => void savePolicy(policy)}>儲存</Button>
       </Row>
     )
   }
 
   return (
     <div className="space-y-6">
-      {error ? <p role="alert" className="text-[12px] text-red-300">{error}</p> : null}
+      {error ? <p role="alert" className="text-body-xs text-status-error-emphasis">{error}</p> : null}
       {GROUPS.map((group) => (
         <section key={group.title} className="space-y-2">
-          <h3 className="text-[13px] font-semibold text-zinc-200">{group.title}</h3>
+          <h3 className="text-body-s-bold text-text-primary">{group.title}</h3>
           {group.categories.map(policyRow)}
         </section>
       ))}
       <section className="space-y-2">
-        <h3 className="text-[13px] font-semibold text-zinc-200">影像</h3>
+        <h3 className="text-body-s-bold text-text-primary">影像</h3>
         <Row title="監控錄影" note={videoError ? `無法取得影像設定：${videoError}` : '超過天數的錄影由影像儲存排程刪除；容量上限與儲存位置在影像管理設定。'}>
-          <label className="text-zinc-400">
+          <label className="text-text-tertiary">
             保存
             <input
               aria-label="監控錄影保存天數"
@@ -174,11 +174,11 @@ export function DataRetentionSettings() {
             />
             天
           </label>
-          <button type="button" disabled={busy || !video} onClick={() => void saveVideo()} className={saveButton}>儲存</button>
+          <Button variant="outlined" disabled={busy || !video} onPress={() => void saveVideo()}>儲存</Button>
         </Row>
       </section>
       <section className="space-y-2">
-        <h3 className="text-[13px] font-semibold text-zinc-200">稽核日誌</h3>
+        <h3 className="text-body-s-bold text-text-primary">稽核日誌</h3>
         <Row title="操作、權限異動、登入日誌" note="目前沒有自動清理，全部保留。" />
       </section>
     </div>

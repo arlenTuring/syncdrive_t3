@@ -28,6 +28,7 @@ export { Panel } from './panel/Panel';
 export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } from './radio/Radio';
 export { headerCheckState } from './checkbox/selection';
 export { Switch, type SwitchConfiguration, type SwitchProps } from './switch/Switch';
+export { SegmentedControl, Tabs, type TabItem } from './tabs/Tabs';
 export {
   buttonAttributes,
   badgeToneColors,
