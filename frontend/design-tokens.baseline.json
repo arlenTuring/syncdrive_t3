@@ -369,100 +369,65 @@
     "hex": 1
   },
   "features/degraded-operation/ActiveExecutionDialogs.tsx": {
-    "hex": 6,
-    "arbitrary": 6,
-    "palette": 31,
-    "button": 7,
-    "selection": 2
+    "hex": 1,
+    "arbitrary": 1
   },
   "features/degraded-operation/DegradedHistoryView.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 75,
-    "button": 5
-  },
-  "features/degraded-operation/DegradedIcons.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 3
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 9,
+    "button": 1
   },
   "features/degraded-operation/DegradedOperationPage.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 61,
-    "button": 13
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 10,
+    "button": 1
   },
   "features/degraded-operation/DegradedPlanDialog.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 34,
-    "button": 4
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 3,
+    "button": 1
   },
   "features/degraded-operation/DegradedPlanForm.tsx": {
     "hex": 1,
-    "arbitrary": 1,
-    "palette": 19,
-    "button": 1,
-    "selection": 2
+    "arbitrary": 1
   },
   "features/degraded-operation/ExecutionScheduleFields.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 11,
-    "button": 2
+    "button": 1
   },
   "features/degraded-operation/MapViewport.tsx": {
-    "palette": 6,
+    "palette": 1,
     "button": 4
   },
   "features/degraded-operation/PlanExecutionDialog.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 26,
-    "button": 3
+    "palette": 1
   },
   "features/degraded-operation/PlanManagementView.tsx": {
     "hex": 2,
-    "arbitrary": 2,
-    "palette": 22,
-    "button": 10
+    "arbitrary": 2
   },
   "features/dispatch-scheduling/components/CreateDispatchConfirmStep.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 25,
-    "button": 1
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 2
   },
   "features/dispatch-scheduling/components/CreateDispatchDialog.tsx": {
-    "hex": 16,
-    "arbitrary": 20,
-    "palette": 43,
-    "button": 10
-  },
-  "features/dispatch-scheduling/components/DispatchReviewDialog.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 11,
-    "button": 3
-  },
-  "features/dispatch-scheduling/components/DispatchStationActionRow.tsx": {
-    "hex": 2,
-    "arbitrary": 3,
-    "palette": 8,
+    "palette": 2,
     "button": 1
   },
   "features/dispatch-scheduling/components/VehicleAssignSelect.tsx": {
-    "hex": 13,
-    "arbitrary": 22,
+    "hex": 3,
+    "arbitrary": 10,
     "rgb": 3,
-    "palette": 5,
+    "palette": 1,
     "button": 2
   },
   "features/dispatch-scheduling/DispatchSchedulingPage.tsx": {
-    "hex": 11,
-    "arbitrary": 13,
-    "palette": 37,
-    "button": 9
+    "hex": 2,
+    "arbitrary": 2,
+    "button": 4
   },
   "features/dispatch-scheduling/types.ts": {
     "hex": 6,
@@ -473,78 +438,26 @@
     "palette": 1
   },
   "features/maintenance-tasks/components/CreateMaintenanceTaskPage.tsx": {
-    "hex": 11,
-    "arbitrary": 14,
+    "hex": 2,
+    "arbitrary": 3,
     "rgb": 1,
-    "palette": 54,
-    "button": 5
+    "palette": 4,
+    "button": 1
   },
   "features/maintenance-tasks/components/FacilityEquipmentRowsEditor.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 22,
-    "button": 2
+    "palette": 1
   },
   "features/maintenance-tasks/components/MaintenanceTaskListPage.tsx": {
-    "hex": 5,
-    "arbitrary": 7,
-    "palette": 66,
-    "button": 10
+    "palette": 9,
+    "button": 5
   },
   "features/maintenance-tasks/components/MaintenanceTaskPreviewContent.tsx": {
     "hex": 3,
-    "arbitrary": 5,
-    "palette": 28,
-    "button": 1
-  },
-  "features/maintenance-tasks/components/MaintenanceTaskResultPreviewPage.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 12,
-    "button": 1
-  },
-  "features/maintenance-tasks/components/NavigateToSetupModal.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 11,
-    "button": 3
-  },
-  "features/maintenance-tasks/components/StepCarWashParams.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 7
-  },
-  "features/maintenance-tasks/components/StepChargingParams.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 6
+    "arbitrary": 3,
+    "palette": 1
   },
   "features/maintenance-tasks/components/StepMaintenanceParams.tsx": {
-    "hex": 8,
-    "arbitrary": 8,
-    "palette": 22,
-    "button": 2
-  },
-  "features/maintenance-tasks/components/StepSchedulePreview.tsx": {
-    "palette": 2
-  },
-  "features/maintenance-tasks/components/StepSectionToggle.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 5,
-    "selection": 1
-  },
-  "features/maintenance-tasks/components/StepStationDurationParams.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 11,
-    "selection": 1
-  },
-  "features/maintenance-tasks/components/TriggerFieldRow.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 11,
-    "selection": 1
+    "palette": 1
   },
   "features/map-editor/components/AreaDragTrack.tsx": {
     "rgb": 6
@@ -958,32 +871,25 @@
     "button": 1
   },
   "features/psd-control/components/DockTimeDialog.tsx": {
-    "hex": 16,
-    "arbitrary": 29,
-    "palette": 27,
-    "button": 6
+    "hex": 8,
+    "arbitrary": 6
   },
   "features/psd-control/components/DoorDetailPage.tsx": {
-    "hex": 3,
-    "arbitrary": 9,
-    "palette": 6,
-    "button": 2
+    "arbitrary": 1
   },
   "features/psd-control/components/DoorLinkIndicator.tsx": {
-    "hex": 8,
-    "arbitrary": 3,
-    "palette": 1
+    "hex": 6,
+    "arbitrary": 1
   },
   "features/psd-control/components/DoorMonitorCard.tsx": {
-    "hex": 8,
-    "arbitrary": 21,
-    "palette": 21,
-    "button": 3
+    "hex": 3,
+    "arbitrary": 5,
+    "palette": 2,
+    "button": 2
   },
   "features/psd-control/PsdControlPage.tsx": {
-    "hex": 7,
-    "arbitrary": 10,
-    "palette": 14,
+    "hex": 1,
+    "arbitrary": 4,
     "button": 3
   },
   "features/schedule-management/components/ScheduleModuleSidebar.tsx": {
@@ -1001,50 +907,36 @@
     "button": 3
   },
   "features/shift-deployment/components/DeploymentShiftTable.tsx": {
-    "hex": 2,
-    "arbitrary": 7,
     "rgb": 2,
-    "palette": 23,
-    "button": 4
+    "button": 1
   },
   "features/shift-deployment/components/ExecutionTimeField.tsx": {
-    "hex": 11,
-    "arbitrary": 19,
+    "hex": 1,
+    "arbitrary": 7,
     "rgb": 4,
-    "palette": 9,
-    "button": 4
+    "button": 2
   },
   "features/shift-deployment/components/RingProgress.tsx": {
     "hex": 1,
-    "arbitrary": 1,
-    "rgb": 1,
-    "palette": 2
-  },
-  "features/shift-deployment/components/ScheduleAdjustApplyDialog.tsx": {
-    "hex": 12,
-    "arbitrary": 13,
-    "palette": 48,
-    "button": 9
+    "rgb": 1
   },
   "features/shift-deployment/components/ScheduleAdjustDiffStep.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 30,
+    "palette": 2,
     "button": 2
   },
   "features/shift-deployment/components/ShiftRouteTrack.tsx": {
     "hex": 5
   },
   "features/shift-deployment/components/SummaryCards.tsx": {
-    "hex": 9,
-    "arbitrary": 25,
-    "palette": 60,
-    "button": 4
+    "hex": 5,
+    "arbitrary": 1,
+    "palette": 9,
+    "button": 1
   },
   "features/shift-deployment/components/VehicleControlSection.tsx": {
-    "hex": 6,
-    "arbitrary": 10,
-    "palette": 7,
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 1,
     "button": 4
   },
   "features/shift-deployment/diffScheduleTasks.ts": {
@@ -1062,9 +954,7 @@
     "rgb": 1
   },
   "features/shift-deployment/ShiftDeploymentPage.tsx": {
-    "arbitrary": 1,
-    "palette": 4,
-    "button": 1
+    "palette": 2
   },
   "features/shift-list/components/CapacityTrendChart.tsx": {
     "hex": 7,
@@ -1198,38 +1088,30 @@
     "hex": 21
   },
   "features/shift-records/components/CustomDateTimePanel.tsx": {
-    "palette": 33,
-    "button": 7
+    "palette": 3,
+    "button": 2
   },
   "features/shift-records/components/DateTimeRangePicker.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 9,
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 1,
     "button": 3
   },
   "features/shift-records/components/DrivingCapabilityModal.tsx": {
-    "hex": 19,
-    "arbitrary": 29,
-    "palette": 35,
-    "button": 3
-  },
-  "features/shift-records/components/RunCodeRow.tsx": {
-    "arbitrary": 1,
-    "palette": 11,
-    "button": 1
-  },
-  "features/shift-records/components/ShiftRecordDetailPage.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 45,
+    "hex": 15,
+    "arbitrary": 15,
+    "palette": 6,
     "button": 2
   },
+  "features/shift-records/components/RunCodeRow.tsx": {
+    "palette": 1
+  },
+  "features/shift-records/components/ShiftRecordDetailPage.tsx": {
+    "palette": 1
+  },
   "features/shift-records/components/ShiftRecordsListPage.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 69,
-    "button": 8,
-    "selection": 2
+    "palette": 5,
+    "button": 5
   },
   "features/shift-records/types.ts": {
     "hex": 7,
@@ -1383,28 +1265,22 @@
     "palette": 24
   },
   "features/vehicle-editor/ComponentPalette.tsx": {
-    "arbitrary": 2,
-    "palette": 9,
     "button": 1
   },
   "features/vehicle-editor/components/VehicleAssetPicker.tsx": {
-    "arbitrary": 3,
-    "palette": 14,
+    "arbitrary": 1,
+    "palette": 1,
     "button": 1
   },
   "features/vehicle-editor/components/VehicleCanvasResizeOverlay.tsx": {
-    "arbitrary": 1,
     "palette": 3
   },
   "features/vehicle-editor/components/VehiclePreviewTestPanel.tsx": {
-    "arbitrary": 8,
-    "palette": 40,
-    "button": 5,
-    "selection": 2
+    "palette": 3,
+    "button": 1
   },
   "features/vehicle-editor/components/VehicleRotationToolbar.tsx": {
-    "palette": 16,
-    "button": 4
+    "palette": 4
   },
   "features/vehicle-editor/constants/palette.ts": {
     "hex": 6
@@ -1419,48 +1295,32 @@
   "features/vehicle-editor/elements/VehicleElementNode.tsx": {
     "arbitrary": 1,
     "rgb": 1,
-    "palette": 2
+    "palette": 1
   },
   "features/vehicle-editor/elements/VehicleImageLayer.tsx": {
     "hex": 1
   },
   "features/vehicle-editor/index.tsx": {
-    "hex": 2,
-    "arbitrary": 8,
-    "palette": 48,
-    "button": 11
-  },
-  "features/vehicle-editor/management/LegacyVehicleModelPanel.tsx": {
-    "hex": 1,
-    "arbitrary": 4,
-    "palette": 35,
-    "button": 6
+    "palette": 2,
+    "button": 1
   },
   "features/vehicle-editor/management/MapVehicleSettingsPanel.tsx": {
-    "hex": 1,
-    "arbitrary": 7,
-    "palette": 35,
-    "button": 3
+    "palette": 2,
+    "button": 2
   },
   "features/vehicle-editor/management/VehicleModelManagement.tsx": {
-    "arbitrary": 2,
-    "palette": 13,
+    "palette": 3,
     "button": 1
   },
   "features/vehicle-editor/model/VehicleBehaviorSettingsFields.tsx": {
-    "arbitrary": 5,
-    "palette": 25,
-    "button": 3
+    "palette": 3
   },
   "features/vehicle-editor/NewVehicleDialog.tsx": {
-    "palette": 39,
-    "button": 4
+    "palette": 2,
+    "button": 1
   },
   "features/vehicle-editor/PropertiesPanel.tsx": {
-    "arbitrary": 9,
-    "palette": 44,
-    "button": 3,
-    "selection": 1
+    "palette": 2
   },
   "features/vehicle-editor/useVehicleEditor.ts": {
     "hex": 1
@@ -1475,26 +1335,22 @@
     "hex": 1
   },
   "features/vehicle-editor/VehicleList.tsx": {
-    "hex": 1,
-    "arbitrary": 5,
-    "palette": 47,
-    "button": 8
+    "palette": 1,
+    "button": 1
   },
   "features/vehicle-editor/VehicleWorkspace.tsx": {
-    "hex": 7,
-    "arbitrary": 3,
+    "hex": 6,
     "rgb": 2,
-    "palette": 14,
-    "button": 3
+    "palette": 4
   },
   "features/vehicle-registry/VehicleRegistryPage.tsx": {
     "button": 1
   },
   "features/vehicle-rotation/VehicleRotationPage.tsx": {
-    "hex": 16,
-    "arbitrary": 16,
-    "palette": 150,
-    "button": 11
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 2,
+    "button": 6
   },
   "features/vehicle-run-history/QueryPanel.tsx": {
     "button": 2
@@ -1525,36 +1381,22 @@
     "button": 4
   },
   "features/virtual-fence-management/components/FenceFormPanel.tsx": {
-    "hex": 12,
-    "arbitrary": 14,
-    "palette": 35,
-    "button": 5,
-    "selection": 2
+    "arbitrary": 1
   },
   "features/virtual-fence-management/components/FenceListPanel.tsx": {
-    "hex": 14,
-    "arbitrary": 16,
-    "palette": 35,
-    "button": 8
+    "hex": 1,
+    "arbitrary": 2
   },
   "features/virtual-fence-management/components/FenceMapPanel.tsx": {
-    "hex": 10,
-    "arbitrary": 11,
-    "palette": 13,
-    "button": 7
+    "hex": 3,
+    "arbitrary": 3,
+    "button": 6
   },
   "features/virtual-fence-management/components/FenceShapeOverlay.tsx": {
-    "hex": 5,
-    "arbitrary": 4,
+    "hex": 1,
     "rgb": 1,
     "palette": 1,
     "button": 2
-  },
-  "features/virtual-fence-management/components/FenceViewPanel.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 10,
-    "button": 3
   },
   "features/virtual-fence-management/types.ts": {
     "hex": 2,
@@ -1563,10 +1405,7 @@
     "palette": 1
   },
   "features/virtual-fence-management/VirtualFencePage.tsx": {
-    "hex": 8,
-    "arbitrary": 11,
-    "palette": 10,
-    "button": 2
+    "arbitrary": 1
   },
   "lib/RotatedElementResizeHandles.tsx": {
     "palette": 5

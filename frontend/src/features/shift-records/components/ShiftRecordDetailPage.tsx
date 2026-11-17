@@ -5,6 +5,7 @@ import { StatusTag } from '../../../components/StatusTag';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail, type ShiftRecordDetail } from '../api/shiftRecordsApi';
 import { EXECUTION_TAG_STYLE, executionDisplayKey } from '../types';
+import { Button } from '../../../components/ui';
 
 type ShiftRecordDetailPageProps = {
   orderId: string;
@@ -13,10 +14,10 @@ type ShiftRecordDetailPageProps = {
 
 function JsonBlock({ value }: { value: unknown }) {
   if (value == null) {
-    return <span className="text-zinc-500">—</span>;
+    return <span className="text-text-quaternary">—</span>;
   }
   return (
-    <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 text-xs text-zinc-300">
+    <pre className="overflow-x-auto rounded-lg border border-border-quaternary bg-surface-sub-background p-3 text-body-xs text-text-secondary">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -55,47 +56,33 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
   }, [load]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <header className="flex items-center justify-between border-b border-zinc-800/80 px-6 py-4">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <header className="flex items-center justify-between border-b border-border-quaternary px-6 py-4">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            <ArrowLeft className="size-4" />
-            {t('shiftRecords.detail.backToList')}
-          </button>
-          <h1 className="text-lg font-semibold">{t('shiftRecords.detail.title')}</h1>
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<ArrowLeft />} onPress={onBack}>{t('shiftRecords.detail.backToList')}</Button>
+          <h1 className="text-headline-5">{t('shiftRecords.detail.title')}</h1>
           {detail && (
-            <span className="font-mono text-sm text-zinc-500">{detail.trip_code}</span>
+            <span className="font-mono text-body-s text-text-quaternary">{detail.trip_code}</span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-        >
-          <RefreshCw className="size-4" />
-          {t('common.refresh')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RefreshCw />} onPress={() => void load()}>{t('common.refresh')}</Button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
         {loading && (
-          <div className="flex items-center justify-center gap-2 py-20 text-zinc-500">
+          <div className="flex items-center justify-center gap-2 py-20 text-text-quaternary">
             <Loader2 className="size-5 animate-spin" />
             {t('common.loading')}
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          <div className="rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
             {error}
           </div>
         )}
         {detail && !loading && (
           <div className="mx-auto max-w-5xl space-y-6">
-            <section className="grid gap-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <section className="grid gap-4 rounded-xl border border-border-quaternary bg-black-30 p-5 sm:grid-cols-2 lg:grid-cols-3">
               <InfoCell label={t('shiftRecords.columns.tripCode')} value={detail.trip_code} />
               <InfoCell label={t('shiftRecords.detail.orderId')} value={detail.order_id} mono />
               <InfoCell label={t('shiftRecords.columns.vehicle')} value={detail.vehicle_code} />
@@ -130,22 +117,22 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+              <h2 className="mb-2 text-body-s-bold text-text-secondary">
                 {t('shiftRecords.detail.currentLeg')}
               </h2>
               <JsonBlock value={detail.current_leg} />
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+              <h2 className="mb-2 text-body-s-bold text-text-secondary">
                 {t('shiftRecords.detail.taskGroup')}
               </h2>
               {detail.task_group.length === 0 ? (
-                <p className="text-sm text-zinc-500">{t('shiftRecords.detail.noTaskGroup')}</p>
+                <p className="text-body-s text-text-quaternary">{t('shiftRecords.detail.noTaskGroup')}</p>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-zinc-800">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="bg-zinc-900/80 text-zinc-500">
+                <div className="overflow-x-auto rounded-xl border border-border-quaternary">
+                  <table className="w-full min-w-[640px] text-left text-body-s">
+                    <thead className="bg-surface-primary text-text-quaternary">
                       <tr>
                         <th className="px-3 py-2 font-medium">task_id</th>
                         <th className="px-3 py-2 font-medium">task_name</th>
@@ -155,13 +142,13 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                     </thead>
                     <tbody>
                       {detail.task_group.map((task, idx) => (
-                        <tr key={String(task.task_id ?? idx)} className="border-t border-zinc-800/80">
-                          <td className="px-3 py-2 font-mono text-xs text-zinc-400">
+                        <tr key={String(task.task_id ?? idx)} className="border-t border-border-quaternary">
+                          <td className="px-3 py-2 font-mono text-body-xs text-text-tertiary">
                             {String(task.task_id ?? '—')}
                           </td>
-                          <td className="px-3 py-2 text-zinc-200">{String(task.task_name ?? '—')}</td>
-                          <td className="px-3 py-2 text-zinc-300">{String(task.status ?? '—')}</td>
-                          <td className="px-3 py-2 text-zinc-500">{String(task.note ?? '')}</td>
+                          <td className="px-3 py-2 text-text-primary">{String(task.task_name ?? '—')}</td>
+                          <td className="px-3 py-2 text-text-secondary">{String(task.status ?? '—')}</td>
+                          <td className="px-3 py-2 text-text-quaternary">{String(task.note ?? '')}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -171,15 +158,15 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+              <h2 className="mb-2 text-body-s-bold text-text-secondary">
                 {t('shiftRecords.detail.stationActions')}
               </h2>
               {detail.actions.length === 0 ? (
-                <p className="text-sm text-zinc-500">{t('shiftRecords.detail.noStationActions')}</p>
+                <p className="text-body-s text-text-quaternary">{t('shiftRecords.detail.noStationActions')}</p>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-zinc-800">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="bg-zinc-900/80 text-zinc-500">
+                <div className="overflow-x-auto rounded-xl border border-border-quaternary">
+                  <table className="w-full min-w-[640px] text-left text-body-s">
+                    <thead className="bg-surface-primary text-text-quaternary">
                       <tr>
                         <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colStation')}</th>
                         <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colAction')}</th>
@@ -189,11 +176,11 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                     </thead>
                     <tbody>
                       {detail.actions.map((action) => (
-                        <tr key={action.action_id} className="border-t border-zinc-800/80">
-                          <td className="px-3 py-2 text-zinc-200">{action.station_id}</td>
-                          <td className="px-3 py-2 text-zinc-300">{action.action_type}</td>
-                          <td className="px-3 py-2 text-zinc-300">{action.action_status}</td>
-                          <td className="px-3 py-2 font-mono text-xs text-zinc-500">
+                        <tr key={action.action_id} className="border-t border-border-quaternary">
+                          <td className="px-3 py-2 text-text-primary">{action.station_id}</td>
+                          <td className="px-3 py-2 text-text-secondary">{action.action_type}</td>
+                          <td className="px-3 py-2 text-text-secondary">{action.action_status}</td>
+                          <td className="px-3 py-2 font-mono text-body-xs text-text-quaternary">
                             {action.node_id ?? '—'}
                           </td>
                         </tr>
@@ -205,7 +192,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+              <h2 className="mb-2 text-body-s-bold text-text-secondary">
                 {t('shiftRecords.detail.rawPayload')}
               </h2>
               <JsonBlock value={detail.payload} />
@@ -228,8 +215,8 @@ function InfoCell({
 }) {
   return (
     <div>
-      <div className="mb-1 text-xs text-zinc-500">{label}</div>
-      <div className={`text-sm text-zinc-100 ${mono ? 'font-mono' : ''}`}>{value}</div>
+      <div className="mb-1 text-body-xs text-text-quaternary">{label}</div>
+      <div className={`text-body-s text-text-primary ${mono ? 'font-mono' : ''}`}>{value}</div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Hourglass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ControlMode } from '../constants';
+import { Button } from '../../../components/ui';
 
 export type DoorKind = 'vehicle' | 'platform';
 
@@ -37,15 +38,15 @@ function ModeToggle({
 }) {
   const { t } = useTranslation();
   const btn = (active: boolean) =>
-    `rounded px-3 py-1.5 text-[12px] leading-none ${
+    `rounded px-3 py-1.5 text-body-xs leading-none ${
       active
-        ? 'border border-[#2B7FFF] bg-[#2B7FFF] text-white'
-        : 'border border-white/25 bg-[#1c1c1f] text-zinc-200 hover:border-white/40'
+        ? 'border border-border-theme bg-link-theme-filled text-text-primary'
+        : 'border border-border-tertiary bg-surface-primary text-text-primary hover:border-white/40'
     }`;
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[12px] text-zinc-300">{t('psdControl.controlMode')}</span>
+      <span className="text-body-xs text-text-secondary">{t('psdControl.controlMode')}</span>
       <div className="flex items-center gap-1">
         <button type="button" onClick={() => onChange('auto')} className={btn(value === 'auto')}>
           {t('psdControl.autoControl')}
@@ -61,8 +62,8 @@ function ModeToggle({
 function StatusCard({ label, value, dot }: { label: string; value: string; dot?: boolean }) {
   return (
     <div className="min-w-0 rounded-md bg-[#2a2a2e] px-2.5 py-2">
-      <p className="text-[11px] leading-none text-zinc-400">{label}</p>
-      <p className="mt-1.5 flex items-center gap-1.5 text-[13px] leading-none text-white">
+      <p className="text-body-xs text-text-tertiary">{label}</p>
+      <p className="mt-1.5 flex items-center gap-1.5 text-body-s text-text-primary">
         {dot ? <span className="size-1.5 shrink-0 rounded-full bg-[#22c55e]" aria-hidden /> : null}
         {value}
       </p>
@@ -73,12 +74,12 @@ function StatusCard({ label, value, dot }: { label: string; value: string; dot?:
 function CameraWell({ src }: { src?: string | null }) {
   const { t } = useTranslation();
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-[#0c0c0e]">
+    <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full min-h-[120px] w-full items-center justify-center">
-          <p className="text-[14px] tracking-[0.4px] text-zinc-400">{t('psdControl.notConnected')}</p>
+          <p className="text-body-s tracking-[0.4px] text-text-tertiary">{t('psdControl.notConnected')}</p>
         </div>
       )}
     </div>
@@ -124,7 +125,7 @@ export function DoorMonitorCard({
   return (
     <div className="flex min-h-0 min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3">
       <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3">
-        <p className="text-[14px] text-white">{door.label}</p>
+        <p className="text-body-s text-text-primary">{door.label}</p>
         <ModeToggle value={door.mode} onChange={onModeChange} />
       </div>
 
@@ -133,28 +134,22 @@ export function DoorMonitorCard({
       <div className="mt-3 grid shrink-0 grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] gap-0">
         <div className="min-w-0 pr-4">
           <div className="mb-2.5 flex items-center gap-2">
-            <p className="text-[13px] text-white">{controlTitle}</p>
-            <span className="rounded-full border border-white/25 bg-[#1c1c1f] px-2 py-0.5 text-[10px] leading-none text-zinc-300">
+            <p className="text-body-s text-text-primary">{controlTitle}</p>
+            <span className="rounded-full border border-border-tertiary bg-surface-primary px-2 py-0.5 text-caption-2 text-text-secondary">
               {t('psdControl.latency', { value: door.latency })}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {actions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className="rounded-md border border-white/30 bg-transparent py-3 text-[13px] text-white hover:border-white/60 hover:bg-white/5"
-              >
-                {action.label}
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" key={action.id}>{action.label}</Button>
             ))}
           </div>
         </div>
 
-        <div className="min-w-0 border-l border-white/10 pl-4">
+        <div className="min-w-0 border-l border-border-quaternary pl-4">
           <div className="mb-2.5 flex items-center justify-between gap-2">
-            <p className="text-[13px] text-white">{t('psdControl.doorStatus')}</p>
-            <p className="flex items-center gap-1.5 text-[12px] text-zinc-300">
+            <p className="text-body-s text-text-primary">{t('psdControl.doorStatus')}</p>
+            <p className="flex items-center gap-1.5 text-body-xs text-text-secondary">
               <Hourglass className="size-3.5 stroke-[1.5]" aria-hidden />
               {timer ?? t('psdControl.notDocked')}
             </p>

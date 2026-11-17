@@ -35,10 +35,10 @@ export function StepSchedulePreview({
 
   return (
     <div className="w-full">
-      <h2 className="mb-2 text-base font-medium text-zinc-100">
+      <h2 className="mb-2 text-body-m-bold text-text-primary">
         {t('maintenanceTasks.schedulePreview.title')}
       </h2>
-      <p className="mb-6 text-sm text-zinc-500">
+      <p className="mb-6 text-body-s text-text-quaternary">
         {t('maintenanceTasks.schedulePreview.hint')}
       </p>
 

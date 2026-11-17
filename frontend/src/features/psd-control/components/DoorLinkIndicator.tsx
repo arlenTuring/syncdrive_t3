@@ -83,17 +83,17 @@ export function DoorLinkIndicator({
         {amount < 0.85 ? (
           <>
             <span
-              className="pointer-events-none absolute left-1/2 top-0 z-[1] h-1 w-1.5 -translate-x-1/2 rounded-b-sm bg-[#0a0a0b]"
+              className="pointer-events-none absolute left-1/2 top-0 z-[1] h-1 w-1.5 -translate-x-1/2 rounded-b-sm bg-surface-sub-background"
               aria-hidden
             />
             <span
-              className="pointer-events-none absolute bottom-0 left-1/2 z-[1] h-1 w-1.5 -translate-x-1/2 rounded-t-sm bg-[#0a0a0b]"
+              className="pointer-events-none absolute bottom-0 left-1/2 z-[1] h-1 w-1.5 -translate-x-1/2 rounded-t-sm bg-surface-sub-background"
               aria-hidden
             />
           </>
         ) : null}
       </div>
-      <span className="text-center text-xs tracking-[0.5px] text-zinc-200">{label}</span>
+      <span className="text-center text-body-xs tracking-[0.5px] text-text-primary">{label}</span>
     </div>
   );
 }

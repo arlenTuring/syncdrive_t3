@@ -35,6 +35,7 @@ import {
   type ExecutionStatusKey,
   type ShiftTab,
 } from '../types';
+import { Button, Checkbox, IconButton } from '../../../components/ui';
 
 type ShiftRecordsListPageProps = {
   onBackToHome?: () => void;
@@ -202,18 +203,18 @@ export function ShiftRecordsListPage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
       {!embedded ? (
-        <header className="border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
+        <header className="border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
           <div className="flex items-center gap-3">
             {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-            <ClipboardList className="size-5 text-sky-400" aria-hidden />
-            <h1 className="text-lg font-semibold tracking-tight">{t('shiftRecords.title')}</h1>
+            <ClipboardList className="size-5 text-text-theme" aria-hidden />
+            <h1 className="text-headline-5">{t('shiftRecords.title')}</h1>
           </div>
         </header>
       ) : null}
 
-      <div className="border-b border-zinc-800/80 px-6">
+      <div className="border-b border-border-quaternary px-6">
         <div className="flex gap-8">
           {(['mainline', 'maintenance'] as const).map((key) => {
             const label =
@@ -227,10 +228,10 @@ export function ShiftRecordsListPage({
                   setTab(key);
                   setPage(1);
                 }}
-                className={`border-b-2 py-3 text-sm font-medium transition ${
+                className={`border-b-2 py-3 text-body-s font-medium transition ${
                   active
-                    ? 'border-sky-400 text-sky-300'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    ? 'border-border-theme text-text-theme'
+                    : 'border-transparent text-text-quaternary hover:text-text-secondary'
                 }`}
               >
                 {label}
@@ -240,25 +241,17 @@ export function ShiftRecordsListPage({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800/60 px-6 py-4">
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700"
-          title={t('common.resetFiltersTitle')}
-        >
-          <RotateCcw className="size-3.5" aria-hidden />
-          {t('common.resetFilters')}
-        </button>
+      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
+        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={resetFilters} title={t('common.resetFiltersTitle')} leadingIcon={<RotateCcw />}>{t('common.resetFilters')}</Button>
         <div className="relative min-w-[180px] flex-1 basis-[200px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
             type="search"
             placeholder={t('shiftRecords.keywordPlaceholder')}
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-sky-600 focus:outline-none"
+            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-sky-600 focus:outline-none"
           />
         </div>
         <SiteSelect
@@ -267,7 +260,7 @@ export function ShiftRecordsListPage({
             setExecutionStatus(e.target.value as ExecutionStatusKey | 'all');
             setPage(1);
           }}
-          className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+          size="md" className="shrink-0"
         >
           {EXECUTION_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -283,7 +276,7 @@ export function ShiftRecordsListPage({
             setVehicleCode(e.target.value);
             setPage(1);
           }}
-          className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+          size="md" className="shrink-0"
         >
           <option value="">{t('shiftRecords.selectVehicle')}</option>
           {vehicles.map((vehicle) => (
@@ -303,40 +296,28 @@ export function ShiftRecordsListPage({
           disabled={!canSearch}
           className={`inline-flex size-9 items-center justify-center rounded-lg border transition ${
             canSearch
-              ? 'border-sky-600 bg-sky-600/20 text-sky-300 hover:bg-sky-600/30'
-              : 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 text-zinc-600'
+              ? 'border-sky-600 bg-link-tonal text-text-theme hover:bg-sky-600/30'
+              : 'cursor-not-allowed border-border-quaternary bg-surface-primary text-text-disabled'
           }`}
           title={t('common.search')}
         >
           <Search className="size-4" />
         </button>
-        <button
-          type="button"
-          onClick={() => void handleDownload()}
-          disabled={exporting}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
-        >
-          {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {t('common.download')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => void handleDownload()} disabled={exporting}>{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {t('common.download')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
         {error && (
-          <div className="mb-3 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          <div className="mb-3 rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
             {error}
           </div>
         )}
-        <table className="w-full min-w-[900px] border-collapse text-sm">
+        <table className="w-full min-w-[900px] border-collapse text-body-s">
           <thead>
-            <tr className="border-b border-zinc-800 text-left text-zinc-500">
+            <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="w-10 py-3 pr-2">
-                <input
-                  type="checkbox"
-                  checked={items.length > 0 && selected.size === items.length}
-                  onChange={toggleAll}
-                  className="rounded border-zinc-600 bg-zinc-900"
-                />
+                <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </th>
               <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.tripCode')}</th>
               <th className="py-3 pr-4 font-medium">{t('shiftRecords.columns.executionStatus')}</th>
@@ -350,14 +331,14 @@ export function ShiftRecordsListPage({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-zinc-500">
+                <td colSpan={8} className="py-16 text-center text-text-quaternary">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
                   {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-zinc-500">
+                <td colSpan={8} className="py-16 text-center text-text-quaternary">
                   {t('shiftRecords.empty')}
                 </td>
               </tr>
@@ -365,36 +346,24 @@ export function ShiftRecordsListPage({
               items.map((row) => (
                 <tr
                   key={row.order_id}
-                  className="border-b border-zinc-800/60 hover:bg-zinc-900/50"
+                  className="border-b border-border-quaternary hover:bg-surface-primary"
                 >
                   <td className="py-3 pr-2">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.order_id)}
-                      onChange={() => toggleRow(row.order_id)}
-                      className="rounded border-zinc-600 bg-zinc-900"
-                    />
+                    <Checkbox checked={selected.has(row.order_id)} onCheckedChange={() => toggleRow(row.order_id)} />
                   </td>
-                  <td className="py-3 pr-4 font-medium text-zinc-100">{row.trip_code}</td>
+                  <td className="py-3 pr-4 font-medium text-text-primary">{row.trip_code}</td>
                   <td className="py-3 pr-4">
                     <StatusTag
                       label={t(`shiftRecords.executionStatus.${executionDisplayKey(row)}`)}
                       style={EXECUTION_TAG_STYLE[executionDisplayKey(row)]}
                     />
                   </td>
-                  <td className="py-3 pr-4 text-zinc-300">{row.route_label}</td>
-                  <td className="py-3 pr-4 text-zinc-300">{row.vehicle_code}</td>
-                  <td className="py-3 pr-4 font-mono leading-5 text-zinc-400"><DateTimeCell value={row.depart_time} /></td>
-                  <td className="py-3 pr-4 font-mono leading-5 text-zinc-400"><DateTimeCell value={row.end_time} /></td>
+                  <td className="py-3 pr-4 text-text-secondary">{row.route_label}</td>
+                  <td className="py-3 pr-4 text-text-secondary">{row.vehicle_code}</td>
+                  <td className="py-3 pr-4 font-mono leading-5 text-text-tertiary"><DateTimeCell value={row.depart_time} /></td>
+                  <td className="py-3 pr-4 font-mono leading-5 text-text-tertiary"><DateTimeCell value={row.end_time} /></td>
                   <td className="py-3">
-                    <button
-                      type="button"
-                      onClick={() => onOpenDetail(row.order_id)}
-                      className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title={t('shiftRecords.drivingCapability')}
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
+                    <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => onOpenDetail(row.order_id)} title={t('shiftRecords.drivingCapability')} label={t('shiftRecords.drivingCapability')} icon={<MoreHorizontal />} />
                   </td>
                 </tr>
               ))
@@ -403,12 +372,12 @@ export function ShiftRecordsListPage({
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-zinc-800/80 px-6 py-4">
+      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -417,10 +386,10 @@ export function ShiftRecordsListPage({
             key={n}
             type="button"
             onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-sm ${
+            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
               n === page
-                ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
-                : 'text-zinc-500 hover:bg-zinc-800'
+                ? 'bg-sky-500/20 text-text-theme ring-1 ring-sky-500/40'
+                : 'text-text-quaternary hover:bg-link-standard-hover'
             }`}
           >
             {n}
@@ -430,7 +399,7 @@ export function ShiftRecordsListPage({
           type="button"
           disabled={page >= totalPages}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronRight className="size-4" />
         </button>

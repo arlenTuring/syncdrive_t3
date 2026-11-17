@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { VirtualFence } from '../types';
+import { Button, IconButton } from '../../../components/ui';
 
 type FenceViewPanelProps = {
   detail: VirtualFence;
@@ -12,8 +13,8 @@ type FenceViewPanelProps = {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-sm text-zinc-300">{label}</p>
-      <p className="text-sm text-white">{value}</p>
+      <p className="text-body-s text-text-secondary">{label}</p>
+      <p className="text-body-s text-text-primary">{value}</p>
     </div>
   );
 }
@@ -36,19 +37,12 @@ export function FenceViewPanel({
       : '—';
 
   return (
-    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-zinc-800/80 bg-[#0a0a0b]">
+    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-border-quaternary bg-surface-sub-background">
       <div className="flex shrink-0 items-center justify-between px-5 py-4">
-        <p className="text-sm font-medium text-white">
+        <p className="text-body-s-bold text-text-primary">
           {t('virtualFence.view.title')}
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex size-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
-          title={t('common.close')}
-        >
-          <X className="size-4" aria-hidden />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} title={t('common.close')} label={t('common.close')} icon={<X />} />
       </div>
 
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-4">
@@ -66,20 +60,8 @@ export function FenceViewPanel({
       </div>
 
       <div className="flex shrink-0 items-center gap-3 px-5 py-4">
-        <button
-          type="button"
-          onClick={onDelete}
-          className="text-sm text-red-500 transition hover:text-red-400"
-        >
-          {t('common.delete')}
-        </button>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="ml-auto inline-flex h-9 min-w-[96px] items-center justify-center rounded-lg bg-[#3f3f46] px-5 text-sm text-white transition hover:bg-[#52525b]"
-        >
-          {t('common.edit')}
-        </button>
+        <Button hierarchy="danger" variant="text" onPress={onDelete}>{t('common.delete')}</Button>
+        <Button hierarchy="subordinate" variant="standard" className="ml-auto min-w-[96px]" onPress={onEdit}>{t('common.edit')}</Button>
       </div>
     </aside>
   );

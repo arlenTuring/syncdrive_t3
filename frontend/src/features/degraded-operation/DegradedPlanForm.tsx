@@ -1,6 +1,7 @@
 import { SiteSelect } from '../../components/SiteSelect';
 /* eslint-disable react-refresh/only-export-components -- draft helpers are the form's shared validation contract */
 import type { DegradedOperationPlan, DegradedOperationPlanInput } from "./api";
+import { Button, Radio } from '../../components/ui';
 
 export type PlanDraft = {
   name: string;
@@ -54,7 +55,7 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-transparent bg-[#252b34] px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-blue-500 disabled:cursor-not-allowed disabled:text-zinc-500";
+  "w-full rounded-xl border border-transparent bg-[#252b34] px-4 py-3 text-text-primary outline-none transition placeholder:text-text-quaternary focus:border-border-theme disabled:cursor-not-allowed disabled:text-text-quaternary";
 
 export function DegradedPlanForm({
   value,
@@ -67,9 +68,9 @@ export function DegradedPlanForm({
     <div className="space-y-4">
       {showIdentity ? (
         <>
-          <label className="block text-sm text-zinc-300">
+          <label className="block text-body-s text-text-secondary">
             <span className="mb-1.5 block">
-              <b className="text-red-400">*</b>計畫名稱
+              <b className="text-status-error-emphasis">*</b>計畫名稱
             </span>
             <input
               autoFocus
@@ -81,7 +82,7 @@ export function DegradedPlanForm({
               placeholder="請輸入"
             />
           </label>
-          <label className="block text-sm text-zinc-300">
+          <label className="block text-body-s text-text-secondary">
             <span className="mb-1.5 block">計畫說明</span>
             <textarea
               disabled={disabled}
@@ -93,9 +94,9 @@ export function DegradedPlanForm({
           </label>
         </>
       ) : null}
-      <label className="block text-sm text-zinc-300">
+      <label className="block text-body-s text-text-secondary">
         <span className="mb-1.5 block">
-          <b className="text-red-400">*</b>計畫等級
+          <b className="text-status-error-emphasis">*</b>計畫等級
         </span>
         <SiteSelect
           disabled={disabled}
@@ -111,43 +112,24 @@ export function DegradedPlanForm({
         </SiteSelect>
       </label>
       <fieldset disabled={disabled} className="space-y-3">
-        <legend className="mb-1.5 text-sm text-zinc-300">
-          <b className="text-red-400">*</b>速限
+        <legend className="mb-1.5 text-body-s text-text-secondary">
+          <b className="text-status-error-emphasis">*</b>速限
         </legend>
-        <div className="flex flex-wrap gap-5 text-sm text-zinc-100">
+        <div className="flex flex-wrap gap-5 text-body-s text-text-primary">
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="radio"
-              name="speed-mode"
-              checked={value.speedMode === "stopped"}
-              onChange={() => patch({ speedMode: "stopped" })}
-              className="size-4 accent-blue-500"
-            />
+            <Radio name="speed-mode" checked={value.speedMode === "stopped"} onChange={() => patch({ speedMode: "stopped" })} />
             停駛
           </label>
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="radio"
-              name="speed-mode"
-              checked={value.speedMode === "custom"}
-              onChange={() => patch({ speedMode: "custom" })}
-              className="size-4 accent-blue-500"
-            />
+            <Radio name="speed-mode" checked={value.speedMode === "custom"} onChange={() => patch({ speedMode: "custom" })} />
             自定義
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
           {[10, 20, 30, 40].map((speed) => (
-            <button
-              key={speed}
-              type="button"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="outlined" className="min-w-16" key={speed} onPress={() =>
                 patch({ speedMode: "custom", customSpeed: String(speed) })
-              }
-              className="min-w-16 rounded-lg border border-zinc-500 px-3 py-1.5 text-sm text-zinc-100 hover:border-blue-400"
-            >
-              {speed}
-            </button>
+              }>{speed}</Button>
           ))}
         </div>
         <div className="relative">
@@ -161,14 +143,14 @@ export function DegradedPlanForm({
             className={`${inputClass} pr-20`}
             aria-label="速限數值"
           />
-          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-zinc-400">
+          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-body-s text-text-tertiary">
             km/h
           </span>
         </div>
         {value.speedMode === "custom" &&
         (!Number.isFinite(Number(value.customSpeed)) ||
           Number(value.customSpeed) <= 0) ? (
-          <p className="text-xs text-red-300">
+          <p className="text-body-xs text-status-error-emphasis">
             自定義速限必須是大於 0 的數值。
           </p>
         ) : null}

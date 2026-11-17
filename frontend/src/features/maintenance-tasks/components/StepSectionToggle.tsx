@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Checkbox } from '../../../components/ui';
 
 type StepSectionToggleProps = {
   title: string;
@@ -18,13 +19,8 @@ export function StepSectionToggle({
   return (
     <div className="w-full">
       <label className="mb-6 flex cursor-pointer items-center gap-2">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onEnabledChange(e.target.checked)}
-          className="size-4 shrink-0 rounded border-zinc-600 bg-zinc-900 text-[#2B7FFF] focus:ring-[#2B7FFF]/30"
-        />
-        <h2 className={`text-base font-medium ${enabled ? 'text-zinc-100' : 'text-zinc-500'}`}>
+        <Checkbox checked={enabled} onCheckedChange={(checked) => onEnabledChange(checked)} />
+        <h2 className={`text-body-m-bold ${enabled ? 'text-text-primary' : 'text-text-quaternary'}`}>
           {title}
         </h2>
       </label>
@@ -32,7 +28,7 @@ export function StepSectionToggle({
       {enabled ? (
         children
       ) : (
-        <p className="text-sm text-zinc-600">{t('maintenanceTasks.stepSkipped')}</p>
+        <p className="text-body-s text-text-disabled">{t('maintenanceTasks.stepSkipped')}</p>
       )}
     </div>
   );

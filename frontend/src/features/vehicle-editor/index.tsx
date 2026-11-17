@@ -12,6 +12,7 @@ import { useVehicleEditor } from './useVehicleEditor';
 import { VehicleDefinitionConflictError, type VehicleModelReference } from './api/vehicleDefinitionsApi';
 import type { VehicleDefinition } from './types';
 import { VEHICLE_NUDGE_SHIFT_STEP, VEHICLE_NUDGE_STEP } from './utils/vehicleNudge';
+import { Button, IconButton } from '../../components/ui';
 
 function isTextEditingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -281,7 +282,7 @@ export default function VehicleEditor({
 
   if (view === 'list') {
     return (
-      <div className="flex h-full min-h-0 w-full flex-col bg-[#0a0f1a]">
+      <div className="flex h-full min-h-0 w-full flex-col bg-surface-sub-background">
         <VehicleList
           vehicles={vehicles}
           readOnly={readOnly}
@@ -290,10 +291,10 @@ export default function VehicleEditor({
             loadState !== 'ready' || listMessage ? (
               <div
                 role="status"
-                className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${
+                className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-body-xs ${
                   listMessage || loadState === 'offline'
-                    ? 'border-red-500/40 bg-red-500/10 text-red-200'
-                    : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                    ? 'border-red-500/40 bg-status-error-light text-status-error-emphasis'
+                    : 'border-border-quaternary bg-surface-primary text-text-tertiary'
                 }`}
               >
                 <span>
@@ -303,13 +304,9 @@ export default function VehicleEditor({
                       : '連不上後端：只顯示此瀏覽器的快取，不能修改')}
                 </span>
                 {loadState === 'offline' ? (
-                  <button type="button" className="underline" onClick={() => void reloadFromServer()}>
-                    重試
-                  </button>
+                  <Button hierarchy="subordinate" variant="text" onPress={() => void reloadFromServer()}>重試</Button>
                 ) : listMessage ? (
-                  <button type="button" onClick={() => setListMessage(null)}>
-                    關閉
-                  </button>
+                  <Button hierarchy="subordinate" variant="tonal" onPress={() => setListMessage(null)}>關閉</Button>
                 ) : null}
               </div>
             ) : null
@@ -334,7 +331,7 @@ export default function VehicleEditor({
 
   if (!activeVehicle) {
     return (
-      <div className="flex h-full items-center justify-center text-zinc-500">
+      <div className="flex h-full items-center justify-center text-text-quaternary">
         {t('vehicleEditor.editor.notFound')}
       </div>
     );
@@ -342,25 +339,18 @@ export default function VehicleEditor({
 
   return (
     <VariableProvider variables={{}}>
-      <div className="flex h-full min-h-0 w-full flex-col bg-[#0a0f1a]">
-        <header className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-2.5">
-          <button
-            type="button"
-            onClick={() => {
+      <div className="flex h-full min-h-0 w-full flex-col bg-surface-sub-background">
+        <header className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-sub-background px-4 py-2.5">
+          <Button hierarchy="subordinate" variant="standard" onPress={() => {
               flushSave();
               setView('list');
               setIsEditMode(false);
               selectElement(null);
-            }}
-            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
-          >
-            <ArrowLeft size={14} />
-            {t('vehicleEditor.editor.backToList')}
-          </button>
-          <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
-            <Bus size={16} className="text-amber-400" />
-            <span className="text-sm font-semibold text-zinc-200">{activeVehicle.name}</span>
-            <span className="font-mono text-[10px] text-zinc-600">
+            }} leadingIcon={<ArrowLeft />}>{t('vehicleEditor.editor.backToList')}</Button>
+          <div className="flex items-center gap-2 border-l border-border-quaternary pl-3">
+            <Bus size={16} className="text-status-warning" />
+            <span className="text-body-s-bold text-text-primary">{activeVehicle.name}</span>
+            <span className="font-mono text-caption-2 text-text-disabled">
               {activeVehicle.width}×{activeVehicle.height}
             </span>
           </div>
@@ -370,41 +360,17 @@ export default function VehicleEditor({
             onTakeServer={() => takeServerVersion(activeVehicle.id)}
           />
           <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              title={t('vehicleEditor.editor.duplicateTitle')}
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" title={t('vehicleEditor.editor.duplicateTitle')} onPress={() => {
                 if (activeVehicleId) duplicateVehicle(activeVehicleId);
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-            >
-              <Copy size={14} />
-              {t('common.duplicate')}
-            </button>
-            <button
-              type="button"
-              title={t('vehicleEditor.editor.exportTitle')}
-              onClick={() => {
+              }} leadingIcon={<Copy />}>{t('common.duplicate')}</Button>
+            <Button hierarchy="subordinate" variant="outlined" title={t('vehicleEditor.editor.exportTitle')} onPress={() => {
                 if (activeVehicleId) exportVehiclesJson([activeVehicleId]);
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-            >
-              <Download size={14} />
-              {t('vehicleEditor.editor.export')}
-            </button>
-            <button
-              type="button"
-              title={t('vehicleEditor.editor.importTitle')}
-              onClick={() => importFileInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-            >
-              <Upload size={14} />
-              {importStatus === 'ok'
+              }} leadingIcon={<Download />}>{t('vehicleEditor.editor.export')}</Button>
+            <Button hierarchy="subordinate" variant="outlined" title={t('vehicleEditor.editor.importTitle')} onPress={() => importFileInputRef.current?.click()} leadingIcon={<Upload />}>{importStatus === 'ok'
                 ? t('vehicleEditor.editor.importOk')
                 : importStatus === 'error'
                   ? t('vehicleEditor.editor.importFail')
-                  : t('vehicleEditor.editor.import')}
-            </button>
+                  : t('vehicleEditor.editor.import')}</Button>
             <input
               ref={importFileInputRef}
               type="file"
@@ -414,24 +380,8 @@ export default function VehicleEditor({
             />
             {isEditMode && (
               <>
-                <button
-                  type="button"
-                  onClick={undo}
-                  disabled={!canUndo}
-                  title={t('vehicleEditor.editor.undoTitle')}
-                  className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
-                >
-                  <Undo2 size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={redo}
-                  disabled={!canRedo}
-                  title={t('vehicleEditor.editor.redoTitle')}
-                  className="rounded-lg border border-zinc-700 p-1.5 text-zinc-400 hover:border-zinc-500 hover:text-white disabled:opacity-30"
-                >
-                  <Redo2 size={14} />
-                </button>
+                <IconButton hierarchy="subordinate" variant="outlined" onPress={undo} disabled={!canUndo} title={t('vehicleEditor.editor.undoTitle')} label={t('vehicleEditor.editor.undoTitle')} icon={<Undo2 />} />
+                <IconButton hierarchy="subordinate" variant="outlined" onPress={redo} disabled={!canRedo} title={t('vehicleEditor.editor.redoTitle')} label={t('vehicleEditor.editor.redoTitle')} icon={<Redo2 />} />
               </>
             )}
             <button
@@ -439,23 +389,16 @@ export default function VehicleEditor({
               disabled={readOnly || syncState[activeVehicle.id]?.status === 'conflict'}
               title={readOnly ? '後端模型還沒讀到，不能修改' : undefined}
               onClick={toggleEditMode}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-body-xs font-medium transition-colors ${
                 isEditMode
-                  ? 'bg-amber-600 text-white'
-                  : 'border border-zinc-700 text-zinc-300 hover:border-zinc-500'
+                  ? 'bg-amber-600 text-text-primary'
+                  : 'border border-border-quaternary text-text-secondary hover:border-border-primary'
               }`}
             >
               <Pencil size={14} />
               {isEditMode ? t('vehicleEditor.editor.editing') : t('vehicleEditor.editor.edit')}
             </button>
-            <button
-              type="button"
-              onClick={handleSaveFeedback}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500"
-            >
-              <Save size={14} />
-              {saveStatus === 'ok' ? t('vehicleEditor.editor.autoSaved') : t('vehicleEditor.editor.save')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={handleSaveFeedback} leadingIcon={<Save />}>{saveStatus === 'ok' ? t('vehicleEditor.editor.autoSaved') : t('vehicleEditor.editor.save')}</Button>
           </div>
         </header>
 
@@ -541,18 +484,16 @@ function SyncBadge({
 }) {
   if (state?.status === 'conflict') {
     return (
-      <span className="flex items-center gap-2 rounded-md bg-red-500/15 px-2 py-1 text-[11px] text-red-200">
+      <span className="flex items-center gap-2 rounded-md bg-status-error-light px-2 py-1 text-body-xs text-status-error-emphasis">
         {state.message}
-        <button type="button" className="underline" onClick={onTakeServer}>
-          {state.current ? '改用伺服器版本' : '移除本機副本'}
-        </button>
+        <Button hierarchy="subordinate" variant="text" onPress={onTakeServer}>{state.current ? '改用伺服器版本' : '移除本機副本'}</Button>
       </span>
     );
   }
   if (state?.status === 'error')
-    return <span className="rounded-md bg-red-500/15 px-2 py-1 text-[11px] text-red-200">未存到後端：{state.message}</span>;
-  if (state?.status === 'saving') return <span className="text-[11px] text-zinc-500">儲存中…</span>;
-  if (state?.status === 'saved') return <span className="text-[11px] text-emerald-400">已存到後端</span>;
-  if (unsaved) return <span className="text-[11px] text-amber-300">尚未存到後端</span>;
+    return <span className="rounded-md bg-status-error-light px-2 py-1 text-body-xs text-status-error-emphasis">未存到後端：{state.message}</span>;
+  if (state?.status === 'saving') return <span className="text-body-xs text-text-quaternary">儲存中…</span>;
+  if (state?.status === 'saved') return <span className="text-body-xs text-status-success">已存到後端</span>;
+  if (unsaved) return <span className="text-body-xs text-status-warning">尚未存到後端</span>;
   return null;
 }

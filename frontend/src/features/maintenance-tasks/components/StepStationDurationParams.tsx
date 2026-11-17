@@ -14,9 +14,10 @@ import {
 import { sanitizeIntegerInput } from '../utils/numericInput';
 import { FacilityEquipmentRowsEditor } from './FacilityEquipmentRowsEditor';
 import { StepSectionToggle } from './StepSectionToggle';
+import { Checkbox } from '../../../components/ui';
 
 const DURATION_INPUT_CLASS =
-  'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 type StepStationDurationParamsProps = {
   title: string;
@@ -104,21 +105,15 @@ export function StepStationDurationParams({
     >
       <div className="space-y-6">
         {showFollowTemplateCheckbox && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#2B7FFF]">
-              <input
-                type="checkbox"
-                checked={task.durationFollowTemplate !== false}
-                onChange={(e) =>
-                  patchTask({
-                    durationFollowTemplate: e.target.checked,
+          <div className="rounded-lg border border-border-quaternary bg-surface-primary p-4">
+            <label className="flex cursor-pointer items-center gap-2 text-body-s-bold text-text-theme-light">
+              <Checkbox checked={task.durationFollowTemplate !== false} onCheckedChange={(checked) => patchTask({
+                    durationFollowTemplate: checked,
                   })
-                }
-                className="size-4 rounded border-zinc-700 bg-zinc-900 accent-[#2B7FFF]"
-              />
+                } />
               依照排班調度決定時長
             </label>
-            <p className="mt-1.5 pl-6 text-xs leading-normal text-zinc-500">
+            <p className="mt-1.5 pl-6 text-body-xs text-text-quaternary">
               勾選後，排班引擎會直接採用時間模板中該任務區間的原始長度，不限固定作業時長。
             </p>
           </div>
@@ -126,8 +121,8 @@ export function StepStationDurationParams({
 
         {(!showFollowTemplateCheckbox || task.durationFollowTemplate === false) && (
           <div>
-            <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
-              <span className="text-red-500">*</span>
+            <span className="mb-2 flex items-center gap-1 text-body-s text-text-secondary">
+              <span className="text-status-error">*</span>
               單次作業時長 (分鐘)
             </span>
             <input

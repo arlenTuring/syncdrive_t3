@@ -21,6 +21,7 @@ import {
 import { DegradedPlanDialog } from "./DegradedPlanDialog";
 import { draftFromPlan } from "./DegradedPlanForm";
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button, IconButton } from '../../components/ui';
 
 type SortKey = "name" | "level" | "speed";
 const PAGE_SIZE = 10;
@@ -107,67 +108,33 @@ export function PlanManagementView({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#15161a] p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col bg-[#15161a] p-5 text-text-primary">
       <div className="mb-6 flex shrink-0 flex-wrap items-center gap-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-lg border border-blue-500/70 px-3 py-2 text-sm text-blue-400 hover:bg-blue-500/10"
-        >
-          <ArrowLeft className="size-4" />
-          返回看即時
-        </button>
-        <h2 className="text-lg font-medium">計畫管理</h2>
-        <button
-          type="button"
-          onClick={() => setDialog({ kind: "create" })}
-          className="ml-auto inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500"
-        >
-          <Plus className="size-4" />
-          新增計畫
-        </button>
+        <Button variant="outlined" leadingIcon={<ArrowLeft />} onPress={onBack}>返回看即時</Button>
+        <h2 className="text-headline-5">計畫管理</h2>
+        <Button className="ml-auto" leadingIcon={<Plus />} onPress={() => setDialog({ kind: "create" })}>新增計畫</Button>
       </div>
       {error ? (
         <div
           role="alert"
-          className="mb-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+          className="mb-4 flex items-center justify-between rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-s text-status-error-emphasis"
         >
           <span>{error}</span>
-          <button type="button" onClick={load} className="underline">
-            重試
-          </button>
+          <Button hierarchy="subordinate" variant="text" onPress={load}>重試</Button>
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-          <thead className="sticky top-0 bg-[#15161a] text-zinc-400">
-            <tr className="border-b border-zinc-700">
+        <table className="w-full min-w-[640px] border-collapse text-left text-body-s">
+          <thead className="sticky top-0 bg-[#15161a] text-text-tertiary">
+            <tr className="border-b border-border-quaternary">
               <th className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => changeSort("name")}
-                  className="inline-flex items-center gap-1"
-                >
-                  降級計畫名稱{sortIcon("name")}
-                </button>
+                <Button hierarchy="subordinate" variant="text" onPress={() => changeSort("name")}>降級計畫名稱{sortIcon("name")}</Button>
               </th>
               <th className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => changeSort("level")}
-                  className="inline-flex items-center gap-1"
-                >
-                  降級等級{sortIcon("level")}
-                </button>
+                <Button hierarchy="subordinate" variant="text" onPress={() => changeSort("level")}>降級等級{sortIcon("level")}</Button>
               </th>
               <th className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => changeSort("speed")}
-                  className="inline-flex items-center gap-1"
-                >
-                  速限{sortIcon("speed")}
-                </button>
+                <Button hierarchy="subordinate" variant="text" onPress={() => changeSort("speed")}>速限{sortIcon("speed")}</Button>
               </th>
               <th className="w-28 px-4 py-3">
                 <span className="sr-only">操作</span>
@@ -177,30 +144,14 @@ export function PlanManagementView({
           <tbody>
             {!loading &&
               result?.items.map((plan) => (
-                <tr key={plan.id} className="border-b border-zinc-800">
+                <tr key={plan.id} className="border-b border-border-quaternary">
                   <td className="px-4 py-4">{plan.name}</td>
                   <td className="px-4 py-4">Level {plan.level}</td>
                   <td className="px-4 py-4">{plan.speed_limit_kmh} km/h</td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void edit(plan.id)}
-                        aria-label={`編輯 ${plan.name}`}
-                        title="編輯"
-                        className="text-zinc-300 hover:text-blue-400"
-                      >
-                        <Pencil className="size-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void remove(plan)}
-                        aria-label={`刪除 ${plan.name}`}
-                        title="刪除"
-                        className="text-zinc-300 hover:text-red-400"
-                      >
-                        <Trash2 className="size-5" />
-                      </button>
+                      <IconButton hierarchy="subordinate" variant="standard" onPress={() => void edit(plan.id)} label={`編輯 ${plan.name}`} title="編輯" icon={<Pencil />} />
+                      <IconButton hierarchy="danger" variant="standard" onPress={() => void remove(plan)} label={`刪除 ${plan.name}`} title="刪除" icon={<Trash2 />} />
                     </div>
                   </td>
                 </tr>
@@ -208,37 +159,21 @@ export function PlanManagementView({
           </tbody>
         </table>
         {loading ? (
-          <div className="py-20 text-center text-sm text-zinc-500">
+          <div className="py-20 text-center text-body-s text-text-quaternary">
             載入計畫…
           </div>
         ) : !error && result?.items.length === 0 ? (
-          <div className="py-20 text-center text-sm text-zinc-500">
+          <div className="py-20 text-center text-body-s text-text-quaternary">
             目前沒有降級計畫
           </div>
         ) : null}
       </div>
-      <div className="mt-4 flex shrink-0 items-center justify-center gap-4 text-sm">
-        <button
-          type="button"
-          disabled={page <= 1 || loading}
-          onClick={() => setPage((value) => value - 1)}
-          aria-label="上一頁"
-          className="rounded p-1 disabled:text-zinc-700"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <span className="rounded-lg border border-blue-500 px-3 py-1 text-blue-300">
+      <div className="mt-4 flex shrink-0 items-center justify-center gap-4 text-body-s">
+        <IconButton hierarchy="subordinate" variant="standard" disabled={page <= 1 || loading} onPress={() => setPage((value) => value - 1)} label="上一頁" icon={<ChevronLeft />} />
+        <span className="rounded-lg border border-border-theme px-3 py-1 text-text-theme">
           {page}
         </span>
-        <button
-          type="button"
-          disabled={loading || page * PAGE_SIZE >= (result?.total ?? 0)}
-          onClick={() => setPage((value) => value + 1)}
-          aria-label="下一頁"
-          className="rounded p-1 disabled:text-zinc-700"
-        >
-          <ChevronRight className="size-5" />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" disabled={loading || page * PAGE_SIZE >= (result?.total ?? 0)} onPress={() => setPage((value) => value + 1)} label="下一頁" icon={<ChevronRight />} />
       </div>
       {dialog?.kind === "create" ? (
         <DegradedPlanDialog

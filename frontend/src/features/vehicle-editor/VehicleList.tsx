@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { VehicleDefinitionMapView } from './elements/VehicleDefinitionMapView';
 import type { VehicleDefinition } from './types';
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button, IconButton } from '../../components/ui';
 
 export function VehicleList({
   vehicles,
@@ -71,51 +72,29 @@ export function VehicleList({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0a0f1a] p-6 md:p-8">
+    <div className="flex-1 overflow-y-auto bg-surface-sub-background p-6 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 pb-5">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border-quaternary pb-5">
           <div>
-            <h1 className="flex items-center gap-3 text-2xl font-bold text-white">
-              <Bus className="text-amber-400" size={28} />
+            <h1 className="flex items-center gap-3 text-headline-3 text-text-primary">
+              <Bus className="text-status-warning" size={28} />
               {t('vehicleEditor.list.title')}
             </h1>
-            <p className="mt-1.5 text-sm text-zinc-500">
+            <p className="mt-1.5 text-body-s text-text-quaternary">
               {t('vehicleEditor.list.subtitle')}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs text-zinc-600">
+            <span className="font-mono text-body-xs text-text-disabled">
               {t('vehicleEditor.list.savedCount', { count: vehicles.length })}
             </span>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
-            >
-              <Upload size={14} />
-              {importStatus === 'ok'
+            <Button hierarchy="subordinate" variant="outlined" onPress={() => fileInputRef.current?.click()} leadingIcon={<Upload />}>{importStatus === 'ok'
                 ? t('vehicleEditor.list.importOk')
                 : importStatus === 'error'
                   ? t('vehicleEditor.list.importFail')
-                  : t('vehicleEditor.list.importJson')}
-            </button>
-            <button
-              type="button"
-              onClick={onExportAll}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 hover:text-white"
-            >
-              <Download size={14} />
-              {t('vehicleEditor.list.exportAll')}
-            </button>
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={onCreate}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-40"
-            >
-              <Plus size={14} />
-              {t('vehicleEditor.list.create')}
-            </button>
+                  : t('vehicleEditor.list.importJson')}</Button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={onExportAll} leadingIcon={<Download />}>{t('vehicleEditor.list.exportAll')}</Button>
+            <Button hierarchy="subordinate" variant="standard" disabled={readOnly} onPress={onCreate} leadingIcon={<Plus />}>{t('vehicleEditor.list.create')}</Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -127,10 +106,10 @@ export function VehicleList({
         </div>
 
         {banner}
-        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-hidden rounded-xl border border-border-quaternary bg-surface-primary">
+          <table className="w-full text-left text-body-s">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              <tr className="border-b border-border-quaternary bg-surface-sub-background text-caption-2 uppercase text-text-quaternary">
                 <th className="px-4 py-3">預覽</th>
                 <th className="px-4 py-3">{t('vehicleEditor.list.colName')}</th>
                 <th className="hidden px-4 py-3 sm:table-cell">{t('vehicleEditor.list.colCanvas')}</th>
@@ -142,7 +121,7 @@ export function VehicleList({
             <tbody>
               {vehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-text-quaternary">
                     {t('vehicleEditor.list.empty')}
                   </td>
                 </tr>
@@ -150,11 +129,11 @@ export function VehicleList({
                 vehicles.map((v) => (
                   <tr
                     key={v.id}
-                    className="group border-b border-zinc-800/80 transition-colors last:border-b-0 hover:bg-zinc-800/40"
+                    className="group border-b border-border-quaternary transition-colors last:border-b-0 hover:bg-zinc-800/40"
                   >
                     <td className="px-4 py-3">
                       {/* 縮圖用跟地圖同一個 renderer、同樣等比顯示，看到的比例就是地圖上的比例 */}
-                      <div className="flex h-10 w-28 items-center justify-center overflow-hidden rounded bg-zinc-950">
+                      <div className="flex h-10 w-28 items-center justify-center overflow-hidden rounded bg-surface-sub-background">
                         <VehicleDefinitionMapView definition={v} displayWidth={104} displayHeight={34} />
                       </div>
                     </td>
@@ -162,30 +141,30 @@ export function VehicleList({
                       <button
                         type="button"
                         onClick={() => onSelect(v.id)}
-                        className="flex w-full items-center gap-2 text-left font-semibold text-zinc-200 hover:text-amber-300"
+                        className="flex w-full items-center gap-2 text-left font-semibold text-text-primary hover:text-status-warning"
                       >
-                        <Bus size={14} className="shrink-0 text-zinc-600 group-hover:text-amber-500/80" />
+                        <Bus size={14} className="shrink-0 text-text-disabled group-hover:text-status-warning" />
                         <span className="truncate">{v.name}</span>
                       </button>
-                      <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-zinc-600 sm:hidden">
+                      <div className="mt-1 flex flex-wrap gap-3 text-caption-2 text-text-disabled sm:hidden">
                         <span>
                           {v.width}×{v.height}
                         </span>
                         <span>{t('vehicleEditor.list.elementCount', { count: v.elements.length })}</span>
                       </div>
-                      <div className="mt-0.5 font-mono text-[10px] text-zinc-600">{v.id}</div>
+                      <div className="mt-0.5 font-mono text-caption-2 text-text-disabled">{v.id}</div>
                       {renderUsage ? <div className="mt-1">{renderUsage(v)}</div> : null}
                     </td>
-                    <td className="hidden px-4 py-3 font-mono text-xs text-zinc-500 sm:table-cell">
+                    <td className="hidden px-4 py-3 font-mono text-body-xs text-text-quaternary sm:table-cell">
                       <span className="inline-flex items-center gap-1">
                         <Maximize2 size={11} />
                         {v.width}×{v.height}
                       </span>
                     </td>
-                    <td className="hidden px-4 py-3 text-zinc-500 md:table-cell">
+                    <td className="hidden px-4 py-3 text-text-quaternary md:table-cell">
                       {v.elements.length}
                     </td>
-                    <td className="hidden px-4 py-3 text-xs text-zinc-500 lg:table-cell">
+                    <td className="hidden px-4 py-3 text-body-xs text-text-quaternary lg:table-cell">
                       <span className="inline-flex items-center gap-1">
                         <Calendar size={11} />
                         {formatDate(v.updatedAt)}
@@ -193,42 +172,12 @@ export function VehicleList({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          title={t('vehicleEditor.list.openEdit')}
-                          onClick={() => onSelect(v.id)}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-700 hover:text-white"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title={t('vehicleEditor.list.duplicate')}
-                          disabled={readOnly}
-                          onClick={() => onDuplicate(v.id)}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-cyan-500/15 hover:text-cyan-300 disabled:opacity-30"
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title={t('vehicleEditor.list.exportOne')}
-                          onClick={() => onExportOne(v.id)}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-700 hover:text-white"
-                        >
-                          <Download size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title={t('vehicleEditor.list.delete')}
-                          disabled={readOnly}
-                          onClick={async () => {
+                        <IconButton hierarchy="subordinate" variant="standard" title={t('vehicleEditor.list.openEdit')} onPress={() => onSelect(v.id)} label={t('vehicleEditor.list.openEdit')} icon={<Pencil />} />
+                        <IconButton variant="standard" title={t('vehicleEditor.list.duplicate')} disabled={readOnly} onPress={() => onDuplicate(v.id)} label={t('vehicleEditor.list.duplicate')} icon={<Copy />} />
+                        <IconButton hierarchy="subordinate" variant="standard" title={t('vehicleEditor.list.exportOne')} onPress={() => onExportOne(v.id)} label={t('vehicleEditor.list.exportOne')} icon={<Download />} />
+                        <IconButton hierarchy="danger" variant="standard" title={t('vehicleEditor.list.delete')} disabled={readOnly} onPress={async () => {
                             if ((await systemConfirm(t('common.confirmDelete', { name: v.name }), { tone: 'danger' }))) void onDelete(v.id);
-                          }}
-                          className="rounded-lg p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                          }} label={t('vehicleEditor.list.delete')} icon={<Trash2 />} />
                       </div>
                     </td>
                   </tr>
@@ -238,7 +187,7 @@ export function VehicleList({
           </table>
         </div>
 
-        <p className="text-center text-[10px] text-zinc-600">
+        <p className="text-center text-caption-2 text-text-disabled">
           {t('vehicleEditor.list.footerHint')}
         </p>
       </div>

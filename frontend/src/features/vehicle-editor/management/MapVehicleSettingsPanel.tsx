@@ -17,6 +17,7 @@ import { templateFromResolution } from '../model/useMapVehicleModel';
 import { useVehicleModelList } from '../model/useVehicleModelList';
 import { VehicleBehaviorSettingsFields } from '../model/VehicleBehaviorSettingsFields';
 import { fitVehicleMarkerSize } from '../utils/vehicleContentBounds';
+import { Button } from '../../../components/ui';
 
 const DEFAULT_TARGET = '__default__';
 type Draft = Pick<
@@ -139,20 +140,20 @@ export function MapVehicleSettingsPanel({
   const modelName = (key?: string | null) => models?.find((m) => m.id === key)?.name ?? key ?? '—';
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 bg-[#0a0f1a] lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="min-h-0 overflow-y-auto border-r border-zinc-800 p-3">
+    <div className="grid h-full min-h-0 grid-cols-1 bg-surface-sub-background lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="min-h-0 overflow-y-auto border-r border-border-quaternary p-3">
         <ul className="space-y-1.5">
           {rows.map((row) => (
             <li key={row.id}>
               <button
                 type="button"
                 onClick={() => setTarget(row.id)}
-                className={`w-full rounded-lg border px-3 py-2 text-left text-xs ${
-                  target === row.id ? 'border-amber-500 bg-amber-500/10' : 'border-zinc-800 hover:border-zinc-600'
+                className={`w-full rounded-lg border px-3 py-2 text-left text-body-xs ${
+                  target === row.id ? 'border-status-warning bg-status-warning-light' : 'border-border-quaternary hover:border-border-tertiary'
                 }`}
               >
-                <span className="block font-semibold text-zinc-200">{row.name}</span>
-                <span className="text-[11px] text-zinc-500">
+                <span className="block font-semibold text-text-primary">{row.name}</span>
+                <span className="text-body-xs text-text-quaternary">
                   {row.setting
                     ? `${modelName(row.setting.definitionKey)}・${row.setting.displayWidthPx}×${row.setting.displayHeightPx}`
                     : row.id === DEFAULT_TARGET
@@ -166,12 +167,12 @@ export function MapVehicleSettingsPanel({
       </aside>
       <section className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-xs">
-            <h3 className="text-sm font-semibold text-zinc-200">
+          <div className="space-y-3 rounded-xl border border-border-quaternary bg-surface-primary p-4 text-body-xs">
+            <h3 className="text-body-s-bold text-text-primary">
               {target === DEFAULT_TARGET ? '系統預設車輛模型' : `地圖 ${rows.find((r) => r.id === target)?.name ?? target}`}
             </h3>
             <label className="block space-y-1">
-              <span className="text-[10px] font-bold text-zinc-500">車輛模型</span>
+              <span className="text-caption-2 text-text-quaternary">車輛模型</span>
               <SiteSelect
                 value={draft?.definitionKey ?? ''}
                 onChange={(e) => {
@@ -191,7 +192,7 @@ export function MapVehicleSettingsPanel({
                     };
                   });
                 }}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-zinc-200"
+                size="md" className="w-full"
               >
                 <option value="">（未設定）</option>
                 {(models ?? []).map((m) => (
@@ -205,32 +206,32 @@ export function MapVehicleSettingsPanel({
               <>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1">
-                    <span className="text-[10px] font-bold text-zinc-500">顯示寬（px，沿軌道）</span>
+                    <span className="text-caption-2 text-text-quaternary">顯示寬（px，沿軌道）</span>
                     <NumberInput
                       min={8}
                       max={600}
                       value={draft.displayWidthPx}
                       onChange={(n) => setDraft({ ...draft, displayWidthPx: n || draft.displayWidthPx })}
-                      className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-zinc-200"
+                      className="w-full rounded-md border border-border-quaternary bg-surface-secondary px-2 py-1.5 text-text-primary"
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[10px] font-bold text-zinc-500">顯示高（px）</span>
+                    <span className="text-caption-2 text-text-quaternary">顯示高（px）</span>
                     <NumberInput
                       min={8}
                       max={600}
                       value={draft.displayHeightPx}
                       onChange={(n) => setDraft({ ...draft, displayHeightPx: n || draft.displayHeightPx })}
-                      className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-zinc-200"
+                      className="w-full rounded-md border border-border-quaternary bg-surface-secondary px-2 py-1.5 text-text-primary"
                     />
                   </label>
                 </div>
-                <p className="text-[10px] leading-relaxed text-zinc-500">
+                <p className="text-caption-2 text-text-quaternary">
                   顯示尺寸是上限框：車身照模型自己的比例等比放進去，不會被拉長或壓扁。
                   {fitted ? `實際畫出 ${fitted.width.toFixed(1)}×${fitted.height.toFixed(1)} px。` : ''}
                 </p>
                 {model ? (
-                  <div className="flex items-center justify-center rounded-lg bg-zinc-950 p-3">
+                  <div className="flex items-center justify-center rounded-lg bg-surface-sub-background p-3">
                     <div className="relative outline outline-1 outline-dashed outline-zinc-600" style={{ width: draft.displayWidthPx, height: draft.displayHeightPx }}>
                       <VehicleDefinitionMapView
                         definition={model}
@@ -252,28 +253,21 @@ export function MapVehicleSettingsPanel({
                 type="button"
                 disabled={!draft?.definitionKey || saving}
                 onClick={() => void save()}
-                className="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white disabled:opacity-40"
+                className="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-text-primary disabled:opacity-40"
               >
                 儲存
               </button>
               {saved ? (
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void clear()}
-                  className="rounded-lg border border-zinc-700 px-3 py-2 text-zinc-300"
-                >
-                  {target === DEFAULT_TARGET ? '清除預設' : '移除（改用系統預設）'}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" disabled={saving} onPress={() => void clear()}>{target === DEFAULT_TARGET ? '清除預設' : '移除（改用系統預設）'}</Button>
               ) : null}
             </div>
             {message ? (
-              <p className={message.tone === 'ok' ? 'text-emerald-300' : 'text-red-300'}>{message.text}</p>
+              <p className={message.tone === 'ok' ? 'text-status-success' : 'text-status-error-emphasis'}>{message.text}</p>
             ) : null}
           </div>
           {target !== DEFAULT_TARGET ? (
-            <div className="flex h-[560px] flex-col self-start rounded-xl border border-zinc-800 bg-zinc-950 xl:sticky xl:top-0">
-              <p className="border-b border-zinc-800 px-3 py-2 text-[11px] text-zinc-400">
+            <div className="flex h-[560px] flex-col self-start rounded-xl border border-border-quaternary bg-surface-sub-background xl:sticky xl:top-0">
+              <p className="border-b border-border-quaternary px-3 py-2 text-body-xs text-text-tertiary">
                 圖資預覽（即時車輛、未儲存的設定也會先套用在這裡）
               </p>
               <div className="min-h-0 flex-1">

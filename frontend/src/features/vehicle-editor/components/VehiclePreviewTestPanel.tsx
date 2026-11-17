@@ -9,6 +9,7 @@ import {
 } from '../constants/vehiclePreviewTestSequence';
 import type { VehicleDefinition } from '../types';
 import { readOperationActions } from '../utils/resolveBehaviorActions';
+import { Button, Checkbox, IconButton } from '../../../components/ui';
 
 function mergePreviewData(
   base: Record<string, unknown> | undefined,
@@ -79,74 +80,47 @@ export function VehiclePreviewTestPanel({
   };
 
   return (
-    <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3">
+    <div className="shrink-0 border-t border-border-quaternary bg-surface-popup px-4 py-3">
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600">
+          <span className="text-caption-2 uppercase text-cyan-600">
             {t('vehicleEditor.preview.title')}
           </span>
-          <span className="text-[11px] text-zinc-500">
+          <span className="text-body-xs text-text-quaternary">
             {stepIndex + 1} / {VEHICLE_PREVIEW_TEST_SEQUENCE.length}
           </span>
-          <span className="min-w-0 flex-1 truncate text-xs text-zinc-400">
+          <span className="min-w-0 flex-1 truncate text-body-xs text-text-tertiary">
             {currentStep?.label}
           </span>
-          <button
-            type="button"
-            onClick={() => applyStep(Math.max(0, stepIndex - 1))}
-            className="rounded border border-zinc-700 p-1 text-zinc-400 hover:text-white"
-            title={t('vehicleEditor.preview.prev')}
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setPlaying((v) => !v)}
-            className="flex items-center gap-1 rounded border border-cyan-800 bg-cyan-950/40 px-2 py-1 text-xs text-cyan-300 hover:border-cyan-600"
-          >
-            {playing ? <Pause size={12} /> : <Play size={12} />}
-            {playing ? t('vehicleEditor.preview.pause') : t('vehicleEditor.preview.play')}
-          </button>
-          <button
-            type="button"
-            onClick={() => applyStep((stepIndex + 1) % VEHICLE_PREVIEW_TEST_SEQUENCE.length)}
-            className="rounded border border-zinc-700 p-1 text-zinc-400 hover:text-white"
-            title={t('vehicleEditor.preview.next')}
-          >
-            <ChevronRight size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => applyStep(0)}
-            className="flex items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:text-white"
-          >
-            <SkipForward size={12} />
-            {t('vehicleEditor.preview.reset')}
-          </button>
+          <IconButton hierarchy="subordinate" variant="outlined" onPress={() => applyStep(Math.max(0, stepIndex - 1))} title={t('vehicleEditor.preview.prev')} label={t('vehicleEditor.preview.prev')} icon={<ChevronLeft />} />
+          <Button variant="outlined" onPress={() => setPlaying((v) => !v)}>{playing ? <Pause size={12} /> : <Play size={12} />}
+            {playing ? t('vehicleEditor.preview.pause') : t('vehicleEditor.preview.play')}</Button>
+          <IconButton hierarchy="subordinate" variant="outlined" onPress={() => applyStep((stepIndex + 1) % VEHICLE_PREVIEW_TEST_SEQUENCE.length)} title={t('vehicleEditor.preview.next')} label={t('vehicleEditor.preview.next')} icon={<ChevronRight />} />
+          <Button hierarchy="subordinate" variant="outlined" onPress={() => applyStep(0)} leadingIcon={<SkipForward />}>{t('vehicleEditor.preview.reset')}</Button>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3 text-xs">
+        <div className="flex flex-wrap items-end gap-3 text-body-xs">
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-zinc-500">{t('vehicleEditor.preview.trip')}</span>
+            <span className="text-caption-2 text-text-quaternary">{t('vehicleEditor.preview.trip')}</span>
             <input
               value={String(preview.trip_code ?? '')}
               onChange={(e) => {
                 const trip = e.target.value;
                 onUpdatePreviewData({ ...preview, trip_code: trip, badge_label: trip });
               }}
-              className="w-24 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-zinc-200"
+              className="w-24 rounded border border-border-quaternary bg-surface-primary px-2 py-1 font-mono text-text-primary"
             />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-zinc-500">{t('vehicleEditor.preview.vehicleCode')}</span>
+            <span className="text-caption-2 text-text-quaternary">{t('vehicleEditor.preview.vehicleCode')}</span>
             <input
               value={String(preview.vehicle_code ?? '')}
               onChange={(e) => patchField('vehicle_code', e.target.value)}
-              className="w-24 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-zinc-200"
+              className="w-24 rounded border border-border-quaternary bg-surface-primary px-2 py-1 font-mono text-text-primary"
             />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-zinc-500">{t('vehicleEditor.preview.direction')}</span>
+            <span className="text-caption-2 text-text-quaternary">{t('vehicleEditor.preview.direction')}</span>
             <SiteSelect
               value={String(preview.direction_label ?? DIR_DOWN)}
               onChange={(e) => {
@@ -160,14 +134,14 @@ export function VehiclePreviewTestPanel({
                 }
                 onUpdatePreviewData(next);
               }}
-              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+              size="sm"
             >
               <option value={DIR_DOWN}>{t('vehicleEditor.preview.down')}</option>
               <option value={DIR_UP}>{t('vehicleEditor.preview.up')}</option>
             </SiteSelect>
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-zinc-500">
+            <span className="text-caption-2 text-text-quaternary">
               {t('vehicleEditor.preview.doorOpen', { pct: String(preview.door_open_percent ?? 0) })}
             </span>
             <input
@@ -180,25 +154,17 @@ export function VehiclePreviewTestPanel({
             />
           </label>
           <label className="flex items-center gap-1.5 pb-1">
-            <input
-              type="checkbox"
-              checked={Boolean(preview.head_light_on)}
-              onChange={(e) => patchField('head_light_on', e.target.checked)}
-            />
-            <span className="text-zinc-400">{t('vehicleEditor.preview.headLight')}</span>
+            <Checkbox checked={Boolean(preview.head_light_on)} onCheckedChange={(checked) => patchField('head_light_on', checked)} />
+            <span className="text-text-tertiary">{t('vehicleEditor.preview.headLight')}</span>
           </label>
           <label className="flex items-center gap-1.5 pb-1">
-            <input
-              type="checkbox"
-              checked={Boolean(preview.tail_light_on)}
-              onChange={(e) => patchField('tail_light_on', e.target.checked)}
-            />
-            <span className="text-zinc-400">{t('vehicleEditor.preview.tailLight')}</span>
+            <Checkbox checked={Boolean(preview.tail_light_on)} onCheckedChange={(checked) => patchField('tail_light_on', checked)} />
+            <span className="text-text-tertiary">{t('vehicleEditor.preview.tailLight')}</span>
           </label>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-zinc-500">{t('vehicleEditor.preview.actions')}</span>
+          <span className="text-caption-2 text-text-quaternary">{t('vehicleEditor.preview.actions')}</span>
           {VEHICLE_BEHAVIOR_ACTION_CATALOG.map((action) => {
             const active = activeActions.includes(action.code);
             return (
@@ -206,10 +172,10 @@ export function VehiclePreviewTestPanel({
                 key={action.code}
                 type="button"
                 onClick={() => toggleAction(action.code)}
-                className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                className={`rounded-full border px-2 py-0.5 text-caption-2 transition-colors ${
                   active
-                    ? 'border-amber-500/60 bg-amber-950/50 text-amber-300'
-                    : 'border-zinc-700 text-zinc-500 hover:border-zinc-500'
+                    ? 'border-amber-500/60 bg-amber-950/50 text-status-warning'
+                    : 'border-border-quaternary text-text-quaternary hover:border-border-primary'
                 }`}
               >
                 {action.label}

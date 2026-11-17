@@ -16,7 +16,7 @@ import { StepSectionToggle } from './StepSectionToggle';
 import { TriggerFieldRow } from './TriggerFieldRow';
 
 const RATE_INPUT_CLASS =
-  'h-[42px] w-[88px] rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] w-[88px] rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 type StepChargingParamsProps = {
   draft: MaintenanceTaskChargingDraft;
@@ -110,7 +110,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
           })}
           onChange={(equipmentRows) => patchCharging({ equipmentRows })}
           renderExtraFields={(row, updateRow) => (
-            <div className="flex shrink-0 items-center gap-2 text-sm text-zinc-400">
+            <div className="flex shrink-0 items-center gap-2 text-body-s text-text-tertiary">
               <span className="whitespace-nowrap">{t('maintenanceTasks.charging.chargeRate')}</span>
               <input
                 type="text"
@@ -124,7 +124,7 @@ export function StepChargingParams({ draft, onChange }: StepChargingParamsProps)
                 placeholder={t('maintenanceTasks.triggerField.placeholder')}
                 className={RATE_INPUT_CLASS}
               />
-              <span className="whitespace-nowrap text-zinc-500">
+              <span className="whitespace-nowrap text-text-quaternary">
                 {t('maintenanceTasks.charging.chargeRateUnit')}
               </span>
             </div>

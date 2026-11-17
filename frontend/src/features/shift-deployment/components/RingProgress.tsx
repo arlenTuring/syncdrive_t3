@@ -36,8 +36,8 @@ export function RingProgress({ value, caption }: RingProgressProps) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[10px] text-zinc-400">{caption}</span>
-        <span className="text-lg font-semibold leading-tight text-white">{display}%</span>
+        <span className="text-caption-2 text-text-tertiary">{caption}</span>
+        <span className="text-headline-5 text-text-primary">{display}%</span>
       </div>
     </div>
   );

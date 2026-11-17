@@ -57,8 +57,8 @@ function ColumnFilter({
           onClick={() => setOpen((prev) => !prev)}
           className={`inline-flex size-6 items-center justify-center rounded-md transition ${
             active || open
-              ? 'text-[#2B7FFF]'
-              : 'text-zinc-600 hover:bg-white/5 hover:text-zinc-300'
+              ? 'text-text-theme-light'
+              : 'text-text-disabled hover:bg-link-standard hover:text-text-secondary'
           }`}
           aria-label={t('shiftDeployment.diff.filterAria', { label })}
           title={t('shiftDeployment.diff.filterAria', { label })}
@@ -66,15 +66,15 @@ function ColumnFilter({
           <ListFilter className="size-3.5" />
         </button>
         {open ? (
-          <div className="absolute left-4 top-full z-20 min-w-[140px] overflow-hidden rounded-lg border border-zinc-800 bg-[#18181B] py-1 shadow-lg shadow-black/40">
+          <div className="absolute left-4 top-full z-20 min-w-[140px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-lg shadow-black-30">
             {options.map((option) => (
               <button
                 key={option.value}
                 type="button"
-                className={`flex h-9 w-full items-center px-3 text-left text-sm ${
+                className={`flex h-9 w-full items-center px-3 text-left text-body-s ${
                   value === option.value
-                    ? 'bg-white/10 text-zinc-100'
-                    : 'text-zinc-300 hover:bg-white/5'
+                    ? 'bg-link-standard-hover text-text-primary'
+                    : 'text-text-secondary hover:bg-link-standard'
                 }`}
                 onClick={() => {
                   onChange(option.value);
@@ -173,44 +173,44 @@ export function ScheduleAdjustDiffStep({
   return (
     <div className="flex flex-col px-6 pb-3">
       <section className="pb-5">
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">
+        <h3 className="mb-3 text-body-s-bold text-text-primary">
           {t('shiftDeployment.diff.applicationContent')}
         </h3>
-        <div className="grid grid-cols-2 gap-8 text-sm">
+        <div className="grid grid-cols-2 gap-8 text-body-s">
           <div>
-            <p className="mb-1 text-xs text-zinc-500">{t('shiftDeployment.diff.executionTime')}</p>
-            <p className="text-zinc-100">{formatExecutionDisplay(execDate, execTime)}</p>
+            <p className="mb-1 text-body-xs text-text-quaternary">{t('shiftDeployment.diff.executionTime')}</p>
+            <p className="text-text-primary">{formatExecutionDisplay(execDate, execTime)}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">{t('shiftDeployment.diff.schedule')}</p>
-            <p className="text-zinc-100">{scheduleName || '—'}</p>
+            <p className="mb-1 text-body-xs text-text-quaternary">{t('shiftDeployment.diff.schedule')}</p>
+            <p className="text-text-primary">{scheduleName || '—'}</p>
           </div>
         </div>
       </section>
 
       <section className="flex flex-col">
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">
+        <h3 className="mb-3 text-body-s-bold text-text-primary">
           {t('shiftDeployment.diff.impactSummary')}
         </h3>
         {missingCurrent ? (
-          <p className="mb-2 text-xs text-zinc-500">
+          <p className="mb-2 text-body-xs text-text-quaternary">
             {t('shiftDeployment.diff.missingCurrent')}
           </p>
         ) : null}
-        <div className="overflow-visible rounded-xl border border-zinc-800/80 bg-[#0c0c0e]">
+        <div className="overflow-visible rounded-xl border border-border-quaternary bg-surface-sub-background">
           {loading ? (
-            <div className="flex min-h-[280px] items-center justify-center gap-2 text-zinc-500">
+            <div className="flex min-h-[280px] items-center justify-center gap-2 text-text-quaternary">
               <Loader2 className="size-5 animate-spin" />
               {t('shiftDeployment.diff.comparing')}
             </div>
           ) : error ? (
-            <div className="m-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+            <div className="m-4 rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
               {error}
             </div>
           ) : (
-            <table className="w-full min-w-[860px] border-collapse text-sm">
+            <table className="w-full min-w-[860px] border-collapse text-body-s">
               <thead>
-                <tr className="border-b border-zinc-800 bg-[#141416] text-left text-zinc-400">
+                <tr className="border-b border-border-quaternary bg-surface-popup text-left text-text-tertiary">
                   <ColumnFilter
                     label={t('shiftDeployment.diff.newDepart')}
                     value={newTimeFilter}
@@ -274,12 +274,12 @@ function DiffRow({ row }: { row: ScheduleDiffRow }) {
   const { t } = useTranslation();
   const isDelete = row.kind === 'delete';
   return (
-    <tr className="border-b border-zinc-800/50 hover:bg-white/[0.02]">
-      <td className="px-4 py-3 tabular-nums text-zinc-200">{row.newDepartLabel || ''}</td>
+    <tr className="border-b border-border-quaternary hover:bg-white/[0.02]">
+      <td className="px-4 py-3 tabular-nums text-text-primary">{row.newDepartLabel || ''}</td>
       <td className="px-4 py-3">
         <span
-          className={`inline-flex items-center gap-2 text-sm ${
-            isDelete ? 'text-red-400' : 'text-emerald-400'
+          className={`inline-flex items-center gap-2 text-body-s ${
+            isDelete ? 'text-status-error-emphasis' : 'text-status-success'
           }`}
         >
           {isDelete ? <Trash2 className="size-4" /> : <Plus className="size-4" />}
@@ -288,11 +288,11 @@ function DiffRow({ row }: { row: ScheduleDiffRow }) {
             : t('shiftDeployment.diff.createTask')}
         </span>
       </td>
-      <td className="px-4 py-3 tabular-nums text-zinc-200">{row.originalDepartLabel || ''}</td>
+      <td className="px-4 py-3 tabular-nums text-text-primary">{row.originalDepartLabel || ''}</td>
       <td className="px-4 py-3">
         <StatusTag label={taskTypeLabel(row.taskType)} style={row.tagStyle} />
       </td>
-      <td className="px-4 py-3 text-zinc-400">{row.reason}</td>
+      <td className="px-4 py-3 text-text-tertiary">{row.reason}</td>
     </tr>
   );
 }

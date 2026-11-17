@@ -16,10 +16,11 @@ import {
   shouldShowResourceStage,
   type ShiftRouteSegmentAction,
 } from '../../shift-list/utils/actionSettings';
+import { IconButton } from '../../../components/ui';
 
 const OFFSET_INPUT =
-  'h-8 w-[44px] shrink-0 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-1.5 text-xs tabular-nums text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30';
-const FIELD_LABEL = 'mb-1 block text-[11px] leading-none text-zinc-400';
+  'h-8 w-[44px] shrink-0 rounded-md border border-border-quaternary bg-surface-primary px-1.5 text-body-xs tabular-nums text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn';
+const FIELD_LABEL = 'mb-1 block text-body-xs text-text-tertiary';
 
 type DispatchStationActionRowProps = {
   action: ShiftRouteSegmentAction;
@@ -163,14 +164,7 @@ export function DispatchStationActionRow({
           />
         ) : null}
       </div>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        aria-label={t('dispatchScheduling.actionRow.deleteAction')}
-      >
-        <X className="size-3.5" />
-      </button>
+      <IconButton size="small" hierarchy="subordinate" variant="standard" className="mt-0.5 shrink-0" onPress={onRemove} label={t('dispatchScheduling.actionRow.deleteAction')} icon={<X />} />
     </div>
   );
 }

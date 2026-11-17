@@ -132,7 +132,7 @@ export function FenceShapeOverlay({
             <button
               key={`vtx-${i}`}
               type="button"
-              className="pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-[#2B7FFF] shadow"
+              className="pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white bg-link-theme-filled shadow"
               style={{ left: p.x, top: p.y }}
               title="拖曳頂點"
               onPointerDown={(e) => onVertexPointerDown(e, i)}
@@ -148,7 +148,7 @@ export function FenceShapeOverlay({
             return (
               <button
                 type="button"
-                className="pointer-events-auto absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#2B7FFF] bg-[#18181b] text-[#51A2FF] shadow"
+                className="pointer-events-auto absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border-theme bg-surface-popup text-text-theme shadow"
                 style={{ left: mid.x, top: mid.y }}
                 title="新增節點"
                 onClick={(e) => onAddVertex(e, activeEdge)}

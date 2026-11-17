@@ -28,6 +28,7 @@ import {
   typicalTelemetryInterval,
   visibleVehicles,
 } from "./replayState";
+import { Button } from '../../components/ui';
 
 const PAGE_SIZE = 20;
 
@@ -64,16 +65,9 @@ export function DegradedHistoryView({ onBack }: { onBack: () => void }) {
   const currentMeta = meta?.id === selectedId ? meta : null;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 bg-black xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
-      <section className="relative flex min-h-[420px] min-w-0 flex-col border-b border-zinc-800 p-4 xl:min-h-0 xl:border-r xl:border-b-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="absolute top-4 left-4 z-20 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/70 bg-black/80 px-3 py-1.5 text-sm text-blue-300 hover:bg-blue-500/10"
-        >
-          <ChevronLeft className="size-4" />
-          返回看即時
-        </button>
+    <div className="grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
+      <section className="relative flex min-h-[420px] min-w-0 flex-col border-b border-border-quaternary p-4 xl:min-h-0 xl:border-r xl:border-b-0">
+        <Button variant="outlined" className="absolute top-4 left-4 z-20" leadingIcon={<ChevronLeft />} onPress={onBack}>返回看即時</Button>
         {/* 以紀錄 id 為 key：換一筆就整個重建，前一筆的播放、請求、資料一起丟掉 */}
         <ReplayStage
           key={selectedId ?? "none"}
@@ -82,7 +76,7 @@ export function DegradedHistoryView({ onBack }: { onBack: () => void }) {
           detail={currentDetail?.value ?? null}
         />
       </section>
-      <aside className="flex min-h-[520px] min-w-0 flex-col bg-[#121214] p-4 xl:min-h-0">
+      <aside className="flex min-h-[520px] min-w-0 flex-col bg-surface-primary p-4 xl:min-h-0">
         {panel === "detail" && selectedId ? (
           <HistoryDetailPanel
             detail={currentDetail}
@@ -139,36 +133,34 @@ function HistoryList({
   const hasMore = total != null && items.length < total;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <h2 className="mb-4 text-lg">歷史降級紀錄</h2>
+      <h2 className="mb-4 text-headline-5">歷史降級紀錄</h2>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {error && items.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-red-300">
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-status-error-emphasis">
             歷史紀錄載入失敗：{error}
-            <button type="button" onClick={() => setRetry((value) => value + 1)} className="underline">
-              重試
-            </button>
+            <Button hierarchy="subordinate" variant="text" onPress={() => setRetry((value) => value + 1)}>重試</Button>
           </div>
         ) : !loading && items.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-zinc-500">尚無降級紀錄</div>
+          <div className="flex h-full items-center justify-center text-text-quaternary">尚無降級紀錄</div>
         ) : (
-          <ol className="relative space-y-3 border-l border-zinc-700 pl-6">
+          <ol className="relative space-y-3 border-l border-border-quaternary pl-6">
             {items.map((item) => (
               <li key={item.execution_id} className="relative">
-                <span className="absolute top-1/2 -left-[29px] size-2.5 -translate-y-1/2 rounded-full bg-zinc-500" />
+                <span className="absolute top-1/2 -left-[29px] size-2.5 -translate-y-1/2 rounded-full bg-status-inactive" />
                 <button
                   type="button"
                   onClick={() => onSelect(item.execution_id)}
-                  className={`w-full rounded-xl border bg-[#1b1d21] p-4 text-left hover:border-blue-500 ${
-                    item.execution_id === selectedId ? "border-blue-500" : "border-zinc-700"
+                  className={`w-full rounded-xl border bg-[#1b1d21] p-4 text-left hover:border-border-theme ${
+                    item.execution_id === selectedId ? "border-border-theme" : "border-border-quaternary"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
-                      <span className={`text-sm ${levelText(item.level)}`}>Level {item.level}</span>
-                      <p className="truncate text-base">{item.name}</p>
-                      <p className="mt-1 text-sm text-zinc-400">{historyRange(item)}</p>
+                      <span className={`text-body-s ${levelText(item.level)}`}>Level {item.level}</span>
+                      <p className="truncate text-body-m">{item.name}</p>
+                      <p className="mt-1 text-body-s text-text-tertiary">{historyRange(item)}</p>
                       {replayNote(item) ? (
-                        <p className="mt-1 text-xs text-amber-300/80">{replayNote(item)}</p>
+                        <p className="mt-1 text-body-xs text-amber-300/80">{replayNote(item)}</p>
                       ) : null}
                     </div>
                     <StatusBadge status={item.execution_status} />
@@ -178,16 +170,10 @@ function HistoryList({
             ))}
           </ol>
         )}
-        {error && items.length > 0 ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
-        {loading ? <p className="py-4 text-center text-sm text-zinc-500">載入中…</p> : null}
+        {error && items.length > 0 ? <p className="mt-3 text-body-s text-status-error-emphasis">{error}</p> : null}
+        {loading ? <p className="py-4 text-center text-body-s text-text-quaternary">載入中…</p> : null}
         {hasMore && !loading ? (
-          <button
-            type="button"
-            onClick={() => setPage((value) => value + 1)}
-            className="mt-3 w-full rounded-lg border border-zinc-700 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            載入更多（{items.length}／{total}）
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="mt-3 w-full" onPress={() => setPage((value) => value + 1)}>載入更多（{items.length}／{total}）</Button>
         ) : null}
       </div>
     </div>
@@ -204,34 +190,31 @@ function HistoryDetailPanel({
   const value = detail?.value ?? null;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-2 self-start text-zinc-200">
-        <ArrowLeft className="size-4" />
-        降級紀錄詳情
-      </button>
+      <Button hierarchy="subordinate" variant="text" className="mb-4 self-start" leadingIcon={<ArrowLeft />} onPress={onBack}>降級紀錄詳情</Button>
       {detail?.error ? (
-        <div className="text-red-300">詳情載入失敗：{detail.error}</div>
+        <div className="text-status-error-emphasis">詳情載入失敗：{detail.error}</div>
       ) : !value ? (
-        <div className="text-zinc-500">載入中…</div>
+        <div className="text-text-quaternary">載入中…</div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <span className="text-sm text-zinc-400">計畫名稱</span>
+          <span className="text-body-s text-text-tertiary">計畫名稱</span>
           <div className="flex items-start gap-3">
-            <h3 className="min-w-0 flex-1 text-xl break-words">{value.name}</h3>
-            <span className={`shrink-0 rounded px-3 py-1 text-xs ${levelBadge(value.level)}`}>Level {value.level}</span>
+            <h3 className="min-w-0 flex-1 text-headline-4 break-words">{value.name}</h3>
+            <span className={`shrink-0 rounded px-3 py-1 text-body-xs ${levelBadge(value.level)}`}>Level {value.level}</span>
           </div>
-          <p className="mt-3 flex items-center gap-2 text-zinc-300">
-            <Clock3 className="size-4 text-zinc-400" />
+          <p className="mt-3 flex items-center gap-2 text-text-secondary">
+            <Clock3 className="size-4 text-text-tertiary" />
             {durationLabel(value)}
           </p>
-          <p className="mt-2 flex items-start gap-2 text-zinc-300">
-            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-zinc-400" />
+          <p className="mt-2 flex items-start gap-2 text-text-secondary">
+            <MessageSquareText className="mt-0.5 size-4 shrink-0 text-text-tertiary" />
             <span className="whitespace-pre-wrap">{value.description || "未填寫說明"}</span>
           </p>
           <ImpactMetrics speedLimitKmh={value.speed_limit_kmh} className="mt-4" />
-          <p className="mt-1 text-right text-xs text-zinc-500">本次最終參數</p>
-          <h4 className="mt-5 border-t border-zinc-700 pt-4 text-base">參數詳細紀錄</h4>
+          <p className="mt-1 text-right text-body-xs text-text-quaternary">本次最終參數</p>
+          <h4 className="mt-5 border-t border-border-quaternary pt-4 text-body-m">參數詳細紀錄</h4>
           {value.parameter_changes.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-500">沒有參數變更紀錄</p>
+            <p className="mt-3 text-body-s text-text-quaternary">沒有參數變更紀錄</p>
           ) : (
             <ol className="mt-3 space-y-3">
               {[...value.parameter_changes].reverse().map((change) => (
@@ -260,24 +243,24 @@ function ParameterChangeRow({ change }: { change: ParameterChange }) {
   const changedSpeed =
     change.previous_speed_limit_kmh != null && change.previous_speed_limit_kmh !== change.speed_limit_kmh;
   return (
-    <li className="border-l-2 border-zinc-600 pl-3">
-      <div className="text-lg">{effective != null ? formatClockSeconds(effective) : "—"}</div>
-      <div className="text-sm text-zinc-300">
+    <li className="border-l-2 border-border-tertiary pl-3">
+      <div className="text-headline-5">{effective != null ? formatClockSeconds(effective) : "—"}</div>
+      <div className="text-body-s text-text-secondary">
         {ACTION_LABEL[change.action] ?? change.action}
         {change.action === "degraded_restored" && change.speed_limit_kmh != null ? (
-          <span className="text-zinc-400">
+          <span className="text-text-tertiary">
             （解除前：速限 {change.speed_limit_kmh} km/h・Level {change.level}）
           </span>
         ) : change.action !== "schedule_cancelled" && change.speed_limit_kmh != null ? (
           <>
             　速限 {changedSpeed ? `${change.previous_speed_limit_kmh} → ` : ""}
-            <b className="font-normal text-white">{change.speed_limit_kmh}</b> km/h　・　等級{" "}
+            <b className="font-normal text-text-primary">{change.speed_limit_kmh}</b> km/h　・　等級{" "}
             {changedLevel ? `Level ${change.previous_level} → ` : ""}
-            <b className="font-normal text-white">Level {change.level}</b>
+            <b className="font-normal text-text-primary">Level {change.level}</b>
           </>
         ) : null}
       </div>
-      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-xs text-zinc-500">
+      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-body-xs text-text-quaternary">
         <dt>操作</dt>
         <dd>
           {formatDateTimeSeconds(change.operated_at_real)}（實際時間）・{change.operator_id}
@@ -396,42 +379,42 @@ function ReplayStage({
   const canPlay = !!source;
   return (
     <>
-      <div className="relative mt-12 min-h-0 flex-1 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
+      <div className="relative mt-12 min-h-0 flex-1 overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background">
         {body}
         {canPlay ? (
-          <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[70%] flex-col gap-2 text-xs">
+          <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[70%] flex-col gap-2 text-body-xs">
             {params ? (
-              <span className="self-start rounded-lg bg-black/75 px-3 py-1.5 text-zinc-200">
+              <span className="self-start rounded-lg bg-black-50 px-3 py-1.5 text-text-primary">
                 回放時刻參數：Level {params.level}・速限 {params.speedLimitKmh} km/h
               </span>
             ) : null}
             {value?.availability.state === "partial" ? (
-              <span className="self-start rounded-lg bg-amber-500/15 px-3 py-1.5 text-amber-200">
+              <span className="self-start rounded-lg bg-status-warning-light px-3 py-1.5 text-status-warning">
                 資料不完整：{value.availability.reason}
               </span>
             ) : null}
             {replayVehicleModelNotice(value?.vehicle_model ?? null) ? (
-              <span className="self-start rounded-lg bg-amber-500/15 px-3 py-1.5 text-amber-200">
+              <span className="self-start rounded-lg bg-status-warning-light px-3 py-1.5 text-status-warning">
                 {replayVehicleModelNotice(value?.vehicle_model ?? null)}
               </span>
             ) : null}
             {inGap ? (
-              <span className="self-start rounded-lg bg-red-500/20 px-3 py-1.5 text-red-200">
+              <span className="self-start rounded-lg bg-status-error-light px-3 py-1.5 text-status-error-emphasis">
                 資料缺段（{GAP_REASON[inGap.reason] ?? inGap.reason}），此段沒有車輛資料
               </span>
             ) : null}
             {visible.hidden.length > 0 ? (
-              <span className="self-start rounded-lg bg-zinc-800/90 px-3 py-1.5 text-zinc-300">
+              <span className="self-start rounded-lg bg-zinc-800/90 px-3 py-1.5 text-text-secondary">
                 未顯示：{visible.hidden.map((item) => `${item.code}（${item.reason === "gap" ? "缺段" : "資料過期"}）`).join("、")}
               </span>
             ) : null}
             {player.error ? (
-              <span className="self-start rounded-lg bg-red-500/20 px-3 py-1.5 text-red-200">{player.error}</span>
+              <span className="self-start rounded-lg bg-status-error-light px-3 py-1.5 text-status-error-emphasis">{player.error}</span>
             ) : null}
           </div>
         ) : null}
         {canPlay && selectedVehicle ? (
-          <div className="absolute top-3 right-3 bottom-3 z-20 flex w-[min(380px,85%)] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#121214]/95 shadow-2xl">
+          <div className="absolute top-3 right-3 bottom-3 z-20 flex w-[min(380px,85%)] flex-col overflow-hidden rounded-xl border border-border-quaternary bg-[#121214]/95 shadow-2xl">
             <VehicleDataPanel
               vehicleCode={selectedVehicle}
               vehicles={visible.vehicles.map((vehicle) => vehicle.code)}
@@ -460,7 +443,7 @@ function ReplayStage({
 
 function StageMessage({ children, tone }: { children: React.ReactNode; tone?: "error" }) {
   return (
-    <div className={`flex h-full items-center justify-center px-6 text-center ${tone === "error" ? "text-red-300" : "text-zinc-400"}`}>
+    <div className={`flex h-full items-center justify-center px-6 text-center ${tone === "error" ? "text-status-error-emphasis" : "text-text-tertiary"}`}>
       {children}
     </div>
   );
@@ -468,16 +451,16 @@ function StageMessage({ children, tone }: { children: React.ReactNode; tone?: "e
 
 function StatusBadge({ status }: { status: HistoryItem["execution_status"] }) {
   const map: Record<HistoryItem["execution_status"], [string, string]> = {
-    ended: ["已解除", "bg-emerald-900/60 text-emerald-200"],
-    cancelled: ["已取消預約", "bg-zinc-700 text-zinc-300"],
-    active: ["進行中", "bg-red-900/70 text-red-200"],
-    activating: ["啟動中", "bg-red-900/70 text-red-200"],
-    restoring: ["恢復中", "bg-amber-900/70 text-amber-200"],
-    scheduled: ["待執行", "bg-amber-900/70 text-amber-200"],
-    failed: ["失敗", "bg-red-950 text-red-300"],
+    ended: ["已解除", "bg-emerald-900/60 text-status-success"],
+    cancelled: ["已取消預約", "bg-link-standard-hover text-text-secondary"],
+    active: ["進行中", "bg-status-error-light text-status-error-emphasis"],
+    activating: ["啟動中", "bg-status-error-light text-status-error-emphasis"],
+    restoring: ["恢復中", "bg-status-warning-light text-status-warning"],
+    scheduled: ["待執行", "bg-status-warning-light text-status-warning"],
+    failed: ["失敗", "bg-red-950 text-status-error-emphasis"],
   };
-  const [label, className] = map[status] ?? [status, "bg-zinc-700"];
-  return <span className={`shrink-0 rounded-md px-3 py-1 text-sm ${className}`}>{label}</span>;
+  const [label, className] = map[status] ?? [status, "bg-link-standard-hover"];
+  return <span className={`shrink-0 rounded-md px-3 py-1 text-body-s ${className}`}>{label}</span>;
 }
 
 function replayNote(item: HistoryItem): string | null {
@@ -510,10 +493,10 @@ function durationLabel(item: HistoryItem): string {
 }
 
 function levelText(level: number) {
-  return level === 1 ? "text-red-500" : level === 2 ? "text-orange-400" : "text-yellow-400";
+  return level === 1 ? "text-status-error" : level === 2 ? "text-orange-400" : "text-yellow-400";
 }
 function levelBadge(level: number) {
-  return level === 1 ? "bg-red-900" : level === 2 ? "bg-amber-800" : "bg-yellow-800";
+  return level === 1 ? "bg-status-error-light" : level === 2 ? "bg-amber-800" : "bg-yellow-800";
 }
 
 const pad = (value: number) => String(value).padStart(2, "0");

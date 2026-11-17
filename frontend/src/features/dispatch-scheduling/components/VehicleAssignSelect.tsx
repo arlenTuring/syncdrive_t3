@@ -24,13 +24,13 @@ export function reservedVehicleCodesFromRows(rows: DispatchListItem[]): string[]
 function VehicleStatusPill({ status }: { status: VehicleAssignStatus }) {
   if (status === 'available') {
     return (
-      <span className="shrink-0 rounded-full bg-[rgba(0,201,81,0.28)] px-2 py-0.5 text-[11px] font-medium leading-4 tracking-[0.5px] text-[#F3F4F6]">
+      <span className="shrink-0 rounded-full bg-[rgba(0,201,81,0.28)] px-2 py-0.5 text-body-xs-bold tracking-[0.5px] text-text-primary">
         可用
       </span>
     );
   }
   return (
-    <span className="shrink-0 rounded-full bg-[rgba(146,64,14,0.55)] px-2 py-0.5 text-[11px] font-medium leading-4 tracking-[0.5px] text-[#E7C9A3]">
+    <span className="shrink-0 rounded-full bg-[rgba(146,64,14,0.55)] px-2 py-0.5 text-body-xs-bold tracking-[0.5px] text-[#E7C9A3]">
       預約任務
     </span>
   );
@@ -75,28 +75,28 @@ export function VehicleAssignSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex h-10 w-full items-center gap-2 rounded-lg border bg-zinc-900/80 px-3 text-left text-sm focus:outline-none ${
+        className={`flex h-10 w-full items-center gap-2 rounded-lg border bg-surface-primary px-3 text-left text-body-s focus:outline-none ${
           open
-            ? 'border-[#7CB8FF] ring-1 ring-[#2B7FFF]/40'
-            : 'border-zinc-700/80 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30'
+            ? 'border-[#7CB8FF] ring-1 ring-border-theme-light'
+            : 'border-border-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn'
         }`}
       >
         {value ? (
           <>
-            <span className="min-w-0 flex-1 truncate tracking-[0.5px] text-[#F3F4F6]">{value}</span>
+            <span className="min-w-0 flex-1 truncate tracking-[0.5px] text-text-primary">{value}</span>
             {selectedStatus ? <VehicleStatusPill status={selectedStatus} /> : null}
           </>
         ) : (
           <span className="min-w-0 flex-1 truncate tracking-[0.5px] text-[#99A1AF]">請選擇</span>
         )}
         <ChevronDown
-          className={`size-3.5 shrink-0 text-[#6A7282] transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`size-3.5 shrink-0 text-text-quaternary transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open ? (
         <div
-          className="absolute left-0 top-[calc(100%+4px)] z-40 w-full overflow-hidden rounded-xl bg-[#18181B] py-1 shadow-lg shadow-black/40"
+          className="absolute left-0 top-[calc(100%+4px)] z-40 w-full overflow-hidden rounded-xl bg-surface-primary py-1 shadow-lg shadow-black-30"
           role="listbox"
         >
           <div className="max-h-[280px] overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
@@ -116,12 +116,12 @@ export function VehicleAssignSelect({
                     onChange(code);
                     setOpen(false);
                   }}
-                  className={`flex h-10 w-full items-center gap-2 px-3 text-left text-sm tracking-[0.5px] ${
+                  className={`flex h-10 w-full items-center gap-2 px-3 text-left text-body-s tracking-[0.5px] ${
                     reservedRow
-                      ? 'cursor-not-allowed text-[#6A7282]'
+                      ? 'cursor-not-allowed text-text-quaternary'
                       : active
-                        ? 'bg-white/10 text-[#F3F4F6]'
-                        : 'text-[#F3F4F6] hover:bg-white/5'
+                        ? 'bg-link-standard-hover text-text-primary'
+                        : 'text-text-primary hover:bg-link-standard'
                   }`}
                 >
                   <span className="min-w-0 flex-1 truncate">{code}</span>

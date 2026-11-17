@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveDwellConflict, type DwellConflict } from '../resolveDwellConflict';
 import { fetchVehicleStopDwellSeconds } from '../fetchVehicleStopDwell';
+import { Button, Dialog, IconButton } from '../../../components/ui';
 
 const MIN_SECONDS = 10;
 
@@ -19,45 +20,29 @@ function ConfirmVerifyDialog({
   const ok = text.trim() === phrase;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-[480px] rounded-xl bg-[#27272a] px-6 pb-5 pt-5 text-zinc-100 shadow-2xl">
+    <Dialog headerless padded={false} title={t('psdControl.dock.dualVerify')} onClose={onClose} widthClassName="w-full max-w-[480px]">
+<div className="px-6 pb-5 pt-5 text-text-primary flex min-h-0 flex-1 flex-col overflow-auto">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-[15px] font-medium">{t('psdControl.dock.dualVerify')}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-0.5 text-zinc-300 hover:text-white"
-            aria-label={t('common.close')}
-          >
-            <X className="size-5 stroke-[1.75]" />
-          </button>
+          <h3 className="text-body-m-bold">{t('psdControl.dock.dualVerify')}</h3>
+          <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
         </div>
         <div className="mb-8 rounded-lg bg-[#3f3f46]/50 px-4 py-4">
-          <p className="mb-3 text-[14px] text-zinc-100">{t('psdControl.dock.confirmAndSave')}</p>
+          <p className="mb-3 text-body-s text-text-primary">{t('psdControl.dock.confirmAndSave')}</p>
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t('psdControl.dock.confirmPlaceholder', { phrase })}
-            className="h-11 w-full rounded-md border border-zinc-600 bg-[#18181b] px-3 text-[14px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]"
+            className="h-11 w-full rounded-md border border-border-tertiary bg-surface-popup px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
           />
         </div>
         <div className="flex items-center justify-between">
-          <button type="button" onClick={onClose} className="text-[14px] text-zinc-100 hover:text-white">
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            disabled={!ok}
-            onClick={onSave}
-            className={`rounded-lg px-5 py-2 text-[14px] ${
-              ok ? 'bg-[#2B7FFF] text-white hover:bg-[#1d6feb]' : 'cursor-not-allowed bg-zinc-700 text-zinc-400'
-            }`}
-          >
+          <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
+          <Button disabled={!ok} onPress={onSave}>
             {t('common.save')}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+</Dialog>
   );
 }
 
@@ -120,29 +105,23 @@ export function DockTimeDialog({
   }, [conflict, t]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-[560px] rounded-xl bg-[#27272a] px-6 pb-5 pt-5 text-zinc-100 shadow-2xl">
+    <>
+      <Dialog headerless padded={false} title={t('psdControl.dock.title')} onClose={onClose} widthClassName="max-w-[560px]">
+      <div className="px-6 pb-5 pt-5 text-text-primary">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-[15px] font-medium">{t('psdControl.dock.title')}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-0.5 text-zinc-300 hover:text-white"
-            aria-label={t('common.close')}
-          >
-            <X className="size-5 stroke-[1.75]" />
-          </button>
+          <h3 className="text-body-m-bold">{t('psdControl.dock.title')}</h3>
+          <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
         </div>
 
-        <p className="mb-8 flex items-start gap-2 text-[13px] leading-relaxed text-zinc-400">
-          <Lightbulb className="mt-0.5 size-4 shrink-0 stroke-[1.75] text-zinc-400" aria-hidden />
+        <p className="mb-8 flex items-start gap-2 text-body-s text-text-tertiary">
+          <Lightbulb className="mt-0.5 size-4 shrink-0 stroke-[1.75] text-text-tertiary" aria-hidden />
           {t('psdControl.dock.hint')}
         </p>
 
         {!loaded ? (
-          <p className="mb-8 text-[13px] text-zinc-400">{t('psdControl.dock.loading')}</p>
+          <p className="mb-8 text-body-s text-text-tertiary">{t('psdControl.dock.loading')}</p>
         ) : loadError || initial == null ? (
-          <p className="mb-8 text-[13px] text-red-400">{loadError ?? t('psdControl.dock.noData')}</p>
+          <p className="mb-8 text-body-s text-status-error-emphasis">{loadError ?? t('psdControl.dock.noData')}</p>
         ) : (
           <div className="mb-6 flex items-center gap-4">
             <input
@@ -156,14 +135,14 @@ export function DockTimeDialog({
                 background: `linear-gradient(to right, #2B7FFF 0%, #2B7FFF ${pct}%, #3f3f46 ${pct}%, #3f3f46 100%)`,
               }}
             />
-            <span className="w-14 shrink-0 text-right text-[14px] text-zinc-100">
+            <span className="w-14 shrink-0 text-right text-body-s text-text-primary">
               {t('psdControl.dock.seconds', { value })}
             </span>
           </div>
         )}
 
         {showWarning ? (
-          <p className="mb-8 flex items-start gap-2 text-[13px] leading-relaxed text-[#f87171]">
+          <p className="mb-8 flex items-start gap-2 text-body-s text-[#f87171]">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             {warningText}
           </p>
@@ -172,21 +151,13 @@ export function DockTimeDialog({
         )}
 
         <div className="flex items-center justify-between">
-          <button type="button" onClick={onClose} className="text-[14px] text-zinc-100 hover:text-white">
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            disabled={!dirty}
-            onClick={() => setStep('verify')}
-            className={`rounded-lg px-5 py-2 text-[14px] ${
-              dirty ? 'bg-[#2B7FFF] text-white hover:bg-[#1d6feb]' : 'cursor-not-allowed bg-zinc-700 text-zinc-400'
-            }`}
-          >
+          <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
+          <Button disabled={!dirty} onPress={() => setStep('verify')}>
             {t('psdControl.dock.next')}
-          </button>
+          </Button>
         </div>
       </div>
+      </Dialog>
 
       {step === 'verify' ? (
         <ConfirmVerifyDialog
@@ -194,6 +165,6 @@ export function DockTimeDialog({
           onSave={() => onApply(value)}
         />
       ) : null}
-    </div>
+    </>
   );
 }

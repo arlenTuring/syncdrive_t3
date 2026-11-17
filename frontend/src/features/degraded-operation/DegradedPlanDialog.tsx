@@ -15,6 +15,7 @@ import {
   ExecutionScheduleFields,
   immediateSchedule,
 } from "./ExecutionScheduleFields";
+import { Button, Dialog, IconButton } from '../../components/ui';
 
 type Kind = "create" | "edit" | "execute";
 type Props = {
@@ -44,7 +45,6 @@ export function DegradedPlanDialog({
   const [tipOpen, setTipOpen] = useState(false);
   const [schedule, setSchedule] =
     useState<ExecutionSchedule>(immediateSchedule);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef(document.activeElement as HTMLElement | null);
   const payload = planDraftPayload(draft);
   const title =
@@ -63,25 +63,6 @@ export function DegradedPlanDialog({
     return () => window.clearTimeout(timer);
   }, [draft, kind, schedule]);
 
-  const keyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape" && !saving) onClose();
-    if (event.key !== "Tab") return;
-    const nodes = [
-      ...(dialogRef.current?.querySelectorAll<HTMLElement>(
-        "button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled)",
-      ) ?? []),
-    ];
-    if (!nodes.length) return;
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -106,56 +87,27 @@ export function DegradedPlanDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !saving) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="degraded-dialog-title"
-        onKeyDown={keyDown}
-        className="flex max-h-[calc(100vh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-[#17181c] shadow-2xl"
-      >
+    <Dialog headerless padded={false} title={title} busy={saving} onClose={() => onClose()} widthClassName="w-full max-w-[680px]" heightClassName="max-h-[calc(100vh-2rem)]">
         <div className="flex shrink-0 items-center gap-2 px-6 py-5">
           <h2
             id="degraded-dialog-title"
-            className="text-xl font-semibold text-zinc-100"
+            className="text-headline-4 text-text-primary"
           >
             {title}
           </h2>
           {kind === "execute" ? (
             <span className="group relative">
-              <button
-                type="button"
-                aria-label="執行降級說明"
-                aria-describedby="degraded-tooltip"
-                onClick={() => setTipOpen((open) => !open)}
-                className="rounded-full text-zinc-400 hover:text-white focus:text-white"
-              >
-                <Info className="size-5" />
-              </button>
+              <IconButton hierarchy="subordinate" variant="standard" label="執行降級說明" aria-describedby="degraded-tooltip" onPress={() => setTipOpen((open) => !open)} icon={<Info />} />
               <span
                 id="degraded-tooltip"
                 role="tooltip"
-                className={`${tipOpen ? "block" : "hidden group-hover:block group-focus-within:block"} absolute left-0 top-7 z-10 w-72 rounded-lg border border-zinc-600 bg-zinc-900 p-3 text-xs leading-5 text-zinc-200 shadow-xl`}
+                className={`${tipOpen ? "block" : "hidden group-hover:block group-focus-within:block"} absolute left-0 top-7 z-10 w-72 rounded-lg border border-border-tertiary bg-surface-primary p-3 text-body-xs text-text-primary shadow-xl`}
               >
                 {tooltip}
               </span>
             </span>
           ) : null}
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            className="ml-auto rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white"
-            aria-label="關閉"
-          >
-            <X className="size-6" />
-          </button>
+          <IconButton hierarchy="subordinate" variant="standard" className="ml-auto" disabled={saving} onPress={onClose} label="關閉" icon={<X />} />
         </div>
         <form
           onSubmit={submit}
@@ -165,12 +117,12 @@ export function DegradedPlanDialog({
             <section
               className={
                 kind === "execute"
-                  ? "rounded-2xl border border-zinc-700 p-4"
+                  ? "rounded-2xl border border-border-quaternary p-4"
                   : ""
               }
             >
               {kind === "execute" ? (
-                <h3 className="mb-4 text-lg text-zinc-100">降級設定</h3>
+                <h3 className="mb-4 text-headline-5 text-text-primary">降級設定</h3>
               ) : null}
               <DegradedPlanForm
                 value={draft}
@@ -186,19 +138,19 @@ export function DegradedPlanDialog({
               />
             ) : null}
             {kind === "execute" ? (
-              <section className="rounded-2xl border border-zinc-700 p-4">
-                <h3 className="mb-4 text-lg text-zinc-100">營運影響預估</h3>
+              <section className="rounded-2xl border border-border-quaternary p-4">
+                <h3 className="mb-4 text-headline-5 text-text-primary">營運影響預估</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-[#292f38] p-3 text-center text-zinc-400">
-                    <span className="block text-sm">影響班次</span>
-                    <b className="text-xl font-normal text-zinc-100">—</b>
+                  <div className="rounded-xl bg-[#292f38] p-3 text-center text-text-tertiary">
+                    <span className="block text-body-s">影響班次</span>
+                    <b className="text-headline-4 font-normal text-text-primary">—</b>
                   </div>
-                  <div className="rounded-xl bg-[#292f38] p-3 text-center text-zinc-400">
-                    <span className="block text-sm">運能損失</span>
-                    <b className="text-xl font-normal text-zinc-100">— %</b>
+                  <div className="rounded-xl bg-[#292f38] p-3 text-center text-text-tertiary">
+                    <span className="block text-body-s">運能損失</span>
+                    <b className="text-headline-4 font-normal text-text-primary">— %</b>
                   </div>
                 </div>
-                <p className="mt-2 text-center text-xs text-zinc-500">
+                <p className="mt-2 text-center text-body-xs text-text-quaternary">
                   影響預估尚未提供
                 </p>
               </section>
@@ -206,21 +158,14 @@ export function DegradedPlanDialog({
             {error ? (
               <p
                 role="alert"
-                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+                className="rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-s text-status-error-emphasis"
               >
                 {error}
               </p>
             ) : null}
           </div>
-          <div className="flex shrink-0 justify-end gap-3 border-t border-zinc-700 px-6 py-4">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onClose}
-              className="rounded-xl px-5 py-2.5 text-zinc-200 hover:bg-white/5"
-            >
-              取消
-            </button>
+          <div className="flex shrink-0 justify-end gap-3 border-t border-border-quaternary px-6 py-4">
+            <Button hierarchy="subordinate" variant="tonal" disabled={saving} onPress={onClose}>取消</Button>
             <button
               type="submit"
               disabled={
@@ -230,7 +175,7 @@ export function DegradedPlanDialog({
                   schedule.schedule_mode === "scheduled" &&
                   !schedule.scheduled_time)
               }
-              className={`rounded-xl px-5 py-2.5 font-medium text-white disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-500 ${kind === "execute" ? "bg-red-600 hover:bg-red-500" : "bg-blue-600 hover:bg-blue-500"}`}
+              className={`rounded-xl px-5 py-2.5 font-medium text-text-primary disabled:cursor-not-allowed disabled:bg-link-standard-hover disabled:text-text-quaternary ${kind === "execute" ? "bg-red-600 hover:bg-status-error" : "bg-blue-600 hover:bg-blue-500"}`}
             >
               {saving
                 ? "處理中…"
@@ -242,7 +187,6 @@ export function DegradedPlanDialog({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 }

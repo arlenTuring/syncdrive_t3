@@ -6,6 +6,7 @@ import {
   CreateDispatchConfirmHeader,
   CreateDispatchConfirmStep,
 } from './CreateDispatchConfirmStep';
+import { Button, Dialog } from '../../../components/ui';
 
 const APPROVE_PHRASE = '核准';
 
@@ -60,13 +61,7 @@ export function DispatchReviewDialog({
       ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-dispatch-title"
-        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#18181b] shadow-2xl"
-      >
+    <Dialog headerless padded={false} title={isApprove ? t('dispatchScheduling.confirm.dualVerifyTitle') : t('dispatchScheduling.confirm.taskTitle')} onClose={onClose} widthClassName="w-full max-w-xl" heightClassName="max-h-[92vh]">
         <CreateDispatchConfirmHeader
           onClose={onClose}
           title={
@@ -98,34 +93,14 @@ export function DispatchReviewDialog({
           >
             {isApprove ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => onReject?.(row)}
-                  className="rounded-lg border border-red-500 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10"
-                >
-                  {t('dispatchScheduling.confirm.reject')}
-                </button>
-                <button
-                  type="button"
-                  disabled={!canApprove}
-                  onClick={() => onApprove?.(row)}
-                  className="rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-                >
-                  {t('dispatchScheduling.confirm.approve')}
-                </button>
+                <Button hierarchy="danger" variant="outlined" onPress={() => onReject?.(row)}>{t('dispatchScheduling.confirm.reject')}</Button>
+                <Button disabled={!canApprove} onPress={() => onApprove?.(row)}>{t('dispatchScheduling.confirm.approve')}</Button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => onWithdraw?.(row)}
-                className="rounded-lg border border-red-500 bg-transparent px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10"
-              >
-                {t('dispatchScheduling.confirm.withdraw')}
-              </button>
+              <Button hierarchy="danger" variant="outlined" onPress={() => onWithdraw?.(row)}>{t('dispatchScheduling.confirm.withdraw')}</Button>
             )}
           </footer>
         ) : null}
-      </div>
-    </div>
+      </Dialog>
   );
 }

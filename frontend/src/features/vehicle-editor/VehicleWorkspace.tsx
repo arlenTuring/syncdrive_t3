@@ -22,6 +22,7 @@ import {
   workspaceGridStepPx,
 } from './utils/workspaceEditScale';
 import { selectedElementsBounds } from './utils/selectedElementsBounds';
+import { IconButton } from '../../components/ui';
 
 const MARQUEE_START_PX = 4;
 const MIN_CANVAS_WIDTH = 40;
@@ -435,23 +436,16 @@ export function VehicleWorkspace({
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 overflow-hidden bg-[#0a0f1a]"
+      className="relative flex-1 overflow-hidden bg-surface-sub-background"
       onPointerDownCapture={handleWorkspacePointerDownCapture}
     >
       <div
         data-vehicle-workspace-chrome
-        className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-900/90 p-1"
+        className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-lg border border-border-quaternary bg-surface-primary p-1"
       >
-        <button
-          type="button"
-          className="rounded p-1 text-zinc-400 hover:text-white"
-          onClick={() => setUserZoom((z) => Math.max(0.25, z / 1.25))}
-          title={t('vehicleEditor.workspace.zoomOut')}
-        >
-          <ZoomOut size={16} />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" onPress={() => setUserZoom((z) => Math.max(0.25, z / 1.25))} title={t('vehicleEditor.workspace.zoomOut')} label={t('vehicleEditor.workspace.zoomOut')} icon={<ZoomOut />} />
         <span
-          className="min-w-[56px] text-center font-mono text-[10px] text-zinc-500"
+          className="min-w-[56px] text-center font-mono text-caption-2 text-text-quaternary"
           title={
             compactCanvas
               ? t('vehicleEditor.workspace.logicalCanvasTitle', { w: vehicle.width, h: vehicle.height })
@@ -460,22 +454,8 @@ export function VehicleWorkspace({
         >
           {Math.round(totalScale * 100)}%
         </span>
-        <button
-          type="button"
-          className="rounded p-1 text-zinc-400 hover:text-white"
-          onClick={() => setUserZoom((z) => Math.min(4, z * 1.25))}
-          title={t('vehicleEditor.workspace.zoomIn')}
-        >
-          <ZoomIn size={16} />
-        </button>
-        <button
-          type="button"
-          className="rounded p-1 text-zinc-400 hover:text-white"
-          onClick={resetWorkspaceView}
-          title={t('vehicleEditor.workspace.resetView')}
-        >
-          <Crosshair size={16} />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" onPress={() => setUserZoom((z) => Math.min(4, z * 1.25))} title={t('vehicleEditor.workspace.zoomIn')} label={t('vehicleEditor.workspace.zoomIn')} icon={<ZoomIn />} />
+        <IconButton hierarchy="subordinate" variant="standard" onPress={resetWorkspaceView} title={t('vehicleEditor.workspace.resetView')} label={t('vehicleEditor.workspace.resetView')} icon={<Crosshair />} />
       </div>
 
       <div ref={canvasStageRef} className="flex h-full w-full flex-col items-center justify-center p-10">
@@ -620,7 +600,7 @@ export function VehicleWorkspace({
             ) : null}
         </div>
         {isEditMode && (
-          <p className="mt-3 font-mono text-[10px] text-zinc-500">
+          <p className="mt-3 font-mono text-caption-2 text-text-quaternary">
             {t('vehicleEditor.workspace.logicalCanvas', { w: vehicle.width, h: vehicle.height })}
             {compactCanvas ? t('vehicleEditor.workspace.compactHint') : null}
             {selectedElementIds.length > 0

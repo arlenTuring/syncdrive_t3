@@ -35,6 +35,7 @@ import {
   type DispatchListItem,
   type DispatchPriorityKey,
 } from '../types';
+import { Button, Dialog, IconButton } from '../../../components/ui';
 
 type CreateDispatchDialogProps = {
   existingCodes: string[];
@@ -46,9 +47,9 @@ type CreateDispatchDialogProps = {
 
 type StationStop = { id: string; stationId: string; actions: ShiftRouteSegmentAction[] };
 
-const FIELD_LABEL = 'mb-1.5 block text-xs text-zinc-400';
+const FIELD_LABEL = 'mb-1.5 block text-body-xs text-text-tertiary';
 const INPUT =
-  'h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn';
 
 const STATION_ACTION_OPTIONS = SHIFT_ACTION_CATEGORY_CATALOG.filter(
   (item) => item.group === 'station',
@@ -98,7 +99,7 @@ function minutesFromNow(hm: string): number | null {
 function RequiredLabel({ children }: { children: string }) {
   return (
     <span className={FIELD_LABEL}>
-      <span className="mr-0.5 text-red-500">*</span>
+      <span className="mr-0.5 text-status-error">*</span>
       {children}
     </span>
   );
@@ -376,33 +377,17 @@ export function CreateDispatchDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      role="presentation"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-dispatch-title"
-        className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#18181b] shadow-2xl ${
-          step === 1 ? 'max-w-5xl' : 'max-w-lg'
-        }`}
-      >
+    <Dialog headerless padded={false} title={editing
+                ? t('dispatchScheduling.createDialog.titleEdit')
+                : t('dispatchScheduling.createDialog.titleCreate')} onClose={onClose} widthClassName={step === 1 ? 'max-w-5xl' : 'max-w-lg'} heightClassName="max-h-[92vh]">
         {step === 1 ? (
           <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
-            <h2 id="create-dispatch-title" className="text-base font-semibold text-zinc-100">
+            <h2 id="create-dispatch-title" className="text-body-m-bold text-text-primary">
               {editing
                 ? t('dispatchScheduling.createDialog.titleEdit')
                 : t('dispatchScheduling.createDialog.titleCreate')}
             </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-              aria-label={t('common.close')}
-            >
-              <X className="size-4" />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
           </header>
         ) : (
           <CreateDispatchConfirmHeader onClose={onClose} />
@@ -410,7 +395,7 @@ export function CreateDispatchDialog({
 
         {step === 1 ? (
           <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] overflow-hidden">
-            <aside className="space-y-4 overflow-auto border-r border-zinc-800/80 px-6 py-1">
+            <aside className="space-y-4 overflow-auto border-r border-border-quaternary px-6 py-1">
               <div>
                 <RequiredLabel>{t('dispatchScheduling.createDialog.execTime')}</RequiredLabel>
                 <ExecutionTimeField
@@ -420,7 +405,7 @@ export function CreateDispatchDialog({
                   onNow={() => setExecTime(formatLocalHm(new Date()))}
                 />
                 {execTime && !timeOk ? (
-                  <p className="mt-1 text-[11px] text-red-400">
+                  <p className="mt-1 text-body-xs text-status-error-emphasis">
                     {t('dispatchScheduling.createDialog.execTimeError')}
                   </p>
                 ) : null}
@@ -454,39 +439,32 @@ export function CreateDispatchDialog({
             <div className="min-h-0 overflow-auto px-6 py-1 pb-4">
               <section className="mb-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-zinc-200">
+                  <h3 className="text-body-s-bold text-text-primary">
                     {t('dispatchScheduling.createDialog.basicInfo')}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setGroupPickerOpen((open) => !open)}
-                    className="inline-flex items-center text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
-                  >
-                    {t('dispatchScheduling.createDialog.selectRouteGroup')}
-                    <ChevronRight className="size-4" />
-                  </button>
+                  <Button variant="text" trailingIcon={<ChevronRight />} onPress={() => setGroupPickerOpen((open) => !open)}>{t('dispatchScheduling.createDialog.selectRouteGroup')}</Button>
                 </div>
                 {groupPickerOpen ? (
-                  <div className="mb-4 max-h-56 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950/60 p-2">
+                  <div className="mb-4 max-h-56 overflow-auto rounded-xl border border-border-quaternary bg-black-30 p-2">
                     {groups.length === 0 ? (
-                      <p className="px-2 py-3 text-xs text-zinc-500">
+                      <p className="px-2 py-3 text-body-xs text-text-quaternary">
                         {t('dispatchScheduling.createDialog.noRouteGroups')}
                       </p>
                     ) : (
                       groups.map((group) => (
                         <div key={group.groupId} className="mb-2 last:mb-0">
-                          <p className="px-2 py-1 text-[11px] text-zinc-500">{group.groupName}</p>
+                          <p className="px-2 py-1 text-body-xs text-text-quaternary">{group.groupName}</p>
                           {group.routes.map((route) => (
                             <button
                               key={route.routeId}
                               type="button"
                               onClick={() => applyRoute(group, route)}
-                              className={`flex w-full flex-col rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5 ${
-                                routeId === route.routeId ? 'bg-white/10 text-zinc-100' : 'text-zinc-300'
+                              className={`flex w-full flex-col rounded-lg px-2 py-1.5 text-left text-body-s hover:bg-link-standard ${
+                                routeId === route.routeId ? 'bg-link-standard-hover text-text-primary' : 'text-text-secondary'
                               }`}
                             >
                               <span>{route.label}</span>
-                              <span className="text-[11px] text-zinc-500">{route.stationPathLabel}</span>
+                              <span className="text-body-xs text-text-quaternary">{route.stationPathLabel}</span>
                             </button>
                           ))}
                         </div>
@@ -495,7 +473,7 @@ export function CreateDispatchDialog({
                   </div>
                 ) : null}
                 {selectedGroup ? (
-                  <p className="mb-3 text-[11px] text-zinc-500">
+                  <p className="mb-3 text-body-xs text-text-quaternary">
                     {t('dispatchScheduling.createDialog.selected', {
                       name: `${selectedGroup.groupName}${
                         routeId
@@ -526,7 +504,7 @@ export function CreateDispatchDialog({
                         className={`${INPUT} pr-12`}
                         inputMode="numeric"
                       />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-xs text-text-quaternary">
                         {t('dispatchScheduling.createDialog.minutes')}
                       </span>
                     </div>
@@ -564,26 +542,19 @@ export function CreateDispatchDialog({
 
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-zinc-200">
+                  <h3 className="text-body-s-bold text-text-primary">
                     {t('dispatchScheduling.createDialog.planSection')}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setStations((prev) => [...prev, emptyStation()])}
-                    className="inline-flex items-center gap-1 text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
-                  >
-                    <Plus className="size-3.5" />
-                    {t('dispatchScheduling.createDialog.createStation')}
-                  </button>
+                  <Button variant="text" leadingIcon={<Plus />} onPress={() => setStations((prev) => [...prev, emptyStation()])}>{t('dispatchScheduling.createDialog.createStation')}</Button>
                 </div>
 
                 <div className="space-y-3">
                   {stations.map((stop, index) => (
                     <div
                       key={stop.id}
-                      className="flex overflow-visible rounded-xl border border-zinc-800 bg-zinc-950/40"
+                      className="flex overflow-visible rounded-xl border border-border-quaternary bg-black-30"
                     >
-                      <div className="flex w-8 shrink-0 items-center justify-center rounded-l-xl bg-[#2B7FFF] text-sm font-semibold text-white">
+                      <div className="flex w-8 shrink-0 items-center justify-center rounded-l-xl bg-link-theme-filled text-body-s-bold text-text-primary">
                         {stationLetter(index)}
                       </div>
                       <div className="min-w-0 flex-1 p-3">
@@ -610,36 +581,22 @@ export function CreateDispatchDialog({
                             />
                           ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => addAction(stop.id)}
-                          className="mt-2 inline-flex items-center gap-1 text-sm text-[#51A2FF] hover:text-[#7CB8FF]"
-                        >
-                          <Plus className="size-3.5" />
-                          {t('dispatchScheduling.createDialog.createAction')}
-                        </button>
+                        <Button variant="text" className="mt-2" leadingIcon={<Plus />} onPress={() => addAction(stop.id)}>{t('dispatchScheduling.createDialog.createAction')}</Button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setStations((prev) =>
-                            prev.length <= 1
-                              ? [emptyStation()]
-                              : prev.filter((item) => item.id !== stop.id),
-                          )
-                        }
-                        className="m-2 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                        aria-label={t('dispatchScheduling.createDialog.deleteStation')}
-                      >
-                        <X className="size-4" />
-                      </button>
+                      <IconButton size="small" hierarchy="subordinate" variant="standard" className="m-2 shrink-0" onPress={() =>
+             setStations((prev) =>
+              prev.length <= 1
+               ? [emptyStation()]
+               : prev.filter((item) => item.id !== stop.id),
+             )
+            } label={t('dispatchScheduling.createDialog.deleteStation')} icon={<X />} />
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between text-sm text-zinc-400">
+                <div className="mt-4 flex items-center justify-between text-body-s text-text-tertiary">
                   <span>{t('dispatchScheduling.createDialog.totalTripTime')}</span>
-                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                  <span className="rounded-full bg-surface-secondary px-3 py-1 text-body-xs text-text-secondary">
                     {t('dispatchScheduling.createDialog.estimate', { minutes: estimateMinutes })}
                   </span>
                 </div>
@@ -659,46 +616,19 @@ export function CreateDispatchDialog({
         )}
 
         <footer className="flex shrink-0 items-center justify-between px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-3.5 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            {t('common.cancel')}
-          </button>
+          <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
           {step === 1 ? (
-            <button
-              type="button"
-              disabled={!canNext}
-              onClick={() => {
+            <Button disabled={!canNext} onPress={() => {
                 setConfirmText('');
                 setStep(2);
-              }}
-              className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t('dispatchScheduling.createDialog.next')}
-            </button>
+              }}>{t('dispatchScheduling.createDialog.next')}</Button>
           ) : (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="rounded-lg px-3.5 py-2 text-sm font-medium text-[#51A2FF] hover:bg-[#2B7FFF]/10"
-              >
-                {t('dispatchScheduling.createDialog.previous')}
-              </button>
-              <button
-                type="button"
-                disabled={!canCreate}
-                onClick={submit}
-                className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2569e6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-              >
-                {t('dispatchScheduling.createDialog.create')}
-              </button>
+              <Button variant="text" onPress={() => setStep(1)}>{t('dispatchScheduling.createDialog.previous')}</Button>
+              <Button disabled={!canCreate} onPress={submit}>{t('dispatchScheduling.createDialog.create')}</Button>
             </div>
           )}
         </footer>
-      </div>
-    </div>
+      </Dialog>
   );
 }

@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sanitizeIntegerInput } from '../utils/numericInput';
+import { Checkbox } from '../../../components/ui';
 
 const INLINE_INPUT_ENABLED =
-  'h-[42px] w-[90%] min-w-[180px] flex-1 max-w-[900px] rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] w-[90%] min-w-[180px] flex-1 max-w-[900px] rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 type TriggerFieldRowProps = {
   label: ReactNode;
@@ -43,24 +44,19 @@ export function TriggerFieldRow({
   return (
     <div className={fieldActive ? '' : 'opacity-50'}>
       {showToggle ? (
-        <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onEnabledChange(e.target.checked)}
-            className="size-4 shrink-0 rounded border-zinc-600 bg-zinc-900 text-[#2B7FFF] focus:ring-[#2B7FFF]/30"
-          />
+        <label className="mb-2 flex cursor-pointer items-center gap-2 text-body-s text-text-secondary">
+          <Checkbox checked={enabled} onCheckedChange={(checked) => onEnabledChange(checked)} />
           {label}
         </label>
       ) : (
-        <div className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
-          {required && <span className="text-red-500">*</span>}
+        <div className="mb-2 flex items-center gap-1 text-body-s text-text-secondary">
+          {required && <span className="text-status-error">*</span>}
           {label}
         </div>
       )}
 
       {fieldActive ? (
-        <div className="flex w-full flex-wrap items-center gap-2 text-sm text-zinc-300">
+        <div className="flex w-full flex-wrap items-center gap-2 text-body-s text-text-secondary">
           <span>{prefixText}</span>
           <input
             type="text"
@@ -73,7 +69,7 @@ export function TriggerFieldRow({
           <span>{suffixText}</span>
         </div>
       ) : (
-        <p className="text-sm text-zinc-600">{resolvedDisabledMessage}</p>
+        <p className="text-body-s text-text-disabled">{resolvedDisabledMessage}</p>
       )}
     </div>
   );

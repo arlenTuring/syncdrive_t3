@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, RotateCcw, RotateCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { normalizeDegrees } from '../../map-editor/utils/rotation';
+import { IconButton } from '../../../components/ui';
 
 export function VehicleRotationToolbar({
   rotationDeg,
@@ -28,41 +29,13 @@ export function VehicleRotationToolbar({
         role="toolbar"
         aria-label={t('vehicleEditor.rotationToolbar.aria')}
       >
-        <button
-          type="button"
-          title={t('vehicleEditor.rotationToolbar.left90')}
-          onClick={onRotateLeft90}
-          className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-        >
-          <RotateCcw className="size-4" aria-hidden />
-        </button>
-        <button
-          type="button"
-          title={t('vehicleEditor.rotationToolbar.right90')}
-          onClick={onRotateRight90}
-          className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-        >
-          <RotateCw className="size-4" aria-hidden />
-        </button>
-        <span className="mx-0.5 min-w-[2rem] text-center font-mono text-xs leading-none text-cyan-400/90">
+        <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.left90')} onPress={onRotateLeft90} label={t('vehicleEditor.rotationToolbar.left90')} icon={<RotateCcw />} />
+        <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.right90')} onPress={onRotateRight90} label={t('vehicleEditor.rotationToolbar.right90')} icon={<RotateCw />} />
+        <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-cyan-400/90">
           {angleLabel}
         </span>
-        <button
-          type="button"
-          title={t('vehicleEditor.rotationToolbar.nudgeMinus')}
-          onClick={() => onRotateDelta(-5)}
-          className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-        </button>
-        <button
-          type="button"
-          title={t('vehicleEditor.rotationToolbar.nudgePlus')}
-          onClick={() => onRotateDelta(5)}
-          className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
-        >
-          <ChevronRight className="size-4" aria-hidden />
-        </button>
+        <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.nudgeMinus')} onPress={() => onRotateDelta(-5)} label={t('vehicleEditor.rotationToolbar.nudgeMinus')} icon={<ChevronLeft />} />
+        <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.nudgePlus')} onPress={() => onRotateDelta(5)} label={t('vehicleEditor.rotationToolbar.nudgePlus')} icon={<ChevronRight />} />
       </div>
   );
 

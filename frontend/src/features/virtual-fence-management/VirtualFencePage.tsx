@@ -25,9 +25,10 @@ import {
   upsertVirtualFence,
 } from './virtualFenceStore';
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button, IconButton } from '../../components/ui';
 
 const SELECT =
-  'h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF]/60';
+  'h-9 rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary outline-none focus:border-border-theme-light';
 
 export function VirtualFencePage() {
   const { t } = useTranslation();
@@ -183,8 +184,8 @@ export function VirtualFencePage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <div className="relative flex shrink-0 items-center gap-2 border-b border-zinc-800/80 px-4 py-3">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <div className="relative flex shrink-0 items-center gap-2 border-b border-border-quaternary px-4 py-3">
         {!isEditing ? (
           <>
             <SiteSelect
@@ -197,36 +198,22 @@ export function VirtualFencePage() {
               <option value="enabled">{t('virtualFence.enableFilterEnabled')}</option>
               <option value="disabled">{t('virtualFence.enableFilterDisabled')}</option>
             </SiteSelect>
-            <button
-              type="button"
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 text-[#51A2FF] transition hover:bg-[#2B7FFF]/25"
-              title={t('common.search')}
-              onClick={() => {
-                document
-                  .querySelector<HTMLInputElement>('[data-fence-list-search]')
-                  ?.focus();
-              }}
-            >
-              <Search className="size-4" />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('common.search')} onPress={() => {
+        document
+         .querySelector<HTMLInputElement>('[data-fence-list-search]')
+         ?.focus();
+       }} label={t('common.search')} icon={<Search />} />
             <div className="ml-auto flex min-w-0 items-center gap-3">
               {mapId ? (
-                <p className="hidden truncate text-xs text-zinc-500 sm:block">
+                <p className="hidden truncate text-body-xs text-text-quaternary sm:block">
                   {t('virtualFence.currentMap', { name: displayName || mapId })}
                 </p>
               ) : null}
-              <button
-                type="button"
-                onClick={startCreate}
-                className="inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
-              >
-                <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-                {t('virtualFence.create')}
-              </button>
+              <Button className="w-fit shrink-0" onPress={startCreate} leadingIcon={<Plus />}>{t('virtualFence.create')}</Button>
             </div>
           </>
         ) : (
-          <p className="absolute inset-x-0 text-center text-sm tracking-[0.4px] text-zinc-300">
+          <p className="absolute inset-x-0 text-center text-body-s tracking-[0.4px] text-text-secondary">
             {t('virtualFence.editing')}
           </p>
         )}
@@ -234,11 +221,11 @@ export function VirtualFencePage() {
 
       <div className="flex min-h-0 flex-1">
         {loading ? (
-          <p className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+          <p className="flex flex-1 items-center justify-center text-body-s text-text-quaternary">
             {t('virtualFence.loading')}
           </p>
         ) : error ? (
-          <p className="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-400">
+          <p className="flex flex-1 items-center justify-center px-6 text-center text-body-s text-status-error-emphasis">
             {error}
           </p>
         ) : (

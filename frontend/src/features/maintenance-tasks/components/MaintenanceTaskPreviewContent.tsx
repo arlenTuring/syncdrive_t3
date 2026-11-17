@@ -13,6 +13,7 @@ import {
   type MaintenanceTaskCreateDraft,
 } from '../types/create';
 import { useTranslation } from 'react-i18next';
+import { Button } from '../../../components/ui';
 
 export function PreviewSection({
   step,
@@ -31,28 +32,21 @@ export function PreviewSection({
   const showSkipped = enabled === false;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/30">
-      <header className="flex items-center gap-3 border-b border-zinc-800/60 bg-zinc-900/50 px-5 py-3.5">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-semibold text-zinc-400">
+    <section className="overflow-hidden rounded-xl border border-border-quaternary bg-black-30">
+      <header className="flex items-center gap-3 border-b border-border-quaternary bg-surface-primary px-5 py-3.5">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-body-xs-bold text-text-tertiary">
           {step}
         </span>
-        <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+        <h3 className="text-body-s-bold text-text-primary">{title}</h3>
         {onEdit && (
-          <button
-            type="button"
-            onClick={() => onEdit(step as CreateMaintenanceTaskStep)}
-            className="inline-flex items-center gap-1 rounded-md border border-zinc-700/80 px-2.5 py-1 text-xs text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            <Pencil className="size-3" />
-            {t('maintenanceTasks.previewChrome.edit')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Pencil />} onPress={() => onEdit(step as CreateMaintenanceTaskStep)}>{t('maintenanceTasks.previewChrome.edit')}</Button>
         )}
         {enabled !== undefined && (
           <span
-            className={`ml-auto rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+            className={`ml-auto rounded-full px-2.5 py-0.5 text-body-xs font-medium ${
               enabled
-                ? 'bg-emerald-500/15 text-emerald-400'
-                : 'bg-zinc-800 text-zinc-500'
+                ? 'bg-status-success-light text-status-success'
+                : 'bg-surface-secondary text-text-quaternary'
             }`}
           >
             {enabled
@@ -64,7 +58,7 @@ export function PreviewSection({
 
       <div className="px-5 py-4">
         {showSkipped ? (
-          <p className="text-sm text-zinc-600">{t('maintenanceTasks.stepSkipped')}</p>
+          <p className="text-body-s text-text-disabled">{t('maintenanceTasks.stepSkipped')}</p>
         ) : (
           children
         )}
@@ -76,9 +70,9 @@ export function PreviewSection({
 export function PreviewRow({ label, value }: { label: string; value: ReactNode }) {
   const empty = value === '' || value === null || value === undefined;
   return (
-    <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-1 text-sm">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className={`min-w-0 break-words ${empty ? 'text-zinc-600' : 'text-zinc-200'}`}>
+    <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-1 text-body-s">
+      <dt className="text-text-quaternary">{label}</dt>
+      <dd className={`min-w-0 break-words ${empty ? 'text-text-disabled' : 'text-text-primary'}`}>
         {empty ? '—' : value}
       </dd>
     </div>
@@ -87,16 +81,16 @@ export function PreviewRow({ label, value }: { label: string; value: ReactNode }
 
 export function PreviewList({ items }: { items: string[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-zinc-600">—</p>;
+    return <p className="text-body-s text-text-disabled">—</p>;
   }
   return (
     <ol className="space-y-2">
       {items.map((item, index) => (
         <li
           key={`${index}-${item}`}
-          className="flex gap-2 text-sm text-zinc-200"
+          className="flex gap-2 text-body-s text-text-primary"
         >
-          <span className="shrink-0 tabular-nums text-zinc-500">{index + 1}.</span>
+          <span className="shrink-0 tabular-nums text-text-quaternary">{index + 1}.</span>
           <span className="min-w-0 break-words">{item}</span>
         </li>
       ))}
@@ -201,11 +195,11 @@ function WizardBulletCard({ title, items }: { title: string; items: string[] }) 
   if (items.length === 0) return null;
   return (
     <div className="rounded-lg bg-[#1b1b1f] px-4 py-3">
-      <h4 className="mb-2 text-sm font-medium text-zinc-100">{title}</h4>
+      <h4 className="mb-2 text-body-s-bold text-text-primary">{title}</h4>
       <ul className="space-y-1.5">
         {items.map((item, index) => (
-          <li key={`${index}-${item}`} className="flex gap-2 text-sm text-zinc-200">
-            <span className="shrink-0 text-zinc-500" aria-hidden>•</span>
+          <li key={`${index}-${item}`} className="flex gap-2 text-body-s text-text-primary">
+            <span className="shrink-0 text-text-quaternary" aria-hidden>•</span>
             <span className="min-w-0 break-words">{item}</span>
           </li>
         ))}
@@ -242,12 +236,12 @@ export function MaintenanceTaskPreviewContent({
     return (
       <div className="space-y-4">
         <section className="rounded-xl bg-[#232329] px-5 py-5">
-          <h3 className="mb-4 text-base font-medium text-zinc-100">{stepLabels[1]}</h3>
+          <h3 className="mb-4 text-body-m-bold text-text-primary">{stepLabels[1]}</h3>
           {basicRows}
         </section>
         {SECTION_ORDER.filter(({ key }) => lines[key].enabled).map(({ key, step }) => (
           <section key={key} className="space-y-4 rounded-xl bg-[#232329] px-5 py-5">
-            <h3 className="text-base font-medium text-zinc-100">{stepLabels[step]}</h3>
+            <h3 className="text-body-m-bold text-text-primary">{stepLabels[step]}</h3>
             {sectionExtras?.[key]}
             <WizardBulletCard title="條件設定" items={lines[key].conditions} />
             <WizardBulletCard title="營運設施" items={lines[key].facilities} />

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { AnchoredPopover } from "../../lib/AnchoredPopover";
 import { TimePickerPanel } from "../time-templates/components/TimeOfDayPicker";
 import type { ExecutionSchedule } from "./api";
+import { Button } from '../../components/ui';
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -51,12 +52,12 @@ function ScheduledTimeField({
         aria-expanded={open}
         aria-label="預約開始時間"
         onClick={() => (open ? setOpen(false) : openPanel())}
-        className={`flex w-full items-center rounded-xl bg-[#29303a] px-4 py-3 text-left tabular-nums outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 ${
-          open ? "ring-1 ring-blue-500" : ""
-        } ${value ? "text-zinc-100" : "text-zinc-400"}`}
+        className={`flex w-full items-center rounded-xl bg-surface-secondary px-4 py-3 text-left tabular-nums outline-none focus:ring-1 focus:ring-border-theme disabled:opacity-50 ${
+          open ? "ring-1 ring-border-theme" : ""
+        } ${value ? "text-text-primary" : "text-text-tertiary"}`}
       >
         {value || "--:--"}
-        <Clock className="ml-auto size-4 text-zinc-400" aria-hidden />
+        <Clock className="ml-auto size-4 text-text-tertiary" aria-hidden />
       </button>
       <AnchoredPopover
         open={open}
@@ -101,25 +102,18 @@ export function ExecutionScheduleFields({
 }) {
   const scheduled = value.schedule_mode === "scheduled";
   return (
-    <section className="rounded-2xl border border-zinc-700 p-4 text-sm text-zinc-200">
+    <section className="rounded-2xl border border-border-quaternary p-4 text-body-s text-text-primary">
       <div className="flex flex-wrap items-center gap-3">
-        <Clock3 className="size-5 text-zinc-400" />
+        <Clock3 className="size-5 text-text-tertiary" />
         <span>執行時間</span>
-        {!scheduled ? <span className="text-base">當下立即執行</span> : null}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() =>
+        {!scheduled ? <span className="text-body-m">當下立即執行</span> : null}
+        <Button variant="text" className="ml-auto" disabled={disabled} onPress={() =>
             onChange(
               scheduled
                 ? immediateSchedule()
                 : { ...value, schedule_mode: "scheduled", scheduled_time: "" },
             )
-          }
-          className="ml-auto text-blue-400 hover:text-blue-300"
-        >
-          {scheduled ? "取消調整／恢復" : "調整執行時間"}
-        </button>
+          }>{scheduled ? "取消調整／恢復" : "調整執行時間"}</Button>
       </div>
       {scheduled ? (
         <div className="mt-4 block">
@@ -128,7 +122,7 @@ export function ExecutionScheduleFields({
             onChange={(scheduled_time) => onChange({ ...value, scheduled_time })}
             disabled={disabled}
           />
-          <span className="mt-2 block text-xs text-zinc-500">
+          <span className="mt-2 block text-body-xs text-text-quaternary">
             以營運時鐘當日為準；已過分鐘會由後端拒絕，不會自動排到隔日。
           </span>
         </div>

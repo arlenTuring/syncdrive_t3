@@ -18,6 +18,7 @@ import {
   type TimelineEvent,
   type TimelineEventKind,
 } from '../utils/buildDrivingCapabilityModel';
+import { Dialog, IconButton } from '../../../components/ui';
 
 /** 圖例順序對齊設計稿：線型 → 常用動作 → 號誌／告警 → 整備類 */
 const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; channel?: 'action' | 'event' }> = [
@@ -298,14 +299,14 @@ function TimelineEventNode({
         </span>
       </span>
       <span className="mt-2 flex w-[96px] flex-col items-center gap-0.5">
-        <span className="font-mono text-[10px] leading-none text-zinc-400">
+        <span className="font-mono text-caption-2 text-text-tertiary">
           {formatEventTime(event.atMs)}
         </span>
-        <span className="line-clamp-2 text-center text-[11px] leading-tight text-zinc-100">
+        <span className="line-clamp-2 text-center text-body-xs text-text-primary">
           {event.label}
         </span>
         {event.delayLabel ? (
-          <span className="rounded bg-[#422006] px-1.5 py-0.5 text-[10px] font-medium text-orange-400">
+          <span className="rounded bg-[#422006] px-1.5 py-0.5 text-caption-2 text-orange-400">
             {event.delayLabel}
           </span>
         ) : null}
@@ -336,13 +337,13 @@ function StatusBarRow({
             ? 'bg-[#22C55E]'
             : seg.tone === 'blue'
               ? 'bg-[#38BDF8]'
-              : 'bg-red-500';
+              : 'bg-status-error';
         const isFirst = index === 0;
         const isLast = index === model.statusSegments.length - 1;
         return (
           <div
             key={seg.id}
-            className={`absolute top-1 flex h-6 items-center justify-center px-2 text-[11px] font-medium text-white ${bg} ${
+            className={`absolute top-1 flex h-6 items-center justify-center px-2 text-body-xs font-medium text-text-primary ${bg} ${
               isFirst ? 'rounded-l-md' : ''
             } ${isLast ? 'rounded-r-md' : ''}`}
             style={{ left, width: w }}
@@ -476,15 +477,15 @@ function TimelinePanel({
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/60 bg-[#0c0c0e]/80">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-[#0c0c0e]/80">
       <div className="flex min-h-0 flex-1">
         <div
-          className="shrink-0 text-[12px]"
+          className="shrink-0 text-body-xs"
           style={{ width: LANE_LABEL_W, paddingTop: labelPadTop }}
         >
           {showAction ? (
             <div
-              className="flex items-start justify-end border-b border-[#51A2FF]/40 pr-2 font-medium text-[#51A2FF]"
+              className="flex items-start justify-end border-b border-[#51A2FF]/40 pr-2 font-medium text-text-theme"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
               {t('shiftRecords.capabilityModal.laneAction')}
@@ -492,7 +493,7 @@ function TimelinePanel({
           ) : null}
           {showEvent ? (
             <div
-              className="flex items-start justify-end border-b border-dashed border-zinc-600 pr-2 text-zinc-200"
+              className="flex items-start justify-end border-b border-dashed border-border-tertiary pr-2 text-text-primary"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
               {t('shiftRecords.capabilityModal.laneEvent')}
@@ -517,7 +518,7 @@ function TimelinePanel({
                 {ticks.map((tick) => (
                   <span
                     key={tick.key}
-                    className="absolute -translate-x-1/2 font-mono text-[10px] tabular-nums text-zinc-300"
+                    className="absolute -translate-x-1/2 font-mono text-caption-2 tabular-nums text-text-secondary"
                     style={{ left: tick.left }}
                   >
                     {formatAxisTick(tick.ms)}
@@ -562,10 +563,10 @@ function TimelinePanel({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 border-t border-zinc-800/50 px-4 py-2.5 text-[11px] text-zinc-500">
+      <div className="flex items-center gap-1.5 border-t border-border-quaternary px-4 py-2.5 text-body-xs text-text-quaternary">
         <Info className="size-3.5 shrink-0" aria-hidden />
         {t('shiftRecords.capabilityModal.scrollHint')}
-        <span className="text-zinc-600">← →</span>
+        <span className="text-text-disabled">← →</span>
       </div>
     </div>
   );
@@ -596,7 +597,7 @@ function TimelineLegend() {
   const { t } = useTranslation();
   return (
     <div className="rounded-xl border border-[#2B7FFF]/35 bg-[#0c0c0e]/60 px-4 py-3.5">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 text-[12px] text-zinc-300">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 text-body-xs text-text-secondary">
         <div className="flex items-center gap-2">
           <LegendLine color="#3b82f6" />
           {t('shiftRecords.capabilityModal.primaryTask')}
@@ -669,45 +670,27 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
   }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="operation-record-title"
-        className="flex max-h-[92vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#18181b] shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog headerless padded={false} title={t('shiftRecords.capabilityModal.title')} onClose={onClose} widthClassName="w-full max-w-[1100px]" heightClassName="max-h-[92vh]">
         <header className="relative shrink-0 px-6 pt-5 pb-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label={t('common.close')}
-          >
-            <X className="size-5" />
-          </button>
+          <IconButton hierarchy="subordinate" variant="standard" className="absolute top-4 right-4" onPress={onClose} label={t('common.close')} icon={<X />} />
 
-          <h2 id="operation-record-title" className="pr-10 text-base font-semibold tracking-wide text-zinc-100">
+          <h2 id="operation-record-title" className="pr-10 text-body-m-bold text-text-primary">
             {t('shiftRecords.capabilityModal.title')}
           </h2>
 
           {model ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-8">
-              <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-sm text-zinc-200">
-                <span className="rounded-md bg-[#2B7FFF] px-2.5 py-0.5 font-mono text-[13px] font-semibold text-white">
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-body-s text-text-primary">
+                <span className="rounded-md bg-link-theme-filled px-2.5 py-0.5 font-mono text-body-s-bold text-text-primary">
                   {model.tripCode}
                 </span>
                 <span className="truncate">{model.routeEndpoints.replace(/➔|→/g, '→')}</span>
               </div>
               <div className="flex min-w-0 shrink-0 flex-col items-end gap-1">
-                <div className="inline-flex shrink-0 items-center gap-2 text-[12px] text-zinc-400">
+                <div className="inline-flex shrink-0 items-center gap-2 text-body-xs text-text-tertiary">
                   <Clock className="size-3.5 shrink-0" aria-hidden />
                   <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
-                  <span className="text-zinc-500">
+                  <span className="text-text-quaternary">
                     {t('shiftRecords.capabilityModal.durationMinutes', {
                       minutes: model.durationMinutes,
                     })}
@@ -721,14 +704,14 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6 pt-3 pb-5">
           {loading ? (
-            <div className="flex flex-1 items-center justify-center gap-2 py-16 text-zinc-500">
+            <div className="flex flex-1 items-center justify-center gap-2 py-16 text-text-quaternary">
               <Loader2 className="size-5 animate-spin" />
               {t('common.loading')}
             </div>
           ) : null}
 
           {error ? (
-            <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+            <div className="rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
               {error}
             </div>
           ) : null}
@@ -736,7 +719,7 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
           {model && !loading ? (
             <>
               {/* 設計稿：連段式 segmented control */}
-              <div className="inline-flex w-fit rounded-lg bg-[#27272a] p-0.5">
+              <div className="inline-flex w-fit rounded-lg bg-surface-secondary p-0.5">
                 {CHANNEL_FILTERS.map((value) => {
                   const active = filter === value;
                   return (
@@ -744,10 +727,10 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
                       key={value}
                       type="button"
                       onClick={() => setFilter(value)}
-                      className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+                      className={`rounded-md px-4 py-1.5 text-body-s transition-colors ${
                         active
-                          ? 'bg-[#3f3f46] text-zinc-100 shadow-sm'
-                          : 'text-zinc-500 hover:text-zinc-300'
+                          ? 'bg-[#3f3f46] text-text-primary shadow-sm'
+                          : 'text-text-quaternary hover:text-text-secondary'
                       }`}
                     >
                       {filterLabels[value]}
@@ -769,7 +752,6 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
             </>
           ) : null}
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 }

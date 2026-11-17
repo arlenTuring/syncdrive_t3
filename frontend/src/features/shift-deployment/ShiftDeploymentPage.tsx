@@ -8,6 +8,7 @@ import { VehicleControlSection } from './components/VehicleControlSection';
 import { cancelShiftOrder, setDispatchEnabled, useDeploymentData } from './hooks/useDeploymentData';
 import type { ShiftDeploymentAction } from './types';
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button } from '../../components/ui';
 
 export function ShiftDeploymentPage() {
   const { t } = useTranslation();
@@ -85,15 +86,9 @@ export function ShiftDeploymentPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {hint ? (
-        <div className="shrink-0 border-b border-sky-900/60 bg-sky-950/40 px-5 py-2 text-[12px] text-sky-200">
+        <div className="shrink-0 border-b border-sky-900/60 bg-sky-950/40 px-5 py-2 text-body-xs text-text-theme">
           {hint}
-          <button
-            type="button"
-            onClick={() => setHint(null)}
-            className="ml-3 text-sky-400 hover:underline"
-          >
-            {t('common.close')}
-          </button>
+          <Button variant="text" className="ml-3" onPress={() => setHint(null)}>{t('common.close')}</Button>
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">

@@ -280,7 +280,7 @@ export function VehicleElementNode({
         }}
       >
         {isEditMode && element.editPlaceholder && !selected && (
-          <div className="pointer-events-none absolute -top-4 left-0 text-[8px] text-zinc-500">
+          <div className="pointer-events-none absolute -top-4 left-0 text-[8px] text-text-quaternary">
             {element.editPlaceholder}
           </div>
         )}

@@ -1,9 +1,10 @@
 import { Clock } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Button } from '../../../components/ui';
 
 const INPUT =
-  'h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 pr-9 text-left text-sm text-zinc-100 outline-none focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 pr-9 text-left text-body-s text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn';
 
 type Period = 'am' | 'pm';
 
@@ -78,10 +79,10 @@ function WheelColumn<T extends string | number>({
             className="mb-0 flex h-8 w-12 items-center justify-center"
           >
             <span
-              className={`flex h-8 w-12 items-center justify-center rounded-lg text-sm tracking-[0.5px] ${
+              className={`flex h-8 w-12 items-center justify-center rounded-lg text-body-s tracking-[0.5px] ${
                 selected
-                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-[#D1D5DC]'
-                  : 'font-normal text-[#D1D5DC] hover:bg-zinc-800/50'
+                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-text-secondary'
+                  : 'font-normal text-text-secondary hover:bg-link-standard'
               }`}
             >
               {format(item)}
@@ -183,15 +184,15 @@ export function ExecutionTimeField({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`${INPUT} truncate ${open ? 'border-[#2B7FFF] ring-1 ring-[#2B7FFF]/30' : ''} ${
-          value ? 'text-zinc-100' : 'text-zinc-500'
+        className={`${INPUT} truncate ${open ? 'border-border-theme ring-1 ring-[#2B7FFF]/30' : ''} ${
+          value ? 'text-text-primary' : 'text-text-quaternary'
         }`}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
         {value || placeholder}
       </button>
-      <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+      <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
       {open &&
         createPortal(
           <div
@@ -199,7 +200,7 @@ export function ExecutionTimeField({
             className="fixed z-[200]"
             style={{ top: panelPos.top, left: panelPos.left }}
           >
-            <div className="relative w-[196px] rounded-xl border border-zinc-800 bg-[#18181B] shadow-[0px_4px_24px_rgba(98,116,142,0.2)]">
+            <div className="relative w-[196px] rounded-xl border border-border-quaternary bg-surface-primary shadow-[0px_4px_24px_rgba(98,116,142,0.2)]">
               <div className="p-1">
                 <div className="flex rounded-lg p-1">
                   <WheelColumn
@@ -221,20 +222,8 @@ export function ExecutionTimeField({
               </div>
               <div className="h-px w-full bg-[rgba(212,212,212,0.15)]" />
               <div className="flex items-center justify-between px-2 py-2">
-                <button
-                  type="button"
-                  onClick={handleNow}
-                  className="rounded-lg px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-[#51A2FF] hover:bg-[#51A2FF]/10"
-                >
-                  此刻
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-white hover:bg-[#2569e6]"
-                >
-                  確定
-                </button>
+                <Button variant="text" onPress={handleNow}>此刻</Button>
+                <Button onPress={handleConfirm}>確定</Button>
               </div>
             </div>
           </div>,

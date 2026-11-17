@@ -24,18 +24,18 @@ function AssetThumb({
       title={asset.label}
       className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition-all ${
         selected
-          ? 'border-amber-500 bg-amber-500/10'
-          : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-500'
+          ? 'border-status-warning bg-status-warning-light'
+          : 'border-border-quaternary bg-zinc-800/50 hover:border-border-primary'
       }`}
     >
-      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded bg-zinc-950">
+      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded bg-surface-sub-background">
         {url ? (
           <img src={url} alt="" className="max-h-9 max-w-9 object-contain" draggable={false} />
         ) : (
-          <ImageIcon size={16} className="text-zinc-600" />
+          <ImageIcon size={16} className="text-text-disabled" />
         )}
       </div>
-      <span className="max-w-[56px] truncate text-[8px] text-zinc-400">{asset.label}</span>
+      <span className="max-w-[56px] truncate text-[8px] text-text-tertiary">{asset.label}</span>
     </button>
   );
 }
@@ -55,8 +55,8 @@ export function VehicleAssetPicker({
   if (assets.length === 0) return null;
 
   return (
-    <div className={`rounded-lg border border-zinc-700/60 bg-zinc-900/50 ${compact ? 'p-2' : 'p-2.5'}`}>
-      <div className="mb-2 flex items-center gap-1 text-[9px] text-zinc-500">
+    <div className={`rounded-lg border border-border-quaternary bg-surface-primary ${compact ? 'p-2' : 'p-2.5'}`}>
+      <div className="mb-2 flex items-center gap-1 text-caption-2 text-text-quaternary">
         <ImageIcon size={11} />
         <span>圖庫（public/vehicle-editor/{category}/）</span>
       </div>
@@ -74,7 +74,7 @@ export function VehicleAssetPicker({
         <input
           value={value}
           onChange={(e) => onSelect(e.target.value)}
-          className="mt-2 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 font-mono text-[10px] text-zinc-300"
+          className="mt-2 w-full rounded border border-border-quaternary bg-surface-secondary px-2 py-1 font-mono text-caption-2 text-text-secondary"
           placeholder="或輸入檔名路徑"
         />
       )}

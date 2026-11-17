@@ -10,12 +10,13 @@ import {
   type MapWaypointItem,
 } from '../api/waypointsApi';
 import type { MaintenanceFacilityEquipmentRow } from '../types/create';
+import { IconButton } from '../../../components/ui';
 
 const SELECT_CLASS =
-  'h-[42px] min-w-0 flex-1 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] min-w-0 flex-1 rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const WAYPOINT_SELECT_CLASS =
-  'h-[42px] w-[148px] shrink-0 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] w-[148px] shrink-0 rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 type FacilityEquipmentRowsEditorProps<TRow extends MaintenanceFacilityEquipmentRow> = {
   rows: TRow[];
@@ -99,37 +100,29 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-sm text-zinc-300">{t('maintenanceTasks.facilityRows.loadFacilities')}</span>
-        <button
-          type="button"
-          onClick={addRow}
-          disabled={!canAddRow || loadingEquipment || Boolean(equipmentError)}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label={t('maintenanceTasks.facilityRows.addRowAria')}
-        >
-          <Plus className="size-4" />
-        </button>
+        <span className="text-body-s text-text-secondary">{t('maintenanceTasks.facilityRows.loadFacilities')}</span>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0" onPress={addRow} disabled={!canAddRow || loadingEquipment || Boolean(equipmentError)} label={t('maintenanceTasks.facilityRows.addRowAria')} icon={<Plus />} />
       </div>
 
       {loadingEquipment && (
-        <div className="flex items-center gap-2 py-4 text-sm text-zinc-500">
+        <div className="flex items-center gap-2 py-4 text-body-s text-text-quaternary">
           <Loader2 className="size-4 animate-spin" />
           {t('maintenanceTasks.facilityRows.loading')}
         </div>
       )}
 
-      {equipmentError && <p className="py-2 text-sm text-red-400">{equipmentError}</p>}
+      {equipmentError && <p className="py-2 text-body-s text-status-error-emphasis">{equipmentError}</p>}
 
       {!loadingEquipment && !equipmentError && equipment.length === 0 && (
-        <p className="py-2 text-sm text-zinc-500">{t('maintenanceTasks.facilityRows.empty')}</p>
+        <p className="py-2 text-body-s text-text-quaternary">{t('maintenanceTasks.facilityRows.empty')}</p>
       )}
 
       {loadingWaypoints && rows.length > 0 && (
-        <p className="mb-3 text-xs text-zinc-500">{t('maintenanceTasks.facilityRows.loadingWaypoints')}</p>
+        <p className="mb-3 text-body-xs text-text-quaternary">{t('maintenanceTasks.facilityRows.loadingWaypoints')}</p>
       )}
 
       {waypointError && (
-        <p className="mb-3 text-sm text-amber-400/90">
+        <p className="mb-3 text-body-s text-status-warning">
           {t('maintenanceTasks.facilityRows.waypointLoadFailed', { error: waypointError })}
         </p>
       )}
@@ -139,7 +132,7 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
           {rows.map((row) => (
             <div
               key={row.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/30 p-3"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-border-quaternary bg-black-30 p-3"
             >
               <SiteSelect
                 value={equipmentIdOf(row)}
@@ -185,21 +178,14 @@ export function FacilityEquipmentRowsEditor<TRow extends MaintenanceFacilityEqui
 
               {renderExtraFields?.(row, (patch) => updateRow(row.id, patch))}
 
-              <button
-                type="button"
-                onClick={() => removeRow(row.id)}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300"
-                aria-label={t('maintenanceTasks.facilityRows.removeRowAria')}
-              >
-                <X className="size-4" />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0" onPress={() => removeRow(row.id)} label={t('maintenanceTasks.facilityRows.removeRowAria')} icon={<X />} />
             </div>
           ))}
         </div>
       )}
 
       {!loadingEquipment && equipment.length > 0 && equipmentHint ? (
-        <p className="mt-2 text-xs text-zinc-600">{equipmentHint}</p>
+        <p className="mt-2 text-body-xs text-text-disabled">{equipmentHint}</p>
       ) : null}
     </div>
   );

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShiftDeploymentAction, ShiftListTab, ShiftRow } from '../types';
 import { ShiftRouteTrack } from './ShiftRouteTrack';
+import { Button } from '../../../components/ui';
 
 export function DeploymentShiftTable({
   scheduleName,
@@ -20,8 +21,8 @@ export function DeploymentShiftTable({
   const rows = tab === 'mainline' ? mainline : maintenance;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#18181b]">
-      <div className="flex shrink-0 items-end justify-between gap-3 border-b border-zinc-800 px-4 pt-3">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup">
+      <div className="flex shrink-0 items-end justify-between gap-3 border-b border-border-quaternary px-4 pt-3">
         <div className="flex gap-5">
           <TabButton active={tab === 'mainline'} onClick={() => setTab('mainline')}>
             {t('shiftDeployment.table.tabMainline')}
@@ -30,15 +31,15 @@ export function DeploymentShiftTable({
             {t('shiftDeployment.table.tabMaintenance')}
           </TabButton>
         </div>
-        <div className="pb-2 text-[12px] text-zinc-400">
+        <div className="pb-2 text-body-xs text-text-tertiary">
           {t('shiftDeployment.table.currentSchedule')}{' '}
-          <span className="text-zinc-200">{scheduleName}</span>
+          <span className="text-text-primary">{scheduleName}</span>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 bg-[#27272a] text-[12px] text-zinc-400">
+        <table className="w-full min-w-[980px] border-collapse text-left text-body-s">
+          <thead className="sticky top-0 bg-surface-secondary text-body-xs text-text-tertiary">
             <tr>
               {tab === 'mainline' ? (
                 <>
@@ -65,7 +66,7 @@ export function DeploymentShiftTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-zinc-500">
+                <td colSpan={7} className="px-4 py-10 text-center text-text-quaternary">
                   {t('shiftDeployment.table.empty')}
                 </td>
               </tr>
@@ -73,36 +74,24 @@ export function DeploymentShiftTable({
               rows.map((row, index) => (
                 <tr
                   key={row.shiftKey}
-                  className="border-b border-white/5"
+                  className="border-b border-border-disabled"
                   style={{ backgroundColor: index % 2 === 1 ? 'rgba(255,255,255,0.02)' : undefined }}
                 >
-                  <Td className="font-semibold text-zinc-100">{row.tripCode}</Td>
-                  <Td className="text-zinc-300">{row.directionLabel}</Td>
-                  <Td className="text-zinc-200">{row.vehicleCode}</Td>
+                  <Td className="font-semibold text-text-primary">{row.tripCode}</Td>
+                  <Td className="text-text-secondary">{row.directionLabel}</Td>
+                  <Td className="text-text-primary">{row.vehicleCode}</Td>
                   <Td>
                     <ShiftRouteTrack row={row} />
                   </Td>
                   <Td>
                     <StatusPill row={row} />
                   </Td>
-                  <Td className="whitespace-nowrap text-zinc-400">{row.departTime}</Td>
+                  <Td className="whitespace-nowrap text-text-tertiary">{row.departTime}</Td>
                   <Td>
                     <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onAction({ kind: 'shift-detail', tab, row })}
-                        className="text-sky-400 hover:underline"
-                      >
-                        {t('shiftDeployment.table.viewDetail')}
-                      </button>
+                      <Button variant="text" onPress={() => onAction({ kind: 'shift-detail', tab, row })}>{t('shiftDeployment.table.viewDetail')}</Button>
                       {row.orderStatus === 'PENDING' || row.orderStatus === 'PROCESSING' ? (
-                        <button
-                          type="button"
-                          onClick={() => onAction({ kind: 'shift-cancel', row })}
-                          className="text-red-400 hover:underline"
-                        >
-                          {t('shiftDeployment.table.cancel')}
-                        </button>
+                        <Button hierarchy="danger" variant="text" onPress={() => onAction({ kind: 'shift-cancel', row })}>{t('shiftDeployment.table.cancel')}</Button>
                       ) : null}
                     </div>
                   </Td>
@@ -112,24 +101,18 @@ export function DeploymentShiftTable({
               rows.map((row, index) => (
                 <tr
                   key={row.shiftKey}
-                  className="border-b border-white/5"
+                  className="border-b border-border-disabled"
                   style={{ backgroundColor: index % 2 === 1 ? 'rgba(255,255,255,0.02)' : undefined }}
                 >
-                  <Td className="font-semibold text-zinc-100">{row.tripCode}</Td>
-                  <Td className="text-zinc-200">{row.vehicleCode}</Td>
-                  <Td className="text-zinc-300">{row.maintTypeLabel ?? '—'}</Td>
+                  <Td className="font-semibold text-text-primary">{row.tripCode}</Td>
+                  <Td className="text-text-primary">{row.vehicleCode}</Td>
+                  <Td className="text-text-secondary">{row.maintTypeLabel ?? '—'}</Td>
                   <Td>
                     <StatusPill row={row} />
                   </Td>
-                  <Td className="whitespace-nowrap text-zinc-400">{row.departTime}</Td>
+                  <Td className="whitespace-nowrap text-text-tertiary">{row.departTime}</Td>
                   <Td>
-                    <button
-                      type="button"
-                      onClick={() => onAction({ kind: 'shift-detail', tab, row })}
-                      className="text-sky-400 hover:underline"
-                    >
-                      {t('shiftDeployment.table.viewDetail')}
-                    </button>
+                    <Button variant="text" onPress={() => onAction({ kind: 'shift-detail', tab, row })}>{t('shiftDeployment.table.viewDetail')}</Button>
                   </Td>
                 </tr>
               ))
@@ -154,10 +137,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`border-b-2 pb-2 text-[14px] transition ${
+      className={`border-b-2 pb-2 text-body-s transition ${
         active
-          ? 'border-blue-500 font-medium text-blue-400'
-          : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          ? 'border-border-theme font-medium text-text-theme'
+          : 'border-transparent text-text-quaternary hover:text-text-secondary'
       }`}
     >
       {children}
@@ -190,7 +173,7 @@ function Td({
 function StatusPill({ row }: { row: ShiftRow }) {
   return (
     <span
-      className="inline-flex rounded-full px-2.5 py-0.5 text-[12px] font-medium"
+      className="inline-flex rounded-full px-2.5 py-0.5 text-body-xs-bold"
       style={{ backgroundColor: row.statusBg, color: row.statusColor }}
     >
       {row.statusLabel}

@@ -1,5 +1,6 @@
 import { Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button } from '../../../components/ui';
 
 /** 複製到剪貼簿；Clipboard API 不能用（非安全來源等）時退回選取複製 */
 async function copyText(text: string): Promise<boolean> {
@@ -43,28 +44,20 @@ export function RunCodeRow({ code }: { code: string }) {
     setToast({ ok, id: Date.now() });
   };
   return (
-    <div className="inline-flex min-w-0 items-center gap-2 text-[12px] text-zinc-400">
+    <div className="inline-flex min-w-0 items-center gap-2 text-body-xs text-text-tertiary">
       <span className="shrink-0">班次唯一碼：</span>
-      <span className="max-w-[300px] truncate font-mono text-zinc-200 select-all" title={code}>
+      <span className="max-w-[300px] truncate font-mono text-text-primary select-all" title={code}>
         {code}
       </span>
-      <button
-        type="button"
-        onClick={() => void onCopy()}
-        aria-label={`複製班次唯一碼 ${code}`}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:border-zinc-500 hover:text-white focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-      >
-        <Copy className="size-3.5" aria-hidden />
-        複製
-      </button>
+      <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => void onCopy()} aria-label={`複製班次唯一碼 ${code}`} leadingIcon={<Copy />}>複製</Button>
       <div aria-live="polite" role="status" className="sr-only">
         {toast ? (toast.ok ? '班次唯一碼已複製' : '複製失敗，請手動選取班次唯一碼') : ''}
       </div>
       {toast ? (
         <div
           key={toast.id}
-          className={`fixed bottom-8 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-2 text-sm shadow-xl ${
-            toast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+          className={`fixed bottom-8 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-2 text-body-s shadow-xl ${
+            toast.ok ? 'bg-status-success-emphasis text-text-primary' : 'bg-red-600 text-text-primary'
           }`}
         >
           {toast.ok ? '班次唯一碼已複製' : '複製失敗，請手動選取班次唯一碼'}

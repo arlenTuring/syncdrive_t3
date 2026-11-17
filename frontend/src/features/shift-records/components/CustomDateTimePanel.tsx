@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, IconButton } from '../../../components/ui';
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
@@ -72,17 +73,17 @@ function TimeColumn({
   return (
     <div
       ref={ref}
-      className="h-[212px] w-11 overflow-y-auto scroll-smooth border-l border-zinc-800/80 first:border-l-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="h-[212px] w-11 overflow-y-auto scroll-smooth border-l border-border-quaternary first:border-l-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {Array.from({ length: max + 1 }, (_, n) => (
         <button
           key={n}
           type="button"
           onClick={() => onChange(n)}
-          className={`flex h-8 w-full items-center justify-center font-mono text-sm transition ${
+          className={`flex h-8 w-full items-center justify-center font-mono text-body-s transition ${
             value === n
-              ? 'bg-sky-600/35 font-medium text-sky-100'
-              : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300'
+              ? 'bg-sky-600/35 font-medium text-text-theme'
+              : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
           }`}
         >
           {String(n).padStart(2, '0')}
@@ -139,51 +140,23 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-2.5">
+      <div className="flex items-center justify-between border-b border-border-quaternary px-3 py-2.5">
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => shiftYear(-1)}
-            className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label={t('shiftRecords.datePicker.prevYear')}
-          >
-            <ChevronsLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => shiftMonth(-1)}
-            className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label={t('shiftRecords.datePicker.prevMonth')}
-          >
-            <ChevronLeft className="size-4" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftYear(-1)} label={t('shiftRecords.datePicker.prevYear')} icon={<ChevronsLeft />} />
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(-1)} label={t('shiftRecords.datePicker.prevMonth')} icon={<ChevronLeft />} />
         </div>
-        <span className="text-sm font-medium text-zinc-100">
+        <span className="text-body-s-bold text-text-primary">
           {t(`shiftRecords.datePicker.months.m${viewMonth}`)} {viewYear}
         </span>
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => shiftMonth(1)}
-            className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label={t('shiftRecords.datePicker.nextMonth')}
-          >
-            <ChevronRight className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => shiftYear(1)}
-            className="inline-flex size-7 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label={t('shiftRecords.datePicker.nextYear')}
-          >
-            <ChevronsRight className="size-4" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(1)} label={t('shiftRecords.datePicker.nextMonth')} icon={<ChevronRight />} />
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftYear(1)} label={t('shiftRecords.datePicker.nextYear')} icon={<ChevronsRight />} />
         </div>
       </div>
 
       <div className="flex">
         <div className="min-w-0 flex-1 p-3 pr-2">
-          <div className="mb-2 grid grid-cols-7 text-center text-xs text-zinc-500">
+          <div className="mb-2 grid grid-cols-7 text-center text-body-xs text-text-quaternary">
             {WEEKDAY_KEYS.map((w) => (
               <div key={w} className="py-1">
                 {t(`shiftRecords.datePicker.weekdays.${w}`)}
@@ -200,12 +173,12 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
                   key={idx}
                   type="button"
                   onClick={() => pickDay(cell)}
-                  className={`mx-auto flex size-8 items-center justify-center rounded-full text-sm transition ${
+                  className={`mx-auto flex size-8 items-center justify-center rounded-full text-body-s transition ${
                     selected
-                      ? 'bg-sky-600 font-medium text-white'
+                      ? 'bg-sky-600 font-medium text-text-primary'
                       : cell.inMonth
-                        ? 'text-zinc-200 hover:bg-zinc-800'
-                        : 'text-zinc-600 hover:bg-zinc-800/50'
+                        ? 'text-text-primary hover:bg-link-standard-hover'
+                        : 'text-text-disabled hover:bg-link-standard'
                   } ${isToday && !selected ? 'ring-1 ring-dashed ring-zinc-400' : ''}`}
                 >
                   {cell.day}
@@ -215,21 +188,15 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
           </div>
         </div>
 
-        <div className="flex shrink-0 border-l border-zinc-800/80 py-2">
+        <div className="flex shrink-0 border-l border-border-quaternary py-2">
           <TimeColumn max={23} value={hour} onChange={setHour} />
           <TimeColumn max={59} value={minute} onChange={setMinute} />
           <TimeColumn max={59} value={second} onChange={setSecond} />
         </div>
       </div>
 
-      <div className="flex justify-end border-t border-zinc-800/80 px-3 py-2.5">
-        <button
-          type="button"
-          onClick={handleConfirm}
-          className="rounded-lg bg-sky-600 px-5 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
-        >
-          {t('shiftRecords.datePicker.confirm')}
-        </button>
+      <div className="flex justify-end border-t border-border-quaternary px-3 py-2.5">
+        <Button onPress={handleConfirm}>{t('shiftRecords.datePicker.confirm')}</Button>
       </div>
     </div>
   );

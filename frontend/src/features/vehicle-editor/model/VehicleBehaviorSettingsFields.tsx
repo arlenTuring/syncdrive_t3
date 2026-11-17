@@ -8,6 +8,7 @@ import {
   buildVehicleBehaviorActionRules,
   VEHICLE_BEHAVIOR_ACTION_CATALOG,
 } from '../constants/behaviorActionCatalog';
+import { Button } from '../../../components/ui';
 
 /** 車輛行為圖示的設定值（地圖車輛模型設定、儀表板獨立載具容器共用） */
 export type VehicleBehaviorSettings = {
@@ -17,15 +18,15 @@ export type VehicleBehaviorSettings = {
   behaviorIconSize?: number;
 };
 
-const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
-const selectCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer`;
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="block text-[10px] font-bold uppercase tracking-tight text-zinc-500">{label}</label>
+      <label className="block text-caption-2 uppercase text-text-quaternary">{label}</label>
       {children}
     </div>
   );
@@ -64,7 +65,7 @@ export function VehicleBehaviorSettingsFields({
   return (
     <div className="space-y-3">
       {header ?? (
-        <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-1 text-xs font-semibold uppercase tracking-wider text-violet-400">
+        <div className="flex items-center gap-1.5 border-b border-border-quaternary pb-1 text-body-xs-bold uppercase text-violet-400">
           <Zap size={14} /> {t('dashboard.properties.widgets.vehicleContainer.actions')}
         </div>
       )}
@@ -105,24 +106,16 @@ export function VehicleBehaviorSettingsFields({
               }
               className={inputCls}
             />
-            <span className="shrink-0 text-[9px] text-zinc-500">{t('dashboard.properties.widgets.vehicleContainer.iconSizeHint')}</span>
+            <span className="shrink-0 text-caption-2 text-text-quaternary">{t('dashboard.properties.widgets.vehicleContainer.iconSizeHint')}</span>
           </div>
         </Field>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-zinc-400">{t('dashboard.properties.widgets.vehicleContainer.actionRules')}</span>
+          <span className="text-caption-2 text-text-tertiary">{t('dashboard.properties.widgets.vehicleContainer.actionRules')}</span>
           <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => onChange({ actionIconRules: buildVehicleBehaviorActionRules('operation_action') })}
-              className="rounded bg-zinc-800 px-2 py-0.5 text-[9px] text-zinc-400 hover:text-amber-400"
-            >
-              {t('dashboard.properties.widgets.vehicleContainer.catalog11')}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="tonal" onPress={() => onChange({ actionIconRules: buildVehicleBehaviorActionRules('operation_action') })}>{t('dashboard.properties.widgets.vehicleContainer.catalog11')}</Button>
+            <Button hierarchy="subordinate" variant="standard" onPress={() =>
                 onChange({
                   actionIconRules: [
                     ...rules,
@@ -135,20 +128,16 @@ export function VehicleBehaviorSettingsFields({
                     },
                   ],
                 })
-              }
-              className="rounded p-1 text-amber-500 hover:bg-zinc-800"
-            >
-              <Plus size={14} />
-            </button>
+              }><Plus size={14} /></Button>
           </div>
         </div>
         {rules.length === 0 && (
-          <p className="text-[9px] text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             {t('dashboard.properties.widgets.vehicleContainer.rulesHint')}
           </p>
         )}
         {rules.map((rule, i) => (
-          <div key={rule.id} className="space-y-1.5 rounded border border-zinc-700/50 bg-zinc-800/30 p-2">
+          <div key={rule.id} className="space-y-1.5 rounded border border-border-quaternary bg-link-standard p-2">
             <div className="flex gap-1">
               <SiteSelect
                 value={rule.iconFile}
@@ -169,13 +158,7 @@ export function VehicleBehaviorSettingsFields({
                   </option>
                 ))}
               </SiteSelect>
-              <button
-                type="button"
-                onClick={() => onChange({ actionIconRules: rules.filter((_, j) => j !== i) })}
-                className="p-1 text-zinc-500 hover:text-red-400"
-              >
-                <Trash2 size={12} />
-              </button>
+              <Button hierarchy="danger" variant="text" onPress={() => onChange({ actionIconRules: rules.filter((_, j) => j !== i) })}><Trash2 size={12} /></Button>
             </div>
             <input
               value={rule.sourceVarKey}

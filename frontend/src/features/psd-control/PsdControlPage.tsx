@@ -38,9 +38,9 @@ function ControlCard({
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-xl border border-zinc-800/80 bg-[#18181b] px-6 py-5 text-left transition hover:border-zinc-600 hover:bg-[#1c1c20]"
+      className="w-full rounded-xl border border-border-quaternary bg-surface-popup px-6 py-5 text-left transition hover:border-border-tertiary hover:bg-[#1c1c20]"
     >
-      <p className="mb-5 text-center text-sm font-medium tracking-[0.5px] text-zinc-100">{title}</p>
+      <p className="mb-5 text-center text-body-s-bold tracking-[0.5px] text-text-primary">{title}</p>
       <div className="flex items-start justify-between gap-3">
         {doors.map((door) => {
           const model = doorVisualStateFor(door.id, doorStates ?? {});
@@ -150,30 +150,30 @@ export function PsdControlPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <div className="flex shrink-0 gap-6 border-b border-zinc-800/80 px-6">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <div className="flex shrink-0 gap-6 border-b border-border-quaternary px-6">
         <button
           type="button"
           onClick={() => setTab('vehicle')}
-          className={`relative py-3 text-sm tracking-[0.5px] ${
-            tab === 'vehicle' ? 'text-[#51A2FF]' : 'text-zinc-500 hover:text-zinc-300'
+          className={`relative py-3 text-body-s tracking-[0.5px] ${
+            tab === 'vehicle' ? 'text-text-theme' : 'text-text-quaternary hover:text-text-secondary'
           }`}
         >
           {t('psdControl.tabVehicle')}
           {tab === 'vehicle' ? (
-            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#2B7FFF]" />
+            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-link-theme-filled" />
           ) : null}
         </button>
         <button
           type="button"
           onClick={() => setTab('platform')}
-          className={`relative py-3 text-sm tracking-[0.5px] ${
-            tab === 'platform' ? 'text-[#51A2FF]' : 'text-zinc-500 hover:text-zinc-300'
+          className={`relative py-3 text-body-s tracking-[0.5px] ${
+            tab === 'platform' ? 'text-text-theme' : 'text-text-quaternary hover:text-text-secondary'
           }`}
         >
           {t('psdControl.tabPlatform')}
           {tab === 'platform' ? (
-            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-[#2B7FFF]" />
+            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-link-theme-filled" />
           ) : null}
         </button>
       </div>
@@ -181,9 +181,9 @@ export function PsdControlPage() {
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {tab === 'vehicle' ? (
           vehicleLoading ? (
-            <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.loadingVehicles')}</p>
+            <p className="py-16 text-center text-body-s text-text-quaternary">{t('psdControl.loadingVehicles')}</p>
           ) : vehicles.length === 0 ? (
-            <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.emptyVehicles')}</p>
+            <p className="py-16 text-center text-body-s text-text-quaternary">{t('psdControl.emptyVehicles')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {vehicles.map((vehicle) => (
@@ -200,11 +200,11 @@ export function PsdControlPage() {
             </div>
           )
         ) : platformLoading ? (
-          <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.loadingPlatforms')}</p>
+          <p className="py-16 text-center text-body-s text-text-quaternary">{t('psdControl.loadingPlatforms')}</p>
         ) : platformError ? (
-          <p className="py-16 text-center text-sm text-red-400">{platformError}</p>
+          <p className="py-16 text-center text-body-s text-status-error-emphasis">{platformError}</p>
         ) : platforms.length === 0 ? (
-          <p className="py-16 text-center text-sm text-zinc-500">{t('psdControl.emptyPlatforms')}</p>
+          <p className="py-16 text-center text-body-s text-text-quaternary">{t('psdControl.emptyPlatforms')}</p>
         ) : (
           <div className="flex flex-col gap-4">
             {platforms.map((platform) => (

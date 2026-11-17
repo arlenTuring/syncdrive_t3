@@ -12,6 +12,7 @@ import {
 } from '../mapDoorMqtt';
 import { DockTimeDialog } from './DockTimeDialog';
 import { DoorMonitorCard, type DoorKind, type DoorMonitorState } from './DoorMonitorCard';
+import { Button, IconButton } from '../../../components/ui';
 
 function bodyVisualKey(
   visual: ReturnType<typeof visualFromDoorMqtt>['visual'],
@@ -167,36 +168,22 @@ export function DoorDetailPage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
       <div className="flex h-11 shrink-0 items-center justify-between gap-4 px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-md p-1 text-zinc-200 hover:bg-zinc-800 hover:text-white"
-            aria-label={t('psdControl.back')}
-          >
-            <ArrowLeft className="size-5 stroke-[1.75]" />
-          </button>
-          <h2 className="truncate text-[15px] font-normal tracking-[0.2px]">{title}</h2>
+          <IconButton hierarchy="subordinate" variant="standard" onPress={onBack} label={t('psdControl.back')} icon={<ArrowLeft />} />
+          <h2 className="truncate text-body-m font-normal tracking-[0.2px]">{title}</h2>
         </div>
         {kind === 'vehicle' ? (
           <div className="flex shrink-0 items-center gap-3">
-            <p className="hidden text-[13px] text-zinc-100 sm:block">
+            <p className="hidden text-body-s text-text-primary sm:block">
               {dwellLoading
                 ? t('psdControl.dwellLoading')
                 : arrivalSeconds == null
                   ? t('psdControl.dwellNone')
                   : t('psdControl.dwellSeconds', { seconds: arrivalSeconds })}
             </p>
-            <button
-              type="button"
-              onClick={() => setDockDialog(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[#2563eb] px-3 py-1.5 text-[13px] text-white hover:bg-[#1d4ed8]"
-            >
-              <SlidersHorizontal className="size-3.5 stroke-[1.75]" aria-hidden />
-              {t('psdControl.editDockTime')}
-            </button>
+            <Button hierarchy="subordinate" variant="standard" onPress={() => setDockDialog(true)} leadingIcon={<SlidersHorizontal />}>{t('psdControl.editDockTime')}</Button>
           </div>
         ) : null}
       </div>

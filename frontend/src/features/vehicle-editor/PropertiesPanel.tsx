@@ -19,15 +19,16 @@ import { VehicleRotationToolbar } from './components/VehicleRotationToolbar';
 import { newRuleId } from './utils/id';
 import { isTransparentColor, toColorInputHex } from './utils/colorInput';
 import { VEHICLE_NUDGE_SHIFT_STEP, VEHICLE_NUDGE_STEP } from './utils/vehicleNudge';
+import { Button, Checkbox, IconButton } from '../../components/ui';
 
 const inputCls =
-  'w-full rounded-md border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/20';
+  'w-full rounded-md border border-border-quaternary bg-surface-secondary px-2.5 py-1.5 text-body-xs text-text-primary focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-amber-500/20';
 const selectCls = `${inputCls} cursor-pointer`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="block text-[10px] font-bold uppercase tracking-tight text-zinc-500">{label}</label>
+      <label className="block text-caption-2 uppercase text-text-quaternary">{label}</label>
       {children}
     </div>
   );
@@ -118,13 +119,11 @@ function ImageRulesEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold text-zinc-400">{t('vehicleEditor.properties.imageRules')}</span>
-        <button type="button" onClick={addRule} className="rounded p-1 text-amber-500 hover:bg-zinc-800">
-          <Plus size={14} />
-        </button>
+        <span className="text-caption-2 text-text-tertiary">{t('vehicleEditor.properties.imageRules')}</span>
+        <Button hierarchy="subordinate" variant="standard" onPress={addRule}><Plus size={14} /></Button>
       </div>
       {rules.map((rule, i) => (
-        <div key={rule.id} className="space-y-1.5 rounded border border-zinc-700/50 bg-zinc-800/30 p-2">
+        <div key={rule.id} className="space-y-1.5 rounded border border-border-quaternary bg-link-standard p-2">
           <div className="flex gap-1">
             <input
               value={rule.label ?? ''}
@@ -133,13 +132,7 @@ function ImageRulesEditor({
               placeholder={t('vehicleEditor.properties.ruleLabel')}
               style={{ fontSize: 10 }}
             />
-            <button
-              type="button"
-              onClick={() => onChange(rules.filter((_, j) => j !== i))}
-              className="p-1 text-zinc-500 hover:text-red-400"
-            >
-              <Trash2 size={12} />
-            </button>
+            <Button hierarchy="danger" variant="text" onPress={() => onChange(rules.filter((_, j) => j !== i))}><Trash2 size={12} /></Button>
           </div>
           <input
             value={rule.sourceField}
@@ -182,7 +175,7 @@ function ImageRulesEditor({
               <SiteColorInput
                 value={rule.tintColor ?? DEFAULT_BODY_TINT}
                 onChange={(e) => updateRule(i, { tintColor: e.target.value })}
-                className="h-8 w-full cursor-pointer rounded border border-zinc-700"
+                className="h-8 w-full cursor-pointer rounded border border-border-quaternary"
                />
             </Field>
           )}
@@ -224,12 +217,12 @@ export function PropertiesPanel({
 
   if (!selectedElement) {
     return (
-      <aside className="w-72 shrink-0 overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-4">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
+      <aside className="w-72 shrink-0 overflow-y-auto border-l border-border-quaternary bg-surface-sub-background p-4">
+        <h2 className="mb-4 text-body-xs-bold uppercase text-text-quaternary">
           {t('vehicleEditor.properties.vehicleProps')}
         </h2>
         {selectedCount > 1 ? (
-          <p className="mb-3 rounded-md border border-cyan-500/25 bg-cyan-500/5 px-2.5 py-2 text-[10px] text-cyan-300">
+          <p className="mb-3 rounded-md border border-border-theme-light-trn bg-surface-theme-light px-2.5 py-2 text-caption-2 text-text-theme">
             {t('vehicleEditor.properties.multiSelectHint', {
               count: selectedCount,
               step: VEHICLE_NUDGE_STEP,
@@ -265,21 +258,15 @@ export function PropertiesPanel({
                 value={toColorInputHex(vehicle.backgroundColor)}
                 disabled={isTransparentColor(vehicle.backgroundColor)}
                 onChange={(e) => onUpdateVehicle({ backgroundColor: e.target.value })}
-                className="h-8 min-w-0 flex-1 cursor-pointer rounded border border-zinc-700 bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-8 min-w-0 flex-1 cursor-pointer rounded border border-border-quaternary bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40"
                />
-              <label className="flex shrink-0 items-center gap-1.5 text-[10px] text-zinc-400">
-                <input
-                  type="checkbox"
-                  checked={isTransparentColor(vehicle.backgroundColor)}
-                  onChange={(e) =>
-                    onUpdateVehicle({
-                      backgroundColor: e.target.checked
+              <label className="flex shrink-0 items-center gap-1.5 text-caption-2 text-text-tertiary">
+                <Checkbox checked={isTransparentColor(vehicle.backgroundColor)} onCheckedChange={(checked) => onUpdateVehicle({
+                      backgroundColor: checked
                         ? 'transparent'
                         : toColorInputHex(vehicle.backgroundColor),
                     })
-                  }
-                  className="rounded border-zinc-600"
-                />
+                  } />
                 {t('vehicleEditor.properties.transparent')}
               </label>
             </div>
@@ -295,7 +282,7 @@ export function PropertiesPanel({
                 }
               }}
               rows={8}
-              className={`${inputCls} font-mono text-[10px]`}
+              className={`${inputCls} font-mono text-caption-2`}
             />
           </Field>
         </div>
@@ -307,11 +294,11 @@ export function PropertiesPanel({
 
   if (selectedCount > 1) {
     return (
-      <aside className="w-72 shrink-0 overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-4">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
+      <aside className="w-72 shrink-0 overflow-y-auto border-l border-border-quaternary bg-surface-sub-background p-4">
+        <h2 className="mb-4 text-body-xs-bold uppercase text-text-quaternary">
           {t('vehicleEditor.properties.multiSelect')}
         </h2>
-        <p className="rounded-md border border-cyan-500/25 bg-cyan-500/5 px-2.5 py-2 text-[10px] leading-relaxed text-cyan-200">
+        <p className="rounded-md border border-border-theme-light-trn bg-surface-theme-light px-2.5 py-2 text-caption-2 text-cyan-200">
           {t('vehicleEditor.properties.multiSelectHintAlt', {
             count: selectedCount,
             step: VEHICLE_NUDGE_STEP,
@@ -334,20 +321,13 @@ export function PropertiesPanel({
           : t('vehicleEditor.properties.typeDoor');
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-4">
+    <aside className="w-72 shrink-0 overflow-y-auto border-l border-border-quaternary bg-surface-sub-background p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">{typeTitle}</h2>
-        <button
-          type="button"
-          onClick={(e) => {
+        <h2 className="text-body-xs-bold uppercase text-text-quaternary">{typeTitle}</h2>
+        <IconButton hierarchy="danger" variant="standard" onPress={(e) => {
             e.stopPropagation();
             onDeleteElement(el.id);
-          }}
-          className="text-zinc-500 hover:text-red-400"
-          title={t('vehicleEditor.properties.deleteElement')}
-        >
-          <Trash2 size={14} />
-        </button>
+          }} title={t('vehicleEditor.properties.deleteElement')} label={t('vehicleEditor.properties.deleteElement')} icon={<Trash2 />} />
       </div>
 
       <div className="space-y-3">
@@ -393,7 +373,7 @@ export function PropertiesPanel({
                 onChange={(e) =>
                   patch({ defaultImage: DEFAULT_BODY_IMAGE, defaultTintColor: e.target.value })
                 }
-                className="h-8 w-full cursor-pointer rounded border border-zinc-700"
+                className="h-8 w-full cursor-pointer rounded border border-border-quaternary"
                />
             </Field>
             <Field label={t('vehicleEditor.properties.colorField')}>
@@ -403,7 +383,7 @@ export function PropertiesPanel({
                 className={inputCls}
                 placeholder="icon_bg_color"
               />
-              <p className="mt-1 text-[9px] text-zinc-600">
+              <p className="mt-1 text-caption-2 text-text-disabled">
                 {t('vehicleEditor.properties.colorFieldHint')}
               </p>
             </Field>
@@ -440,7 +420,7 @@ export function PropertiesPanel({
               <SiteColorInput
                 value={el.color}
                 onChange={(e) => patch({ color: e.target.value })}
-                className="h-8 w-full cursor-pointer rounded border border-zinc-700"
+                className="h-8 w-full cursor-pointer rounded border border-border-quaternary"
                />
             </Field>
             <Field label={t('vehicleEditor.properties.align')}>
@@ -459,7 +439,7 @@ export function PropertiesPanel({
 
         {el.type === 'light' && (
           <>
-            <p className="rounded-md border border-zinc-700/80 bg-zinc-900/60 px-2 py-1.5 text-[10px] text-zinc-400">
+            <p className="rounded-md border border-border-quaternary bg-surface-primary px-2 py-1.5 text-caption-2 text-text-tertiary">
               {t('vehicleEditor.properties.lightHint')}
             </p>
             <Field label={t('vehicleEditor.properties.visibilityField')}>
@@ -472,7 +452,7 @@ export function PropertiesPanel({
                 placeholder="head_light_on"
               />
             </Field>
-            <p className="text-[9px] leading-relaxed text-zinc-600">
+            <p className="text-caption-2 text-text-disabled">
               {t('vehicleEditor.properties.visibilityHint')}
             </p>
           </>
@@ -484,7 +464,7 @@ export function PropertiesPanel({
               <SiteColorInput
                 value={el.defaultColor ?? DEFAULT_DOOR_COLOR}
                 onChange={(e) => patch({ defaultColor: e.target.value })}
-                className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-800"
+                className="h-8 w-full cursor-pointer rounded border border-border-quaternary bg-surface-secondary"
                />
             </Field>
             <Field label={t('vehicleEditor.properties.openPercentField')}>

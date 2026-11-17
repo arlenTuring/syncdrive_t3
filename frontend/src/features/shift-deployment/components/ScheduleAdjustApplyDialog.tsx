@@ -29,6 +29,7 @@ import {
   resolvePendingScheduleAdjust,
 } from '../pendingScheduleAdjust';
 import { systemConfirm } from '../../../lib/systemDialog';
+import { Button, Dialog, IconButton } from '../../../components/ui';
 
 type ScheduleAdjustApplyDialogProps = {
   onClose: () => void;
@@ -37,9 +38,9 @@ type ScheduleAdjustApplyDialogProps = {
   onApplied?: () => void;
 };
 
-const FIELD_LABEL = 'mb-1.5 block text-xs text-zinc-400';
+const FIELD_LABEL = 'mb-1.5 block text-body-xs text-text-tertiary';
 const INPUT =
-  'h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 pr-9 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30 [color-scheme:dark]';
+  'h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 pr-9 text-body-s text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn [color-scheme:dark]';
 const EMPTY_PICKER =
   '[&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0';
 
@@ -261,24 +262,12 @@ export function ScheduleAdjustApplyDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div
-        role="dialog"
-        aria-labelledby="schedule-adjust-title"
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-[#18181b] shadow-2xl"
-      >
+    <Dialog headerless padded={false} title={t('shiftDeployment.adjust.title')} onClose={onClose} widthClassName="w-full max-w-6xl" heightClassName="max-h-[92vh]">
         <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
-          <h2 id="schedule-adjust-title" className="text-base font-semibold text-zinc-100">
+          <h2 id="schedule-adjust-title" className="text-body-m-bold text-text-primary">
             {t('shiftDeployment.adjust.title')}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/5 hover:text-white"
-            aria-label={t('common.close')}
-          >
-            <X className="size-4" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
         </header>
 
         {step === 1 ? (
@@ -286,7 +275,7 @@ export function ScheduleAdjustApplyDialog({
             <div className="relative z-20 grid shrink-0 grid-cols-3 gap-4 px-6 pb-4">
               <label className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>
+                  <span className="mr-0.5 text-status-error">*</span>
                   {t('shiftDeployment.adjust.execDate')}
                 </span>
                 <div className="relative">
@@ -296,12 +285,12 @@ export function ScheduleAdjustApplyDialog({
                     onChange={(e) => setExecDate(e.target.value)}
                     className={`${INPUT} ${EMPTY_PICKER}`}
                   />
-                  <Calendar className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
                 </div>
               </label>
               <div className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>
+                  <span className="mr-0.5 text-status-error">*</span>
                   {t('shiftDeployment.adjust.execTime')}
                 </span>
                 <ExecutionTimeField
@@ -316,7 +305,7 @@ export function ScheduleAdjustApplyDialog({
               </div>
               <div className="min-w-0">
                 <span className={FIELD_LABEL}>
-                  <span className="mr-0.5 text-red-500">*</span>
+                  <span className="mr-0.5 text-status-error">*</span>
                   {t('shiftDeployment.adjust.selectSchedule')}
                 </span>
                 <ShiftMenuSelect
@@ -330,23 +319,23 @@ export function ScheduleAdjustApplyDialog({
                   panelWidth={360}
                 />
                 {listError ? (
-                  <p className="mt-1 text-[11px] text-red-400">{listError}</p>
+                  <p className="mt-1 text-body-xs text-status-error-emphasis">{listError}</p>
                 ) : null}
               </div>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col px-6 pb-3">
-              <p className="mb-2 shrink-0 text-sm text-zinc-300">
+              <p className="mb-2 shrink-0 text-body-s text-text-secondary">
                 {t('shiftDeployment.adjust.browse')}
               </p>
-              <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-zinc-800/80 bg-[#0c0c0e] p-4">
+              <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border-quaternary bg-surface-sub-background p-4">
                 {previewLoading ? (
-                  <div className="flex min-h-[280px] items-center justify-center gap-2 text-zinc-500">
+                  <div className="flex min-h-[280px] items-center justify-center gap-2 text-text-quaternary">
                     <Loader2 className="size-5 animate-spin" />
                     {t('shiftDeployment.adjust.loadingPreview')}
                   </div>
                 ) : previewError ? (
-                  <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+                  <div className="rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
                     {previewError}
                   </div>
                 ) : draft ? (
@@ -371,8 +360,8 @@ export function ScheduleAdjustApplyDialog({
             />
             {showSupervisorApproval ? (
               <section className="px-6 pb-4">
-                <div className="rounded-xl border border-zinc-800 bg-[#141416] p-4">
-                  <h3 className="mb-3 text-sm font-medium text-zinc-200">
+                <div className="rounded-xl border border-border-quaternary bg-surface-popup p-4">
+                  <h3 className="mb-3 text-body-s-bold text-text-primary">
                     {t('shiftDeployment.adjust.approvalSection')}
                   </h3>
                   <input
@@ -381,7 +370,7 @@ export function ScheduleAdjustApplyDialog({
                     placeholder={t('shiftDeployment.adjust.approvalPlaceholder', {
                       phrase: approvalPhrase,
                     })}
-                    className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]"
+                    className="h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
                   />
                 </div>
               </section>
@@ -391,92 +380,37 @@ export function ScheduleAdjustApplyDialog({
 
         <footer className="flex shrink-0 flex-col gap-2 px-6 py-4">
           {actionError ? (
-            <p className="text-sm text-red-400">{actionError}</p>
+            <p className="text-body-s text-status-error-emphasis">{actionError}</p>
           ) : null}
           <div className="flex items-center justify-between">
           {step === 1 ? (
             <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm text-zinc-300 transition hover:text-white"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={!canNext || busy}
-                onClick={() => setStep(2)}
-                className="rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-              >
-                {t('shiftDeployment.adjust.nextWithTemplate')}
-              </button>
+              <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
+              <Button disabled={!canNext || busy} onPress={() => setStep(2)}>{t('shiftDeployment.adjust.nextWithTemplate')}</Button>
             </>
           ) : showSupervisorApproval ? (
             <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleReject}
-                className="rounded-lg border border-red-500/70 px-4 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
-              >
-                {t('shiftDeployment.adjust.reject')}
-              </button>
+              <Button hierarchy="danger" variant="outlined" disabled={busy} onPress={handleReject}>{t('shiftDeployment.adjust.reject')}</Button>
               <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setStep(1)}
-                  className="text-sm text-zinc-300 transition hover:text-white"
-                >
-                  {t('shiftDeployment.adjust.previous')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || approvalText.trim() !== approvalPhrase}
-                  onClick={() => void handleDeployNow()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-                >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {t('shiftDeployment.adjust.approveAndApply')}
-                </button>
+                <Button hierarchy="subordinate" variant="text" disabled={busy} onPress={() => setStep(1)}>{t('shiftDeployment.adjust.previous')}</Button>
+                <Button disabled={busy || approvalText.trim() !== approvalPhrase} onPress={() => void handleDeployNow()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {t('shiftDeployment.adjust.approveAndApply')}</Button>
               </div>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm text-zinc-300 transition hover:text-white"
-              >
-                {t('common.cancel')}
-              </button>
+              <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
               <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setStep(1)}
-                  className="text-sm text-zinc-300 transition hover:text-white"
-                >
-                  {t('shiftDeployment.adjust.previous')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || !shiftId}
-                  onClick={handleSubmitApplication}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#2B7FFF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#256fe6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-                >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                <Button hierarchy="subordinate" variant="text" disabled={busy} onPress={() => setStep(1)}>{t('shiftDeployment.adjust.previous')}</Button>
+                <Button disabled={busy || !shiftId} onPress={handleSubmitApplication}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
                   {supervisorApproval
                     ? t('shiftDeployment.adjust.submitApplication')
-                    : t('shiftDeployment.adjust.deploySchedule')}
-                </button>
+                    : t('shiftDeployment.adjust.deploySchedule')}</Button>
               </div>
             </>
           )}
           </div>
         </footer>
-      </div>
-    </div>
+      </Dialog>
   );
 }

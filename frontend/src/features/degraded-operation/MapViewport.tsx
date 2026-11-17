@@ -179,7 +179,7 @@ export function MapViewport({
   }, []);
 
   const button =
-    "flex size-8 items-center justify-center rounded-lg text-zinc-300 hover:bg-zinc-700/70 disabled:cursor-not-allowed disabled:opacity-35";
+    "flex size-8 items-center justify-center rounded-lg text-text-secondary hover:bg-zinc-700/70 disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div
@@ -201,7 +201,7 @@ export function MapViewport({
       </div>
       <div
         data-map-viewport-controls
-        className="absolute right-3 bottom-3 z-10 flex items-center gap-0.5 rounded-xl border border-zinc-700 bg-zinc-900/90 p-1 shadow-lg"
+        className="absolute right-3 bottom-3 z-10 flex items-center gap-0.5 rounded-xl border border-border-quaternary bg-surface-primary p-1 shadow-lg"
       >
         <button
           type="button"
@@ -214,7 +214,7 @@ export function MapViewport({
           <ZoomOut className="size-4" />
         </button>
         <span
-          className="min-w-12 text-center font-mono text-xs text-zinc-300"
+          className="min-w-12 text-center font-mono text-body-xs text-text-secondary"
           aria-label="目前縮放比例"
         >
           {Math.round(view.zoom * 100)}%
@@ -241,7 +241,7 @@ export function MapViewport({
         </button>
         <button
           type="button"
-          className={`${button} ${view.locked ? "text-amber-300" : ""}`}
+          className={`${button} ${view.locked ? "text-status-warning" : ""}`}
           onClick={toggleLock}
           aria-pressed={view.locked}
           aria-label={view.locked ? "解鎖視角" : "鎖定視角"}

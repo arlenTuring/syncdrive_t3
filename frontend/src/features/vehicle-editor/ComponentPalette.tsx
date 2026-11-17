@@ -11,9 +11,9 @@ export function ComponentPalette({
   if (!isEditMode) return null;
 
   return (
-    <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3">
+    <div className="shrink-0 border-t border-border-quaternary bg-surface-popup px-4 py-3">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">元件</span>
+        <span className="text-caption-2 uppercase text-text-disabled">元件</span>
         {VEHICLE_PALETTE.map((item) => (
           <button
             key={item.type}
@@ -24,7 +24,7 @@ export function ComponentPalette({
               e.dataTransfer.effectAllowed = 'copy';
             }}
             onClick={() => onAddAtCenter?.(item.type)}
-            className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition-all hover:border-zinc-500 hover:bg-zinc-800"
+            className="flex items-center gap-2 rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 text-body-xs text-text-secondary transition-all hover:border-border-primary hover:bg-link-standard-hover"
             title={item.description}
           >
             <span
@@ -34,7 +34,7 @@ export function ComponentPalette({
             {item.label}
           </button>
         ))}
-        <span className="text-[10px] text-zinc-600">拖曳至畫布或外圍放置 · 行為請放畫布外</span>
+        <span className="text-caption-2 text-text-disabled">拖曳至畫布或外圍放置 · 行為請放畫布外</span>
       </div>
     </div>
   );

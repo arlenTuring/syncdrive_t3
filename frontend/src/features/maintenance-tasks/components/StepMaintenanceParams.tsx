@@ -18,15 +18,16 @@ import {
 import { sanitizeIntegerInput } from '../utils/numericInput';
 import { FacilityEquipmentRowsEditor } from './FacilityEquipmentRowsEditor';
 import { StepSectionToggle } from './StepSectionToggle';
+import { IconButton } from '../../../components/ui';
 
 const SMALL_INPUT_CLASS =
-  'h-9 w-[88px] rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-[88px] rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const UNIT_SELECT_CLASS =
-  'h-9 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-2 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const EVENT_INPUT_CLASS =
-  'h-9 min-w-[140px] flex-1 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 min-w-[140px] flex-1 rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 type StepMaintenanceParamsProps = {
   draft: MaintenanceTaskMaintenanceDraft;
@@ -108,15 +109,15 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
       onEnabledChange={(stepEnabled) => patchMaintenance({ stepEnabled })}
     >
       <div className="space-y-6">
-        <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-5">
+        <div className="rounded-xl border border-border-quaternary bg-black-30 p-5">
           <div className="mb-4">
-            <span className="text-sm font-medium text-zinc-200">
+            <span className="text-body-s-bold text-text-primary">
               {t('maintenanceTasks.maintenance.cycleTitle')}
             </span>
           </div>
 
           {maintenance.cycleConditions.length === 0 ? (
-            <p className="mb-3 text-sm text-zinc-600">
+            <p className="mb-3 text-body-s text-text-disabled">
               {t('maintenanceTasks.maintenance.cycleEmpty')}
             </p>
           ) : (
@@ -124,9 +125,9 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
               {maintenance.cycleConditions.map((row, index) => (
                 <div
                   key={row.id}
-                  className="flex flex-wrap items-center gap-2 text-sm text-zinc-300"
+                  className="flex flex-wrap items-center gap-2 text-body-s text-text-secondary"
                 >
-                  <span className="w-6 shrink-0 text-zinc-500">{index + 1}.</span>
+                  <span className="w-6 shrink-0 text-text-quaternary">{index + 1}.</span>
                   <span>{cyclePrefixText(row.unit)}</span>
                   <input
                     type="text"
@@ -190,27 +191,13 @@ export function StepMaintenanceParams({ draft, onChange }: StepMaintenanceParams
                     className={SMALL_INPUT_CLASS}
                   />
                   <span>{t('maintenanceTasks.maintenance.minutes')}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeCondition(row.id)}
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300"
-                    aria-label={t('maintenanceTasks.maintenance.removeConditionAria')}
-                  >
-                    <X className="size-4" />
-                  </button>
+                  <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0" onPress={() => removeCondition(row.id)} label={t('maintenanceTasks.maintenance.removeConditionAria')} icon={<X />} />
                 </div>
               ))}
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={addCondition}
-            className="mt-4 inline-flex size-9 items-center justify-center rounded-lg border border-zinc-700 text-[#2B7FFF] transition hover:border-[#2B7FFF]/50 hover:bg-zinc-900"
-            aria-label={t('maintenanceTasks.maintenance.addConditionAria')}
-          >
-            <Plus className="size-4" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" className="mt-4" onPress={addCondition} label={t('maintenanceTasks.maintenance.addConditionAria')} icon={<Plus />} />
         </div>
 
         <FacilityEquipmentRowsEditor<MaintenanceFacilityEquipmentRow>

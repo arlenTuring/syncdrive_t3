@@ -15,6 +15,7 @@ import {
   DISPATCH_STATUS_TAG_STYLE,
 } from '../types';
 import { StatusTag } from '../../../components/StatusTag';
+import { IconButton } from '../../../components/ui';
 
 export type ConfirmStationStop = {
   id: string;
@@ -181,11 +182,11 @@ export function CreateDispatchConfirmStep({
 
   const card = variant === 'approval' || variant === 'pending';
   const sectionClass = card
-    ? 'mb-3 rounded-xl bg-zinc-900/80 px-4 py-3'
+    ? 'mb-3 rounded-xl bg-surface-primary px-4 py-3'
     : 'mb-6';
   const headingClass = card
-    ? 'mb-3 text-sm font-medium text-zinc-200'
-    : 'mb-3 text-sm font-medium text-zinc-200';
+    ? 'mb-3 text-body-s-bold text-text-primary'
+    : 'mb-3 text-body-s-bold text-text-primary';
 
   return (
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-2">
@@ -195,26 +196,26 @@ export function CreateDispatchConfirmStep({
             ? t('dispatchScheduling.confirm.basicSettings')
             : t('dispatchScheduling.createDialog.basicInfo')}
         </h3>
-        <div className={`grid gap-4 text-sm ${card ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        <div className={`grid gap-4 text-body-s ${card ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.createDialog.execTime')}</p>
-            <p className="text-zinc-100">{execDisplay ?? formatDotDateTime(execAt)}</p>
+            <p className="mb-1 text-body-xs text-text-quaternary">{t('dispatchScheduling.createDialog.execTime')}</p>
+            <p className="text-text-primary">{execDisplay ?? formatDotDateTime(execAt)}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.createDialog.priority')}</p>
-            <p className="text-zinc-100">
+            <p className="mb-1 text-body-xs text-text-quaternary">{t('dispatchScheduling.createDialog.priority')}</p>
+            <p className="text-text-primary">
               {priority ? t(`dispatchScheduling.priority.${priority}`) : '—'}
             </p>
           </div>
           <div>
-            <p className="mb-1 text-xs text-zinc-500">
+            <p className="mb-1 text-body-xs text-text-quaternary">
               {t('dispatchScheduling.createDialog.assignVehicle')}
             </p>
-            <p className="text-zinc-100">{vehicleCode || '—'}</p>
+            <p className="text-text-primary">{vehicleCode || '—'}</p>
           </div>
           {dispatchStatus ? (
             <div>
-              <p className="mb-1 text-xs text-zinc-500">{t('dispatchScheduling.columns.status')}</p>
+              <p className="mb-1 text-body-xs text-text-quaternary">{t('dispatchScheduling.columns.status')}</p>
               <StatusTag
                 label={t(`dispatchScheduling.status.${dispatchStatus}`)}
                 style={DISPATCH_STATUS_TAG_STYLE[dispatchStatus]}
@@ -230,15 +231,15 @@ export function CreateDispatchConfirmStep({
           {stations.map((stop, index) => (
             <div key={stop.id} className="relative flex gap-3 pb-5 last:pb-0">
               <div className="relative flex w-4 shrink-0 flex-col items-center">
-                <MapPin className="relative z-[1] size-4 text-[#51A2FF]" />
+                <MapPin className="relative z-[1] size-4 text-text-theme" />
                 {index < stations.length - 1 ? (
-                  <div className="absolute top-4 bottom-[-4px] border-l border-dashed border-zinc-600" />
+                  <div className="absolute top-4 bottom-[-4px] border-l border-dashed border-border-tertiary" />
                 ) : null}
               </div>
               <div className="-mt-0.5">
-                <p className="text-sm text-zinc-100">{stop.name}</p>
+                <p className="text-body-s text-text-primary">{stop.name}</p>
                 {stop.taskLabels.length > 0 ? (
-                  <p className="mt-0.5 text-xs text-zinc-500">{stop.taskLabels.join('、')}</p>
+                  <p className="mt-0.5 text-body-xs text-text-quaternary">{stop.taskLabels.join('、')}</p>
                 ) : null}
               </div>
             </div>
@@ -247,7 +248,7 @@ export function CreateDispatchConfirmStep({
       </section>
 
       {conflict ? (
-        <p className="mb-3 flex items-start gap-2 text-sm text-red-400">
+        <p className="mb-3 flex items-start gap-2 text-body-s text-status-error-emphasis">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <span>
             {t('dispatchScheduling.confirm.conflictWarning', {
@@ -260,14 +261,14 @@ export function CreateDispatchConfirmStep({
       ) : null}
 
       {showConfirmField ? (
-        <label className={card ? 'mb-1 block rounded-xl bg-zinc-900/80 px-4 py-3' : 'block'}>
-          <span className="mb-1.5 block text-xs text-zinc-400">{resolvedConfirmLabel}</span>
+        <label className={card ? 'mb-1 block rounded-xl bg-surface-primary px-4 py-3' : 'block'}>
+          <span className="mb-1.5 block text-body-xs text-text-tertiary">{resolvedConfirmLabel}</span>
           <input
             value={confirmText}
             onChange={(e) => onConfirmTextChange(e.target.value)}
             placeholder={resolvedConfirmPlaceholder}
             autoComplete="off"
-            className="h-10 w-full rounded-lg border border-zinc-700/80 bg-zinc-950/40 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30"
+            className="h-10 w-full rounded-lg border border-border-quaternary bg-black-30 px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn"
           />
         </label>
       ) : null}
@@ -287,23 +288,16 @@ export function CreateDispatchConfirmHeader({
     <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
       <div className="flex items-center gap-2.5">
         <span
-          className="inline-flex size-7 items-center justify-center rounded-full bg-[#EFB100] text-sm font-bold text-black"
+          className="inline-flex size-7 items-center justify-center rounded-full bg-[#EFB100] text-body-s-bold text-black"
           aria-hidden
         >
           !
         </span>
-        <h2 id="create-dispatch-title" className="text-base font-semibold text-zinc-100">
+        <h2 id="create-dispatch-title" className="text-body-m-bold text-text-primary">
           {title ?? t('dispatchScheduling.confirm.dualVerifyTitle')}
         </h2>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        aria-label={t('common.close')}
-      >
-        <X className="size-4" />
-      </button>
+      <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
     </header>
   );
 }

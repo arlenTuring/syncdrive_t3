@@ -16,10 +16,11 @@ import type {
   ShiftDeploymentAction,
 } from '../types';
 import { RingProgress } from './RingProgress';
+import { Button } from '../../../components/ui';
 
 const PERIOD_DOTS = ['#A78BFA', '#22C55E', '#F97316'] as const;
 
-const CARD = 'flex min-h-[210px] flex-col rounded-xl border border-zinc-800/80 bg-[#18181b] p-3.5';
+const CARD = 'flex min-h-[210px] flex-col rounded-xl border border-border-quaternary bg-surface-popup p-3.5';
 
 export function SummaryCards({
   mode,
@@ -42,23 +43,23 @@ export function SummaryCards({
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
       <section className={CARD}>
-        <h2 className="text-[15px] font-semibold text-zinc-100">
+        <h2 className="text-body-m-bold text-text-primary">
           {t('shiftDeployment.summary.currentMode')}
         </h2>
         <div className="mt-3 flex flex-1 items-center justify-center rounded-xl bg-[#1B4332] px-4 py-8 text-center">
           <div>
-            <div className="text-[28px] font-bold leading-tight text-white">{mode.modeLabel}</div>
-            <div className="mt-1 text-sm text-white/80">{mode.modeLevel}</div>
+            <div className="text-headline-2 text-text-primary">{mode.modeLabel}</div>
+            <div className="mt-1 text-body-s text-white/80">{mode.modeLevel}</div>
           </div>
         </div>
       </section>
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-zinc-100">
+          <h2 className="text-body-m-bold text-text-primary">
             {t('shiftDeployment.summary.dataStats')}
           </h2>
-          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[11px] text-zinc-200">
+          <span className="rounded-full bg-surface-secondary px-2.5 py-0.5 text-body-xs text-text-primary">
             {t('shiftDeployment.summary.ontimeRate', { pct: stats.ontimePct })}
           </span>
         </div>
@@ -69,28 +70,28 @@ export function SummaryCards({
               caption={t('shiftDeployment.summary.achievement')}
             />
             <div className="mt-2 flex w-full gap-1.5">
-              <span className="flex-1 rounded-full bg-zinc-800 py-1 text-center text-[11px] text-zinc-200">
+              <span className="flex-1 rounded-full bg-surface-secondary py-1 text-center text-body-xs text-text-primary">
                 {t('shiftDeployment.summary.total', { count: stats.totalCount })}
               </span>
-              <span className="flex-1 rounded-full bg-zinc-800 py-1 text-center text-[11px] text-zinc-200">
+              <span className="flex-1 rounded-full bg-surface-secondary py-1 text-center text-body-xs text-text-primary">
                 {t('shiftDeployment.summary.completed', { count: stats.completedCount })}
               </span>
             </div>
           </div>
-          <div className="w-px bg-white/10" />
-          <div className="flex flex-1 flex-col justify-center gap-3 text-sm">
+          <div className="w-px bg-link-standard-hover" />
+          <div className="flex flex-1 flex-col justify-center gap-3 text-body-s">
             <StatRow
-              icon={<Clock className="size-4 text-zinc-400" />}
+              icon={<Clock className="size-4 text-text-tertiary" />}
               label={t('shiftDeployment.summary.delayed')}
               value={stats.delayedCount}
             />
             <StatRow
-              icon={<AlertTriangle className="size-4 text-zinc-400" />}
+              icon={<AlertTriangle className="size-4 text-text-tertiary" />}
               label={t('shiftDeployment.summary.abnormal')}
               value={stats.abnormalCount}
             />
             <StatRow
-              icon={<CircleX className="size-4 text-zinc-400" />}
+              icon={<CircleX className="size-4 text-text-tertiary" />}
               label={t('shiftDeployment.summary.cancelled')}
               value={stats.cancelledCount}
             />
@@ -100,31 +101,25 @@ export function SummaryCards({
 
       <section className={CARD}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-zinc-100">
+          <h2 className="text-body-m-bold text-text-primary">
             {t('shiftDeployment.summary.executingSchedule')}
           </h2>
-          <button
-            type="button"
-            onClick={() => onAction({ kind: 'schedule-adjust' })}
-            className="rounded-lg border border-sky-500 px-2.5 py-1 text-[11px] text-sky-400 transition hover:bg-sky-500/10"
-          >
-            {t('shiftDeployment.summary.scheduleAdjust')}
-          </button>
+          <Button variant="outlined" onPress={() => onAction({ kind: 'schedule-adjust' })}>{t('shiftDeployment.summary.scheduleAdjust')}</Button>
         </div>
         <DispatchControlPanel dispatchEnabled={dispatchEnabled} onAction={onAction} />
-        <div className="mt-3 flex flex-1 flex-col rounded-xl bg-[#212124] p-3">
+        <div className="mt-3 flex flex-1 flex-col rounded-xl bg-surface-primary p-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-zinc-400">{schedule.scheduleMeta}</span>
+            <span className="text-body-xs text-text-tertiary">{schedule.scheduleMeta}</span>
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-body-xs ${
                 schedule.pending
                   ? 'bg-orange-950 text-orange-300'
-                  : 'bg-emerald-900 text-emerald-300'
+                  : 'bg-emerald-900 text-status-success'
               }`}
             >
               <span
                 className={`size-1.5 rounded-full ${
-                  schedule.pending ? 'bg-orange-400' : 'bg-emerald-400'
+                  schedule.pending ? 'bg-orange-400' : 'bg-status-success'
                 }`}
               />
               {schedule.statusLabel}
@@ -133,19 +128,19 @@ export function SummaryCards({
           <div className="mt-2 flex items-center gap-2">
             <span
               className={`h-5 w-0.5 rounded-full ${
-                schedule.pending ? 'bg-orange-400' : 'bg-emerald-500'
+                schedule.pending ? 'bg-orange-400' : 'bg-status-success'
               }`}
             />
-            <span className="text-lg font-semibold text-zinc-50">{schedule.scheduleName}</span>
+            <span className="text-headline-5 text-text-primary">{schedule.scheduleName}</span>
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-zinc-300">
-            <span className="text-zinc-500">{t('shiftDeployment.summary.reviewer')}</span>
-            <User className="size-3.5 text-zinc-500" />
+          <div className="mt-1.5 flex items-center gap-1.5 text-body-xs text-text-secondary">
+            <span className="text-text-quaternary">{t('shiftDeployment.summary.reviewer')}</span>
+            <User className="size-3.5 text-text-quaternary" />
             {schedule.reviewerName}
           </div>
-          <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
+          <div className="mt-2 space-y-1 border-t border-border-quaternary pt-2">
             {schedule.periods.map((period, index) => (
-              <div key={period} className="flex items-center gap-2 text-[11px] text-zinc-400">
+              <div key={period} className="flex items-center gap-2 text-body-xs text-text-tertiary">
                 <span
                   className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: PERIOD_DOTS[index] ?? '#71717A' }}
@@ -158,27 +153,27 @@ export function SummaryCards({
       </section>
 
       <section className={CARD}>
-        <h2 className="text-[15px] font-semibold text-zinc-100">
+        <h2 className="text-body-m-bold text-text-primary">
           {t('shiftDeployment.summary.majorEvent')}
         </h2>
         <button
           type="button"
           onClick={() => onAction({ kind: 'event-open' })}
-          className="mt-3 flex items-start gap-3 rounded-xl border border-red-400/80 bg-red-950/30 p-3 text-left transition hover:bg-red-950/50"
+          className="mt-3 flex items-start gap-3 rounded-xl border border-red-400/80 bg-status-error-light p-3 text-left transition hover:bg-red-950/50"
         >
-          <AlertTriangle className="mt-0.5 size-6 shrink-0 text-red-400" />
+          <AlertTriangle className="mt-0.5 size-6 shrink-0 text-status-error-emphasis" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-semibold text-zinc-50">{event.title}</span>
-              <span className="shrink-0 text-[11px] text-zinc-400">{event.date}</span>
+              <span className="font-semibold text-text-primary">{event.title}</span>
+              <span className="shrink-0 text-body-xs text-text-tertiary">{event.date}</span>
             </div>
             <div className="mt-1 flex items-start justify-between gap-2">
-              <span className="text-[12px] text-zinc-400">{event.level}</span>
-              <span className="shrink-0 text-[11px] text-zinc-400">{event.time}</span>
+              <span className="text-body-xs text-text-tertiary">{event.level}</span>
+              <span className="shrink-0 text-body-xs text-text-tertiary">{event.time}</span>
             </div>
           </div>
         </button>
-        <div className="mt-2 flex flex-1 items-center justify-center rounded-xl bg-[#212124] text-[13px] text-zinc-500">
+        <div className="mt-2 flex flex-1 items-center justify-center rounded-xl bg-surface-primary text-body-s text-text-quaternary">
           {t('shiftDeployment.summary.noMoreEvents')}
         </div>
       </section>
@@ -208,36 +203,20 @@ function DispatchControlPanel({
       ? t('shiftDeployment.dispatch.running')
       : t('shiftDeployment.dispatch.paused');
   const dotColor = dispatchEnabled === null
-    ? 'bg-zinc-500'
+    ? 'bg-status-inactive'
     : dispatchEnabled
-      ? 'bg-emerald-400'
+      ? 'bg-status-success'
       : 'bg-orange-400';
 
   return (
-    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#212124] px-3 py-2">
-      <div className="flex items-center gap-1.5 text-[12px] text-zinc-300">
+    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-surface-primary px-3 py-2">
+      <div className="flex items-center gap-1.5 text-body-xs text-text-secondary">
         <span className={`size-1.5 rounded-full ${dotColor}`} />
         {t('shiftDeployment.dispatch.label')}：{statusLabel}
       </div>
       <div className="flex gap-1.5">
-        <button
-          type="button"
-          onClick={() => onAction({ kind: 'dispatch-pause' })}
-          disabled={dispatchEnabled === false}
-          className="flex items-center gap-1 rounded-md border border-orange-500 px-2 py-1 text-[11px] text-orange-400 transition hover:bg-orange-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-600"
-        >
-          <Pause className="size-3" />
-          {t('shiftDeployment.dispatch.pause')}
-        </button>
-        <button
-          type="button"
-          onClick={() => onAction({ kind: 'dispatch-start' })}
-          disabled={dispatchEnabled === true}
-          className="flex items-center gap-1 rounded-md border border-emerald-500 px-2 py-1 text-[11px] text-emerald-400 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-600"
-        >
-          <Play className="size-3" />
-          {t('shiftDeployment.dispatch.start')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Pause />} onPress={() => onAction({ kind: 'dispatch-pause' })} disabled={dispatchEnabled === false}>{t('shiftDeployment.dispatch.pause')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Play />} onPress={() => onAction({ kind: 'dispatch-start' })} disabled={dispatchEnabled === true}>{t('shiftDeployment.dispatch.start')}</Button>
       </div>
     </div>
   );
@@ -254,11 +233,11 @@ function StatRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-2 text-zinc-400">
+      <span className="flex items-center gap-2 text-text-tertiary">
         {icon}
         {label}
       </span>
-      <span className="text-xl font-semibold text-zinc-50">{value}</span>
+      <span className="text-headline-4 text-text-primary">{value}</span>
     </div>
   );
 }

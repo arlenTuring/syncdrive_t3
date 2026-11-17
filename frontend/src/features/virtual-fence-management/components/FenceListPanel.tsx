@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { StatusTag } from '../../../components/StatusTag';
 import { FENCE_ENABLE_STATUS, type FenceListItem } from '../types';
+import { Button, IconButton } from '../../../components/ui';
 
 type FenceListPanelProps = {
   fences: FenceListItem[];
@@ -57,35 +58,19 @@ export function FenceListPanel({
 
   if (collapsed) {
     return (
-      <div className="relative z-30 flex h-full w-10 shrink-0 flex-col items-center border-r border-zinc-800/80 bg-[#0a0a0b] pt-3">
-        <button
-          type="button"
-          onClick={() => onCollapsedChange(false)}
-          title={t('virtualFence.list.expand')}
-          aria-label={t('virtualFence.list.expand')}
-          className="inline-flex size-8 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
-        >
-          <PanelLeftOpen className="size-4" aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={() => onCollapsedChange(false)}
-          className="mt-auto mb-6 inline-flex h-16 w-5 items-center justify-center rounded-r-md border border-l-0 border-zinc-700 bg-[#18181b] text-zinc-400 hover:text-[#51A2FF]"
-          title={t('virtualFence.list.expand')}
-          aria-label={t('virtualFence.list.expand')}
-        >
-          <ChevronRight className="size-3.5" aria-hidden />
-        </button>
+      <div className="relative z-30 flex h-full w-10 shrink-0 flex-col items-center border-r border-border-quaternary bg-surface-sub-background pt-3">
+        <IconButton variant="outlined" onPress={() => onCollapsedChange(false)} title={t('virtualFence.list.expand')} label={t('virtualFence.list.expand')} icon={<PanelLeftOpen />} />
+        <IconButton variant="outlined" className="mt-auto mb-6 w-5" onPress={() => onCollapsedChange(false)} title={t('virtualFence.list.expand')} label={t('virtualFence.list.expand')} icon={<ChevronRight />} />
       </div>
     );
   }
 
   return (
-    <aside className="relative z-30 flex h-full min-h-0 w-[300px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#0a0a0b]">
-      <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800/60 px-3 py-3">
+    <aside className="relative z-30 flex h-full min-h-0 w-[300px] shrink-0 flex-col border-r border-border-quaternary bg-surface-sub-background">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border-quaternary px-3 py-3">
         <label className="relative min-w-0 flex-1">
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500"
+            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-text-quaternary"
             aria-hidden
           />
           <input
@@ -94,26 +79,18 @@ export function FenceListPanel({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('common.search')}
-            className="h-9 w-full rounded-lg border border-zinc-700 bg-zinc-900/80 py-2 pl-8 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-[#2B7FFF]/60"
+            className="h-9 w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-8 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary outline-none focus:border-border-theme-light"
           />
         </label>
-        <button
-          type="button"
-          onClick={() => onCollapsedChange(true)}
-          title={t('virtualFence.list.collapse')}
-          aria-label={t('virtualFence.list.collapse')}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
-        >
-          <PanelLeftClose className="size-4" aria-hidden />
-        </button>
+        <IconButton variant="outlined" className="shrink-0" onPress={() => onCollapsedChange(true)} title={t('virtualFence.list.collapse')} label={t('virtualFence.list.collapse')} icon={<PanelLeftClose />} />
       </div>
 
       <ul className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
         {fences.length === 0 ? (
-          <li className="px-3 py-10 text-center text-sm text-zinc-500">
+          <li className="px-3 py-10 text-center text-body-s text-text-quaternary">
             {t('virtualFence.list.empty')}
             <br />
-            <span className="text-xs text-zinc-600">{t('virtualFence.list.emptyHint')}</span>
+            <span className="text-body-xs text-text-disabled">{t('virtualFence.list.emptyHint')}</span>
           </li>
         ) : (
           fences.map((fence) => {
@@ -142,79 +119,50 @@ export function FenceListPanel({
                     }
                   }}
                   className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2.5 transition ${
-                    selected ? 'bg-[#1a3a5c]/80' : 'hover:bg-zinc-900/80'
+                    selected ? 'bg-[#1a3a5c]/80' : 'hover:bg-surface-primary'
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm tracking-[0.3px] text-zinc-100">
+                    <p className="truncate text-body-s tracking-[0.3px] text-text-primary">
                       {fence.name}
                     </p>
-                    <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                    <p className="mt-0.5 truncate text-body-xs text-text-quaternary">
                       {t('virtualFence.list.eventAlert')}
                     </p>
                   </div>
                   <StatusTag label={statusLabel} style={statusStyle} />
-                  <button
-                    type="button"
-                    title={
+                  <Button hierarchy="subordinate" variant="text" className="shrink-0" title={
                       visible
                         ? t('virtualFence.list.hideOnMap')
                         : t('virtualFence.list.showOnMap')
-                    }
-                    onClick={(e) => {
+                    } onPress={(e) => {
                       e.stopPropagation();
                       onToggleVisible(fence.id);
-                    }}
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
-                  >
-                    {visible ? (
+                    }}>{visible ? (
                       <Eye className="size-3.5" aria-hidden />
                     ) : (
                       <EyeOff className="size-3.5" aria-hidden />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    title={t('common.moreActions')}
-                    aria-expanded={menuOpen}
-                    onClick={(e) => {
+                    )}</Button>
+                  <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" title={t('common.moreActions')} aria-expanded={menuOpen} onPress={(e) => {
                       e.stopPropagation();
                       setMenuId((prev) => (prev === fence.id ? null : fence.id));
-                    }}
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
-                  >
-                    <Ellipsis className="size-3.5" aria-hidden />
-                  </button>
+                    }} label={t('common.moreActions')} icon={<Ellipsis />} />
                 </div>
 
                 {menuOpen ? (
                   <div
                     ref={menuRef}
-                    className="absolute right-2 top-11 z-40 min-w-[120px] overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] py-1 shadow-xl"
+                    className="absolute right-2 top-11 z-40 min-w-[120px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-popup py-1 shadow-xl"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800"
-                      onClick={() => {
+                    <Button hierarchy="subordinate" variant="standard" className="w-full" onPress={() => {
                         setMenuId(null);
                         onEdit(fence.id);
-                      }}
-                    >
-                      <Pencil className="size-3.5 text-zinc-400" aria-hidden />
-                      {t('common.edit')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800"
-                      onClick={() => {
+                      }} leadingIcon={<Pencil />}>{t('common.edit')}</Button>
+                    <Button hierarchy="danger" variant="text" className="w-full" onPress={() => {
                         setMenuId(null);
                         onDelete(fence.id);
-                      }}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden />
-                      {t('common.delete')}
-                    </button>
+                      }} leadingIcon={<Trash2 />}>{t('common.delete')}</Button>
                   </div>
                 ) : null}
               </li>
@@ -223,15 +171,7 @@ export function FenceListPanel({
         )}
       </ul>
 
-      <button
-        type="button"
-        onClick={() => onCollapsedChange(true)}
-        title={t('virtualFence.list.collapse')}
-        aria-label={t('virtualFence.list.collapse')}
-        className="absolute top-1/2 right-0 z-30 flex h-12 w-5 translate-x-full -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-zinc-700 bg-[#18181b] text-zinc-400 transition hover:border-[#2B7FFF]/50 hover:text-[#51A2FF]"
-      >
-        <ChevronLeft className="size-3.5" aria-hidden />
-      </button>
+      <IconButton variant="outlined" className="absolute top-1/2 right-0 z-30 w-5 translate-x-full -translate-y-1/2" onPress={() => onCollapsedChange(true)} title={t('virtualFence.list.collapse')} label={t('virtualFence.list.collapse')} icon={<ChevronLeft />} />
     </aside>
   );
 }

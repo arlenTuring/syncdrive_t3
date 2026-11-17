@@ -7,6 +7,7 @@ import {
   type MaintenanceTaskCreateDraft,
 } from '../types/create';
 import { MaintenanceTaskPreviewContent } from './MaintenanceTaskPreviewContent';
+import { IconButton } from '../../../components/ui';
 
 type MaintenanceTaskResultPreviewPageProps = {
   taskId: string;
@@ -45,35 +46,28 @@ export function MaintenanceTaskResultPreviewPage({
   }, [taskId]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <header className="flex shrink-0 items-center gap-3 border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex size-9 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
-          title={t('maintenanceTasks.resultPreview.backToList')}
-        >
-          <ArrowLeft className="size-4" />
-        </button>
-        <Wrench className="size-5 text-[#2B7FFF]" aria-hidden />
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onBack} title={t('maintenanceTasks.resultPreview.backToList')} label={t('maintenanceTasks.resultPreview.backToList')} icon={<ArrowLeft />} />
+        <Wrench className="size-5 text-text-theme-light" aria-hidden />
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight">
+          <h1 className="truncate text-headline-5">
             {t('maintenanceTasks.preview')}
           </h1>
           {draft?.basic.name ? (
-            <p className="truncate text-xs text-zinc-500">{draft.basic.name}</p>
+            <p className="truncate text-body-xs text-text-quaternary">{draft.basic.name}</p>
           ) : null}
         </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
         {loading ? (
-          <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+          <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
             <Loader2 className="size-5 animate-spin" />
             {t('maintenanceTasks.resultPreview.loading')}
           </div>
         ) : error ? (
-          <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          <div className="rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
             {error}
           </div>
         ) : draft ? (

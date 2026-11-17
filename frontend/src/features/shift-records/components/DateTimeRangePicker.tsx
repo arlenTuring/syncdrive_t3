@@ -65,7 +65,7 @@ function FieldDateTimePopover({
       align={field === 'end' ? 'end' : 'start'}
       offset={10}
       autoFocus={false}
-      className="w-[min(420px,calc(100vw-24px))] rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50"
+      className="w-[min(420px,calc(100vw-24px))] rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50"
     >
       <span id={titleId} className="sr-only">
         {label}
@@ -105,15 +105,15 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
   const endLabel = formatRangeLabel(value.end);
 
   const fieldBtnClass = (hasValue: boolean, active: boolean) =>
-    `inline-flex shrink-0 items-center justify-start whitespace-nowrap py-2.5 text-left transition hover:text-zinc-200 ${
-      active ? 'text-sky-300' : hasValue ? 'text-zinc-200' : 'text-zinc-500'
+    `inline-flex shrink-0 items-center justify-start whitespace-nowrap py-2.5 text-left transition hover:text-text-primary ${
+      active ? 'text-text-theme' : hasValue ? 'text-text-primary' : 'text-text-quaternary'
     }`;
 
   return (
     <>
       <div
         ref={rangeRef}
-        className="flex w-full min-w-[400px] max-w-[520px] shrink-0 flex-nowrap items-stretch overflow-hidden rounded-lg border border-zinc-700/90 bg-[#1c1c1e] text-sm"
+        className="flex w-full min-w-[400px] max-w-[520px] shrink-0 flex-nowrap items-stretch overflow-hidden rounded-lg border border-border-quaternary bg-[#1c1c1e] text-body-s"
         role="group"
         aria-label={t('shiftRecords.dateRange.aria')}
       >
@@ -129,7 +129,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
           {!startLabel && (
             <span className="inline-block w-[7.5rem] shrink-0" aria-hidden />
           )}
-          <span className="shrink-0 px-2 text-zinc-600" aria-hidden>
+          <span className="shrink-0 px-2 text-text-disabled" aria-hidden>
             →
           </span>
           <button
@@ -148,7 +148,7 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
           ref={iconBtnRef}
           type="button"
           onClick={() => open(value.start ? 'end' : 'start')}
-          className="flex w-11 shrink-0 items-center justify-center border-l border-zinc-700/80 opacity-90 transition hover:opacity-100"
+          className="flex w-11 shrink-0 items-center justify-center border-l border-border-quaternary opacity-90 transition hover:opacity-100"
           title={t('shiftRecords.dateRange.selectDateTime')}
         >
           <img

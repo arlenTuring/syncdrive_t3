@@ -26,6 +26,7 @@ import {
 } from '../fenceModel';
 import type { FenceCoverageSegment, FenceVertex } from '../types';
 import { FenceShapeOverlay } from './FenceShapeOverlay';
+import { IconButton } from '../../../components/ui';
 
 type DrawTool = 'rect' | 'polygon';
 
@@ -256,8 +257,8 @@ export function FenceMapPanel({
   const toolBtn = (active: boolean) =>
     `inline-flex size-8 items-center justify-center rounded-md border transition ${
       active
-        ? 'border-[#2B7FFF] bg-[#2B7FFF]/20 text-[#51A2FF]'
-        : 'border-zinc-700 bg-[#18181b]/90 text-zinc-300 hover:border-zinc-500 hover:text-white'
+        ? 'border-border-theme bg-[#2B7FFF]/20 text-text-theme'
+        : 'border-border-quaternary bg-[#18181b]/90 text-text-secondary hover:border-border-primary hover:text-text-primary'
     }`;
 
   const displayZoom = Math.round(zoomLevel);
@@ -276,10 +277,10 @@ export function FenceMapPanel({
   return (
     <div
       ref={rootRef}
-      className="relative h-full min-h-0 w-full overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0c0c0e]"
+      className="relative h-full min-h-0 w-full overflow-hidden rounded-xl border border-border-quaternary bg-surface-sub-background"
     >
       {editing ? (
-        <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-lg border border-zinc-700/80 bg-[#18181b]/95 p-1 shadow-lg backdrop-blur-sm">
+        <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm">
           <button
             type="button"
             className={toolBtn(drawTool === 'rect')}
@@ -300,7 +301,7 @@ export function FenceMapPanel({
       ) : null}
 
       <div
-        className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-lg border border-zinc-700/80 bg-[#18181b]/95 p-1 shadow-lg backdrop-blur-sm"
+        className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm"
         title={t('virtualFence.map.panZoomHint')}
       >
         <button
@@ -312,7 +313,7 @@ export function FenceMapPanel({
         >
           <ZoomIn className="size-4" aria-hidden />
         </button>
-        <span className="min-w-[2.5rem] text-center font-mono text-[11px] text-zinc-400">
+        <span className="min-w-[2.5rem] text-center font-mono text-body-xs text-text-tertiary">
           {displayZoom}/{MAP_PIXEL_ZOOM_LEVEL_COUNT}
         </span>
         <button
@@ -327,7 +328,7 @@ export function FenceMapPanel({
       </div>
 
       {editing ? (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-lg border border-zinc-700/80 bg-[#18181b]/95 p-1 shadow-lg backdrop-blur-sm">
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm">
           <button
             type="button"
             className={toolBtn(false)}
@@ -346,23 +347,15 @@ export function FenceMapPanel({
           >
             <Redo2 className="size-4" aria-hidden />
           </button>
-          <span className="mx-0.5 h-5 w-px bg-zinc-700" aria-hidden />
-          <button
-            type="button"
-            className="inline-flex size-8 items-center justify-center rounded-md text-red-400 transition hover:bg-red-500/10 disabled:opacity-40"
-            title={t('virtualFence.map.clearShape')}
-            disabled={vertices.length === 0 && coverage.length === 0}
-            onClick={() => pushShape({ coverage: [], vertices: [] })}
-          >
-            <Trash2 className="size-4" aria-hidden />
-          </button>
+          <span className="mx-0.5 h-5 w-px bg-link-standard-hover" aria-hidden />
+          <IconButton hierarchy="danger" variant="standard" title={t('virtualFence.map.clearShape')} disabled={vertices.length === 0 && coverage.length === 0} onPress={() => pushShape({ coverage: [], vertices: [] })} label={t('virtualFence.map.clearShape')} icon={<Trash2 />} />
         </div>
       ) : null}
 
       {mapAreas.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500">
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-text-quaternary">
           <MapIcon className="size-6 opacity-40" aria-hidden />
-          <p className="text-sm">{t('virtualFence.map.emptyAreas')}</p>
+          <p className="text-body-s">{t('virtualFence.map.emptyAreas')}</p>
         </div>
       ) : (
         <MapAreaCanvas
@@ -431,7 +424,7 @@ export function FenceMapPanel({
 
       {marqueeScreen ? (
         <div
-          className="pointer-events-none absolute z-30 border-2 border-[#2B7FFF] bg-[#2B7FFF]/25"
+          className="pointer-events-none absolute z-30 border-2 border-border-theme bg-[#2B7FFF]/25"
           style={{
             left: marqueeScreen.left,
             top: marqueeScreen.top,

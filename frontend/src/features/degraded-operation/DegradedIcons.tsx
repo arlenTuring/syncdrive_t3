@@ -52,15 +52,15 @@ export function ImpactMetrics({
     <div className="flex min-w-0 items-start gap-2">
       <DegradedIcon name={icon} className="mt-0.5 size-6" />
       <div className="min-w-0">
-        <span className="block text-sm text-zinc-400">{label}</span>
-        <b className="text-2xl font-normal text-white">{value}</b>
-        {unit ? <small className="ml-1 text-xs text-zinc-400">{unit}</small> : null}
+        <span className="block text-body-s text-text-tertiary">{label}</span>
+        <b className="text-headline-3 font-normal text-text-primary">{value}</b>
+        {unit ? <small className="ml-1 text-body-xs text-text-tertiary">{unit}</small> : null}
       </div>
     </div>
   );
   return (
     <div
-      className={`grid grid-cols-3 gap-2 rounded-xl bg-[#222831] p-4 ${className}`}
+      className={`grid grid-cols-3 gap-2 rounded-xl bg-surface-secondary p-4 ${className}`}
     >
       {cell(
         "speed",

@@ -32,6 +32,7 @@ import { StepPreTripParams } from './StepPreTripParams';
 import { StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 type CreateMaintenanceTaskPageProps = {
   onBack: () => void;
@@ -40,7 +41,7 @@ type CreateMaintenanceTaskPageProps = {
 };
 
 const INPUT_CLASS =
-  'h-[42px] w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-[42px] w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 
@@ -67,21 +68,21 @@ function AutoSaveDraftBadge({
   if (status === 'idle' && !savedAt) return null;
 
   return (
-    <div className="absolute right-6 top-6 flex items-center gap-2 text-xs text-zinc-400">
+    <div className="absolute right-6 top-6 flex items-center gap-2 text-body-xs text-text-tertiary">
       {status === 'saving' ? (
         <>
-          <Loader2 className="size-3 animate-spin text-zinc-500" />
+          <Loader2 className="size-3 animate-spin text-text-quaternary" />
           {t('maintenanceTasks.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
-          <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+          <span className="size-2 rounded-full bg-status-success" aria-hidden />
           {t('maintenanceTasks.createWizard.draftSaved', {
             time: formatAutoSaveTime(savedAt, i18n.language),
           })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">{t('maintenanceTasks.createWizard.autoSaveFailed')}</span>
+        <span className="text-status-error-emphasis">{t('maintenanceTasks.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -106,17 +107,10 @@ function CreateStepSidebar({
 }) {
   const { t } = useTranslation();
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
-      <div className="border-b border-zinc-800/80 px-4 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
-        >
-          <ArrowLeft className="size-4" />
-          {t('maintenanceTasks.createWizard.backToPlatform')}
-        </button>
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-border-quaternary bg-[#08080a]">
+      <div className="border-b border-border-quaternary px-4 py-4">
+        <Button hierarchy="subordinate" variant="text" className="mb-4" leadingIcon={<ArrowLeft />} onPress={onBack}>{t('maintenanceTasks.createWizard.backToPlatform')}</Button>
+        <div className="flex items-center gap-2 text-body-s-bold text-text-primary">
           <ClipboardList className="size-4 text-violet-400" />
           {t('maintenanceTasks.createWizard.title')}
         </div>
@@ -141,34 +135,34 @@ function CreateStepSidebar({
                     active
                       ? 'bg-[rgba(43,127,255,0.12)]'
                       : unlocked
-                        ? 'hover:bg-zinc-900/80'
+                        ? 'hover:bg-surface-primary'
                         : 'cursor-not-allowed opacity-50'
                   }`}
                 >
                   {active && (
                     <span
-                      className="absolute inset-y-2 left-0 w-1 rounded-r bg-[#2B7FFF]"
+                      className="absolute inset-y-2 left-0 w-1 rounded-r bg-link-theme-filled"
                       aria-hidden
                     />
                   )}
                   <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${
+                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-body-xs font-medium ${
                       active
-                        ? 'bg-[#2B7FFF] text-white'
+                        ? 'bg-link-theme-filled text-text-primary'
                         : completed
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-zinc-800 text-zinc-500'
+                          ? 'bg-emerald-500/20 text-status-success'
+                          : 'bg-surface-secondary text-text-quaternary'
                     }`}
                   >
                     {completed ? <Check className="size-3.5" strokeWidth={2.5} /> : item.step}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] uppercase tracking-wider text-zinc-600">
+                    <span className="block text-caption-2 uppercase text-text-disabled">
                       STEP {item.step}
                     </span>
                     <span
-                      className={`block truncate text-sm ${
-                        active ? 'font-medium text-zinc-100' : 'text-zinc-400'
+                      className={`block truncate text-body-s ${
+                        active ? 'font-medium text-text-primary' : 'text-text-tertiary'
                       }`}
                     >
                       {t(`maintenanceTasks.createWizard.steps.${item.step}`)}
@@ -181,15 +175,8 @@ function CreateStepSidebar({
         </ol>
       </nav>
 
-      <div className="border-t border-zinc-800/80 p-4">
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
-        >
-          <Trash2 className="size-4" />
-          {t('maintenanceTasks.createWizard.discardDraft')}
-        </button>
+      <div className="border-t border-border-quaternary p-4">
+        <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Trash2 />} onPress={onDiscard}>{t('maintenanceTasks.createWizard.discardDraft')}</Button>
       </div>
     </aside>
   );
@@ -210,11 +197,11 @@ function StepBasicInfo({
 
   return (
     <div className="w-full">
-      <h2 className="mb-6 text-base font-medium text-zinc-100">{t('maintenanceTasks.createWizard.setNameTitle')}</h2>
+      <h2 className="mb-6 text-body-m-bold text-text-primary">{t('maintenanceTasks.createWizard.setNameTitle')}</h2>
       <div className="space-y-5">
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center gap-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             {t('maintenanceTasks.createWizard.scheduleName')}
           </span>
           <div className="relative">
@@ -223,25 +210,25 @@ function StepBasicInfo({
               value={draft.name}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
               placeholder={t('maintenanceTasks.createWizard.placeholder')}
-              className={`${INPUT_CLASS} ${nameInvalid ? 'border-red-500/80 pr-9 focus:border-red-500 focus:ring-red-500/30' : ''}`}
+              className={`${INPUT_CLASS} ${nameInvalid ? 'border-red-500/80 pr-9 focus:border-status-error focus:ring-red-500/30' : ''}`}
             />
             {nameInvalid && (
-              <AlertCircle className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-red-500" />
+              <AlertCircle className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-status-error" />
             )}
             {nameUniqueState === 'checking' && (
-              <Loader2 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-zinc-500" />
+              <Loader2 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-text-quaternary" />
             )}
           </div>
           {nameUniqueState === 'duplicate' && (
-            <p className="mt-1 text-xs text-red-500">{t('maintenanceTasks.createWizard.nameDuplicate')}</p>
+            <p className="mt-1 text-body-xs text-status-error">{t('maintenanceTasks.createWizard.nameDuplicate')}</p>
           )}
           {nameUniqueState === 'error' && (
-            <p className="mt-1 text-xs text-red-500">{t('maintenanceTasks.createWizard.nameCheckFailed')}</p>
+            <p className="mt-1 text-body-xs text-status-error">{t('maintenanceTasks.createWizard.nameCheckFailed')}</p>
           )}
         </label>
         <label className="block">
-          <span className="mb-2 flex items-center gap-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center gap-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             {t('maintenanceTasks.createWizard.version')}
           </span>
           <input
@@ -253,7 +240,7 @@ function StepBasicInfo({
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm text-zinc-300">{t('maintenanceTasks.createWizard.remarks')}</span>
+          <span className="mb-2 block text-body-s text-text-secondary">{t('maintenanceTasks.createWizard.remarks')}</span>
           <input
             type="text"
             value={draft.remarks}
@@ -584,7 +571,7 @@ export function CreateMaintenanceTaskPage({
     : canGoNext;
 
   return (
-    <div className="fixed inset-0 z-[60] flex bg-[#0a0a0b] text-zinc-100">
+    <div className="fixed inset-0 z-[60] flex bg-surface-sub-background text-text-primary">
       <CreateStepSidebar
         currentStep={draft.currentStep}
         maxReachedStep={draft.maxReachedStep}
@@ -598,20 +585,20 @@ export function CreateMaintenanceTaskPage({
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="border-b border-zinc-800/60 px-8 py-3 text-center text-xs text-zinc-500">
+        <div className="border-b border-border-quaternary px-8 py-3 text-center text-body-xs text-text-quaternary">
           {t('maintenanceTasks.createWizard.stepHint')}
         </div>
 
         <div ref={previewScrollRef} className="min-h-0 flex-1 overflow-auto p-8">
-          <div className="relative min-h-full rounded-2xl border border-zinc-800/80 bg-[#111113] p-8 pt-14">
+          <div className="relative min-h-full rounded-2xl border border-border-quaternary bg-[#111113] p-8 pt-14">
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
             {loading ? (
-              <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+              <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
                 <Loader2 className="size-6 animate-spin" />
                 {t('maintenanceTasks.createWizard.loadingDraft')}
               </div>
             ) : loadError ? (
-              <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
+              <div className="flex min-h-[240px] items-center justify-center text-body-s text-status-error-emphasis">
                 {loadError}
               </div>
             ) : (
@@ -668,39 +655,22 @@ export function CreateMaintenanceTaskPage({
           </div>
         </div>
 
-        <footer className="flex shrink-0 flex-col gap-1 border-t border-zinc-800/80 px-8 py-4">
-          {saveError && <p className="text-xs text-red-400">{saveError}</p>}
-          {!saveError && currentStepReason && <p className="text-xs text-amber-400/90">{currentStepReason}</p>}
+        <footer className="flex shrink-0 flex-col gap-1 border-t border-border-quaternary px-8 py-4">
+          {saveError && <p className="text-body-xs text-status-error-emphasis">{saveError}</p>}
+          {!saveError && currentStepReason && <p className="text-body-xs text-status-warning">{currentStepReason}</p>}
           <div className="flex items-center justify-end gap-4">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}
-              className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t('maintenanceTasks.createWizard.previous')}
-            </button>
-            <button
-              type="button"
-              onClick={() => (isLastStep ? void handleComplete() : handleNext())}
+            <Button variant="text" onPress={handlePrevious} disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}>{t('maintenanceTasks.createWizard.previous')}</Button>
+            <Button
+              onPress={() => (isLastStep ? void handleComplete() : handleNext())}
               disabled={!primaryActionEnabled}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                primaryActionEnabled
-                  ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
-                  : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
-              }`}
+              leadingIcon={completing ? <Loader2 className="animate-spin" /> : undefined}
             >
-              {completing ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="size-4 animate-spin" />
-                  {t('common.saving')}
-                </span>
-              ) : isLastStep ? (
-                t('maintenanceTasks.createWizard.finish')
-              ) : (
-                t('maintenanceTasks.createWizard.next')
-              )}
-            </button>
+              {completing
+                ? t('common.saving')
+                : isLastStep
+                  ? t('maintenanceTasks.createWizard.finish')
+                  : t('maintenanceTasks.createWizard.next')}
+            </Button>
           </div>
         </footer>
       </div>

@@ -40,6 +40,7 @@ import {
 import { DegradedPlanDialog } from "./DegradedPlanDialog";
 import { PlanExecutionDialog } from "./PlanExecutionDialog";
 import { PlanManagementView } from "./PlanManagementView";
+import { Button, IconButton } from '../../components/ui';
 
 type LoadState<T> = { loading: boolean; value: T | null; error: string | null };
 const loading = <T,>(): LoadState<T> => ({
@@ -168,15 +169,15 @@ export function DegradedOperationPage() {
 
   return (
     <div
-      className={`grid h-full min-h-0 grid-cols-1 bg-black xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)] ${degraded ? "shadow-[inset_0_0_60px_rgba(220,38,38,.45)]" : ""}`}
+      className={`grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)] ${degraded ? "shadow-[inset_0_0_60px_rgba(220,38,38,.45)]" : ""}`}
     >
-      <section className="flex min-h-[420px] min-w-0 flex-col border-b border-zinc-800 xl:min-h-0 xl:border-r xl:border-b-0">
+      <section className="flex min-h-[420px] min-w-0 flex-col border-b border-border-quaternary xl:min-h-0 xl:border-r xl:border-b-0">
         <div
-          className={`flex min-h-16 shrink-0 items-center justify-between gap-4 border-l-4 px-5 ${degraded ? "border-red-500 bg-gradient-to-r from-red-950 to-black" : "border-emerald-400 bg-gradient-to-r from-emerald-950/80 to-black"}`}
+          className={`flex min-h-16 shrink-0 items-center justify-between gap-4 border-l-4 px-5 ${degraded ? "border-status-error bg-gradient-to-r from-red-950 to-black" : "border-emerald-400 bg-gradient-to-r from-emerald-950/80 to-black"}`}
         >
-          <span className="text-sm text-zinc-300">目前營運模式</span>
+          <span className="text-body-s text-text-secondary">目前營運模式</span>
           <span
-            className={`text-xl font-semibold ${degraded ? "text-red-400" : pending ? "text-amber-300" : unknown ? "text-zinc-400" : "text-emerald-400"}`}
+            className={`text-headline-4 ${degraded ? "text-status-error-emphasis" : pending ? "text-status-warning" : unknown ? "text-text-tertiary" : "text-status-success"}`}
           >
             {modeLabel}
           </span>
@@ -184,57 +185,29 @@ export function DegradedOperationPage() {
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-4">
           {!degraded ? (
             <>
-              <button
-                type="button"
-                onClick={() => setView("history")}
-                className="inline-flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-sm"
-              >
-                <FileClock className="size-4" />
-                歷史降級紀錄
-              </button>
-              <button
-                type="button"
-                onClick={() => {
+              <Button hierarchy="subordinate" variant="tonal" leadingIcon={<FileClock />} onPress={() => setView("history")}>歷史降級紀錄</Button>
+              <Button hierarchy="danger" leadingIcon={<AlertTriangle />} onPress={() => {
                   setCustomOpen(true);
                   void recordDegradedInteraction("dialog_opened", {
                     draft_key: "custom-execution",
                   });
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium"
-              >
-                <AlertTriangle className="size-4" />
-                執行降級
-              </button>
+                }}>執行降級</Button>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => setActiveDialog("adjust")}
-                className="ml-auto rounded-xl border border-red-500 px-4 py-2.5 text-red-300"
-              >
-                更換計畫
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDialog("restore")}
-                className="rounded-xl bg-red-600 px-4 py-2.5 font-medium"
-              >
-                終止降級並恢復營運
-              </button>
+              <Button hierarchy="danger" variant="outlined" className="ml-auto" onPress={() => setActiveDialog("adjust")}>更換計畫</Button>
+              <Button hierarchy="danger" onPress={() => setActiveDialog("restore")}>終止降級並恢復營運</Button>
             </>
           )}
         </div>
         {pending ? (
-          <div className="mx-5 mb-3 flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <div className="mx-5 mb-3 flex items-center gap-3 rounded-xl border border-status-warning-light bg-status-warning-light px-4 py-3 text-body-s text-status-warning">
             <TimerReset className="size-5" />
             <span>
               待執行：{pending.name}，營運時間{" "}
               {formatClock(Number(pending.scheduled_for_operating))}
             </span>
-            <button
-              type="button"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="text" className="ml-auto" onPress={() =>
                 void cancelDegradedSchedule(
                   pending.execution_id,
                   pending.version,
@@ -244,32 +217,26 @@ export function DegradedOperationPage() {
                     reloadStatus();
                   })
                   .catch((error: Error) => setNotice(error.message))
-              }
-              className="ml-auto underline"
-            >
-              取消預約
-            </button>
+              }>取消預約</Button>
           </div>
         ) : null}
         {notice ? (
           <div
             role="status"
-            className="mx-5 mb-3 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+            className="mx-5 mb-3 flex items-center justify-between rounded-lg border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-xs text-status-warning"
           >
             <span>{notice}</span>
-            <button type="button" onClick={() => setNotice(null)}>
-              關閉
-            </button>
+            <Button hierarchy="subordinate" variant="tonal" onPress={() => setNotice(null)}>關閉</Button>
           </div>
         ) : null}
         <div className="min-h-0 flex-1 p-5 pt-1">
-          <div className="h-full min-h-[260px] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
+          <div className="h-full min-h-[260px] overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background">
             {mapId.loading ? (
-              <div className="flex h-full items-center justify-center text-zinc-500">
+              <div className="flex h-full items-center justify-center text-text-quaternary">
                 載入場域地圖…
               </div>
             ) : mapId.error || !mapId.value ? (
-              <div className="flex h-full items-center justify-center text-red-300">
+              <div className="flex h-full items-center justify-center text-status-error-emphasis">
                 {mapId.error || "目前沒有啟用的地圖"}
               </div>
             ) : (
@@ -279,13 +246,11 @@ export function DegradedOperationPage() {
         </div>
       </section>
       <aside
-        className={`flex min-h-[520px] min-w-0 flex-col p-4 xl:min-h-0 ${degraded ? "bg-red-950/20" : "bg-[#121214]"}`}
+        className={`flex min-h-[520px] min-w-0 flex-col p-4 xl:min-h-0 ${degraded ? "bg-red-950/20" : "bg-surface-primary"}`}
       >
         <div className="mb-3 flex items-center justify-between">
           <h2>降級資訊</h2>
-          <button type="button" onClick={reload} aria-label="重新載入">
-            <RefreshCw className="size-4 text-zinc-400" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={reload} label="重新載入" icon={<RefreshCw />} />
         </div>
         {side.kind === "impact" ? (
           <ActiveSummary
@@ -295,16 +260,14 @@ export function DegradedOperationPage() {
             onContent={() => setActiveDialog("content")}
           />
         ) : side.kind === "loading" ? (
-          <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-zinc-800 text-zinc-500">
+          <div className="mt-4 flex flex-1 items-center justify-center rounded-xl border border-border-quaternary text-text-quaternary">
             讀取營運狀態…
           </div>
         ) : side.kind === "error" ? (
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-red-900/60 px-6 text-center text-red-300">
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-red-900/60 px-6 text-center text-status-error-emphasis">
             <AlertTriangle className="size-6" />
             營運狀態未知：{side.message}
-            <button type="button" onClick={reload} className="text-sm underline">
-              重新讀取
-            </button>
+            <Button hierarchy="subordinate" variant="text" onPress={reload}>重新讀取</Button>
           </div>
         ) : (
           <PlanCards
@@ -410,30 +373,23 @@ function PlanCards({
 }) {
   return (
     <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl bg-[#191c1f] p-4">
-      <div className="flex items-center gap-3 border-b border-zinc-700 pb-3">
-        <h3 className="mr-auto text-sm">降級計畫清單</h3>
-        <span className="text-sm">Total {plans.value?.total ?? "—"}</span>
-        <button
-          type="button"
-          onClick={onManage}
-          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm"
-        >
-          <Settings2 className="size-4" />
-          計畫管理
-        </button>
+      <div className="flex items-center gap-3 border-b border-border-quaternary pb-3">
+        <h3 className="mr-auto text-body-s">降級計畫清單</h3>
+        <span className="text-body-s">Total {plans.value?.total ?? "—"}</span>
+        <Button leadingIcon={<Settings2 />} onPress={onManage}>計畫管理</Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pt-3">
         {plans.loading ? (
-          <div className="flex h-full items-center justify-center text-zinc-500">
+          <div className="flex h-full items-center justify-center text-text-quaternary">
             載入降級計畫…
           </div>
         ) : plans.error ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-red-300">
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-status-error-emphasis">
             降級計畫載入失敗：{plans.error}
-            <button onClick={onRetry}>重試</button>
+            <Button hierarchy="subordinate" variant="text" onPress={onRetry} type="submit">重試</Button>
           </div>
         ) : !plans.value?.items.length ? (
-          <div className="flex h-full items-center justify-center text-zinc-400">
+          <div className="flex h-full items-center justify-center text-text-tertiary">
             無計畫
           </div>
         ) : (
@@ -443,20 +399,20 @@ function PlanCards({
                 key={plan.id}
                 type="button"
                 onClick={() => onSelect(plan)}
-                className="min-w-0 rounded-2xl border border-zinc-700 bg-[#202328] p-3 text-left hover:border-blue-500"
+                className="min-w-0 rounded-2xl border border-border-quaternary bg-[#202328] p-3 text-left hover:border-border-theme"
               >
                 <span
-                  className={`-ml-3 rounded-r px-4 py-1 text-xs ${plan.level === 1 ? "bg-red-900" : plan.level === 2 ? "bg-amber-800" : "bg-yellow-800"}`}
+                  className={`-ml-3 rounded-r px-4 py-1 text-body-xs ${plan.level === 1 ? "bg-status-error-light" : plan.level === 2 ? "bg-amber-800" : "bg-yellow-800"}`}
                 >
                   Level {plan.level}
                 </span>
                 <p className="min-h-12 break-words py-2">{plan.name}</p>
-                <div className="flex border-t border-zinc-600 py-2">
+                <div className="flex border-t border-border-tertiary py-2">
                   <Gauge className="mr-2 size-4" />
                   速限
                   <span className="ml-auto">{plan.speed_limit_kmh} km/h</span>
                 </div>
-                <p className="rounded-full bg-zinc-700/50 py-1 text-center text-xs text-zinc-400">
+                <p className="rounded-full bg-link-standard-hover py-1 text-center text-body-xs text-text-tertiary">
                   點擊卡片設定執行
                 </p>
               </button>
@@ -481,38 +437,24 @@ function ActiveSummary({
 }) {
   return (
     <div className="mt-1 min-h-0 flex-1 overflow-y-auto rounded-xl bg-[#191c1f] p-4">
-      <h3 className="border-b border-zinc-700 pb-3">降級影響範圍</h3>
-      <div className="my-5 flex items-center justify-center gap-2 text-xl text-zinc-300">
-        <Hourglass className="size-5 text-zinc-400" />
+      <h3 className="border-b border-border-quaternary pb-3">降級影響範圍</h3>
+      <div className="my-5 flex items-center justify-center gap-2 text-headline-4 text-text-secondary">
+        <Hourglass className="size-5 text-text-tertiary" />
         持續時間 {duration}
       </div>
-      <button
-        type="button"
-        onClick={onAdjust}
-        className="mb-3 w-full rounded-xl bg-blue-500/20 py-3 text-blue-400"
-      >
-        <SlidersHorizontal className="mr-2 inline size-4" />
-        調整降級參數
-      </button>
+      <Button className="mb-3 w-full" leadingIcon={<SlidersHorizontal />} onPress={onAdjust}>調整降級參數</Button>
       <ImpactMetrics speedLimitKmh={active.speed_limit_kmh} />
-      <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+      <p className="mt-3 rounded-lg border border-status-warning-light bg-status-warning-light p-3 text-body-xs text-status-warning">
         管理狀態已受理；車端控制契約尚未接通，控制結果：未下發。
       </p>
-      <button
-        type="button"
-        onClick={onContent}
-        className="my-4 w-full rounded-xl border border-zinc-600 py-2.5"
-      >
-        <Pencil className="mr-2 inline size-4" />
-        填寫降級計畫內容
-      </button>
+      <Button hierarchy="subordinate" variant="outlined" className="my-4 w-full" leadingIcon={<Pencil />} onPress={onContent}>填寫降級計畫內容</Button>
       <div className="rounded-xl bg-[#1d2024] p-4">
-        <span className="text-sm text-zinc-400">計畫名稱</span>
-        <h4 className="text-lg">{active.name}</h4>
-        <span className="float-right rounded bg-yellow-800 px-3 py-1 text-xs">
+        <span className="text-body-s text-text-tertiary">計畫名稱</span>
+        <h4 className="text-headline-5">{active.name}</h4>
+        <span className="float-right rounded bg-yellow-800 px-3 py-1 text-body-xs">
           Level {active.level}
         </span>
-        <p className="mt-4 whitespace-pre-wrap text-sm text-zinc-300">
+        <p className="mt-4 whitespace-pre-wrap text-body-s text-text-secondary">
           {active.description || "未填寫說明"}
         </p>
       </div>
@@ -535,7 +477,7 @@ function LiveMap({ mapId }: { mapId: string }) {
           <MapPlatformLayer mapId={mapId} vehicleTemplate={model.template} />
         </MapViewport>
         {notice ? (
-          <span className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs text-amber-200">
+          <span className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-status-warning-light px-3 py-1.5 text-body-xs text-status-warning">
             {notice}
           </span>
         ) : null}

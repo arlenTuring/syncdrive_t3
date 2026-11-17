@@ -46,7 +46,7 @@ export function VehicleCanvasResizeOverlay({
       {edgeStrip('ne', { left: `calc(100% - ${half}px)`, top: -half, width: hit, height: hit }, onResizePointerDown)}
       {edgeStrip('sw', { left: -half, top: `calc(100% - ${half}px)`, width: hit, height: hit }, onResizePointerDown)}
       {edgeStrip('se', { left: `calc(100% - ${half}px)`, top: `calc(100% - ${half}px)`, width: hit, height: hit }, onResizePointerDown)}
-      <div className="pointer-events-none absolute bottom-0 right-0 translate-y-full pt-1 font-mono text-[9px] text-cyan-400/80">
+      <div className="pointer-events-none absolute bottom-0 right-0 translate-y-full pt-1 font-mono text-caption-2 text-cyan-400/80">
         {sizeLabel}
       </div>
     </div>

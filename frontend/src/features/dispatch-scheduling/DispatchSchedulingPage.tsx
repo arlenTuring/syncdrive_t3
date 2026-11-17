@@ -30,10 +30,11 @@ import {
   type DispatchPriorityKey,
   type DispatchStatusKey,
 } from './types';
+import { Button, IconButton } from '../../components/ui';
 
 const PAGE_SIZE = 20;
 const SELECT =
-  'rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200';
+  'rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 text-body-s text-text-primary';
 
 type SortKey = 'priority' | 'vehicle_code' | 'status' | 'created_at';
 type SortDir = 'asc' | 'desc';
@@ -227,8 +228,8 @@ export function DispatchSchedulingPage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800/60 px-6 py-4">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
         <SiteSelect
           value={priority}
           onChange={(e) => {
@@ -295,28 +296,14 @@ export function DispatchSchedulingPage() {
             </option>
           ))}
         </SiteSelect>
-        <button
-          type="button"
-          onClick={applyFilters}
-          className="inline-flex size-9 items-center justify-center rounded-lg border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 text-[#51A2FF] transition hover:bg-[#2B7FFF]/25"
-          title={t('common.search')}
-        >
-          <Search className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
-        >
-          <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          {t('dispatchScheduling.create')}
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={applyFilters} title={t('common.search')} label={t('common.search')} icon={<Search />} />
+        <Button className="ml-auto w-fit shrink-0" onPress={() => setCreating(true)} leadingIcon={<Plus />}>{t('dispatchScheduling.create')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+        <table className="w-full min-w-[960px] border-collapse text-body-s">
           <thead>
-            <tr className="border-b border-zinc-800 text-left text-zinc-500">
+            <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="py-3 pr-4 font-medium">{t('dispatchScheduling.columns.dispatchCode')}</th>
               <SortHeader
                 label={t('dispatchScheduling.columns.priority')}
@@ -345,7 +332,7 @@ export function DispatchSchedulingPage() {
           <tbody>
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-zinc-500">
+                <td colSpan={7} className="py-16 text-center text-text-quaternary">
                   {t('dispatchScheduling.empty')}
                 </td>
               </tr>
@@ -353,53 +340,37 @@ export function DispatchSchedulingPage() {
               pageItems.map((row) => (
                 <tr
                   key={row.dispatch_id}
-                  className="border-b border-zinc-800/60 hover:bg-zinc-900/50"
+                  className="border-b border-border-quaternary hover:bg-surface-primary"
                 >
-                  <td className="py-3 pr-4 font-medium text-zinc-100">{row.dispatch_code}</td>
-                  <td className="py-3 pr-4 text-zinc-200">
+                  <td className="py-3 pr-4 font-medium text-text-primary">{row.dispatch_code}</td>
+                  <td className="py-3 pr-4 text-text-primary">
                     {t(`dispatchScheduling.priority.${row.priority}`)}
                   </td>
-                  <td className="py-3 pr-4 text-zinc-300">{row.location}</td>
-                  <td className="py-3 pr-4 text-zinc-200">{row.vehicle_code}</td>
+                  <td className="py-3 pr-4 text-text-secondary">{row.location}</td>
+                  <td className="py-3 pr-4 text-text-primary">{row.vehicle_code}</td>
                   <td className="py-3 pr-4">
                     <StatusTag
                       label={t(`dispatchScheduling.status.${row.status}`)}
                       style={DISPATCH_STATUS_TAG_STYLE[row.status]}
                     />
                   </td>
-                  <td className="py-3 pr-4 font-mono text-zinc-400">{row.created_at}</td>
+                  <td className="py-3 pr-4 font-mono text-text-tertiary">{row.created_at}</td>
                   <td className="relative py-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenMenuId((prev) => (prev === row.dispatch_id ? null : row.dispatch_id))
-                      }
-                      className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title={t('common.moreActions')}
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
+                    <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
+            setOpenMenuId((prev) => (prev === row.dispatch_id ? null : row.dispatch_id))
+           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
                     {openMenuId === row.dispatch_id && (
                       <div
                         ref={menuRef}
-                        className="absolute right-0 top-full z-20 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-zinc-700 bg-[#222226] py-1 shadow-xl"
+                        className="absolute right-0 top-full z-20 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-border-quaternary bg-[#222226] py-1 shadow-xl"
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
+                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => {
                             setOpenMenuId(null);
                             setEditing(row);
                             setCreating(true);
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800"
-                        >
-                          <Pencil className="size-4 text-zinc-400" />
-                          {t('common.edit')}
-                        </button>
-                        <div className="my-1 h-px bg-zinc-700/80" />
-                        <button
-                          type="button"
-                          onClick={() => {
+                          }}>{t('common.edit')}</Button>
+                        <div className="my-1 h-px bg-link-standard-hover" />
+                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Eye />} onPress={() => {
                             setOpenMenuId(null);
                             setReview({
                               row,
@@ -408,14 +379,9 @@ export function DispatchSchedulingPage() {
                                   ? 'approve'
                                   : 'view',
                             });
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-800"
-                        >
-                          <Eye className="size-4 text-zinc-400" />
-                          {isSupervisor
+                          }}>{isSupervisor
                             ? t('dispatchScheduling.viewAndApprove')
-                            : t('dispatchScheduling.view')}
-                        </button>
+                            : t('dispatchScheduling.view')}</Button>
                       </div>
                     )}
                   </td>
@@ -426,12 +392,12 @@ export function DispatchSchedulingPage() {
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-zinc-800/80 px-6 py-4">
+      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -440,10 +406,10 @@ export function DispatchSchedulingPage() {
             key={n}
             type="button"
             onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-sm ${
+            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
               n === page
-                ? 'bg-[#2B7FFF]/20 text-[#51A2FF] ring-1 ring-[#2B7FFF]/40'
-                : 'text-zinc-500 hover:bg-zinc-800'
+                ? 'bg-[#2B7FFF]/20 text-text-theme ring-1 ring-border-theme-light'
+                : 'text-text-quaternary hover:bg-link-standard-hover'
             }`}
           >
             {n}
@@ -453,7 +419,7 @@ export function DispatchSchedulingPage() {
           type="button"
           disabled={page >= totalPages}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronRight className="size-4" />
         </button>
@@ -502,7 +468,7 @@ function SortHeader({
         type="button"
         onClick={onClick}
         className={`inline-flex items-center gap-1 ${
-          active ? 'text-zinc-300' : 'text-zinc-500 hover:text-zinc-300'
+          active ? 'text-text-secondary' : 'text-text-quaternary hover:text-text-secondary'
         }`}
       >
         {label}

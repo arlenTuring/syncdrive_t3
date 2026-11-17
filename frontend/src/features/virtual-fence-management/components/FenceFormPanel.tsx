@@ -5,6 +5,7 @@ import {
   type FenceBehaviorKind,
   type FenceDraft,
 } from '../types';
+import { Button, Checkbox, IconButton, Switch } from '../../../components/ui';
 
 type FenceFormPanelProps = {
   mode: 'edit' | 'create';
@@ -17,9 +18,9 @@ type FenceFormPanelProps = {
 
 function RequiredLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-1.5 text-xs tracking-[0.3px] text-zinc-400">
+    <p className="mb-1.5 text-body-xs tracking-[0.3px] text-text-tertiary">
       {children}
-      <span className="ml-0.5 text-red-400">*</span>
+      <span className="ml-0.5 text-status-error-emphasis">*</span>
     </p>
   );
 }
@@ -42,22 +43,17 @@ function BehaviorGroup({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 py-2.5">
-      <p className="text-xs font-medium text-zinc-300">{title}</p>
+    <div className="space-y-2 rounded-lg border border-border-quaternary bg-surface-secondary px-3 py-2.5">
+      <p className="text-body-xs-bold text-text-secondary">{title}</p>
       <div className="flex flex-col gap-2">
         {FENCE_BEHAVIOR_OPTIONS.map((opt) => {
           const checked = selected.includes(opt.id);
           return (
             <label
               key={opt.id}
-              className="flex cursor-pointer items-center gap-2 text-sm text-zinc-200"
+              className="flex cursor-pointer items-center gap-2 text-body-s text-text-primary"
             >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => onToggle(opt.id)}
-                className="size-3.5 rounded border-zinc-600 bg-zinc-900 text-[#2B7FFF] focus:ring-[#2B7FFF]/40"
-              />
+              <Checkbox checked={checked} onCheckedChange={() => onToggle(opt.id)} />
               {t(`virtualFence.behavior.${opt.id}`)}
             </label>
           );
@@ -92,21 +88,14 @@ export function FenceFormPanel({
   };
 
   return (
-    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-zinc-800/80 bg-[#1c1c1f]">
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-4 py-3">
-        <p className="text-sm font-medium text-zinc-100">
+    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-border-quaternary bg-surface-primary">
+      <div className="flex shrink-0 items-center justify-between border-b border-border-quaternary px-4 py-3">
+        <p className="text-body-s-bold text-text-primary">
           {mode === 'create'
             ? t('virtualFence.form.createTitle')
             : t('virtualFence.form.editTitle')}
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          title={t('common.close')}
-        >
-          <X className="size-4" aria-hidden />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} title={t('common.close')} label={t('common.close')} icon={<X />} />
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
@@ -117,15 +106,15 @@ export function FenceFormPanel({
             value={draft.name}
             onChange={(e) => onChange({ ...draft, name: e.target.value })}
             placeholder={t('virtualFence.form.inputPlaceholder')}
-            className="h-9 w-full rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#2B7FFF]/60"
+            className="h-9 w-full rounded-lg border border-border-quaternary bg-surface-secondary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme-light"
           />
         </div>
 
         <div>
           <RequiredLabel>{t('virtualFence.form.coverage')}</RequiredLabel>
-          <div className="min-h-9 rounded-lg border border-zinc-700/60 bg-[#27272a] px-2 py-1.5">
+          <div className="min-h-9 rounded-lg border border-border-quaternary bg-surface-secondary px-2 py-1.5">
             {draft.coverage.length === 0 ? (
-              <p className="px-1 py-1 text-sm text-zinc-500">
+              <p className="px-1 py-1 text-body-s text-text-quaternary">
                 {draft.vertices.length >= 3
                   ? t('virtualFence.form.coverageEmptyDrawn')
                   : t('virtualFence.form.coverageEmptyHint')}
@@ -135,19 +124,12 @@ export function FenceFormPanel({
                 {draft.coverage.map((seg) => (
                   <span
                     key={seg.trackId}
-                    className="inline-flex items-center gap-1 rounded-md border border-zinc-600 bg-zinc-800/80 px-2 py-0.5 text-xs text-zinc-100"
+                    className="inline-flex items-center gap-1 rounded-md border border-border-tertiary bg-surface-secondary px-2 py-0.5 text-body-xs text-text-primary"
                   >
                     {seg.label}
-                    <button
-                      type="button"
-                      onClick={() => removeCoverage(seg.trackId)}
-                      className="text-zinc-400 hover:text-white"
-                      aria-label={t('virtualFence.form.removeCoverage', {
+                    <Button hierarchy="subordinate" variant="text" onPress={() => removeCoverage(seg.trackId)} aria-label={t('virtualFence.form.removeCoverage', {
                         label: seg.label,
-                      })}
-                    >
-                      ×
-                    </button>
+                      })}>×</Button>
                   </span>
                 ))}
               </div>
@@ -157,26 +139,12 @@ export function FenceFormPanel({
 
         <div>
           <RequiredLabel>{t('virtualFence.form.enable')}</RequiredLabel>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={draft.enabled}
-            onClick={() => onChange({ ...draft, enabled: !draft.enabled })}
-            className={`relative h-6 w-11 rounded-full transition ${
-              draft.enabled ? 'bg-[#2B7FFF]' : 'bg-zinc-700'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 size-5 rounded-full bg-white transition ${
-                draft.enabled ? 'left-5' : 'left-0.5'
-              }`}
-            />
-          </button>
+          <Switch checked={draft.enabled} aria-label={t('virtualFence.form.enable')} onCheckedChange={(enabled) => onChange({ ...draft, enabled })} />
         </div>
 
         <div className="space-y-2">
           <RequiredLabel>{t('virtualFence.form.behaviors')}</RequiredLabel>
-          <p className="text-[11px] leading-relaxed text-zinc-500">
+          <p className="text-body-xs text-text-quaternary">
             {t('virtualFence.form.behaviorsHint')}
           </p>
           <BehaviorGroup
@@ -217,9 +185,9 @@ export function FenceFormPanel({
                     speedLimitKmh: Number.isFinite(n) ? n : null,
                   });
                 }}
-                className="h-9 w-24 rounded-lg border border-zinc-700/60 bg-[#27272a] px-3 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF]/60"
+                className="h-9 w-24 rounded-lg border border-border-quaternary bg-surface-secondary px-3 text-body-s text-text-primary outline-none focus:border-border-theme-light"
               />
-              <span className="text-sm text-zinc-400">
+              <span className="text-body-s text-text-tertiary">
                 {t('virtualFence.form.speedUnit')}
               </span>
             </div>
@@ -227,26 +195,13 @@ export function FenceFormPanel({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-3 border-t border-zinc-800/60 px-4 py-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-9 px-2 text-sm text-zinc-300 transition hover:text-white"
-        >
-          {mode === 'create'
+      <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border-quaternary px-4 py-3">
+        <Button hierarchy="subordinate" variant="tonal" onPress={onCancel}>{mode === 'create'
             ? t('virtualFence.form.discard')
-            : t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={onSubmit}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-[#2B7FFF] px-5 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
-        >
-          {mode === 'create'
+            : t('common.cancel')}</Button>
+        <Button disabled={!canSubmit} onPress={onSubmit}>{mode === 'create'
             ? t('virtualFence.form.createAction')
-            : t('common.save')}
-        </button>
+            : t('common.save')}</Button>
       </div>
     </aside>
   );

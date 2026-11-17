@@ -26,6 +26,11 @@ export type DialogProps = {
   closeOnBackdrop?: boolean;
   /** 隱藏右上角 X */
   hideClose?: boolean;
+  /**
+   * 不顯示系統標題列（標題只給螢幕閱讀器），由 children 自己排標題與關閉鈕。
+   * 給還沒整理內部版面的舊對話框過渡用：外框、遮罩、焦點、Escape 已經是系統的。
+   */
+  headerless?: boolean;
   /** 疊在其他對話框之上時用較高的層級 */
   layer?: 'dialog' | 'system';
   /** 開啟時要聚焦的元素；不給就聚焦第一個可操作元件 */
@@ -58,6 +63,7 @@ export function Dialog({
   busy = false,
   closeOnBackdrop = true,
   hideClose = false,
+  headerless = false,
   layer = 'dialog',
   initialFocusRef,
   role = 'dialog',
@@ -156,14 +162,18 @@ export function Dialog({
         onKeyDown={onKeyDown}
         className={cn(DIALOG_PANEL_CLASS, widthClassName ?? DIALOG_WIDTHS[size], heightClassName)}
       >
-        <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
-          <div className="min-w-0 flex-1">
-            {icon}
-            <h2 id={titleId} className="text-headline-4 text-text-primary">{title}</h2>
-            {description ? <p id={descriptionId} className="mt-1 text-body-s text-text-tertiary">{description}</p> : null}
-          </div>
-          {hideClose ? null : <IconButton label="關閉" icon={<X />} size="small" hierarchy="subordinate" variant="standard" onClick={onClose} disabled={busy} />}
-        </header>
+        {headerless ? (
+          <h2 id={titleId} className="sr-only">{title}</h2>
+        ) : (
+          <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
+            <div className="min-w-0 flex-1">
+              {icon}
+              <h2 id={titleId} className="text-headline-4 text-text-primary">{title}</h2>
+              {description ? <p id={descriptionId} className="mt-1 text-body-s text-text-tertiary">{description}</p> : null}
+            </div>
+            {hideClose ? null : <IconButton label="關閉" icon={<X />} size="small" hierarchy="subordinate" variant="standard" onClick={onClose} disabled={busy} />}
+          </header>
+        )}
         {onSubmit ? (
           <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
             {content}

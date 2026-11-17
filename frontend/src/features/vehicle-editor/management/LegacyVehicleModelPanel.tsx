@@ -17,6 +17,7 @@ import { migrateVehicleDefinition } from '../utils/migrateVehicleDefinition';
 import { cloneVehicleDefinition } from '../utils/vehicleDefinitionIO';
 import { readLegacyVehicleCache } from '../storage/vehicleDefinitionStorage';
 import { systemConfirm } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 type CacheEntry = {
   local: VehicleDefinition;
@@ -117,26 +118,26 @@ export function LegacyVehicleModelPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[#0a0f1a] p-6">
-      <div className="mx-auto max-w-5xl space-y-8 text-xs text-zinc-300">
+    <div className="h-full overflow-y-auto bg-surface-sub-background p-6">
+      <div className="mx-auto max-w-5xl space-y-8 text-body-xs text-text-secondary">
         {message ? (
-          <p role="status" className={message.tone === 'ok' ? 'text-emerald-300' : 'text-red-300'}>
+          <p role="status" className={message.tone === 'ok' ? 'text-status-success' : 'text-status-error-emphasis'}>
             {message.text}
           </p>
         ) : null}
 
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-100">此瀏覽器的舊模型</h2>
-          <p className="text-zinc-500">
+          <h2 className="text-body-s-bold text-text-primary">此瀏覽器的舊模型</h2>
+          <p className="text-text-quaternary">
             只列出這台瀏覽器快取裡的模型；其他電腦或瀏覽器裡的模型這裡看不到，請到那台瀏覽器打開此頁匯入。
           </p>
           {server === null ? (
-            <p className="text-zinc-500">讀取後端模型中…</p>
+            <p className="text-text-quaternary">讀取後端模型中…</p>
           ) : entries.length === 0 ? (
-            <p className="text-zinc-500">此瀏覽器沒有快取的模型。</p>
+            <p className="text-text-quaternary">此瀏覽器沒有快取的模型。</p>
           ) : (
-            <table className="w-full overflow-hidden rounded-xl border border-zinc-800">
-              <thead className="bg-zinc-950 text-[10px] text-zinc-500">
+            <table className="w-full overflow-hidden rounded-xl border border-border-quaternary">
+              <thead className="bg-surface-sub-background text-caption-2 text-text-quaternary">
                 <tr>
                   <th className="px-3 py-2 text-left">此瀏覽器</th>
                   <th className="px-3 py-2 text-left">後端</th>
@@ -146,11 +147,11 @@ export function LegacyVehicleModelPanel() {
               </thead>
               <tbody>
                 {entries.map((entry) => (
-                  <tr key={entry.local.id} className="border-t border-zinc-800">
+                  <tr key={entry.local.id} className="border-t border-border-quaternary">
                     <td className="px-3 py-2">
                       <Thumb vehicle={entry.local} />
                       <div className="mt-1">{entry.local.name}</div>
-                      <div className="font-mono text-[10px] text-zinc-600">{entry.local.id}</div>
+                      <div className="font-mono text-caption-2 text-text-disabled">{entry.local.id}</div>
                     </td>
                     <td className="px-3 py-2">
                       {entry.server ? (
@@ -161,40 +162,29 @@ export function LegacyVehicleModelPanel() {
                           </div>
                         </>
                       ) : (
-                        <span className="text-zinc-600">沒有</span>
+                        <span className="text-text-disabled">沒有</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
                       {entry.state === 'same' ? (
-                        <span className="text-emerald-300">相同，不用處理</span>
+                        <span className="text-status-success">相同，不用處理</span>
                       ) : entry.state === 'only-local' ? (
-                        <span className="text-amber-300">只在此瀏覽器</span>
+                        <span className="text-status-warning">只在此瀏覽器</span>
                       ) : (
-                        <span className="text-red-300">同 ID 但內容不同</span>
+                        <span className="text-status-error-emphasis">同 ID 但內容不同</span>
                       )}
                     </td>
                     <td className="space-x-2 px-3 py-2 text-right">
                       {entry.state === 'only-local' ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          className="rounded bg-amber-600 px-2 py-1 text-white disabled:opacity-40"
-                          onClick={() =>
+                        <Button hierarchy="subordinate" variant="standard" disabled={busy} onPress={() =>
                             void act(`已匯入「${entry.local.name}」`, () =>
                               saveVehicleDefinition({ ...entry.local, serverVersion: undefined }, null),
                             )
-                          }
-                        >
-                          匯入
-                        </button>
+                          }>匯入</Button>
                       ) : null}
                       {entry.state === 'different' ? (
                         <>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            className="rounded border border-zinc-600 px-2 py-1 disabled:opacity-40"
-                            onClick={() => {
+                          <Button hierarchy="subordinate" variant="outlined" disabled={busy} onPress={() => {
                               const copy = cloneVehicleDefinition(entry.local);
                               void act(`已以新 ID ${copy.id} 匯入（後端原模型不變）`, () =>
                                 saveVehicleDefinition(
@@ -202,15 +192,8 @@ export function LegacyVehicleModelPanel() {
                                   null,
                                 ),
                               );
-                            }}
-                          >
-                            以新 ID 匯入
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            className="rounded border border-red-500/60 px-2 py-1 text-red-200 disabled:opacity-40"
-                            onClick={async () => {
+                            }}>以新 ID 匯入</Button>
+                          <Button hierarchy="danger" variant="outlined" disabled={busy} onPress={async () => {
                               if (
                                 !(await systemConfirm(
                                   `用此瀏覽器的版本覆蓋後端的「${entry.server?.name}」（第 ${entry.server?.serverVersion} 版）？所有地圖與儀表板都會改用這個外觀。`,
@@ -220,10 +203,7 @@ export function LegacyVehicleModelPanel() {
                               void act('已覆蓋後端版本', () =>
                                 saveVehicleDefinition(entry.local, entry.server?.serverVersion ?? null),
                               );
-                            }}
-                          >
-                            覆蓋後端
-                          </button>
+                            }}>覆蓋後端</Button>
                         </>
                       ) : null}
                     </td>
@@ -235,49 +215,30 @@ export function LegacyVehicleModelPanel() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-100">儀表板設定遷移成地圖設定</h2>
-          <p className="text-zinc-500">
+          <h2 className="text-body-s-bold text-text-primary">儀表板設定遷移成地圖設定</h2>
+          <p className="text-text-quaternary">
             把儀表板圖台上「載具容器」的模型、顯示尺寸與行為圖示，搬成圖資管理的地圖設定。只新增地圖設定、不改儀表板；
             地圖已有設定就跳過；同一張地圖在不同儀表板設得不一樣會列成衝突，不替你挑。
           </p>
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              className="rounded border border-zinc-600 px-3 py-1.5 disabled:opacity-40"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="outlined" disabled={busy} onPress={() =>
                 void act('試跑完成（沒有寫入）', async () => setReport(await runVehicleModelMigration(true)))
-              }
-            >
-              試跑
-            </button>
-            <button
-              type="button"
-              disabled={busy || !report?.dryRun}
-              title={report?.dryRun ? undefined : '先試跑看報告'}
-              className="rounded bg-amber-600 px-3 py-1.5 font-semibold text-white disabled:opacity-40"
-              onClick={() => void act('遷移完成', async () => setReport(await runVehicleModelMigration(false)))}
-            >
-              正式執行
-            </button>
+              }>試跑</Button>
+            <Button hierarchy="subordinate" variant="standard" disabled={busy || !report?.dryRun} title={report?.dryRun ? undefined : '先試跑看報告'} onPress={() => void act('遷移完成', async () => setReport(await runVehicleModelMigration(false)))}>正式執行</Button>
           </div>
           {report ? <MigrationReportView report={report} /> : null}
           {history.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="text-[11px] font-semibold text-zinc-400">遷移紀錄</h3>
+              <h3 className="text-body-xs-bold text-text-tertiary">遷移紀錄</h3>
               {history.map((item) => (
-                <div key={item.migrationId ?? item.at} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2">
+                <div key={item.migrationId ?? item.at} className="flex items-center justify-between rounded-lg border border-border-quaternary px-3 py-2">
                   <span>
                     {new Date(item.at).toLocaleString('zh-TW')}・新增 {item.created.length} 張地圖設定
                     {item.defaultSet ? `・設定預設模型 ${item.defaultSet}` : ''}
                     {item.rolledBackAt ? `・已於 ${new Date(item.rolledBackAt).toLocaleString('zh-TW')} 回復` : ''}
                   </span>
                   {!item.rolledBackAt && item.migrationId ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="rounded border border-zinc-600 px-2 py-1 disabled:opacity-40"
-                      onClick={async () => {
+                    <Button hierarchy="subordinate" variant="outlined" disabled={busy} onPress={async () => {
                         if (!(await systemConfirm('回復這次遷移？只會刪除遷移後沒有人改過的地圖設定。', { tone: 'danger' }))) return;
                         void act('已回復', async () => {
                           const result = await rollbackVehicleModelMigration(item.migrationId!);
@@ -286,10 +247,7 @@ export function LegacyVehicleModelPanel() {
                             text: `已回復：刪除 ${result.removed.length} 筆${result.kept.length ? `，保留 ${result.kept.length} 筆（遷移後被改過）` : ''}`,
                           });
                         });
-                      }}
-                    >
-                      回復
-                    </button>
+                      }}>回復</Button>
                   ) : null}
                 </div>
               ))}
@@ -303,7 +261,7 @@ export function LegacyVehicleModelPanel() {
 
 function Thumb({ vehicle }: { vehicle: VehicleDefinition }) {
   return (
-    <div className="flex h-9 w-28 items-center justify-center overflow-hidden rounded bg-zinc-950">
+    <div className="flex h-9 w-28 items-center justify-center overflow-hidden rounded bg-surface-sub-background">
       <VehicleDefinitionMapView definition={vehicle} displayWidth={104} displayHeight={32} />
     </div>
   );
@@ -311,7 +269,7 @@ function Thumb({ vehicle }: { vehicle: VehicleDefinition }) {
 
 function MigrationReportView({ report }: { report: VehicleModelMigrationReport }) {
   return (
-    <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+    <div className="space-y-2 rounded-xl border border-border-quaternary bg-surface-primary p-3">
       <p className="font-semibold">{report.dryRun ? '試跑報告（尚未寫入）' : `已執行（紀錄 ${report.migrationId ?? '—'}）`}</p>
       <ul className="list-disc space-y-1 pl-5">
         {report.created.map((item) => (
@@ -324,17 +282,17 @@ function MigrationReportView({ report }: { report: VehicleModelMigrationReport }
         ))}
         {report.defaultSet ? <li>系統預設模型 → {report.defaultSet}（原本沒有預設）</li> : null}
         {report.skipped.map((item) => (
-          <li key={`s-${item.mapId}`} className="text-zinc-400">
+          <li key={`s-${item.mapId}`} className="text-text-tertiary">
             跳過 {item.mapId}：{item.reason}
           </li>
         ))}
         {report.conflicts.map((item) => (
-          <li key={`c-${item.mapId}`} className="text-red-300">
+          <li key={`c-${item.mapId}`} className="text-status-error-emphasis">
             衝突 {item.mapId}：{item.reason}
           </li>
         ))}
         {report.created.length + report.skipped.length + report.conflicts.length === 0 ? (
-          <li className="text-zinc-500">沒有需要遷移的儀表板設定</li>
+          <li className="text-text-quaternary">沒有需要遷移的儀表板設定</li>
         ) : null}
       </ul>
     </div>

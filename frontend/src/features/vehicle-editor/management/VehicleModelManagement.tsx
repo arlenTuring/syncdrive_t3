@@ -48,14 +48,14 @@ export function VehicleModelManagement({
       const maps = refs.filter((ref) => ref.kind === 'map').length;
       const dashboards = refs.filter((ref) => ref.kind === 'dashboard').length;
       if (!isDefault && refs.length === 0)
-        return <span className="text-[10px] text-zinc-600">未被使用</span>;
+        return <span className="text-caption-2 text-text-disabled">未被使用</span>;
       return (
-        <span className="flex flex-wrap gap-1.5 text-[10px]">
-          {isDefault ? <span className="rounded bg-sky-600/30 px-1.5 py-px text-sky-200">系統預設</span> : null}
-          {maps ? <span className="rounded bg-emerald-600/25 px-1.5 py-px text-emerald-200">{maps} 張地圖</span> : null}
+        <span className="flex flex-wrap gap-1.5 text-caption-2">
+          {isDefault ? <span className="rounded bg-sky-600/30 px-1.5 py-px text-text-theme">系統預設</span> : null}
+          {maps ? <span className="rounded bg-emerald-600/25 px-1.5 py-px text-status-success">{maps} 張地圖</span> : null}
           {dashboards ? (
             <span
-              className="rounded bg-amber-600/25 px-1.5 py-px text-amber-200"
+              className="rounded bg-amber-600/25 px-1.5 py-px text-status-warning"
               title={refs
                 .filter((ref): ref is Extract<VehicleModelReference, { kind: 'dashboard' }> => ref.kind === 'dashboard')
                 .map((ref) => `${ref.planeName}${ref.label ? `／${ref.label}` : ''}`)
@@ -76,8 +76,8 @@ export function VehicleModelManagement({
       role="tab"
       aria-selected={tab === value}
       onClick={() => setTab(value)}
-      className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-        tab === value ? 'bg-zinc-800 text-amber-300' : 'text-zinc-500 hover:text-zinc-300'
+      className={`rounded-md px-3 py-1.5 text-body-xs font-medium ${
+        tab === value ? 'bg-surface-secondary text-status-warning' : 'text-text-quaternary hover:text-text-secondary'
       }`}
     >
       {label}
@@ -86,7 +86,7 @@ export function VehicleModelManagement({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-950 px-4 py-2" role="tablist">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border-quaternary bg-surface-sub-background px-4 py-2" role="tablist">
         {tabButton('models', '模型')}
         {tabButton('maps', '地圖使用設定')}
         {tabButton('legacy', '舊資料匯入與遷移')}
