@@ -51,6 +51,7 @@ import { presetIconUrl } from './iconLibrary';
 import { DEMO_FS as FS } from './demoTypography';
 import demoPlaneSnapshot from './demoPlane.snapshot.json';
 import { upgradeVehicleCardGroup } from '../utils/vehicleInfoCardTemplate';
+import { operationStatusBadgeBinding } from '../utils/operationStatusBadge';
 
 const DS = 'default-internal';
 const MQTT = 'default-mqtt';
@@ -1683,8 +1684,10 @@ elements[8].children = [
     fontSize: FS.emphasis, dateFontSize: FS.aux, color: '#f1f5f9', dateColor: '#94a3b8', fontFamily: 'monospace',
   },
   {
-    ...badge, id: cid(), width: 260, height: 44, defaultLabel: '尚未設定（營運狀態來源）',
-    defaultBgColor: '#27272a', defaultTextColor: '#a1a1aa', fontSize: FS.body, borderRadius: 8, showDot: false,
+    ...badge, id: cid(), width: 260, height: 44,
+    defaultBgColor: '#27272a', defaultTextColor: '#a1a1aa', fontSize: FS.body, borderRadius: 8,
+    // 營運狀態：正常營運／降級運轉中／未部署班表／調度暫停中／營運狀態未知（見 utils/operationStatusBadge）
+    ...operationStatusBadgeBinding(),
   },
   staticText(780, 24, 180, 32, '班距 03:00', FS.body, '#fdba74'),
   staticText(980, 24, 220, 32, '正線營運 4 / 4', FS.body, '#7dd3fc'),

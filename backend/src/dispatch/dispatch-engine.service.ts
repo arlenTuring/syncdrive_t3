@@ -3,10 +3,12 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Vehicle } from '../database/entities/vehicle.entity';
+import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 import { OperationOrder } from '../database/entities/operation-order.entity';
 import { OperationShiftService } from '../operation-shift/operation-shift.service';
 import { resolveMapIdFromShiftBody } from '../operation-shift/timetable/station-alias';
@@ -116,6 +118,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly dailyPlans: DailyPlanStore,
     private readonly scheduledOrders: ScheduledOrderService,
     private readonly rotationOverlays: RotationOverlayStore,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
 
   /**
@@ -165,6 +168,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         Date.now(),
       ],
     );
+    this.invalidation?.emit([DS_TAGS.OPERATION_STATUS], 'dispatch_enabled');
     this.logger.log(`即時調度引擎${enabled ? '啟用' : '停用'}（已保存）`);
   }
 

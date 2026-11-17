@@ -24,5 +24,6 @@ import { DegradedOperationService } from './degraded-operation.service';
   ],
   controllers: [DegradedOperationController],
   providers: [DegradedOperationService],
+  exports: [DegradedOperationService],
 })
 export class DegradedOperationModule {}

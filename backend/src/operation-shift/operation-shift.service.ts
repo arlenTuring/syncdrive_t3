@@ -1,5 +1,6 @@
 import { DAY_END_SECOND } from './timetable/clock';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -61,6 +62,7 @@ export class OperationShiftService {
     @InjectRepository(OperationShift)
     private readonly repo: Repository<OperationShift>,
     private readonly mapService: MapService,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
 
   async listShifts(query: ListOperationShiftsQuery): Promise<{
@@ -383,6 +385,7 @@ export class OperationShiftService {
     };
     row.updatedAt = now;
     const saved = await this.repo.save(row);
+    this.invalidation?.emit([DS_TAGS.OPERATION_STATUS], 'shift_deployed');
     return toOperationShiftListItem(saved);
   }
 

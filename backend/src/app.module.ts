@@ -90,6 +90,7 @@ import { DegradedOperationExecution } from './database/entities/degraded-operati
 import { DegradedOperationEvent } from './database/entities/degraded-operation-event.entity';
 import { DegradedOperationDraft } from './database/entities/degraded-operation-draft.entity';
 import { DegradedOperationModule } from './degraded-operation/degraded-operation.module';
+import { OperationStatusModule } from './operation-status/operation-status.module';
 import { AccessControlModule } from './access-control/access-control.module';
 import {
   DegradedReplayFrame,
@@ -250,6 +251,7 @@ import { ScheduledOrderEntry } from './database/entities/scheduled-order-entry.e
     DataAdminModule,
     VehicleRotationModule,
     DegradedOperationModule,
+    OperationStatusModule,
     AccessControlModule,
     VehicleHistoryModule,
   ],

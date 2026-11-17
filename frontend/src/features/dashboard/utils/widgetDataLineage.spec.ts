@@ -107,7 +107,7 @@ describe('元件資料來源：面板說的就是實際跑的', () => {
 });
 
 describe('內建總控大屏：載入後每個顯示資料的元件都有來源', () => {
-  it('只剩「營運模式」徽章沒有資料來源（系統裡還沒有這份資料，待決定），其他都接上了', () => {
+  it('每個顯示資料的元件都接上了（「營運狀態」2026-11-17 起接 /operation-status）', () => {
     const plane = migratePlane(cloneDemoPlane() as DashboardPlane);
     const unbound: string[] = [];
     for (const element of plane.elements) {
@@ -118,7 +118,7 @@ describe('內建總控大屏：載入後每個顯示資料的元件都有來源'
         }
       }
     }
-    assert.deepEqual(unbound, ['即時圖台:status-badge:尚未設定（營運狀態來源）']);
+    assert.deepEqual(unbound, []);
   });
 
   it('「班距」接營運指標的目前時段班距，「正線營運」接訂單查詢，不再是寫死的字', () => {

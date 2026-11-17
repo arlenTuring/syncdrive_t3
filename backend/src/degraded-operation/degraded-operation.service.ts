@@ -6,10 +6,12 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { DegradedOperationDraft } from '../database/entities/degraded-operation-draft.entity';
+import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 import { DegradedOperationEvent } from '../database/entities/degraded-operation-event.entity';
 import { DegradedOperationExecution } from '../database/entities/degraded-operation-execution.entity';
 import { DegradedOperationPlan } from '../database/entities/degraded-operation-plan.entity';
@@ -83,7 +85,13 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
     private readonly clock: OperatingClockService,
     private readonly foundation: SystemFoundationSettingsService,
     private readonly replayRecorder: DegradedReplayRecorder,
+    @Optional() private readonly invalidation?: DatasourceInvalidationService,
   ) {}
+
+  /** 營運狀態變了（交易確定之後才發，畫面重查時讀得到新狀態） */
+  private notifyOperationStatus(): void {
+    this.invalidation?.emit([DS_TAGS.OPERATION_STATUS], 'degraded_operation');
+  }
 
   onModuleInit(): void {
     this.timer = setInterval(() => void this.processDueSchedules(), 1_000);
@@ -301,12 +309,19 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
           : '降級預約已保存，將由後端營運時鐘啟用。',
       );
     });
+    this.notifyOperationStatus();
     // 交易確定後才開始保存回放資料：交易失敗的那一筆不會留下保存紀錄
     if (started) await this.startReplay(started);
     return response;
   }
 
   async cancelScheduled(id: string, version: number, operator = 'unknown') {
+    const result = await this.cancelScheduledInTransaction(id, version, operator);
+    this.notifyOperationStatus();
+    return result;
+  }
+
+  private async cancelScheduledInTransaction(id: string, version: number, operator: string) {
     return this.dataSource.transaction(async (manager) => {
       const execution = await this.lockExecution(
         manager,
@@ -445,6 +460,7 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
         '管理端降級狀態已解除；本次未曾下發車端限制，未清除其他速限。',
       );
     });
+    this.notifyOperationStatus();
     await this.replayRecorder.stop(id, {
       real: Number(response.ended_at_real),
       operating: Number(response.ended_at_operating),
@@ -622,7 +638,10 @@ export class DegradedOperationService implements OnModuleInit, OnModuleDestroy {
       });
       return execution;
     });
-    if (activated) await this.startReplay(activated);
+    if (activated) {
+      this.notifyOperationStatus();
+      await this.startReplay(activated);
+    }
   }
 
   private async startReplay(execution: DegradedOperationExecution) {

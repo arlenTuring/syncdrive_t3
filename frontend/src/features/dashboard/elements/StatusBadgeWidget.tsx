@@ -33,6 +33,9 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
     sqlQuery: widget.sqlQuery,
     dataUrl: widget.dataUrl,
     refreshInterval: widget.refreshInterval,
+    refreshMode: widget.refreshMode,
+    invalidateTags: widget.invalidateTags,
+    freshnessPolicy: widget.freshnessPolicy,
   });
 
   const resolvedMqttTopic = widget.mqttTopic
