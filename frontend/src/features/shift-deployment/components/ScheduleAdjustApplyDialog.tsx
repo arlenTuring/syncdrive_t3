@@ -1,5 +1,5 @@
 import { SiteDateTimeInput } from '../../../components/SiteDateTimeInput';
-import { Calendar, Loader2, X } from 'lucide-react';
+import { Calendar, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,7 +29,7 @@ import {
   resolvePendingScheduleAdjust,
 } from '../pendingScheduleAdjust';
 import { systemConfirm } from '../../../lib/systemDialog';
-import { Button, Dialog, IconButton } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 type ScheduleAdjustApplyDialogProps = {
   onClose: () => void;
@@ -262,14 +262,7 @@ export function ScheduleAdjustApplyDialog({
   };
 
   return (
-    <Dialog headerless padded={false} title={t('shiftDeployment.adjust.title')} onClose={onClose} widthClassName="w-full max-w-6xl" heightClassName="max-h-[92vh]">
-        <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
-          <h2 id="schedule-adjust-title" className="text-body-m-bold text-text-primary">
-            {t('shiftDeployment.adjust.title')}
-          </h2>
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
-        </header>
-
+    <Dialog padded={false} title={t('shiftDeployment.adjust.title')} onClose={onClose} widthClassName="w-full max-w-6xl" heightClassName="max-h-[92vh]">
         {step === 1 ? (
           <>
             <div className="relative z-20 grid shrink-0 grid-cols-3 gap-4 px-6 pb-4">

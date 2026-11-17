@@ -1,4 +1,4 @@
-import { Gauge, Info, X } from "lucide-react";
+import { Gauge, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   saveDegradedDraft,
@@ -9,7 +9,7 @@ import {
   ExecutionScheduleFields,
   immediateSchedule,
 } from "./ExecutionScheduleFields";
-import { Button, Dialog, IconButton } from '../../components/ui';
+import { Button, Dialog } from '../../components/ui';
 
 export function PlanExecutionDialog({
   plan,
@@ -53,14 +53,13 @@ export function PlanExecutionDialog({
     }
   };
   return (
-    <Dialog headerless padded={false} title={"執行降級"} onClose={() => onClose()} widthClassName="w-full max-w-[680px]">
-        <header className="flex items-center gap-2 px-6 py-5">
-          <h2 id="plan-execute-title" className="text-headline-4">
-            執行降級
-          </h2>
-          <Info className="size-5 text-text-tertiary" />
-          <IconButton hierarchy="subordinate" variant="standard" className="ml-auto" onPress={onClose} disabled={saving} label="關閉" icon={<X />} />
-        </header>
+    <Dialog
+      padded={false}
+      busy={saving}
+      title={<span className="inline-flex items-center gap-2">執行降級<Info className="size-5 text-text-tertiary" aria-hidden /></span>}
+      onClose={() => onClose()}
+      widthClassName="w-full max-w-[680px]"
+    >
         <div className="space-y-5 px-6 pb-6">
           <section className="rounded-2xl border border-border-quaternary p-4">
             <h3 className="mb-4 text-headline-5">{plan.name}</h3>

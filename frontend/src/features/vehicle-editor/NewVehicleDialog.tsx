@@ -1,8 +1,8 @@
 import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
-import { Bus, X } from 'lucide-react';
+import { Bus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Button, Dialog, IconButton } from '../../components/ui';
+import { Button, Dialog } from '../../components/ui';
 
 const PRESET_KEYS = [
   { key: 'presetLandscape' as const, width: 500, height: 100 },
@@ -25,16 +25,17 @@ export function NewVehicleDialog({
   const [height, setHeight] = useState(150);
 
   return (
-    <Dialog headerless padded={false} title={t('vehicleEditor.newVehicle.title')} onClose={onCancel} widthClassName="w-[480px]">
-<div className="p-6 flex min-h-0 flex-1 flex-col overflow-auto">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bus className="text-status-warning" size={20} />
-            <h2 className="text-body-m-bold text-text-primary">{t('vehicleEditor.newVehicle.title')}</h2>
-          </div>
-          <IconButton hierarchy="subordinate" variant="standard" onPress={onCancel} label={t('common.close')} icon={<X />} />
-        </div>
-
+    <Dialog
+      title={<span className="inline-flex items-center gap-2"><Bus className="text-status-warning" size={20} aria-hidden />{t('vehicleEditor.newVehicle.title')}</span>}
+      onClose={onCancel}
+      widthClassName="w-[480px]"
+      footer={(
+        <>
+          <Button hierarchy="subordinate" variant="tonal" onPress={onCancel}>{t('common.cancel')}</Button>
+          <Button onPress={() => onConfirm(name || t('vehicleEditor.newVehicle.unnamed'), width, height)} disabled={!name.trim() || width < 40 || height < 40}>{t('vehicleEditor.newVehicle.create')}</Button>
+        </>
+      )}
+    >
         <div className="mb-4">
           <label className="mb-1.5 block text-body-xs-bold text-text-tertiary">{t('vehicleEditor.newVehicle.name')}</label>
           <input
@@ -87,12 +88,6 @@ export function NewVehicleDialog({
             />
           </div>
         </div>
-
-        <div className="mt-6 flex gap-2">
-          <Button hierarchy="subordinate" variant="outlined" className="flex-1" onPress={onCancel}>{t('common.cancel')}</Button>
-          <Button hierarchy="subordinate" variant="standard" className="flex-1" onPress={() => onConfirm(name || t('vehicleEditor.newVehicle.unnamed'), width, height)} disabled={!name.trim() || width < 40 || height < 40}>{t('vehicleEditor.newVehicle.create')}</Button>
-        </div>
-      </div>
 </Dialog>
   );
 }

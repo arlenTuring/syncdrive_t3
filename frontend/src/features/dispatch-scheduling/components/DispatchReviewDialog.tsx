@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { DispatchListItem } from '../types';
 import { isDispatchRevocable } from '../types';
 import {
-  CreateDispatchConfirmHeader,
+  CreateDispatchConfirmTitle,
   CreateDispatchConfirmStep,
 } from './CreateDispatchConfirmStep';
 import { Button, Dialog } from '../../../components/ui';
@@ -61,15 +61,13 @@ export function DispatchReviewDialog({
       ];
 
   return (
-    <Dialog headerless padded={false} title={isApprove ? t('dispatchScheduling.confirm.dualVerifyTitle') : t('dispatchScheduling.confirm.taskTitle')} onClose={onClose} widthClassName="w-full max-w-xl" heightClassName="max-h-[92vh]">
-        <CreateDispatchConfirmHeader
-          onClose={onClose}
-          title={
-            isApprove
-              ? t('dispatchScheduling.confirm.dualVerifyTitle')
-              : t('dispatchScheduling.confirm.taskTitle')
-          }
-        />
+    <Dialog
+      padded={false}
+      title={<CreateDispatchConfirmTitle title={isApprove ? t('dispatchScheduling.confirm.dualVerifyTitle') : t('dispatchScheduling.confirm.taskTitle')} />}
+      onClose={onClose}
+      widthClassName="w-full max-w-xl"
+      heightClassName="max-h-[92vh]"
+    >
         <CreateDispatchConfirmStep
           execTime={execTimeFromRow(row)}
           execDisplay={execDisplayFromRow(row)}

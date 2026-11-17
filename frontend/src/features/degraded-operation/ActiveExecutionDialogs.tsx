@@ -1,4 +1,4 @@
-import { Gauge, X } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { useEffect, useState } from "react";
 import { saveDegradedDraft, type ExecutionResponse } from "./api";
 import { DegradedIcon } from "./DegradedIcons";
@@ -7,7 +7,7 @@ import {
   draftFromPlan,
   planDraftPayload,
 } from "./DegradedPlanForm";
-import { Button, Checkbox, Dialog, IconButton } from '../../components/ui';
+import { Button, Checkbox, Dialog } from '../../components/ui';
 
 function Frame({
   title,
@@ -19,13 +19,9 @@ function Frame({
   onClose: () => void;
 }) {
   return (
-    <Dialog headerless padded={false} title={title} onClose={onClose} widthClassName="w-full max-w-[650px]" heightClassName="max-h-[calc(100vh-2rem)]">
-        <header className="flex items-center px-6 py-5">
-          <h2 className="text-headline-4">{title}</h2>
-          <IconButton hierarchy="subordinate" variant="standard" className="ml-auto" onPress={onClose} label="關閉" icon={<X />} />
-        </header>
-        {children}
-      </Dialog>
+    <Dialog padded={false} title={title} onClose={onClose} widthClassName="w-full max-w-[650px]">
+      {children}
+    </Dialog>
   );
 }
 

@@ -41,7 +41,7 @@ export type DialogProps = {
   bodyClassName?: string;
   /** false＝內容區不加內距、不捲動，由 children 自己排版（例如內容自帶分欄與底部列） */
   padded?: boolean;
-  /** 寬度：預設依 size；要特殊寬度時給 max-w-* class（只放寬度） */
+  /** 寬度：預設依 size；要特殊寬度時給 max-w-* class（只放寬度）。給 w-* 時以它為準，不再撐滿 */
   widthClassName?: string;
   /** 固定高度等尺寸 class（例如 h-[min(820px,92vh)]）；只放尺寸，不放顏色 */
   heightClassName?: string;
@@ -160,7 +160,13 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         onKeyDown={onKeyDown}
-        className={cn(DIALOG_PANEL_CLASS, widthClassName ?? DIALOG_WIDTHS[size], heightClassName)}
+        className={cn(
+          DIALOG_PANEL_CLASS,
+          // 呼叫端自己給 w-* 時不再加 w-full（兩個寬度 class 會互相覆蓋，誰贏看 CSS 順序）
+          /(^|\s)w-/.test(widthClassName ?? '') ? null : 'w-full',
+          widthClassName ?? DIALOG_WIDTHS[size],
+          heightClassName,
+        )}
       >
         {headerless ? (
           <h2 id={titleId} className="sr-only">{title}</h2>

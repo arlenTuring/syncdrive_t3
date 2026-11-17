@@ -1,4 +1,4 @@
-import { Info, X } from "lucide-react";
+import { Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   saveDegradedDraft,
@@ -87,17 +87,17 @@ export function DegradedPlanDialog({
   };
 
   return (
-    <Dialog headerless padded={false} title={title} busy={saving} onClose={() => onClose()} widthClassName="w-full max-w-[680px]" heightClassName="max-h-[calc(100vh-2rem)]">
-        <div className="flex shrink-0 items-center gap-2 px-6 py-5">
-          <h2
-            id="degraded-dialog-title"
-            className="text-headline-4 text-text-primary"
-          >
-            {title}
-          </h2>
+    <Dialog
+      padded={false}
+      busy={saving}
+      onClose={() => onClose()}
+      widthClassName="w-full max-w-[680px]"
+      title={(
+        <span className="inline-flex items-center gap-2">
+          {title}
           {kind === "execute" ? (
             <span className="group relative">
-              <IconButton hierarchy="subordinate" variant="standard" label="執行降級說明" aria-describedby="degraded-tooltip" onPress={() => setTipOpen((open) => !open)} icon={<Info />} />
+              <IconButton size="small" hierarchy="subordinate" variant="standard" label="執行降級說明" aria-describedby="degraded-tooltip" onPress={() => setTipOpen((open) => !open)} icon={<Info />} />
               <span
                 id="degraded-tooltip"
                 role="tooltip"
@@ -107,8 +107,9 @@ export function DegradedPlanDialog({
               </span>
             </span>
           ) : null}
-          <IconButton hierarchy="subordinate" variant="standard" className="ml-auto" disabled={saving} onPress={onClose} label="關閉" icon={<X />} />
-        </div>
+        </span>
+      )}
+    >
         <form
           onSubmit={submit}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"

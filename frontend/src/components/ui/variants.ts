@@ -110,7 +110,7 @@ export const DIALOG_WIDTHS: Record<DialogSize, string> = {
 };
 
 export const DIALOG_OVERLAY_CLASS = 'fixed inset-0 flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm';
-export const DIALOG_PANEL_CLASS = 'flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-popup shadow-2xl';
+export const DIALOG_PANEL_CLASS = 'flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-popup shadow-2xl';
 
 /* ───────────── 浮層選單（下拉、選項清單、日期選擇器） ───────────── */
 

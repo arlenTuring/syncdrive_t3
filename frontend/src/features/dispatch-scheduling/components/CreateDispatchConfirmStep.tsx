@@ -1,4 +1,4 @@
-import { AlertTriangle, MapPin, X } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,7 +15,6 @@ import {
   DISPATCH_STATUS_TAG_STYLE,
 } from '../types';
 import { StatusTag } from '../../../components/StatusTag';
-import { IconButton } from '../../../components/ui';
 
 export type ConfirmStationStop = {
   id: string;
@@ -276,29 +275,19 @@ export function CreateDispatchConfirmStep({
   );
 }
 
-export function CreateDispatchConfirmHeader({
-  onClose,
-  title,
-}: {
-  onClose: () => void;
-  title?: string;
-}) {
+/** 確認步驟的對話框標題（前面加警示圓點），給 Dialog 的 title 用 */
+export function CreateDispatchConfirmTitle({ title }: { title?: string }) {
   const { t } = useTranslation();
   return (
-    <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
-      <div className="flex items-center gap-2.5">
-        <span
-          className="inline-flex size-7 items-center justify-center rounded-full bg-[#EFB100] text-body-s-bold text-black"
-          aria-hidden
-        >
-          !
-        </span>
-        <h2 id="create-dispatch-title" className="text-body-m-bold text-text-primary">
-          {title ?? t('dispatchScheduling.confirm.dualVerifyTitle')}
-        </h2>
-      </div>
-      <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
-    </header>
+    <span className="inline-flex items-center gap-2.5">
+      <span
+        className="inline-flex size-7 items-center justify-center rounded-full bg-status-warning-emphasis text-body-s-bold text-text-invert"
+        aria-hidden
+      >
+        !
+      </span>
+      {title ?? t('dispatchScheduling.confirm.dualVerifyTitle')}
+    </span>
   );
 }
 

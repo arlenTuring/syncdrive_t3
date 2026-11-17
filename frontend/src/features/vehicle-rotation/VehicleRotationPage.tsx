@@ -1,6 +1,5 @@
 import { AlertTriangle, ArrowRight, Check, Circle, CircleDot, Eye, EyeOff, FileText, Rocket, Settings, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { SiteDateTimeInput } from '../../components/SiteDateTimeInput';
 import { SiteMultiSelect } from '../../components/SiteMultiSelect';
 import { SiteSelect } from '../../components/SiteSelect';
@@ -87,21 +86,23 @@ function RulesDialog(props: {
     });
   };
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return createPortal(
-    <Dialog headerless padded={false} title="輪替規則" onClose={() => onClose()} widthClassName="w-[min(520px,96vw)]" heightClassName="max-h-[90vh]">
-        <header className="flex items-center justify-between border-b border-border-quaternary px-5 py-4">
-          <h2 className="text-body-m-bold text-text-primary">輪替規則</h2>
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label="關閉" icon={<X />} />
-        </header>
-        <div className="flex flex-col gap-5 overflow-y-auto px-5 py-5 text-body-s text-text-secondary">
+  return (
+    <Dialog
+      padded={false}
+      busy={saving}
+      title="輪替規則"
+      onClose={() => onClose()}
+      widthClassName="w-[min(520px,96vw)]"
+      heightClassName="max-h-[90vh]"
+      footer={(
+        <>
+          {error ? <span className="mr-auto text-body-xs text-status-error-emphasis">{error}</span> : null}
+          <Button hierarchy="subordinate" variant="outlined" onPress={onClose}>取消</Button>
+          <Button disabled={!valid || saving} onPress={deploy} leadingIcon={<Rocket />}>部署</Button>
+        </>
+      )}
+    >
+        <div className="flex flex-col gap-5 overflow-y-auto px-6 pb-5 text-body-s text-text-secondary">
           <label className="flex flex-col gap-2">
             每多少里程需要接替
             <span className="flex items-center gap-2">
@@ -170,16 +171,7 @@ function RulesDialog(props: {
             </div>
           ) : null}
         </div>
-        <footer className="flex items-center justify-end gap-2 border-t border-border-quaternary px-5 py-4">
-          {error ? <span className="mr-auto text-body-xs text-status-error-emphasis">{error}</span> : null}
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>取消</button>
-          <button type="button" disabled={!valid || saving} onClick={deploy} className={PRIMARY_BUTTON}>
-            <Rocket className="size-3.5" aria-hidden />
-            部署
-          </button>
-        </footer>
-      </Dialog>,
-    document.body,
+      </Dialog>
   );
 }
 

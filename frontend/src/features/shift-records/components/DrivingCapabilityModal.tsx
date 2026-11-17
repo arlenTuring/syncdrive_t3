@@ -1,9 +1,7 @@
 import {
   Clock,
   Info,
-  Loader2,
-  X,
-} from 'lucide-react';
+  Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
@@ -18,7 +16,7 @@ import {
   type TimelineEvent,
   type TimelineEventKind,
 } from '../utils/buildDrivingCapabilityModel';
-import { Dialog, IconButton } from '../../../components/ui';
+import { Dialog } from '../../../components/ui';
 
 /** 圖例順序對齊設計稿：線型 → 常用動作 → 號誌／告警 → 整備類 */
 const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; channel?: 'action' | 'event' }> = [
@@ -670,16 +668,10 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
   }, [onClose]);
 
   return (
-    <Dialog headerless padded={false} title={t('shiftRecords.capabilityModal.title')} onClose={onClose} widthClassName="w-full max-w-[1100px]" heightClassName="max-h-[92vh]">
-        <header className="relative shrink-0 px-6 pt-5 pb-1">
-          <IconButton hierarchy="subordinate" variant="standard" className="absolute top-4 right-4" onPress={onClose} label={t('common.close')} icon={<X />} />
-
-          <h2 id="operation-record-title" className="pr-10 text-body-m-bold text-text-primary">
-            {t('shiftRecords.capabilityModal.title')}
-          </h2>
-
+    <Dialog padded={false} title={t('shiftRecords.capabilityModal.title')} onClose={onClose} widthClassName="w-full max-w-[1100px]" heightClassName="max-h-[92vh]">
+        <div className="shrink-0 px-6 pb-1">
           {model ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-8">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-body-s text-text-primary">
                 <span className="rounded-md bg-link-theme-filled px-2.5 py-0.5 font-mono text-body-s-bold text-text-primary">
                   {model.tripCode}
@@ -700,7 +692,7 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
               </div>
             </div>
           ) : null}
-        </header>
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6 pt-3 pb-5">
           {loading ? (

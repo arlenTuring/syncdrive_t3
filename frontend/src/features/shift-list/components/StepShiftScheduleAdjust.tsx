@@ -58,7 +58,7 @@ import {
   layerSortKey,
   resolveIssueDisplayLayerFromIssue,
 } from '../utils/scheduleAcceptance';
-import { Button, Dialog, IconButton } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
@@ -1538,25 +1538,13 @@ export function StepShiftScheduleAdjust({
         </div>
       ) : null}
       {duplicateWarning ? (
-        <Dialog headerless padded={false} title={t('shiftList.scheduleAdjust.cannotDuplicate')} onClose={() => setDuplicateWarning(null)} widthClassName="w-full max-w-[520px]">
-<div className="px-8 py-8 flex min-h-0 flex-1 flex-col overflow-auto">
-            <div className="flex items-start justify-between gap-4">
-              <h2
-                id="duplicate-warning-title"
-                className="text-headline-5 text-text-primary"
-              >
-                {t('shiftList.scheduleAdjust.cannotDuplicate')}
-              </h2>
-              <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" onPress={() => setDuplicateWarning(null)} label={t('shiftList.scheduleAdjust.close')} icon={<X />} />
-            </div>
-
-            <p className="mt-4 text-body-s text-text-tertiary">
-              {duplicateWarning === i18n.t('shiftList.scheduleAdjust.noSpaceDuplicate')
-                ? t('shiftList.scheduleAdjust.noSpaceDuplicateBody')
-                : duplicateWarning}
-            </p>
-          </div>
-</Dialog>
+        <Dialog title={t('shiftList.scheduleAdjust.cannotDuplicate')} onClose={() => setDuplicateWarning(null)} widthClassName="w-full max-w-[520px]">
+          <p className="text-body-s text-text-tertiary">
+            {duplicateWarning === i18n.t('shiftList.scheduleAdjust.noSpaceDuplicate')
+              ? t('shiftList.scheduleAdjust.noSpaceDuplicateBody')
+              : duplicateWarning}
+          </p>
+        </Dialog>
       ) : null}
       {!isMaximized ? (
         <h2 className="mb-6 shrink-0 text-headline-5 text-text-primary">

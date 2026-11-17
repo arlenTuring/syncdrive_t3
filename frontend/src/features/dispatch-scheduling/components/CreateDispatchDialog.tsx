@@ -24,7 +24,7 @@ import {
   formatLocalHm,
 } from '../../shift-deployment/components/ExecutionTimeField';
 import {
-  CreateDispatchConfirmHeader,
+  CreateDispatchConfirmTitle,
   CreateDispatchConfirmStep,
   CONFIRM_PHRASE,
 } from './CreateDispatchConfirmStep';
@@ -377,22 +377,15 @@ export function CreateDispatchDialog({
   };
 
   return (
-    <Dialog headerless padded={false} title={editing
-                ? t('dispatchScheduling.createDialog.titleEdit')
-                : t('dispatchScheduling.createDialog.titleCreate')} onClose={onClose} widthClassName={step === 1 ? 'max-w-5xl' : 'max-w-lg'} heightClassName="max-h-[92vh]">
-        {step === 1 ? (
-          <header className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
-            <h2 id="create-dispatch-title" className="text-body-m-bold text-text-primary">
-              {editing
-                ? t('dispatchScheduling.createDialog.titleEdit')
-                : t('dispatchScheduling.createDialog.titleCreate')}
-            </h2>
-            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label={t('common.close')} icon={<X />} />
-          </header>
-        ) : (
-          <CreateDispatchConfirmHeader onClose={onClose} />
-        )}
-
+    <Dialog
+      padded={false}
+      title={step === 1
+        ? (editing ? t('dispatchScheduling.createDialog.titleEdit') : t('dispatchScheduling.createDialog.titleCreate'))
+        : <CreateDispatchConfirmTitle />}
+      onClose={onClose}
+      widthClassName={step === 1 ? 'max-w-5xl' : 'max-w-lg'}
+      heightClassName="max-h-[92vh]"
+    >
         {step === 1 ? (
           <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] overflow-hidden">
             <aside className="space-y-4 overflow-auto border-r border-border-quaternary px-6 py-1">
