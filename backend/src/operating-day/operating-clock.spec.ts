@@ -40,13 +40,12 @@ describe('營運時鐘', () => {
     expect(operatingTimeAt(state, later, later)).toBe(OP0 + CLOCK_STALE_AFTER_MS * 10);
   });
 
-  it('結束：停在結束那一刻；回到 realtime 就是實際時間', () => {
+  it('結束：直接回到實際時間，不停在重播的最後一刻', () => {
     let state = applyClockUpdate(REALTIME_CLOCK, { mode: 'replay', runId: 'r1', operatingNow: OP0, rate: 10 }, R0);
     state = applyClockUpdate(state, { mode: 'replay', runId: 'r1', operatingNow: OP0 + 10_000, rate: 10, ended: true }, R0 + 1_000);
-    expect(operatingTimeAt(state, R0 + 60_000, R0 + 60_000)).toBe(OP0 + 10_000);
-    expect(describeClock(state, R0 + 60_000)).toMatchObject({ stale: false, paused: true, ended: true });
-    state = applyClockUpdate(state, { mode: 'realtime' }, R0 + 70_000);
-    expect(operatingTimeAt(state, R0 + 70_000)).toBe(R0 + 70_000);
+    expect(state.mode).toBe('realtime');
+    expect(operatingTimeAt(state, R0 + 60_000, R0 + 60_000)).toBe(R0 + 60_000);
+    expect(describeClock(state, R0 + 60_000)).toMatchObject({ stale: false, paused: false, ended: false });
   });
 
   it('倍速超過上限或缺營運時刻就拒絕', () => {

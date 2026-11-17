@@ -108,6 +108,13 @@ export type ClockUpdate = {
  */
 export function applyClockUpdate(state: ClockState, update: ClockUpdate, realNow: number): ClockState {
   if (update.mode === 'realtime') return { ...REALTIME_CLOCK };
+  /*
+   * 重播結束就回到實際時間。先前結束等同暫停、營運時間停在結束那一刻，要等執行端另外送 realtime 才回來；
+   * 模擬器之後改用即時模式上線時沒有送，整個系統（儀表板時鐘、營運日）就一直卡在重播的最後一刻
+   * （2026-11-17 實測：即時測試跑著，儀表板停在 2027-04-01 01:53 並標「重播已結束」）。
+   * 使用者：不管模擬還是真實，畫面都不因模式改變。
+   */
+  if (update.ended === true) return { ...REALTIME_CLOCK };
   const runId = update.runId ?? null;
   const rate = Number(update.rate);
   if (!Number.isFinite(rate) || rate <= 0 || rate > MAX_CLOCK_RATE) {
@@ -115,8 +122,7 @@ export function applyClockUpdate(state: ClockState, update: ClockUpdate, realNow
   }
   const operatingNow = Number(update.operatingNow);
   if (!Number.isFinite(operatingNow)) throw new Error('需要 operatingNow（此刻的營運時刻）');
-  // 結束等同暫停：營運時間停在結束那一刻
-  const paused = update.paused === true || update.ended === true;
+  const paused = update.paused === true;
   const fresh = state.mode !== 'replay' || state.runId !== runId;
   const base: ClockState = fresh
     ? { ...REALTIME_CLOCK, mode: 'replay', runId, operatingDay: update.operatingDay ?? null, segments: [] }
@@ -138,7 +144,7 @@ export function applyClockUpdate(state: ClockState, update: ClockUpdate, realNow
     segments,
     heartbeatAt: realNow,
     lagMs: Math.max(0, Number(update.lagMs) || 0),
-    ended: update.ended === true,
+    ended: false,
   };
 }
 

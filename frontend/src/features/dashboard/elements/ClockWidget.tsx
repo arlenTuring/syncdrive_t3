@@ -46,7 +46,6 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
 
   const dateStr = formatDate(now, widget.dateFormat);
   const status = clockStatusLabel(clock);
-  const statusColor = status.tone === 'warn' ? '#fb923c' : status.tone === 'replay' ? '#38bdf8' : widget.dateColor;
 
   return (
     <div style={{
@@ -75,7 +74,9 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
           letterSpacing: '0.05em',
         }}>
           {dateStr}
-          <span style={{ marginLeft: '0.6em', color: statusColor }} data-clock-status={status.tone}>{status.text}</span>
+          {status ? (
+            <span style={{ marginLeft: '0.6em', color: '#fb923c' }} data-clock-status={status.tone}>{status.text}</span>
+          ) : null}
         </div>
       )}
     </div>

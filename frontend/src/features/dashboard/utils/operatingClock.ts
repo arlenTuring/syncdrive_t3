@@ -98,17 +98,17 @@ export function clockAdvancing(snapshot: OperatingClockSnapshot | null): boolean
 }
 
 /**
- * 時鐘旁的短狀態：即時／重播／重播暫停／重播結束／重播失聯／時鐘失聯。
- * 畫面停在過去的日期時，要看得出那是暫停的重播，不是自稱即時的監控。
+ * 時鐘旁的短狀態：只在不正常時出現（時鐘查不到、執行端失聯），正常時什麼都不顯示。
+ *
+ * 使用者（2026-11-17）：「不管模擬或是真實，我們都不要改變這邊的畫面，他就是正常不正常」。
+ * 先前會標「即時／重播 ×倍速／重播暫停／重播已結束」，模擬與真實看起來不一樣，已拿掉。
  */
-export function clockStatusLabel(state: OperatingClockState): { text: string; tone: 'live' | 'replay' | 'warn' } {
+export function clockStatusLabel(state: OperatingClockState): { text: string; tone: 'warn' } | null {
   const snapshot = state.snapshot;
   if (state.error && !snapshot) return { text: '時鐘失聯', tone: 'warn' };
-  if (!snapshot || snapshot.mode !== 'replay') return state.error ? { text: '即時（時鐘查詢失敗）', tone: 'warn' } : { text: '即時', tone: 'live' };
-  if (snapshot.ended) return { text: '重播已結束', tone: 'warn' };
-  if (snapshot.stale) return { text: '重播失聯', tone: 'warn' };
-  if (snapshot.paused) return { text: '重播暫停', tone: 'warn' };
-  return { text: `重播 ×${snapshot.rate}`, tone: 'replay' };
+  if (snapshot?.stale) return { text: '時鐘失聯', tone: 'warn' };
+  if (state.error) return { text: '時鐘查詢失敗', tone: 'warn' };
+  return null;
 }
 
 /** 此刻的營運時刻：沒有時鐘資料時退回實際時間 */

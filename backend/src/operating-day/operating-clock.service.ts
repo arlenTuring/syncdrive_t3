@@ -36,7 +36,8 @@ export class OperatingClockService implements OnModuleInit {
     try {
       const row = await this.settings.findOne({ where: { settingKey: SETTING_KEY } });
       const saved = row?.settingValue as ClockState | undefined;
-      if (saved && (saved.mode === 'realtime' || saved.mode === 'replay') && Array.isArray(saved.segments)) {
+      // 已結束的重播不接回來：結束就是回到實際時間（見 applyClockUpdate）
+      if (saved && !saved.ended && (saved.mode === 'realtime' || saved.mode === 'replay') && Array.isArray(saved.segments)) {
         this.state = { ...REALTIME_CLOCK, ...saved };
       }
     } catch (error) {

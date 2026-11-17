@@ -23,13 +23,14 @@ describe('營運時鐘（畫面）', () => {
     assert.equal(operatingNowFrom({ snapshot: null, receivedAt: 0, error: null }, 42), 42);
   });
 
-  it('時鐘旁短狀態：即時／重播／暫停／失聯／結束／查詢失敗', () => {
-    const at = (snapshot: OperatingClockSnapshot | null, error: string | null = null) => clockStatusLabel({ snapshot, receivedAt: 0, error }).text;
-    assert.equal(at({ ...base, mode: 'realtime' }), '即時');
-    assert.equal(at(base), '重播 ×180');
-    assert.equal(at({ ...base, paused: true }), '重播暫停');
-    assert.equal(at({ ...base, paused: true, stale: true }), '重播失聯');
-    assert.equal(at({ ...base, ended: true, paused: true }), '重播已結束');
+  it('時鐘旁短狀態：模擬、重播、暫停、即時都不顯示，只有失聯或查詢失敗才出現', () => {
+    const at = (snapshot: OperatingClockSnapshot | null, error: string | null = null) => clockStatusLabel({ snapshot, receivedAt: 0, error })?.text ?? null;
+    assert.equal(at({ ...base, mode: 'realtime' }), null);
+    assert.equal(at(base), null);
+    assert.equal(at({ ...base, paused: true }), null);
+    assert.equal(at({ ...base, ended: true, paused: true }), null);
+    assert.equal(at({ ...base, paused: true, stale: true }), '時鐘失聯');
     assert.equal(at(null, '營運時鐘查詢失敗（HTTP 401）'), '時鐘失聯');
+    assert.equal(at(base, '營運時鐘查詢失敗（HTTP 500）'), '時鐘查詢失敗');
   });
 });
