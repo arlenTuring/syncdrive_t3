@@ -47,6 +47,7 @@ import { StepShiftSchedulePreview } from './StepShiftSchedulePreview';
 import { StepShiftTimeTemplate } from './StepShiftTimeTemplate';
 import { syncActionSettingsWithSelectedRoutes } from '../utils/actionSettings';
 import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 type CreateShiftSchedulePageProps = {
   onBack: () => void;
@@ -570,7 +571,7 @@ export function CreateShiftSchedulePage({
         scheduleOutput: null,
       }));
     } catch (e) {
-      alert('儲存草稿失敗：' + (e instanceof Error ? e.message : String(e)));
+      void systemAlert('儲存草稿失敗：' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
@@ -608,7 +609,7 @@ export function CreateShiftSchedulePage({
   }, [flushAutoSave, hydrated, loadError, loading, onBack]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm(t('shiftList.createWizard.confirmDiscard'));
+    const confirmed = (await systemConfirm(t('shiftList.createWizard.confirmDiscard')));
     if (!confirmed) return;
     const id = savedShiftIdRef.current;
     if (id) {
@@ -616,7 +617,7 @@ export function CreateShiftSchedulePage({
         await deleteOperationShift(id);
         onSavedDraft?.();
       } catch (e) {
-        alert(e instanceof Error ? e.message : String(e));
+        void systemAlert(e instanceof Error ? e.message : String(e));
         return;
       }
     }

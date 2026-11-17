@@ -14,6 +14,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { VehicleDefinitionMapView } from './elements/VehicleDefinitionMapView';
 import type { VehicleDefinition } from './types';
+import { systemConfirm } from '../../lib/systemDialog';
 
 export function VehicleList({
   vehicles,
@@ -221,8 +222,8 @@ export function VehicleList({
                           type="button"
                           title={t('vehicleEditor.list.delete')}
                           disabled={readOnly}
-                          onClick={() => {
-                            if (confirm(t('common.confirmDelete', { name: v.name }))) void onDelete(v.id);
+                          onClick={async () => {
+                            if ((await systemConfirm(t('common.confirmDelete', { name: v.name }), { tone: 'danger' }))) void onDelete(v.id);
                           }}
                           className="rounded-lg p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30"
                         >

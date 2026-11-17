@@ -27,6 +27,7 @@ import {
   fetchTimeTemplateDetail,
   updateTimeTemplateDraft,
 } from '../api/timeTemplatesApi';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 type CreateTimeTemplateModalProps = {
   onClose: () => void;
@@ -484,7 +485,7 @@ export function CreateTimeTemplateModal({
   }, [flushAutoSave, hydrated, loadError, loading, onClose]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm(t('timeTemplates.createWizard.confirmDiscard'));
+    const confirmed = (await systemConfirm(t('timeTemplates.createWizard.confirmDiscard')));
     if (!confirmed) return;
     const id = savedTemplateIdRef.current;
     if (id) {
@@ -492,7 +493,7 @@ export function CreateTimeTemplateModal({
         await deleteTimeTemplate(id);
         onSavedDraft?.();
       } catch (e) {
-        alert(e instanceof Error ? e.message : String(e));
+        void systemAlert(e instanceof Error ? e.message : String(e));
         return;
       }
     }

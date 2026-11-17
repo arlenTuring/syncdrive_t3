@@ -16,6 +16,7 @@ import type { VehicleDefinition } from '../types';
 import { migrateVehicleDefinition } from '../utils/migrateVehicleDefinition';
 import { cloneVehicleDefinition } from '../utils/vehicleDefinitionIO';
 import { readLegacyVehicleCache } from '../storage/vehicleDefinitionStorage';
+import { systemConfirm } from '../../../lib/systemDialog';
 
 type CacheEntry = {
   local: VehicleDefinition;
@@ -209,11 +210,11 @@ export function LegacyVehicleModelPanel() {
                             type="button"
                             disabled={busy}
                             className="rounded border border-red-500/60 px-2 py-1 text-red-200 disabled:opacity-40"
-                            onClick={() => {
+                            onClick={async () => {
                               if (
-                                !window.confirm(
+                                !(await systemConfirm(
                                   `用此瀏覽器的版本覆蓋後端的「${entry.server?.name}」（第 ${entry.server?.serverVersion} 版）？所有地圖與儀表板都會改用這個外觀。`,
-                                )
+                                { tone: 'danger' },))
                               )
                                 return;
                               void act('已覆蓋後端版本', () =>
@@ -276,8 +277,8 @@ export function LegacyVehicleModelPanel() {
                       type="button"
                       disabled={busy}
                       className="rounded border border-zinc-600 px-2 py-1 disabled:opacity-40"
-                      onClick={() => {
-                        if (!window.confirm('回復這次遷移？只會刪除遷移後沒有人改過的地圖設定。')) return;
+                      onClick={async () => {
+                        if (!(await systemConfirm('回復這次遷移？只會刪除遷移後沒有人改過的地圖設定。', { tone: 'danger' }))) return;
                         void act('已回復', async () => {
                           const result = await rollbackVehicleModelMigration(item.migrationId!);
                           setMessage({

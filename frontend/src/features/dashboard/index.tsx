@@ -61,6 +61,7 @@ import {
   makeTemplateCanvasId,
 } from './utils/groupTemplateEdit';
 import { createWidget } from './types';
+import { systemAlert } from '../../lib/systemDialog';
 
 function cloneCanvasElement(el: CanvasElementProps): CanvasElementProps {
   return JSON.parse(JSON.stringify(el)) as CanvasElementProps;
@@ -628,7 +629,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 ? t('dashboard.bindingIssues', { count: result.bindingIssueCount })
                 : '',
             ].filter(Boolean).join('\n');
-            alert(msg);
+            void systemAlert(msg);
             setView('editor');
           }}
         />
@@ -1302,7 +1303,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                   t('dashboard.imported', { name: result.plane.name }),
                   ...result.dataSourceWarnings,
                 ].join('\n');
-                if (result.dataSourceWarnings.length) alert(msg);
+                if (result.dataSourceWarnings.length) void systemAlert(msg);
               }}
             />
             <ExportTemplateButton plane={activePlane} />

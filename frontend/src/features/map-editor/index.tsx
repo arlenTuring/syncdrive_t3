@@ -272,6 +272,7 @@ import { settleTrackJointsInAreas } from './utils/trackJoints'
 import type { TrackGenGroup } from './utils/trackGenGroups'
 import type { TrackGenLayout } from './utils/trackGenLayout'
 import type { MapWorldBounds } from './utils/mapViewport'
+import { systemAlert, systemConfirm } from '../../lib/systemDialog'
 
 type LoadedMapMeta = EditSessionSnapshot['loadedMapMeta']
 
@@ -1468,10 +1469,10 @@ export default function MapEditorApp({
   }, [routePlanningDraft, pushHistory])
 
   const onDeleteRoute = useCallback(
-    (routeId: string) => {
+    async (routeId: string) => {
       const route = mapRoutes.find((r) => r.routeId === routeId)
       const label = route?.displayName ?? routeId
-      if (!window.confirm(t('mapEditor.chrome.confirmDeleteRoute', { label }))) return
+      if (!(await systemConfirm(t('mapEditor.chrome.confirmDeleteRoute', { label }), { tone: 'danger' }))) return
       pushHistory()
       setMapRoutes((prev) => prev.filter((r) => r.routeId !== routeId))
       setMapRouteGroups((prev) => removeRouteFromAllGroups(prev, routeId))
@@ -1561,13 +1562,13 @@ export default function MapEditorApp({
   }, [routeGroupDraft, pushHistory])
 
   const onDeleteGroup = useCallback(
-    (groupId: string) => {
+    async (groupId: string) => {
       const group = mapRouteGroups.find((g) => g.groupId === groupId)
       const label = group?.displayName ?? t('mapEditor.chrome.thisRouteGroup')
       if (
-        !window.confirm(
+        !(await systemConfirm(
           t('mapEditor.chrome.confirmDeleteGroup', { label }),
-        )
+        { tone: 'danger' },))
       ) {
         return
       }
@@ -1693,7 +1694,7 @@ export default function MapEditorApp({
 
       let entry = getMapLibraryEntry(libraryId)
       if (!entry) {
-        alert(t('mapEditor.chrome.mapNotFound'))
+        void systemAlert(t('mapEditor.chrome.mapNotFound'))
         return
       }
       /*
@@ -2028,7 +2029,7 @@ export default function MapEditorApp({
       } catch (e) {
         if (seq !== trajectoryLoadSeqRef.current) return
         console.error(e)
-        alert(t('mapEditor.chrome.trajectoryLoadFailed', { error: e instanceof Error ? e.message : String(e) }))
+        void systemAlert(t('mapEditor.chrome.trajectoryLoadFailed', { error: e instanceof Error ? e.message : String(e) }))
         setLoadedTrajectory(null)
       }
     },
@@ -2077,7 +2078,7 @@ export default function MapEditorApp({
   const onImportTrajectoryFile = useCallback(
     async (file: File) => {
       if (!selectedVehicleId) {
-        alert(t('mapEditor.chrome.selectVehicleFirst'))
+        void systemAlert(t('mapEditor.chrome.selectVehicleFirst'))
         return
       }
       try {
@@ -2092,7 +2093,7 @@ export default function MapEditorApp({
         setReplayHeadIndex(null)
       } catch (e) {
         console.error(e)
-        alert(t('mapEditor.chrome.trajectoryImportFailed', { error: e instanceof Error ? e.message : String(e) }))
+        void systemAlert(t('mapEditor.chrome.trajectoryImportFailed', { error: e instanceof Error ? e.message : String(e) }))
       }
     },
     [selectedVehicleId],

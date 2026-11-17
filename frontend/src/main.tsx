@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { LocaleBootstrap } from './i18n/LocaleBootstrap'
 import { AuthProvider } from './features/access-control/AuthContext'
 import { installChunkReloadHandler } from './lib/chunkReload'
+import { SystemDialogHost } from './components/SystemDialog'
 
 // 重新打包後舊分頁載不到舊分片：自動重新整理載入新版（見 lib/chunkReload.ts）
 installChunkReloadHandler()
@@ -20,6 +21,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LocaleBootstrap>
       <AuthProvider><App /></AuthProvider>
+      <SystemDialogHost />
     </LocaleBootstrap>
   </StrictMode>,
 )

@@ -9,6 +9,7 @@ import {
   type MapPixelSize,
 } from '../constants/mapPixel'
 import type { MapCreationMode } from '../types/mapFile'
+import { systemAlert } from '../../../lib/systemDialog'
 
 type Props = {
   open: boolean
@@ -46,7 +47,7 @@ export function NewMapPixelDialog({
     const width = Number.parseInt(widthStr, 10)
     const height = Number.parseInt(heightStr, 10)
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      alert(t('mapEditor.newMapPixel.invalidSize'))
+      void systemAlert(t('mapEditor.newMapPixel.invalidSize'))
       return
     }
     onConfirm(clampMapPixelSize({ width, height }), creationMode)

@@ -13,6 +13,7 @@ import {
   planesUsingDefinition,
   withSourceSelection,
 } from '../utils/planeDataSources';
+import { systemAlert } from '../../../lib/systemDialog';
 
 interface Props {
   plane: DashboardPlane;
@@ -62,7 +63,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
       });
       onChange(withSourceSelection(plane.dataSettings, boundId, saved.id));
     } catch (e) {
-      alert(`建立專用連線失敗：${e instanceof Error ? e.message : String(e)}`);
+      void systemAlert(`建立專用連線失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }

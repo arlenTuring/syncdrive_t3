@@ -20,6 +20,7 @@ import {
 import { CLEAR_ALL_ORDERS_SQL } from '../dataAdminTemplates'
 import { DataRetentionPanel } from './DataRetentionPanel'
 import { useAuth } from '../../access-control/AuthContext'
+import { systemConfirm } from '../../../lib/systemDialog';
 
 const TABLE_PURPOSE: Record<string, string> = {
   operation_orders: '已建立的營運訂單',
@@ -117,7 +118,7 @@ export function DataManagementPanel() {
 
   async function runLiveReset() {
     if (!auth.require('system.data-admin.execute')) return
-    if (!window.confirm('將停用調度與即時寫入，並清除所選範圍的訂單、明細、遙測及快照；班表定義會保留。是否繼續？')) return
+    if (!(await systemConfirm('將停用調度與即時寫入，並清除所選範圍的訂單、明細、遙測及快照；班表定義會保留。是否繼續？', { tone: 'danger' }))) return
     setLoading(true)
     setError('')
     setLiveResetResult(null)
@@ -154,7 +155,7 @@ export function DataManagementPanel() {
 
   async function execute() {
     if (!auth.require('system.data-admin.execute')) return
-    if (mode === 'write' && !window.confirm('即將執行資料寫入。失敗時會回滾整筆交易，是否繼續？')) return
+    if (mode === 'write' && !(await systemConfirm('即將執行資料寫入。失敗時會回滾整筆交易，是否繼續？'))) return
     const requestId = crypto.randomUUID()
     setActiveRequestId(requestId)
     setLoading(true)

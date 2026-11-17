@@ -7,6 +7,7 @@ import { SummaryCards } from './components/SummaryCards';
 import { VehicleControlSection } from './components/VehicleControlSection';
 import { cancelShiftOrder, setDispatchEnabled, useDeploymentData } from './hooks/useDeploymentData';
 import type { ShiftDeploymentAction } from './types';
+import { systemConfirm } from '../../lib/systemDialog';
 
 export function ShiftDeploymentPage() {
   const { t } = useTranslation();
@@ -30,7 +31,7 @@ export function ShiftDeploymentPage() {
     }
   };
 
-  const onAction = (action: ShiftDeploymentAction) => {
+  const onAction = async (action: ShiftDeploymentAction) => {
     if (action.kind === 'schedule-adjust') {
       setHint(null);
       setAdjustOpen(true);
@@ -43,7 +44,7 @@ export function ShiftDeploymentPage() {
     }
     if (action.kind === 'shift-cancel') {
       const { row } = action;
-      if (!window.confirm(t('shiftDeployment.actions.confirmCancel', { tripCode: row.tripCode }))) {
+      if (!(await systemConfirm(t('shiftDeployment.actions.confirmCancel', { tripCode: row.tripCode })))) {
         return;
       }
       setHint(null);
@@ -63,7 +64,7 @@ export function ShiftDeploymentPage() {
       const confirmKey = enabling
         ? 'shiftDeployment.actions.confirmDispatchStart'
         : 'shiftDeployment.actions.confirmDispatchPause';
-      if (!window.confirm(t(confirmKey))) return;
+      if (!(await systemConfirm(t(confirmKey)))) return;
       setHint(null);
       setDispatchEnabled(enabling)
         .then(() => {

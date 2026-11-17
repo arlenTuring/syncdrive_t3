@@ -33,6 +33,7 @@ import {
   type PublishStatusKey,
   type TimeTemplateListItem,
 } from '../types';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 type TimeTemplateListPageProps = {
   onBackToHome?: () => void;
@@ -148,7 +149,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         targetIds.length === 1 ? `time-template-${targetIds[0]}.json` : 'time-templates.json',
       );
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
       setOpenMenuId(null);
@@ -162,7 +163,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
 
   const handleDelete = async (row: TimeTemplateListItem) => {
     if (row.usage_status === 'in_use') return;
-    const confirmed = window.confirm(t('common.confirmDelete', { name: row.name }));
+    const confirmed = (await systemConfirm(t('common.confirmDelete', { name: row.name }), { tone: 'danger' }));
     if (!confirmed) return;
 
     setDeletingId(row.template_id);
@@ -171,7 +172,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
       await deleteTimeTemplate(row.template_id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingId(null);
     }
@@ -184,7 +185,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
       await duplicateTimeTemplateDraft(row.template_id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDuplicatingId(null);
     }

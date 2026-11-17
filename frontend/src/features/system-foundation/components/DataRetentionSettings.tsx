@@ -6,6 +6,7 @@ import {
   fetchCleanupCategories, fetchRetentionOverview, previewRetentionPolicy, saveRetentionPolicy,
   type CleanupCategory, type RetentionPolicy,
 } from '../api/dataAdminApi'
+import { systemConfirm } from '../../../lib/systemDialog'
 
 const DAY_MS = 86_400_000
 const HOUR_MS = 3_600_000
@@ -84,7 +85,7 @@ export function DataRetentionSettings() {
       const newMs = draft.retentionValue * unitMs(draft.retentionUnit)
       if ((draft.enabled && !policy.enabled) || (draft.enabled && newMs < oldMs)) {
         const impact = await previewRetentionPolicy(account, policy.category, draft)
-        if (!window.confirm(`政策將影響約 ${impact.preview.records} 筆資料。${impact.preview.impact}\n\n啟用或縮短保留期限後，排程會進行不可還原的刪除。是否儲存？`)) return
+        if (!(await systemConfirm(`政策將影響約 ${impact.preview.records} 筆資料。${impact.preview.impact}\n\n啟用或縮短保留期限後，排程會進行不可還原的刪除。是否儲存？`, { tone: 'danger' }))) return
         confirmationPlanId = impact.planId
       }
       await saveRetentionPolicy(account, policy.category, { ...draft, confirmationPlanId })
@@ -98,7 +99,7 @@ export function DataRetentionSettings() {
 
   async function saveVideo() {
     if (!video || !auth.require('events.video.recording-manage')) return
-    if (videoDays < video.retentionDays && !window.confirm(`影像保存將由 ${video.retentionDays} 天縮短為 ${videoDays} 天，超過天數的錄影會被不可還原地刪除。是否儲存？`)) return
+    if (videoDays < video.retentionDays && !(await systemConfirm(`影像保存將由 ${video.retentionDays} 天縮短為 ${videoDays} 天，超過天數的錄影會被不可還原地刪除。是否儲存？`, { tone: 'danger' }))) return
     setBusy(true); setError('')
     try {
       await videoApi.updateStoragePolicy({ expectedVersion: video.version, retentionDays: videoDays })

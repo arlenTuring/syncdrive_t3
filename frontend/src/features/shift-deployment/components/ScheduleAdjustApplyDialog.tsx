@@ -28,6 +28,7 @@ import {
   writePendingScheduleAdjust,
   resolvePendingScheduleAdjust,
 } from '../pendingScheduleAdjust';
+import { systemConfirm } from '../../../lib/systemDialog';
 
 type ScheduleAdjustApplyDialogProps = {
   onClose: () => void;
@@ -252,8 +253,8 @@ export function ScheduleAdjustApplyDialog({
     void handleDeployNow();
   };
 
-  const handleReject = () => {
-    if (!window.confirm(t('shiftDeployment.adjust.confirmReject'))) return;
+  const handleReject = async () => {
+    if (!(await systemConfirm(t('shiftDeployment.adjust.confirmReject'), { tone: 'danger' }))) return;
     // 駁回要留下是誰駁回的；記成「取消」會讓稽核看不出這筆是被否決的
     void resolvePendingScheduleAdjust('REJECTED', account.name, '主管駁回');
     finishApplied();

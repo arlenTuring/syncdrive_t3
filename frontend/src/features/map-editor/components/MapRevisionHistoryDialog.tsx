@@ -12,6 +12,7 @@ import {
   type MapRevisionMeta,
   type MapRevisionReason,
 } from '../utils/mapRevisionHistory'
+import { systemConfirm } from '../../../lib/systemDialog'
 
 type MapRevisionHistoryDialogProps = {
   open: boolean
@@ -85,7 +86,7 @@ export function MapRevisionHistoryDialog({
 
   const handleRestore = useCallback(
     async (id: string) => {
-      if (!window.confirm(t('mapEditor.revision.restoreConfirm'))) {
+      if (!(await systemConfirm(t('mapEditor.revision.restoreConfirm')))) {
         return
       }
       setBusyId(id)
@@ -104,7 +105,7 @@ export function MapRevisionHistoryDialog({
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm(t('mapEditor.revision.deleteConfirm'))) return
+      if (!(await systemConfirm(t('mapEditor.revision.deleteConfirm'), { tone: 'danger' }))) return
       setBusyId(id)
       try {
         await deleteMapRevision(id)
@@ -118,9 +119,9 @@ export function MapRevisionHistoryDialog({
 
   const handleClearAll = useCallback(async () => {
     if (
-      !window.confirm(
+      !(await systemConfirm(
         t('mapEditor.revision.clearConfirm', { max: MAX_REVISIONS_PER_MAP }),
-      )
+      { tone: 'danger' },))
     ) {
       return
     }

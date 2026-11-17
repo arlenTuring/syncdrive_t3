@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { DashboardPlane } from './types';
 import { ExportTemplateButton, ImportTemplateDialog } from './components/TemplateFileActions';
 import type { TemplateImportResult } from './template/types';
+import { systemConfirm } from '../../lib/systemDialog';
 
 interface Props {
   planes: DashboardPlane[];
@@ -295,9 +296,9 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
                                   setOpenMenuId(null);
-                                  if (confirm(t('dashboard.listPage.confirmDelete'))) onDelete(p.id);
+                                  if ((await systemConfirm(t('dashboard.listPage.confirmDelete'), { tone: 'danger' }))) onDelete(p.id);
                                 }}
                                 className={`${menuItemClass} hover:text-red-300`}
                               >

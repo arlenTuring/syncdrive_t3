@@ -32,6 +32,7 @@ import {
   type OperationShiftListItem,
   type UsageStatusKey,
 } from '../types';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 function resolveCreationMode(row: OperationShiftListItem): CreationModeKey {
   return row.creation_mode === 'manual' ? 'manual' : 'parametric';
@@ -120,7 +121,7 @@ export function ShiftListPage({
 
   const handleDelete = async (row: OperationShiftListItem) => {
     if (row.usage_status === 'in_use') return;
-    const confirmed = window.confirm(t('common.confirmDelete', { name: row.name }));
+    const confirmed = (await systemConfirm(t('common.confirmDelete', { name: row.name }), { tone: 'danger' }));
     if (!confirmed) return;
 
     setDeletingId(row.shift_id);
@@ -129,7 +130,7 @@ export function ShiftListPage({
       await deleteOperationShift(row.shift_id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingId(null);
     }
@@ -143,7 +144,7 @@ export function ShiftListPage({
       await load();
       onEditClick?.(created.shift_id);
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDuplicatingId(null);
     }
@@ -157,7 +158,7 @@ export function ShiftListPage({
       await duplicateOperationShiftAsManualDraft(row.shift_id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setCopyingAsManualId(null);
     }

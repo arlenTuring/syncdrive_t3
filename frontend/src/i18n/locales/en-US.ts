@@ -8,6 +8,10 @@ type DeepStringify<T> = {
 const enUS: DeepStringify<typeof zhTW> = {
   common: {
     cancel: "Cancel",
+    confirm: "Confirm",
+    ok: "OK",
+    dialogTitleConfirm: "Please confirm",
+    dialogTitleNotice: "Notice",
     save: "Save",
     saving: "Saving…",
     retry: "Retry",

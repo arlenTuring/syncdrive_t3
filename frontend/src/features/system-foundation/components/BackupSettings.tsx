@@ -6,6 +6,7 @@ import {
   checkBackupDir, deleteBackup, fetchBackupStatus, saveBackupSettings, startBackup, stopBackup,
   type BackupLocation, type BackupRun, type BackupSettingsValue, type BackupStatus,
 } from '../api/dataAdminApi'
+import { systemConfirm } from '../../../lib/systemDialog'
 
 const POLL_MS = 3_000
 const OVERDUE_MS = 2 * 86_400_000
@@ -124,9 +125,9 @@ export function BackupSettings() {
     })
   }
 
-  const remove = (run: BackupRun) => {
+  const remove = async (run: BackupRun) => {
     if (!auth.require('system.data-admin.cleanup')) return
-    if (!window.confirm(`刪除 ${run.name}？檔案會永久移除，無法復原。`)) return
+    if (!(await systemConfirm(`刪除 ${run.name}？檔案會永久移除，無法復原。`, { tone: 'danger' }))) return
     return act(async () => {
       await deleteBackup(account, run.id)
       setStatus(await fetchBackupStatus(account))

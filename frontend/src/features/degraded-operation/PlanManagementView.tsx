@@ -20,6 +20,7 @@ import {
 } from "./api";
 import { DegradedPlanDialog } from "./DegradedPlanDialog";
 import { draftFromPlan } from "./DegradedPlanForm";
+import { systemConfirm } from '../../lib/systemDialog';
 
 type SortKey = "name" | "level" | "speed";
 const PAGE_SIZE = 10;
@@ -90,9 +91,9 @@ export function PlanManagementView({
   };
   const remove = async (plan: DegradedOperationPlan) => {
     if (
-      !window.confirm(
+      !(await systemConfirm(
         `確定刪除降級計畫「${plan.name}」？\n此操作不會解除正在執行的降級，也不會刪除歷史執行快照。`,
-      )
+      { tone: 'danger' },))
     )
       return;
     try {

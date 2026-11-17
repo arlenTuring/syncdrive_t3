@@ -31,6 +31,7 @@ import { StepMaintenanceParams } from './StepMaintenanceParams';
 import { StepPreTripParams } from './StepPreTripParams';
 import { StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 type CreateMaintenanceTaskPageProps = {
   onBack: () => void;
@@ -485,7 +486,7 @@ export function CreateMaintenanceTaskPage({
   }, [flushAutoSave, hydrated, loadError, loading, onBack]);
 
   const handleDiscard = useCallback(async () => {
-    const confirmed = window.confirm(t('maintenanceTasks.createWizard.confirmDiscard'));
+    const confirmed = (await systemConfirm(t('maintenanceTasks.createWizard.confirmDiscard')));
     if (!confirmed) return;
     const id = savedTaskIdRef.current;
     if (id) {
@@ -493,7 +494,7 @@ export function CreateMaintenanceTaskPage({
         await deleteMaintenanceTask(id);
         onSavedDraft?.();
       } catch (e) {
-        alert(e instanceof Error ? e.message : String(e));
+        void systemAlert(e instanceof Error ? e.message : String(e));
         return;
       }
     }

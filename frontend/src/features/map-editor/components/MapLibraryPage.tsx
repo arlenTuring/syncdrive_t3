@@ -57,6 +57,7 @@ import {
   setActiveMapLibraryEntry,
   type PublishedMapSummary,
 } from '../api/mapLibraryApi'
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog'
 
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
@@ -231,7 +232,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       }
       persistEntries(upsertMapLibraryEntry(readMapLibrary(), stored))
       if (!synced.ok) {
-        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+        void systemAlert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
       }
       onOpenMap(entry.libraryId)
     },
@@ -250,7 +251,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       }
       persistEntries(upsertMapLibraryEntry(readMapLibrary(), stored))
       if (!synced.ok) {
-        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+        void systemAlert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
       }
     },
     [persistEntries, t],
@@ -276,7 +277,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
       const sync = await syncEntryToBackend(entry)
       if (!sync.ok) {
-        alert(
+        void systemAlert(
           t('mapLibrary.renameSyncFailed', {
             error: sync.error ?? t('mapLibrary.backendRequired'),
           }),
@@ -298,12 +299,12 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         ? t('mapLibrary.builtinExample')
         : t('mapLibrary.mapLabel')
       if (
-        !window.confirm(
+        !(await systemConfirm(
           t('mapLibrary.confirmDelete', {
             label,
             name: entry.displayName,
           }),
-        )
+        { tone: 'danger' },))
       ) {
         return
       }
@@ -318,7 +319,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       const mapId = entry.mapDocument.mapId || entry.libraryId
       const result = await deletePublishedMap(mapId)
       if (!result.ok) {
-        alert(
+        void systemAlert(
           t('mapLibrary.deleteFailed', {
             error: result.error ?? t('mapLibrary.backendRejected'),
           }),
@@ -356,7 +357,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       setPasteOpen(false)
       setPasteText('')
       if (!synced.ok) {
-        alert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
+        void systemAlert(t('mapLibrary.publishFailed', { error: t('mapLibrary.backendRequired') }))
       }
     },
     [persistEntries, t],
@@ -369,7 +370,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         const json = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
         importParsed(applyRefFieldZeroPolicyToParsed(parseMapFileJson(json)))
       } catch (e) {
-        alert(
+        void systemAlert(
           t('mapLibrary.importFailed', {
             error: e instanceof Error ? e.message : String(e),
           }),
@@ -401,9 +402,9 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         )
         if (
           existing
-          && !window.confirm(
+          && !(await systemConfirm(
             t('mapLibrary.confirmOverwrite', { name: existing.displayName }),
-          )
+          { tone: 'danger' },))
         ) {
           return
         }
@@ -411,7 +412,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         persistEntries(upsertMapLibraryEntry(readMapLibrary(), entry))
         setServerOpen(false)
       } catch (e) {
-        alert(
+        void systemAlert(
           t('mapLibrary.loadFromServerFailed', {
             error: e instanceof Error ? e.message : String(e),
           }),
@@ -445,7 +446,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       const json = JSON.parse(pasteText.replace(/^\uFEFF/, '')) as unknown
       importParsed(applyRefFieldZeroPolicyToParsed(parseMapFileJson(json)))
     } catch (e) {
-      alert(
+      void systemAlert(
         t('mapLibrary.importFailed', {
           error: e instanceof Error ? e.message : String(e),
         }),

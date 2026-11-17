@@ -1,6 +1,10 @@
 const zhTW = {
   common: {
     cancel: "取消",
+    confirm: "確定",
+    ok: "知道了",
+    dialogTitleConfirm: "請確認",
+    dialogTitleNotice: "提示",
     save: "儲存",
     saving: "儲存中…",
     retry: "重試",

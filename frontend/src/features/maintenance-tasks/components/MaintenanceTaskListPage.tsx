@@ -31,6 +31,7 @@ import {
   type PublishStatusKey,
   type UsageStatusKey,
 } from '../types';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 type MaintenanceTaskListPageProps = {
   onBackToHome?: () => void;
@@ -147,7 +148,7 @@ export function MaintenanceTaskListPage({
       setPage(1);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDuplicatingId(null);
     }
@@ -155,7 +156,7 @@ export function MaintenanceTaskListPage({
 
   const handleDelete = async (row: MaintenanceTaskListItem) => {
     if (row.usage_status === 'in_use') return;
-    const confirmed = window.confirm(t('common.confirmDelete', { name: row.name }));
+    const confirmed = (await systemConfirm(t('common.confirmDelete', { name: row.name }), { tone: 'danger' }));
     if (!confirmed) return;
 
     setDeletingId(row.task_id);
@@ -164,7 +165,7 @@ export function MaintenanceTaskListPage({
       await deleteMaintenanceTask(row.task_id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      void systemAlert(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingId(null);
     }

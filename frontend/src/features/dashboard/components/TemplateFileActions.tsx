@@ -7,6 +7,7 @@ import {
   parseTemplateFile,
 } from '../template/importTemplate';
 import type { TemplateImportResult } from '../template/types';
+import { systemAlert } from '../../../lib/systemDialog';
 
 interface ExportProps {
   plane: DashboardPlane;
@@ -69,7 +70,7 @@ function useTemplateImport(onImported: (result: TemplateImportResult) => void) {
       });
       onImported(result);
     } catch (e) {
-      alert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
+      void systemAlert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';

@@ -24,6 +24,7 @@ import {
   loadVirtualFences,
   upsertVirtualFence,
 } from './virtualFenceStore';
+import { systemConfirm } from '../../lib/systemDialog';
 
 const SELECT =
   'h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-[#2B7FFF]/60';
@@ -174,9 +175,9 @@ export function VirtualFencePage() {
     }
   };
 
-  const removeFence = (fenceId: string) => {
+  const removeFence = async (fenceId: string) => {
     if (!mapId) return;
-    if (!window.confirm(t('virtualFence.confirmDelete'))) return;
+    if (!(await systemConfirm(t('virtualFence.confirmDelete'), { tone: 'danger' }))) return;
     setFences(deleteVirtualFence(mapId, fences, fenceId));
     setMode({ kind: 'browse' });
   };

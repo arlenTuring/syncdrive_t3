@@ -12,6 +12,7 @@ import {
   type DataSourceConfig,
   type DataSourceType,
 } from '../store/useDataSourceStore';
+import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 
 interface Props {
   onClose: () => void;
@@ -110,9 +111,9 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                     onClick={async () => {
                       try {
                         const conflicts = await importLegacyDataSources();
-                        alert(conflicts.length ? `匯入完成：\n${conflicts.join('\n')}` : '舊資料來源已匯入伺服器');
+                        void systemAlert(conflicts.length ? `匯入完成：\n${conflicts.join('\n')}` : '舊資料來源已匯入伺服器');
                       } catch (e) {
-                        alert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
+                        void systemAlert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
                       }
                     }}
                   >匯入舊設定</button>
@@ -144,11 +145,11 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                           onEdit={() => setEditingId(editingId === ds.id ? null : ds.id)}
                           onSave={async (patch) => {
                             try { await updateDataSource(ds.id, patch); setEditingId(null); }
-                            catch (e) { alert(`儲存失敗：${e instanceof Error ? e.message : String(e)}`); }
+                            catch (e) { void systemAlert(`儲存失敗：${e instanceof Error ? e.message : String(e)}`); }
                           }}
                           onDelete={async () => {
                             try { await deleteDataSource(ds.id); }
-                            catch (e) { alert(`刪除失敗：${e instanceof Error ? e.message : String(e)}`); }
+                            catch (e) { void systemAlert(`刪除失敗：${e instanceof Error ? e.message : String(e)}`); }
                           }}
                           onPing={() => pingDataSource(ds)}
                           usedBy={planesUsingDefinition(planes, ds.id).map((p) => p.name)}
@@ -163,7 +164,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                 ? <AddDataSourceForm
                     onAdd={async (cfg) => {
                       try { await addDataSource(cfg); setShowAddForm(false); }
-                      catch (e) { alert(`新增失敗：${e instanceof Error ? e.message : String(e)}`); }
+                      catch (e) { void systemAlert(`新增失敗：${e instanceof Error ? e.message : String(e)}`); }
                     }}
                     onCancel={() => setShowAddForm(false)}
                   />
@@ -201,10 +202,10 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                       try {
                         await seedDashboardAll();
                         setSeedState('ok');
-                        alert(t('dashboard.settings.seedOkAlert'));
+                        void systemAlert(t('dashboard.settings.seedOkAlert'));
                       } catch (e: unknown) {
                         setSeedState('error');
-                        alert(e instanceof Error ? e.message : t('dashboard.settings.seedFailAlert'));
+                        void systemAlert(e instanceof Error ? e.message : t('dashboard.settings.seedFailAlert'));
                       }
                       setTimeout(() => setSeedState('idle'), 3000);
                     }}
@@ -229,7 +230,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                       <div className="text-zinc-500 text-xs mt-1">{t('dashboard.settings.clearAllHint')}</div>
                     </div>
                     <button 
-                      onClick={() => { if(confirm(t('dashboard.settings.clearAllConfirm'))) { onClearAll(); onClose(); } }}
+                      onClick={async () => { if((await systemConfirm(t('dashboard.settings.clearAllConfirm'), { tone: 'danger' }))) { onClearAll(); onClose(); } }}
                       className="px-4 py-2 rounded-lg bg-red-600/20 border border-red-600/40 text-red-400 text-xs font-bold uppercase hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
                     >
                       {t('dashboard.settings.clearAllAction')}

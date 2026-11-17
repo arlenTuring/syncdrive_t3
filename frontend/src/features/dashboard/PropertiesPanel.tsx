@@ -50,6 +50,7 @@ import { DualCanvasSettings } from './components/DualCanvasSettings';
 import { GenericGroupSettings } from './components/GenericGroupSettings';
 import { VehicleRoofIndicatorSettings } from './components/VehicleRoofIndicatorSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
+import { systemConfirm } from '../../lib/systemDialog';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
 const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
@@ -1580,7 +1581,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
 
         <div className="pt-4 border-t border-zinc-800">
           <button 
-            onClick={() => { if(confirm(t('dashboard.properties.plane.deleteConfirm'))) onDelete(); }} 
+            onClick={async () => { if((await systemConfirm(t('dashboard.properties.plane.deleteConfirm'), { tone: 'danger' }))) onDelete(); }} 
             className="w-full py-2.5 rounded-lg bg-red-950/20 border border-red-900/30 text-red-400 text-xs 
                        flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all duration-300"
           >
