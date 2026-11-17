@@ -68,9 +68,6 @@
   "features/dashboard/components/GenericGroupSettings.tsx": {
     "palette": 9
   },
-  "features/dashboard/components/GroupTemplateExitDialog.tsx": {
-    "palette": 2
-  },
   "features/dashboard/components/LayoutValidationIcon.tsx": {
     "hex": 3,
     "rgb": 2
@@ -83,9 +80,9 @@
     "hex": 1
   },
   "features/dashboard/components/TemplateFileActions.tsx": {
-    "arbitrary": 2,
-    "rgb": 2,
-    "palette": 4
+    "arbitrary": 1,
+    "rgb": 1,
+    "palette": 3
   },
   "features/dashboard/components/VehicleRoofIndicatorSettings.tsx": {
     "palette": 1
@@ -239,7 +236,7 @@
     "button": 1
   },
   "features/dashboard/NewPlaneDialog.tsx": {
-    "palette": 6,
+    "palette": 5,
     "button": 1
   },
   "features/dashboard/PlaneWorkspace.tsx": {
@@ -271,7 +268,7 @@
     "palette": 5
   },
   "features/dashboard/settings/SettingsModal.tsx": {
-    "palette": 26
+    "palette": 25
   },
   "features/dashboard/types.ts": {
     "hex": 91,
@@ -426,7 +423,7 @@
     "palette": 13
   },
   "features/map-editor/components/BasemapFilePickerDialog.tsx": {
-    "palette": 6,
+    "palette": 5,
     "button": 1
   },
   "features/map-editor/components/BasemapGraphic.tsx": {
@@ -506,9 +503,6 @@
     "hex": 2,
     "palette": 38
   },
-  "features/map-editor/components/LeaveEditConfirmDialog.tsx": {
-    "palette": 1
-  },
   "features/map-editor/components/MapAreaCanvas.tsx": {
     "hex": 2,
     "rgb": 2
@@ -558,14 +552,14 @@
     "palette": 2
   },
   "features/map-editor/components/MapRevisionHistoryDialog.tsx": {
-    "palette": 2
+    "palette": 1
   },
   "features/map-editor/components/MapRulers.tsx": {
     "arbitrary": 4,
     "palette": 4
   },
   "features/map-editor/components/NewMapPixelDialog.tsx": {
-    "palette": 10,
+    "palette": 9,
     "button": 1
   },
   "features/map-editor/components/PlatformDoorGraphic.tsx": {
@@ -576,7 +570,7 @@
     "hex": 21,
     "arbitrary": 3,
     "rgb": 2,
-    "palette": 36,
+    "palette": 35,
     "button": 6
   },
   "features/map-editor/components/RoadLineInspectorSection.tsx": {
@@ -597,9 +591,9 @@
     "button": 2
   },
   "features/map-editor/components/SetPrimaryMapDialog.tsx": {
-    "arbitrary": 4,
-    "rgb": 2,
-    "palette": 5
+    "arbitrary": 3,
+    "rgb": 1,
+    "palette": 4
   },
   "features/map-editor/components/SignalInspectorSection.tsx": {
     "palette": 5
@@ -628,7 +622,7 @@
   },
   "features/map-editor/components/TrackGenSizeDialog.tsx": {
     "hex": 25,
-    "palette": 7,
+    "palette": 6,
     "button": 1
   },
   "features/map-editor/components/TrackInspectorSection.tsx": {

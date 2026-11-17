@@ -8,7 +8,7 @@ import {
 } from '../template/importTemplate';
 import type { TemplateImportResult } from '../template/types';
 import { systemAlert } from '../../../lib/systemDialog';
-import { Button, Checkbox } from '../../../components/ui';
+import { Button, Checkbox, Dialog } from '../../../components/ui';
 
 interface ExportProps {
   plane: DashboardPlane;
@@ -72,13 +72,19 @@ function useTemplateImport(onImported: (result: TemplateImportResult) => void) {
 export function ImportTemplateDialog({ onImported, onClose }: { onImported: (result: TemplateImportResult) => void; onClose: () => void }) {
   const { inputRef, applyConnections, setApplyConnections, busy, handleFile } = useTemplateImport(onImported);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black-50" role="dialog" aria-modal="true" aria-label="匯入儀表板">
-      <div className="w-[440px] max-w-[92vw] rounded-2xl border border-[rgba(212,212,212,0.15)] bg-surface-primary p-5 text-text-primary shadow-xl">
-        <div className="flex items-center gap-2 text-body-m-bold">
-          <FileJson size={18} className="text-text-theme" />
-          匯入儀表板
-        </div>
-        <p className="mt-3 text-body-xs text-text-tertiary">
+    <Dialog
+      title={<span className="inline-flex items-center gap-2"><FileJson size={18} className="text-text-theme" aria-hidden />匯入儀表板</span>}
+      onClose={onClose}
+      widthClassName="w-[440px] max-w-[92vw]"
+      footer={(
+        <>
+          <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>取消</Button>
+          <Button leadingIcon={<Upload />} disabled={busy} onPress={() => inputRef.current?.click()}>{busy ? '匯入中…' : '選擇樣板檔案'}</Button>
+        </>
+      )}
+    >
+<div className="text-text-primary">
+        <p className="text-body-xs text-text-tertiary">
           選擇 <code className="text-text-secondary">.json</code> 樣板檔，會建立一個新的儀表板。檔案開頭的{' '}
           <code className="text-text-secondary">dataSources</code> 會合併到本機連線設定。
         </p>
@@ -101,12 +107,8 @@ export function ImportTemplateDialog({ onImported, onClose }: { onImported: (res
             if (f) handleFile(f);
           }}
         />
-        <div className="mt-4 flex justify-end gap-3">
-          <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>取消</Button>
-          <Button leadingIcon={<Upload />} disabled={busy} onPress={() => inputRef.current?.click()}>{busy ? '匯入中…' : '選擇樣板檔案'}</Button>
-        </div>
       </div>
-    </div>
+</Dialog>
   );
 }
 

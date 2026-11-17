@@ -46,7 +46,7 @@ import {
   switchTrackPath,
   taperTrackPath,
 } from '../utils/trackShapes'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 /**
  * 生成前的三個參數。
@@ -817,17 +817,8 @@ function SizeDialogBody({
    * 縮放過的容器——量出來對話框被連帶縮成 0.898 倍，還被推到畫面下緣切掉一半。
    */
   return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black-50 p-4"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
-      <div
-        className="flex max-h-full flex-col gap-3 overflow-auto rounded-lg border border-border-quaternary bg-surface-sub-background p-5 shadow-2xl"
-        style={{ width: Math.max(360, stageW + 42) }}
-        data-trackgen-size-dialog
-      >
+    <Dialog headerless padded={false} title={t('mapEditor.trackGen.title')} onClose={onCancel} widthClassName="max-w-md" heightClassName="max-h-full">
+<div className="gap-3 p-5 flex min-h-0 flex-1 flex-col overflow-auto">
         <div>
           <div className="text-body-m-bold text-text-primary">{t('mapEditor.trackGen.title')}</div>
           <p className="mt-1 text-body-xs text-text-quaternary">
@@ -1623,7 +1614,7 @@ function SizeDialogBody({
           <Button hierarchy="subordinate" variant="outlined" onPress={confirm}>{t('mapEditor.trackGen.generate')}</Button>
         </div>
       </div>
-    </div>,
+</Dialog>,
     document.body,
   )
 }

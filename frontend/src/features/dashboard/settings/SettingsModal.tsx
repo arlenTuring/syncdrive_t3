@@ -13,7 +13,7 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, IconButton, Tabs } from '../../../components/ui';
+import { Button, Dialog, IconButton, Tabs } from '../../../components/ui';
 
 interface Props {
   onClose: () => void;
@@ -72,9 +72,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
   }
 
   return (
-    <div className="fixed inset-0 bg-black-50 flex items-center justify-center z-50 backdrop-blur-sm"
-         onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-surface-primary border border-border-quaternary rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
+    <Dialog headerless padded={false} title={plane ? `資料設定 · ${plane.name}` : '資料設定'} onClose={() => onClose()} widthClassName="w-[680px]" heightClassName="max-h-[80vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-quaternary">
           <div className="flex items-center gap-4">
             {plane && (
@@ -228,8 +226,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
         <div className="px-6 py-4 border-t border-border-quaternary flex justify-end">
           <Button hierarchy="subordinate" variant="outlined" onPress={onClose} type="submit">{t('dashboard.settings.close')}</Button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 }
 

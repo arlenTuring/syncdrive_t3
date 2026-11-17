@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   clampMapPixelSize,
@@ -10,7 +10,7 @@ import {
 } from '../constants/mapPixel'
 import type { MapCreationMode } from '../types/mapFile'
 import { systemAlert } from '../../../lib/systemDialog'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -26,7 +26,6 @@ export function NewMapPixelDialog({
   onCancel,
 }: Props) {
   const { t } = useTranslation()
-  const titleId = useId()
   const [creationMode, setCreationMode] = useState<MapCreationMode>('blank')
   const [widthStr, setWidthStr] = useState(
     String(initialPixelSize?.width ?? DEFAULT_MAP_PIXEL_WIDTH),
@@ -68,23 +67,8 @@ export function NewMapPixelDialog({
   ]
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <h2 id={titleId} className="text-body-m-bold text-text-primary">
-          {t('mapEditor.newMapPixel.title')}
-        </h2>
+    <Dialog padded={false} title={t('mapEditor.newMapPixel.title')} onClose={() => onCancel()} widthClassName="w-full max-w-lg">
+<div className="px-6 pb-5 flex min-h-0 flex-1 flex-col overflow-auto">
         <p className="mt-2 text-body-s text-text-tertiary">
           {t('mapEditor.newMapPixel.hint')}
         </p>
@@ -159,6 +143,6 @@ export function NewMapPixelDialog({
               : t('mapEditor.newMapPixel.create')}</Button>
         </div>
       </div>
-    </div>
+</Dialog>
   )
 }

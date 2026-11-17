@@ -17,7 +17,7 @@
 
 | 位置 | 內容 | 圖示 |
 |---|---|---|
-| `features/dashboard/NewPlaneDialog.tsx:63` | {p.label} | — |
+| `features/dashboard/NewPlaneDialog.tsx:54` | {p.label} | — |
 | `features/dashboard/PropertiesPanel.tsx:363` | {React.createElement((LucideIcons as | — |
 | `features/dashboard/PropertiesPanel.tsx:2855` | {tab.label} | — |
 | `features/dashboard/components/DashboardIconPicker.tsx:52` | {set.label} | — |
@@ -55,17 +55,17 @@
 | `features/dispatch-scheduling/components/CreateDispatchDialog.tsx:451` | {route.label} {route.stationPathLabe | — |
 | `features/maintenance-tasks/components/CreateMaintenanceTaskPage.tsx:130` | {active && ( )} {completed ? : item. | Check |
 | `features/maintenance-tasks/components/MaintenanceTaskListPage.tsx:299` | {deletingId === row.task_id ? ( ) :  | Loader2,Trash2 |
-| `features/map-editor/components/BasemapFilePickerDialog.tsx:164` | {previewUrl ? ( ) : xodrPreview ? (  | Upload,Image |
+| `features/map-editor/components/BasemapFilePickerDialog.tsx:148` | {previewUrl ? ( ) : xodrPreview ? (  | Upload,Image |
 | `features/map-editor/components/GeofenceInspectorSection.tsx:205` | {lb.text ｜｜ t('mapEditor.inspector.g | — |
 | `features/map-editor/components/MapEditorToolbar.tsx:261` | mapEditor.toolbar.trackCheck {trackI | ScanSearch |
 | `features/map-editor/components/MapListDrawer.tsx:95` | {entry.name} {formatListDescription( | — |
-| `features/map-editor/components/NewMapPixelDialog.tsx:96` | {t(titleKey)} {t(hintKey)} | — |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1587` | {nodeDisplayLabel(node.id, node.labe | — |
+| `features/map-editor/components/NewMapPixelDialog.tsx:80` | {t(titleKey)} {t(hintKey)} | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1581` | {nodeDisplayLabel(node.id, node.labe | — |
 | `features/map-editor/components/RouteGroupListView.tsx:392` | {open ? ( ) : ( )} {group.displayNam | ChevronDown,ChevronRight |
 | `features/map-editor/components/RoutePlanningPanel.tsx:75` | {station.stationName}{' '} ({station | — |
 | `features/map-editor/components/RoutePlanningPanel.tsx:323` | {selectedStationLabel ?? (selectable | ChevronDown |
 | `features/map-editor/components/TrackDiagnosticsPanel.tsx:49` | {issue.title} {issue.detail} {issue. | — |
-| `features/map-editor/components/TrackGenSizeDialog.tsx:1408` | {g.code ｜｜ '—'} {g.members.length} | — |
+| `features/map-editor/components/TrackGenSizeDialog.tsx:1399` | {g.code ｜｜ '—'} {g.members.length} | — |
 | `features/map-editor/components/TrajectoryRawDataList.tsx:67` | #{originalIndex} {line} | — |
 | `features/map-editor/index.tsx:4816` | mapEditor.chrome.properties | ChevronLeft |
 | `features/media-schedules/MediaSchedulesPage.tsx:151` | {schedule.summary} | — |
@@ -124,10 +124,10 @@
 | `features/map-editor/components/GeofenceNode.tsx:779` | — | Paintbrush |
 | `features/map-editor/components/GeofenceNode.tsx:794` | — | Trash2 |
 | `features/map-editor/components/GeofenceNode.tsx:913` | — | RotateCw |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1865` | {displayLabel} {field ? ( X {field.x | — |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1942` | — | — |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1970` | — | — |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1991` | — | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1859` | {displayLabel} {field ? ( X {field.x | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1936` | — | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1964` | — | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1985` | — | — |
 | `features/map-editor/components/TrackGenGraphic.tsx:120` | mapEditor.trackGen.graphic.loadTitle | Plus |
 | `features/map-editor/components/TrackGenGraphic.tsx:326` | mapEditor.trackGen.graphic.replace | — |
 | `features/media-groups/MediaGroupsPage.tsx:409` | — | GripVertical |
@@ -206,7 +206,7 @@
 | `features/dashboard/elements/TabListWidget.tsx:435` | {tab.label} | — |
 | `features/dashboard/elements/TabListWidget.tsx:577` | — | Edit3 |
 | `features/dashboard/index.tsx:1229` | {saveStatus === 'ok' ? t('dashboard. | Save |
-| `features/map-editor/components/PointTopologyEditorDialog.tsx:1523` | {listOpen ? t('mapEditor.pointTopolo | — |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx:1517` | {listOpen ? t('mapEditor.pointTopolo | — |
 | `features/shift-list/components/ShiftSchedulePlanGrid.tsx:1018` | — | — |
 | `features/time-templates/components/ScheduleIntervalSelection.tsx:124` | — | — |
 | `features/time-templates/components/TimeOfDayPicker.tsx:245` | {displayText} | — |

@@ -13,7 +13,7 @@ import {
   type MapRevisionReason,
 } from '../utils/mapRevisionHistory'
 import { systemConfirm } from '../../../lib/systemDialog'
-import { Button, IconButton } from '../../../components/ui';
+import { Button, Dialog, IconButton } from '../../../components/ui';
 
 type MapRevisionHistoryDialogProps = {
   open: boolean
@@ -138,28 +138,13 @@ export function MapRevisionHistoryDialog({
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="map-revision-history-title"
+    <Dialog
+      padded={false}
+      title={<span className="inline-flex items-center gap-2"><History className="size-5 text-text-theme" aria-hidden />{t('mapEditor.revision.title')}</span>}
+      description={t('mapEditor.revision.hint', { max: MAX_REVISIONS_PER_MAP })}
+      onClose={onClose}
+      widthClassName="w-full max-w-lg" heightClassName="max-h-[min(90vh,40rem)]"
     >
-      <div className="flex max-h-[min(90vh,40rem)] w-full max-w-lg flex-col rounded-xl border border-border-tertiary bg-surface-primary shadow-2xl">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border-quaternary px-5 py-4">
-          <div>
-            <h2
-              id="map-revision-history-title"
-              className="flex items-center gap-2 text-headline-5 text-text-primary"
-            >
-              <History className="size-5 text-text-theme" aria-hidden />
-              {t('mapEditor.revision.title')}
-            </h2>
-            <p className="mt-1 text-body-xs text-text-tertiary">
-              {t('mapEditor.revision.hint', { max: MAX_REVISIONS_PER_MAP })}
-            </p>
-          </div>
-          <Button hierarchy="subordinate" variant="outlined" onPress={onClose}>{t('common.close')}</Button>
-        </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-quaternary px-5 py-3">
           <Button variant="outlined" leadingIcon={bookmarking ? <Loader2 className="animate-spin" /> : <BookmarkPlus />} onPress={() => void handleBookmark()} disabled={bookmarking}>{t('mapEditor.revision.bookmark')}</Button>
@@ -218,7 +203,6 @@ export function MapRevisionHistoryDialog({
             </ul>
           )}
         </div>
-      </div>
-    </div>
+      </Dialog>
   )
 }

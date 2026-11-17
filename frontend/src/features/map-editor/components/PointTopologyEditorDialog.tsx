@@ -54,7 +54,7 @@ import {
   updatePointTopologyEdge,
 } from '../utils/pointTopology'
 import { estimateTopologyEdgeDistanceFromSimRoutes } from '../utils/topologySimRouteDistance'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 /** 拓撲畫布四周留白，便於平移，並讓任意點位可捲到畫面正中心 */
 const CANVAS_PAN_PAD_PX = 2400
@@ -1475,13 +1475,7 @@ export function PointTopologyEditorDialog({
       : null
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50">
-      <div
-        className="relative flex h-[90%] w-[90%] flex-col overflow-hidden rounded-lg border border-border-tertiary bg-surface-primary shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="point-topology-title"
-      >
+    <Dialog headerless padded={false} title={t('mapEditor.pointTopology.title')} onClose={onClose} widthClassName="w-[90%]" heightClassName="h-[90%]">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-quaternary px-3 py-2.5">
           <div className="min-w-0 flex flex-col gap-0.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -2262,8 +2256,7 @@ export function PointTopologyEditorDialog({
               }}>{t('mapEditor.pointTopology.apply')}</Button>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   )
 }
 

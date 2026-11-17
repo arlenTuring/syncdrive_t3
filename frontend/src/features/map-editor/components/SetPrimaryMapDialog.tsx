@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   activateMapLibraryEntry,
@@ -7,7 +7,7 @@ import {
   type MapActivationCheck,
 } from '../api/mapLibraryApi'
 import type { MapLibraryEntry } from '../utils/mapLibraryStorage'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 type Props = {
   entry: MapLibraryEntry
@@ -25,7 +25,6 @@ type Props = {
  */
 export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
   const { t } = useTranslation()
-  const titleId = useId()
   const [check, setCheck] = useState<MapActivationCheck | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activating, setActivating] = useState(false)
@@ -63,22 +62,8 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
   const canConfirm = Boolean(check?.canActivate) && !activating
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !activating) onClose()
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-2xl border border-[rgba(212,212,212,0.15)] bg-surface-primary p-5 text-text-primary shadow-2xl"
-      >
-        <h2 id={titleId} className="text-headline-5">
-          {t('mapLibrary.primary.title', { name: entry.displayName })}
-        </h2>
+    <Dialog padded={false} title={t('mapLibrary.primary.title', { name: entry.displayName })} onClose={() => onClose()} widthClassName="w-full max-w-lg">
+<div className="px-6 pb-5 text-text-primary flex min-h-0 flex-1 flex-col overflow-auto">
         <p className="mt-2 text-body-s leading-[20px] tracking-[0.5px] text-text-tertiary">
           {t('mapLibrary.primary.impact')}
         </p>
@@ -154,6 +139,6 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
           <Button leadingIcon={activating ? <Loader2 className="animate-spin" /> : undefined} onPress={() => void confirm()} disabled={!canConfirm}>{t('mapLibrary.primary.confirm')}</Button>
         </div>
       </div>
-    </div>
+</Dialog>
   )
 }

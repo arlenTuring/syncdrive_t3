@@ -1,8 +1,8 @@
 import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
-import { Monitor, X } from 'lucide-react';
+import { Monitor } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton } from '../../components/ui';
+import { Button, Dialog } from '../../components/ui';
 
 const PRESETS = [
   { label: '32:9 — 3840×1080', width: 3840, height: 1080 },
@@ -33,17 +33,8 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black-50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-surface-primary border border-border-quaternary rounded-xl shadow-2xl w-[480px] p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Monitor className="text-text-theme" size={20} />
-            <h2 className="text-text-primary text-body-m-bold">{t('dashboard.newPlane.title')}</h2>
-          </div>
-          <IconButton hierarchy="subordinate" variant="standard" onPress={onCancel} label={t('common.close')} type="submit" icon={<X />} />
-        </div>
-
+    <Dialog padded={false} title={<span className="inline-flex items-center gap-2"><Monitor className="text-text-theme" size={20} aria-hidden />{t('dashboard.newPlane.title')}</span>} onClose={onCancel} widthClassName="w-[480px]">
+<div className="px-6 pb-6 flex min-h-0 flex-1 flex-col overflow-auto">
         {/* Name */}
         <div className="mb-4">
           <label className="block text-text-tertiary text-body-xs-bold mb-1.5">{t('dashboard.newPlane.name')}</label>
@@ -99,10 +90,10 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
         {/* Actions */}
         <div className="flex gap-2 mt-6">
           <Button hierarchy="subordinate" variant="outlined" className="flex-1" onPress={onCancel} type="submit">{t('common.cancel')}</Button>
-          <Button hierarchy="subordinate" variant="standard" className="flex-1" onPress={() => onConfirm(name || t('dashboard.unnamedPlane'), width, height)} disabled={!name.trim() || width < 320 || height < 240} type="submit">{t('dashboard.newPlane.create')}</Button>
+          <Button className="flex-1" onPress={() => onConfirm(name || t('dashboard.unnamedPlane'), width, height)} disabled={!name.trim() || width < 320 || height < 240} type="submit">{t('dashboard.newPlane.create')}</Button>
         </div>
       </div>
-    </div>
+</Dialog>
   );
 }
 

@@ -1,9 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileCode2, Image, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BasemapFileSelection } from '../utils/basemapFacility'
 import { parseOpenDriveXodr, laneFillColor, lanePolygonToSvgPath, laneStrokeColor } from '../opendrive'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -26,7 +26,6 @@ export function BasemapFilePickerDialog({
   onCancel,
 }: Props) {
   const { t } = useTranslation()
-  const titleId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const previewUrlRef = useRef<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -129,23 +128,8 @@ export function BasemapFilePickerDialog({
   const canSubmit = !!selectedFile && (!!previewUrl || !!xodrContent)
 
   return (
-    <div
-      className="fixed inset-0 z-[220] flex items-center justify-center bg-black-50 p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <h2 id={titleId} className="text-body-m-bold text-text-primary">
-          {t('mapEditor.basemap.title')}
-        </h2>
+    <Dialog padded={false} title={t('mapEditor.basemap.title')} onClose={() => onCancel()} widthClassName="w-full max-w-lg">
+<div className="px-6 pb-5 flex min-h-0 flex-1 flex-col overflow-auto">
         <p className="mt-2 text-body-s text-text-tertiary">
           {t('mapEditor.basemap.hint')}
         </p>
@@ -257,6 +241,6 @@ export function BasemapFilePickerDialog({
           <Button hierarchy="subordinate" variant="outlined" onPress={submit} disabled={!canSubmit}>{t('mapEditor.basemap.apply')}</Button>
         </div>
       </div>
-    </div>
+</Dialog>
   )
 }

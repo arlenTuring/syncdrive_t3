@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Button } from '../../../components/ui';
+import { Button, Dialog } from '../../../components/ui';
 
 type LeaveEditConfirmDialogProps = {
   open: boolean
@@ -18,28 +18,17 @@ export function LeaveEditConfirmDialog({
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="leave-edit-title"
-    >
-      <div className="w-full max-w-md rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl">
-        <h2
-          id="leave-edit-title"
-          className="text-headline-5 text-text-primary"
-        >
-          {t('mapEditor.leaveEditConfirm.title')}
-        </h2>
+    <Dialog padded={false} title={t('mapEditor.leaveEditConfirm.title')} onClose={onCancel} widthClassName="w-full max-w-md">
+<div className="px-6 pb-5 flex min-h-0 flex-1 flex-col overflow-auto">
         <p className="mt-3 text-body-s text-text-tertiary">
           {t('mapEditor.leaveEditConfirm.body')}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button hierarchy="subordinate" variant="outlined" onPress={onCancel}>{t('common.cancel')}</Button>
-          <Button hierarchy="subordinate" variant="outlined" onPress={onDiscard}>{t('mapEditor.leaveEditConfirm.discard')}</Button>
-          <Button hierarchy="subordinate" variant="outlined" onPress={onSave}>{t('mapEditor.leaveEditConfirm.save')}</Button>
+          <Button hierarchy="danger" variant="outlined" onPress={onDiscard}>{t('mapEditor.leaveEditConfirm.discard')}</Button>
+          <Button onPress={onSave}>{t('mapEditor.leaveEditConfirm.save')}</Button>
         </div>
       </div>
-    </div>
+</Dialog>
   )
 }
