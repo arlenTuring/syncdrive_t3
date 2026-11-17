@@ -23,7 +23,7 @@ interface Props {
 }
 
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-lg px-3 py-2 text-text-primary text-body-s
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 /** 給新的專用定義取一個不撞號的 ID（只能英數、點、底線、連字號） */
 function planeCopyId(sourceId: string, plane: DashboardPlane, existing: DataSourceConfig[]): string {
@@ -72,7 +72,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="bg-cyan-950/20 border border-cyan-900/40 rounded-lg px-4 py-3 text-body-xs text-cyan-200">
+      <div className="bg-surface-theme border border-border-theme-light rounded-lg px-4 py-3 text-body-xs text-text-theme-light">
         這裡的選擇只屬於「{plane.name}」，存在伺服器上：其他帳號或瀏覽器打開同一張儀表板會讀到同一份設定，
         改這張不會影響其他儀表板。連線定義本身是共用的，要改連線內容又不想影響別張，請先「建立本儀表板專用連線」。
       </div>
@@ -113,7 +113,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
               )}
             </div>
             {selected && sharedWith.length > 0 && (
-              <p className="text-body-xs text-amber-300/90">
+              <p className="text-body-xs text-status-warning">
                 「{selected.name}」也被 {sharedWith.map((p) => `「${p.name}」`).join('、')} 使用；
                 在「連線定義（共用）」分頁修改它會一起影響這些儀表板。
               </p>

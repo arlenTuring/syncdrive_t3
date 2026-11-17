@@ -63,7 +63,7 @@ export function RotatedElementResizeHandles({
   return (
     <>
       {showSelectionBorder && (
-        <div className="pointer-events-none absolute inset-0 rounded border border-cyan-400/85" />
+        <div className="pointer-events-none absolute inset-0 rounded border border-border-theme-light" />
       )}
       {EDGE_HANDLES.filter(({ edge }) => edgeSet.has(edge as 'left' | 'right' | 'top' | 'bottom')).map(
         ({ edge, style }) => {
@@ -78,7 +78,7 @@ export function RotatedElementResizeHandles({
               onPointerDown={(e) => onResizePointerDown(edge, e)}
             >
               <div
-                className={`absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400/90 bg-zinc-900 opacity-0 transition-opacity group-hover:opacity-100 ${edge === 'left' || edge === 'right' ? 'hidden' : ''}`}
+                className={`absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-border-theme-light bg-surface-primary opacity-0 transition-opacity group-hover:opacity-100 ${edge === 'left' || edge === 'right' ? 'hidden' : ''}`}
               />
             </div>
           );
@@ -97,7 +97,7 @@ export function RotatedElementResizeHandles({
               onPointerDown={(e) => onResizePointerDown(edge, e)}
             >
               <div
-                className="absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400 bg-cyan-500/80 opacity-70 transition-opacity group-hover:opacity-100"
+                className="absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-border-theme bg-surface-theme opacity-70 transition-opacity group-hover:opacity-100"
                 style={{ cursor }}
               />
             </div>

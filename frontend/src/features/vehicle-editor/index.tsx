@@ -293,7 +293,7 @@ export default function VehicleEditor({
                 role="status"
                 className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-body-xs ${
                   listMessage || loadState === 'offline'
-                    ? 'border-red-500/40 bg-status-error-light text-status-error-emphasis'
+                    ? 'border-border-danger-light bg-status-error-light text-status-error-emphasis'
                     : 'border-border-quaternary bg-surface-primary text-text-tertiary'
                 }`}
               >

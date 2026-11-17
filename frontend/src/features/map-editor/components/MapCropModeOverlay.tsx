@@ -270,7 +270,7 @@ export function MapCropModeOverlay({
         }}
       >
         <div
-          className="absolute left-2 top-2 rounded-md border border-status-warning-light bg-amber-950/95 px-3 py-1.5 font-mono text-amber-50 shadow-md"
+          className="absolute left-2 top-2 rounded-md border border-status-warning-light bg-status-warning-light px-3 py-1.5 font-mono text-status-warning shadow-md"
           style={{
             transform: `scale(${labelScreenScale})`,
             transformOrigin: 'top left',
@@ -282,12 +282,12 @@ export function MapCropModeOverlay({
             <span className="ml-1 text-body-s-bold text-status-warning">px</span>
           </div>
           {isStretched || isShrunk ? (
-            <span className="mt-1 block text-body-xs text-amber-300/80">
+            <span className="mt-1 block text-body-xs text-status-warning">
               {isStretched ? t('mapEditor.cropMode.stretched') : t('mapEditor.cropMode.cropped')}
             </span>
           ) : null}
         </div>
-        <p className="absolute bottom-2 left-2 max-w-[90%] text-caption-2 text-amber-200/70">
+        <p className="absolute bottom-2 left-2 max-w-[90%] text-caption-2 text-status-warning">
           {t('mapEditor.cropMode.dragHint')}
         </p>
       </div>
@@ -296,7 +296,7 @@ export function MapCropModeOverlay({
         <div
           key={edge}
           data-map-crop-edge
-          className="absolute bg-amber-500/30 hover:bg-amber-500/45"
+          className="absolute bg-status-warning-light hover:bg-status-warning-light"
           style={{ ...style, pointerEvents: 'auto', touchAction: 'none' }}
           onPointerDown={onPointerDown(edge)}
           title={title}
@@ -306,7 +306,7 @@ export function MapCropModeOverlay({
         <div
           key={edge}
           data-map-crop-corner
-          className="absolute rounded-sm border-2 border-status-warning bg-amber-500/60 hover:bg-amber-400/70"
+          className="absolute rounded-sm border-2 border-status-warning bg-status-warning-light hover:bg-status-warning-light"
           style={{
             left,
             top,

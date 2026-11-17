@@ -160,7 +160,7 @@ function HistoryList({
                       <p className="truncate text-body-m">{item.name}</p>
                       <p className="mt-1 text-body-s text-text-tertiary">{historyRange(item)}</p>
                       {replayNote(item) ? (
-                        <p className="mt-1 text-body-xs text-amber-300/80">{replayNote(item)}</p>
+                        <p className="mt-1 text-body-xs text-status-warning">{replayNote(item)}</p>
                       ) : null}
                     </div>
                     <StatusBadge status={item.execution_status} />
@@ -451,13 +451,13 @@ function StageMessage({ children, tone }: { children: React.ReactNode; tone?: "e
 
 function StatusBadge({ status }: { status: HistoryItem["execution_status"] }) {
   const map: Record<HistoryItem["execution_status"], [string, string]> = {
-    ended: ["已解除", "bg-emerald-900/60 text-status-success"],
+    ended: ["已解除", "bg-status-success-light text-status-success"],
     cancelled: ["已取消預約", "bg-link-standard-hover text-text-secondary"],
     active: ["進行中", "bg-status-error-light text-status-error-emphasis"],
     activating: ["啟動中", "bg-status-error-light text-status-error-emphasis"],
     restoring: ["恢復中", "bg-status-warning-light text-status-warning"],
     scheduled: ["待執行", "bg-status-warning-light text-status-warning"],
-    failed: ["失敗", "bg-red-950 text-status-error-emphasis"],
+    failed: ["失敗", "bg-status-error-light text-status-error-emphasis"],
   };
   const [label, className] = map[status] ?? [status, "bg-link-standard-hover"];
   return <span className={`shrink-0 rounded-md px-3 py-1 text-body-s ${className}`}>{label}</span>;
@@ -493,10 +493,10 @@ function durationLabel(item: HistoryItem): string {
 }
 
 function levelText(level: number) {
-  return level === 1 ? "text-status-error" : level === 2 ? "text-orange-400" : "text-yellow-400";
+  return level === 1 ? "text-status-error" : level === 2 ? "text-status-warning" : "text-status-warning";
 }
 function levelBadge(level: number) {
-  return level === 1 ? "bg-status-error-light" : level === 2 ? "bg-amber-800" : "bg-yellow-800";
+  return level === 1 ? "bg-status-error-light" : level === 2 ? "bg-status-warning-light" : "bg-status-warning-light";
 }
 
 const pad = (value: number) => String(value).padStart(2, "0");

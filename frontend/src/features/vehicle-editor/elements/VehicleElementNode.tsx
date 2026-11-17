@@ -327,7 +327,7 @@ export function VehicleElementNode({
         )}
         {isEditMode && selected && multiSelectCount > 1 && (
           <div
-            className="pointer-events-none absolute inset-0 z-10 rounded border border-cyan-400/85"
+            className="pointer-events-none absolute inset-0 z-10 rounded border border-border-theme-light"
             style={interactionHostStyle ?? { inset: 0 }}
             aria-hidden
           />

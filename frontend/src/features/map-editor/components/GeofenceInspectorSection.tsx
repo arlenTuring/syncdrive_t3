@@ -128,7 +128,7 @@ export function GeofenceInspectorSection({
                 className="mb-1 flex items-center justify-between text-caption-2 text-text-quaternary"
               >
                 <span>{t('mapEditor.inspector.geofence.opacity')}</span>
-                <span className="font-mono text-cyan-400/90">
+                <span className="font-mono text-text-theme">
                   {Math.round(params.fillOpacity * 100)}%
                 </span>
               </label>
@@ -146,7 +146,7 @@ export function GeofenceInspectorSection({
                     fillOpacity: Number(e.target.value) / 100,
                   })
                 }
-                className="h-2 w-full cursor-pointer accent-cyan-500 disabled:opacity-40"
+                className="h-2 w-full cursor-pointer accent-link-theme-filled disabled:opacity-40"
               />
               <div className="mt-1 flex justify-between text-caption-2 text-text-disabled">
                 <span>{t('mapEditor.inspector.fullyTransparent')}</span>
@@ -207,7 +207,7 @@ export function GeofenceInspectorSection({
                   onClick={() => onSelectLabel(lb.id)}
                   className={`w-full rounded border px-2 py-1 text-left text-body-xs ${
                     selectedLabelId === lb.id
-                      ? 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200'
+                      ? 'border-border-theme-light bg-surface-theme text-text-theme-light'
                       : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-tertiary'
                   }`}
                 >

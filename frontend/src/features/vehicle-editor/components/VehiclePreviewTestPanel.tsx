@@ -83,7 +83,7 @@ export function VehiclePreviewTestPanel({
     <div className="shrink-0 border-t border-border-quaternary bg-surface-popup px-4 py-3">
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-caption-2 uppercase text-cyan-600">
+          <span className="text-caption-2 uppercase text-text-theme">
             {t('vehicleEditor.preview.title')}
           </span>
           <span className="text-body-xs text-text-quaternary">
@@ -174,7 +174,7 @@ export function VehiclePreviewTestPanel({
                 onClick={() => toggleAction(action.code)}
                 className={`rounded-full border px-2 py-0.5 text-caption-2 transition-colors ${
                   active
-                    ? 'border-amber-500/60 bg-amber-950/50 text-status-warning'
+                    ? 'border-status-warning-light bg-status-warning-light text-status-warning'
                     : 'border-border-quaternary text-text-quaternary hover:border-border-primary'
                 }`}
               >

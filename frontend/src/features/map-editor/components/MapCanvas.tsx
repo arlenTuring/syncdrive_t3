@@ -446,7 +446,7 @@ export function MapCanvas({
           {selectionCrosshair && (
             <div className="pointer-events-none absolute inset-0 z-[5]">
               <div
-                className="absolute bg-cyan-400/35"
+                className="absolute bg-surface-theme"
                 style={{
                   left: selectionCrosshair.cx - 0.5,
                   top: 0,
@@ -456,7 +456,7 @@ export function MapCanvas({
                 }}
               />
               <div
-                className="absolute bg-cyan-400/35"
+                className="absolute bg-surface-theme"
                 style={{
                   left: 0,
                   top: selectionCrosshair.cy - 0.5,

@@ -215,7 +215,7 @@ export function MapPixelFrameOverlay({
       aria-hidden={!active}
     >
       <div
-        className="pointer-events-none absolute inset-0 border border-amber-500/35"
+        className="pointer-events-none absolute inset-0 border border-status-warning-light"
         style={{
           boxShadow: active ? '0 0 0 1px rgba(251,191,36,0.2)' : undefined,
         }}
@@ -258,7 +258,7 @@ export function MapPixelFrameOverlay({
               title="拖曳調整畫布解析度（寬×高）"
             />
           ))}
-          <div className="pointer-events-none absolute left-2 top-2 z-[6002] rounded bg-amber-950/80 px-2 py-0.5 font-mono text-caption-2 text-status-warning">
+          <div className="pointer-events-none absolute left-2 top-2 z-[6002] rounded bg-status-warning-light px-2 py-0.5 font-mono text-caption-2 text-status-warning">
             畫布 {Math.round(dw)}×{Math.round(dh)} px
           </div>
         </>

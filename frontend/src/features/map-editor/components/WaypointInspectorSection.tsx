@@ -55,8 +55,8 @@ export function WaypointInspectorSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/12 p-3">
-      <h3 className="text-caption-2 uppercase text-emerald-400/90">
+    <section className="space-y-2.5 rounded-lg border border-status-success-light bg-status-success-light p-3">
+      <h3 className="text-caption-2 uppercase text-status-success">
         途經點
       </h3>
       <p className="text-caption-2 text-text-quaternary">
@@ -90,7 +90,7 @@ export function WaypointInspectorSection({
           }}
           placeholder="例：waypoint_1"
           className={`w-full rounded border bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success disabled:opacity-60 ${
-            codeError ? 'border-red-600' : 'border-border-tertiary'
+            codeError ? 'border-status-error' : 'border-border-tertiary'
           }`}
         />
         {codeError ? (

@@ -32,10 +32,10 @@ export const TrajectoryHud = memo(function TrajectoryHud({
 
   return (
     <div
-      className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-[min(100%,20rem)] rounded-md border border-cyan-500/35 bg-surface-sub-background px-3 py-2 font-mono text-body-xs text-text-primary shadow-lg backdrop-blur-sm"
+      className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-[min(100%,20rem)] rounded-md border border-border-theme-light bg-surface-sub-background px-3 py-2 font-mono text-body-xs text-text-primary shadow-lg backdrop-blur-sm"
       aria-live="polite"
     >
-      <div className="text-caption-2 uppercase text-cyan-400/90">
+      <div className="text-caption-2 uppercase text-text-theme">
         目前軌跡點
       </div>
       <div className="mt-1 text-text-tertiary">

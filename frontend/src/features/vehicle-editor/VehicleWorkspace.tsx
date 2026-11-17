@@ -474,7 +474,7 @@ export function VehicleWorkspace({
         >
             {marqueeRect && (
               <div
-                className="pointer-events-none absolute z-[60] border border-cyan-400/80 bg-cyan-400/10"
+                className="pointer-events-none absolute z-[60] border border-border-theme-light bg-surface-theme"
                 style={{
                   left: marqueeRect.x * totalScale,
                   top: marqueeRect.y * totalScale,
@@ -538,7 +538,7 @@ export function VehicleWorkspace({
                   return (
                     <div
                       data-vehicle-bulk-move-layer
-                      className="absolute z-[55] cursor-move rounded border border-dashed border-cyan-400/50 bg-cyan-400/5"
+                      className="absolute z-[55] cursor-move rounded border border-dashed border-border-theme-light bg-surface-theme"
                       style={{
                         left: bounds.x,
                         top: bounds.y,

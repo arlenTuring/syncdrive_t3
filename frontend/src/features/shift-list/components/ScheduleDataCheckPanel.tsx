@@ -20,8 +20,8 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck, embedd
   const tone = running || (!record && !error)
     ? 'border-border-quaternary bg-surface-primary text-text-secondary'
     : error || !record?.ok
-      ? 'border-red-500/50 bg-status-error-light text-status-error-emphasis'
-      : 'border-emerald-500/40 bg-status-success-light text-status-success';
+      ? 'border-border-danger-light bg-status-error-light text-status-error-emphasis'
+      : 'border-status-success-light bg-status-success-light text-status-success';
   const stage = (title: string, issues: Array<{ message: string }>, pending?: string) => (
     <div className="mt-1.5">
       <span className="font-medium">{title}：</span>
@@ -115,7 +115,7 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck, embedd
         </>
       ) : null}
       {!running && record?.ok ? (
-        <p className="mt-1 text-emerald-300/80">
+        <p className="mt-1 text-status-success">
           生成時會再確認用的仍是這一版資料；之後在地圖編輯、整備任務或時間模板改了東西，請按「重新檢查」。
         </p>
       ) : null}

@@ -297,7 +297,7 @@ function RouteGroupsCycleSummaryPanel({
             isOver
               ? 'border-border-danger-light bg-status-error-light'
               : hasLimit
-                ? 'border-status-success-light bg-emerald-500/5'
+                ? 'border-status-success-light bg-status-success-light'
                 : 'border-border-quaternary bg-surface-primary'
           }`}
         >

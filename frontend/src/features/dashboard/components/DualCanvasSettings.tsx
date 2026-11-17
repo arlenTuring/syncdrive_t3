@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Checkbox } from '../../../components/ui';
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;

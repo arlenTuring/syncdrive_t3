@@ -40,8 +40,8 @@ export function FillColorRulesSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-cyan-900/40 bg-cyan-950/15 p-3">
-      <h3 className="text-caption-2 uppercase text-cyan-500/90">
+    <section className="space-y-2.5 rounded-lg border border-border-theme-light bg-surface-theme p-3">
+      <h3 className="text-caption-2 uppercase text-text-theme">
         {title}
       </h3>
       <div className="flex flex-wrap items-center gap-2 text-caption-2 text-text-quaternary">

@@ -144,7 +144,7 @@ function FacilityLabelStyleSection({
             onChange={(n) => patchLabelStyle({ fontSizePx: n })}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
+            className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light disabled:opacity-50"
           />
           <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={readOnly || labelStyle.visible === false} onPress={() => patchLabelStyle({ fontSizePx: undefined })} title={t('mapEditor.inspector.labelStyle.autoTitle', {
               px: DEFAULT_AUTO_LABEL_FONT_PX,
@@ -401,7 +401,7 @@ export function Inspector({
             <label className="mb-1 block text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.standardLayerName')}
             </label>
-            <p className="break-all rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-cyan-300/90">
+            <p className="break-all rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-theme-light">
               {layerName}
             </p>
           </div>
@@ -416,7 +416,7 @@ export function Inspector({
               onChange={(e) => onChangeId(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light read-only:cursor-default read-only:opacity-90"
               placeholder="001"
             />
           </div>
@@ -431,7 +431,7 @@ export function Inspector({
               onChange={(e) => onChangeCustomName(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light read-only:cursor-default read-only:opacity-90"
               placeholder={t('common.optional')}
             />
           </div>
@@ -454,7 +454,7 @@ export function Inspector({
                 }
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
-                className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+                className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light read-only:cursor-default read-only:opacity-90"
                 placeholder={t('mapEditor.inspector.purposePlaceholder')}
               />
               <p className="mt-1 text-caption-2 text-text-disabled">
@@ -549,7 +549,7 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50"
+                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light"
                   />
                   <span className="shrink-0 text-caption-2 text-text-quaternary">px</span>
                 </div>
@@ -571,7 +571,7 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50"
+                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light"
                   />
                   <span className="shrink-0 text-caption-2 text-text-quaternary">px</span>
                 </div>
@@ -626,7 +626,7 @@ export function Inspector({
         {onPatchParameters && facility.type !== 'RoadLine' && (
           <InspectorSection
             title={t('mapEditor.inspector.mqtt.title')}
-            className="border-amber-900/35 bg-amber-950/12"
+            className="border-status-warning-light bg-status-warning-light"
           >
             <p className="text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.mqtt.hintBefore')}{' '}
@@ -658,13 +658,13 @@ export function Inspector({
               }}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-status-warning outline-none focus:border-amber-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-status-warning outline-none focus:border-status-warning-light read-only:opacity-80"
               placeholder={mqttTailDefault}
             />
             <div className="rounded border border-border-quaternary bg-surface-sub-background px-2 py-1.5 font-mono text-caption-2 text-text-tertiary">
               <div>
                 <span className="text-text-quaternary">{t('mapEditor.inspector.mqtt.entityIdLabel')}</span>
-                <span className="text-cyan-300/90">{resolvedEntityId}</span>
+                <span className="text-text-theme-light">{resolvedEntityId}</span>
               </div>
               <div className="mt-0.5">
                 <span className="text-text-quaternary">{t('mapEditor.inspector.mqtt.topicLabel')}</span>
@@ -672,7 +672,7 @@ export function Inspector({
               </div>
             </div>
             {legacyEntityId.length > 0 && (
-              <div className="mt-2 rounded border border-amber-800/40 bg-amber-950/40 px-2 py-1.5 text-caption-2 text-amber-100/90">
+              <div className="mt-2 rounded border border-status-warning-light bg-status-warning-light px-2 py-1.5 text-caption-2 text-status-warning">
                 <p className="mb-1">
                   {t('mapEditor.inspector.mqtt.legacyNote')}
                 </p>
@@ -687,8 +687,8 @@ export function Inspector({
         {facility.type === 'Slot' && sf && occEn && eqEn ? (
           readOnly ? (
             <InspectorSection title={t('mapEditor.inspector.slot.title')}>
-              <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
+              <div className="rounded-md border border-status-success-light bg-status-success-light p-2">
+                <div className="mb-2 text-body-xs-bold text-status-success">
                   {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
                 <p className="mb-2 text-caption-2 text-text-quaternary">
@@ -706,8 +706,8 @@ export function Inspector({
                   ))}
                 </div>
               </div>
-              <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
+              <div className="rounded-md border border-status-success-light bg-status-success-light p-2">
+                <div className="mb-2 text-body-xs-bold text-status-success">
                   {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
                 <p className="mb-2 text-caption-2 text-text-quaternary">
@@ -740,8 +740,8 @@ export function Inspector({
             </InspectorSection>
           ) : (
             <InspectorSection title={t('mapEditor.inspector.slot.title')}>
-              <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
+              <div className="rounded-md border border-status-success-light bg-status-success-light p-2">
+                <div className="mb-2 text-body-xs-bold text-status-success">
                   {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
                 <p className="mb-2 text-caption-2 text-text-quaternary">
@@ -770,8 +770,8 @@ export function Inspector({
                   })}
                 </div>
               </div>
-              <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
+              <div className="rounded-md border border-status-success-light bg-status-success-light p-2">
+                <div className="mb-2 text-body-xs-bold text-status-success">
                   {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
                 <p className="mb-2 text-caption-2 text-text-quaternary">
@@ -844,9 +844,9 @@ export function Inspector({
                   </SiteSelect>
                 </div>
               </div>
-              <div className="rounded-md border border-cyan-900/40 bg-cyan-950/20 p-2">
+              <div className="rounded-md border border-border-theme-light bg-surface-theme p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-body-xs-bold text-cyan-200/90">
+                  <span className="text-body-xs-bold text-text-theme-light">
                     {t('mapEditor.inspector.slot.previewTest')}
                   </span>
                   {slotPreview && (
@@ -923,7 +923,7 @@ export function Inspector({
         {facility.type === 'PSD' && onPatchParameters ? (
           <InspectorSection
             title={t('mapEditor.inspector.psd.title')}
-            className="border-sky-900/35 bg-sky-950/12"
+            className="border-border-theme-light bg-surface-theme"
           >
             <p className="text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.psd.hint')}
@@ -952,7 +952,7 @@ export function Inspector({
               }}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mb-2 w-full accent-sky-500 disabled:opacity-60"
+              className="mb-2 w-full accent-link-theme-filled disabled:opacity-60"
             />
             <label
               htmlFor="psd-mqtt-key"
@@ -975,7 +975,7 @@ export function Inspector({
               }
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-sky-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme-light read-only:opacity-80"
             />
             <label
               htmlFor="psd-sql-field"
@@ -999,7 +999,7 @@ export function Inspector({
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               placeholder="door_open_pct"
-              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-sky-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme-light read-only:opacity-80"
             />
             <pre className="overflow-x-auto rounded border border-border-quaternary bg-surface-sub-background p-2 font-mono text-caption-2 text-text-tertiary">
               {`{\n  "entityId": "${resolvedEntityId}",\n  "openPercent": 72,\n  "alarm": false\n}`}

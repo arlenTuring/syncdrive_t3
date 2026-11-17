@@ -8,7 +8,7 @@ import {
 } from '../store/useDataSourceStore';
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 interface Props {
   kind: DataSourceBindingKind;
@@ -45,7 +45,7 @@ export function DataSourceIdSelect({ kind, value, onChange, emptyLabel }: Props)
         ))}
       </SiteSelect>
       {invalid && (
-        <p className="mt-1 text-caption-2 text-amber-500/90">
+        <p className="mt-1 text-caption-2 text-status-warning">
           目前綁定的「{invalidName ?? value}」不是此類型，請改選
           {kind === 'sql' ? ' SQL ' : ' MQTT '}
           資料來源（設定 → 資料來源可管理分類）。

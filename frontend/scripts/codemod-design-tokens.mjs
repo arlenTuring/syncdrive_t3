@@ -4,6 +4,7 @@
  *
  *   node scripts/codemod-design-tokens.mjs <檔案…>          直接改檔
  *   node scripts/codemod-design-tokens.mjs --dry <檔案…>    只列出會改哪些
+ *   加 --families：對照表沒有的色票依色系換成語意 token（見 familyToken）
  *
  * 只處理「意思明確」的對照（文字層級、框線、常見底色、狀態色、字級）。按鈕、選取狀態、
  * 圖表色這類要看上下文的不在這裡，改完務必看畫面。對照表的依據見 t3-ui-design skill。
@@ -337,13 +338,61 @@ export const CLASS_MAP = {
   'text-2xl': 'text-headline-3',
 };
 
+/**
+ * 色系對應（--families 才啟用）：對照表沒有的 Tailwind 色票，依色系換成語意 token。
+ * 藍系→主題色、琥珀／黃／橘→警告、綠系→成功、紅系→錯誤；深色或半透明底→對應的 light 底。
+ * 不處理：中性灰的半透明底（畫布上的浮層要透明感）、紫／靛／粉（分類色，沒有語意 token）。
+ */
+const FAMILY = {
+  theme: ['cyan', 'sky', 'blue'],
+  warning: ['amber', 'yellow', 'orange'],
+  success: ['emerald', 'green', 'teal', 'lime'],
+  error: ['red', 'rose'],
+};
+const familyOf = (hue) => Object.keys(FAMILY).find((key) => FAMILY[key].includes(hue));
+const BLACK_STEPS = [5, 10, 16, 30, 50];
+const WHITE_STEPS = [40, 50, 80];
+export function familyToken(cls) {
+  const bw = cls.match(/^(bg|border|text|shadow|ring)-(black|white)\/(\d+)$/);
+  if (bw) {
+    const steps = bw[2] === 'black' ? BLACK_STEPS : WHITE_STEPS;
+    const n = Number(bw[3]);
+    return steps.includes(n) ? `${bw[1]}-${bw[2]}-${n}` : null;
+  }
+  const m = cls.match(/^(text|bg|border|ring|accent|fill|stroke|outline|divide)(?:-([trblxy]))?-([a-z]+)-(\d{2,3})(?:\/(\d+))?$/);
+  if (!m) return null;
+  const [, kind, side, hue, shadeText, alpha] = m;
+  const fam = familyOf(hue);
+  if (!fam) return null;
+  const shade = Number(shadeText);
+  const soft = alpha != null || shade >= 800;
+  const pre = side ? `${kind}-${side}` : kind;
+  if (kind === 'text' || kind === 'fill' || kind === 'stroke') {
+    if (fam === 'theme') return `${kind}-text-${shade <= 300 ? 'theme-light' : 'theme'}`;
+    if (fam === 'error') return `${kind}-status-error-emphasis`;
+    return `${kind}-status-${fam}`;
+  }
+  if (kind === 'bg') {
+    if (fam === 'theme') return soft ? 'bg-surface-theme' : 'bg-link-theme-filled';
+    return soft ? `bg-status-${fam}-light` : `bg-status-${fam}`;
+  }
+  if (kind === 'border' || kind === 'divide' || kind === 'outline' || kind === 'ring') {
+    const base = kind === 'border' && side ? pre : kind;
+    if (fam === 'theme') return `${base}-border-${soft ? 'theme-light' : 'theme'}`;
+    if (fam === 'error') return soft ? `${base}-border-danger-light` : `${base}-status-error`;
+    return `${base}-status-${fam}${soft ? '-light' : ''}`;
+  }
+  if (kind === 'accent') return fam === 'theme' ? 'accent-link-theme-filled' : null;
+  return null;
+}
+
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\/#]/g, '\\$&');
 // 前面不能是 class 字元（避免吃到 hover:text-zinc-100 以外的長名稱），後面不能接 class 字元或 /透明度
 const PATTERNS = Object.entries(CLASS_MAP)
   .sort((a, b) => b[0].length - a[0].length)
   .map(([from, to]) => [new RegExp(`(?<![\\w\\-\\[#/:])${escape(from)}(?![\\w\\-/\\]])`, 'g'), to, from]);
 
-export function migrate(text) {
+export function migrate(text, { families = false } = {}) {
   let out = text;
   const hits = {};
   for (const [pattern, to, from] of PATTERNS) {
@@ -371,15 +420,24 @@ export function migrate(text) {
     if (next !== body) hits['字重／字距整理'] = (hits['字重／字距整理'] ?? 0) + 1;
     return `${quote}${next.trimStart() === next ? next : next.trimStart()}${quote}`;
   });
+  if (families) {
+    out = out.replace(/(?<![\w\-[#/:])((?:[a-z0-9-]+:)*)((?:text|bg|border|ring|accent|fill|stroke|outline|divide|shadow)(?:-[trblxy])?-[a-z]+(?:-\d{2,3})?(?:\/\d+)?)(?![\w\-/\]])/g, (whole, prefix, cls) => {
+      const token = familyToken(cls);
+      if (!token) return whole;
+      hits[`${prefix}${cls}`] = (hits[`${prefix}${cls}`] ?? 0) + 1;
+      return `${prefix}${token}`;
+    });
+  }
   return { text: out, hits };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const dry = args.includes('--dry');
-  for (const file of args.filter((arg) => arg !== '--dry')) {
+  const families = args.includes('--families');
+  for (const file of args.filter((arg) => !arg.startsWith('--'))) {
     const before = readFileSync(file, 'utf8');
-    const { text, hits } = migrate(before);
+    const { text, hits } = migrate(before, { families });
     const total = Object.values(hits).reduce((a, b) => a + b, 0);
     if (!dry && text !== before) writeFileSync(file, text);
     console.log(`${file}: ${total} 處${total ? `（${Object.entries(hits).map(([k, v]) => `${k}×${v}`).join('、')}）` : ''}`);

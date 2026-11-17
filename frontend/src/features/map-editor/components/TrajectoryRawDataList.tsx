@@ -75,7 +75,7 @@ export const TrajectoryRawDataList = memo(function TrajectoryRawDataList({
             onClick={() => onSeekToIndex(originalIndex)}
             className={`mb-1 w-full rounded border px-1.5 py-1 text-left font-mono text-caption-2 leading-snug break-all transition enabled:cursor-pointer enabled:hover:border-border-primary enabled:hover:bg-surface-secondary ${
               active
-                ? 'border-amber-400/70 bg-amber-950/50 text-text-primary'
+                ? 'border-status-warning-light bg-status-warning-light text-text-primary'
                 : 'border-border-quaternary bg-surface-sub-background text-text-tertiary'
             }`}
           >

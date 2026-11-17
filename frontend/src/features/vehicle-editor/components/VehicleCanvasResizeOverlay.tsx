@@ -14,7 +14,7 @@ function edgeStrip(
       key={edge}
       data-vehicle-canvas-resize-handle={edge}
       role="presentation"
-      className="pointer-events-auto absolute touch-none hover:bg-cyan-400/15"
+      className="pointer-events-auto absolute touch-none hover:bg-surface-theme"
       style={{ ...style, cursor: resizeCursorForEdge(edge, 0) }}
       onPointerDown={(e) => onResizePointerDown(edge, e)}
     />
@@ -37,7 +37,7 @@ export function VehicleCanvasResizeOverlay({
       className="pointer-events-none absolute inset-0 z-[60]"
       data-vehicle-canvas-resize
     >
-      <div className="pointer-events-none absolute inset-0 rounded border-2 border-cyan-400/55" />
+      <div className="pointer-events-none absolute inset-0 rounded border-2 border-border-theme-light" />
       {edgeStrip('left', { left: -half, top: -half, bottom: -half, width: hit }, onResizePointerDown)}
       {edgeStrip('right', { left: `calc(100% - ${half}px)`, top: -half, bottom: -half, width: hit }, onResizePointerDown)}
       {edgeStrip('top', { top: -half, left: -half, right: -half, height: hit }, onResizePointerDown)}
@@ -46,7 +46,7 @@ export function VehicleCanvasResizeOverlay({
       {edgeStrip('ne', { left: `calc(100% - ${half}px)`, top: -half, width: hit, height: hit }, onResizePointerDown)}
       {edgeStrip('sw', { left: -half, top: `calc(100% - ${half}px)`, width: hit, height: hit }, onResizePointerDown)}
       {edgeStrip('se', { left: `calc(100% - ${half}px)`, top: `calc(100% - ${half}px)`, width: hit, height: hit }, onResizePointerDown)}
-      <div className="pointer-events-none absolute bottom-0 right-0 translate-y-full pt-1 font-mono text-caption-2 text-cyan-400/80">
+      <div className="pointer-events-none absolute bottom-0 right-0 translate-y-full pt-1 font-mono text-caption-2 text-text-theme">
         {sizeLabel}
       </div>
     </div>

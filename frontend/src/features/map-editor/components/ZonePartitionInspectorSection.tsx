@@ -74,14 +74,14 @@ export function ZonePartitionInspectorSection({
     null
 
   return (
-    <section className="space-y-3 rounded-xl border border-emerald-900/40 bg-gradient-to-b from-emerald-950/35 to-zinc-950/50 p-3 shadow-[inset_0_1px_0_rgba(52,211,153,0.08)]">
+    <section className="space-y-3 rounded-xl border border-status-success-light bg-gradient-to-b from-emerald-950/35 to-zinc-950/50 p-3 shadow-[inset_0_1px_0_rgba(52,211,153,0.08)]">
       <header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-emerald-700/50 bg-emerald-950/70 text-status-success">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-status-success-light bg-status-success-light text-status-success">
             <SquareDashed className="size-3.5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h3 className="text-body-xs-bold text-emerald-100/95">
+            <h3 className="text-body-xs-bold text-status-success">
               {t('mapEditor.inspector.zonePartition.title')}
             </h3>
             <p className="mt-0.5 text-caption-2 text-text-quaternary">
@@ -92,7 +92,7 @@ export function ZonePartitionInspectorSection({
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-caption-2 font-medium ${
             bound
-              ? 'border border-emerald-600/50 bg-emerald-950/80 text-status-success'
+              ? 'border border-status-success-light bg-status-success-light text-status-success'
               : 'border border-zinc-600/60 bg-surface-primary text-text-quaternary'
           }`}
         >
@@ -111,33 +111,33 @@ export function ZonePartitionInspectorSection({
         </div>
         {hasBounds ? (
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1.5 rounded-md border border-cyan-800/40 bg-cyan-950/25 px-2 py-2">
-              <div className="text-caption-2 uppercase text-cyan-500/90">
+            <div className="space-y-1.5 rounded-md border border-border-theme-light bg-surface-theme px-2 py-2">
+              <div className="text-caption-2 uppercase text-text-theme">
                 {t('mapEditor.inspector.zonePartition.axisX')}
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-caption-2 text-cyan-700/90">
+                <span className="text-caption-2 text-text-theme">
                   {t('mapEditor.inspector.zonePartition.min')}
                 </span>
-                <span className="font-mono text-body-xs text-cyan-100">
+                <span className="font-mono text-body-xs text-text-theme-light">
                   {formatBound(bounds.xMinM)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-caption-2 text-cyan-700/90">
+                <span className="text-caption-2 text-text-theme">
                   {t('mapEditor.inspector.zonePartition.max')}
                 </span>
-                <span className="font-mono text-body-xs text-cyan-100">
+                <span className="font-mono text-body-xs text-text-theme-light">
                   {formatBound(bounds.xMaxM)}
                 </span>
               </div>
             </div>
-            <div className="space-y-1.5 rounded-md border border-amber-800/40 bg-amber-950/20 px-2 py-2">
-              <div className="text-caption-2 uppercase text-amber-500/90">
+            <div className="space-y-1.5 rounded-md border border-status-warning-light bg-status-warning-light px-2 py-2">
+              <div className="text-caption-2 uppercase text-status-warning">
                 {t('mapEditor.inspector.zonePartition.axisY')}
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-caption-2 text-amber-700/90">
+                <span className="text-caption-2 text-status-warning">
                   {t('mapEditor.inspector.zonePartition.min')}
                 </span>
                 <span className="font-mono text-body-xs text-status-warning">
@@ -145,7 +145,7 @@ export function ZonePartitionInspectorSection({
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-caption-2 text-amber-700/90">
+                <span className="text-caption-2 text-status-warning">
                   {t('mapEditor.inspector.zonePartition.max')}
                 </span>
                 <span className="font-mono text-body-xs text-status-warning">
@@ -180,7 +180,7 @@ export function ZonePartitionInspectorSection({
             {t('mapEditor.inspector.zonePartition.linkAlias')}
           </span>
           <span
-            className="min-w-0 truncate text-body-xs-bold text-emerald-100/90"
+            className="min-w-0 truncate text-body-xs-bold text-status-success"
             title={binding?.linkId}
           >
             {linkAlias ?? '—'}

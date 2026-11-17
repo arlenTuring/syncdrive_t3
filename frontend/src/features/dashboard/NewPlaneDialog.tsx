@@ -42,7 +42,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
             value={name}
             onChange={e => setName(e.target.value)}
             className="w-full bg-surface-secondary border border-border-tertiary rounded-lg px-3 py-2 text-text-primary text-body-s
-                       focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/30 transition-colors"
+                       focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors"
           />
         </div>
 
@@ -56,7 +56,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
                 onClick={() => handlePreset(p.width, p.height)}
                 className={`px-3 py-2 text-body-xs rounded-lg border transition-all text-left ${
                   width === p.width && height === p.height
-                    ? 'bg-cyan-600/20 border-cyan-500 text-text-theme'
+                    ? 'bg-surface-theme border-border-theme text-text-theme'
                     : 'bg-surface-secondary border-border-tertiary text-text-tertiary hover:border-border-primary hover:text-text-primary'
                 }`}
               >
@@ -74,14 +74,14 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
               value={width}
               onChange={n => setWidth(n)}
               className="flex-1 bg-surface-secondary border border-border-tertiary rounded-lg px-3 py-2 text-text-primary text-body-s
-                         focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/30 transition-colors"
+                         focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors"
             />
             <span className="text-text-quaternary text-body-s">×</span>
             <NumberInput min={240} max={4320}
               value={height}
               onChange={n => setHeight(n)}
               className="flex-1 bg-surface-secondary border border-border-tertiary rounded-lg px-3 py-2 text-text-primary text-body-s
-                         focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/30 transition-colors"
+                         focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors"
             />
           </div>
           <p className="text-text-quaternary text-body-xs mt-1.5">{t('dashboard.newPlane.aspectRatio')}<span className="text-text-theme font-mono">{ratio}</span></p>

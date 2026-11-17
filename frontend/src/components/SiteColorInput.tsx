@@ -77,7 +77,7 @@ export function SiteColorInput({ value, onChange, disabled, className = '', name
         </label>
         <label className="mt-3 block text-body-xs text-text-tertiary">
           透明度 {Math.round(parsed.a * 100)}%
-          <input type="range" min={0} max={100} value={Math.round(parsed.a * 100)} onChange={(event) => updateAlpha(Number(event.target.value) / 100)} className="mt-1 w-full accent-sky-500" />
+          <input type="range" min={0} max={100} value={Math.round(parsed.a * 100)} onChange={(event) => updateAlpha(Number(event.target.value) / 100)} className="mt-1 w-full accent-link-theme-filled" />
         </label>
       </AnchoredPopover>
       {name ? <input type="hidden" name={name} value={source} /> : null}

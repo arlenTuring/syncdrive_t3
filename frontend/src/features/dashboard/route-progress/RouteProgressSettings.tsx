@@ -21,7 +21,7 @@ import { DashboardIconPicker } from '../components/DashboardIconPicker';
 import { WidgetDataBindingSettings } from '../elements/WidgetDataBindingSettings';
 import { Button, Checkbox, IconButton } from '../../../components/ui';
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
@@ -210,7 +210,7 @@ export function RouteProgressSettings({
       )}
 
       <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-border-quaternary text-caption-2 text-text-tertiary flex gap-2">
-        <FolderOpen size={14} className="shrink-0 text-cyan-500 mt-0.5" />
+        <FolderOpen size={14} className="shrink-0 text-text-theme mt-0.5" />
         <span>
           {t('dashboard.routeProgress.iconHint', { base: VEHICLE_OPERATION_ACTION_ICONS_BASE })}
         </span>

@@ -17,7 +17,7 @@ export function MapCropInspectorSection({
   }
   return (
     <aside data-inspector className="flex h-full min-h-0 flex-col bg-surface-primary">
-      <div className="border-b border-amber-700/50 bg-status-warning-light px-3 py-2 text-body-xs-bold uppercase text-status-warning">
+      <div className="border-b border-status-warning-light bg-status-warning-light px-3 py-2 text-body-xs-bold uppercase text-status-warning">
         裁減模式
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 text-body-s">
@@ -46,11 +46,11 @@ export function MapCropInspectorSection({
               {viewOrigin.x}, {viewOrigin.y}
             </dd>
           </div>
-          <div className="rounded-md border border-status-warning-light bg-amber-950/40 px-3 py-2.5">
+          <div className="rounded-md border border-status-warning-light bg-status-warning-light px-3 py-2.5">
             <dt className="text-body-xs-bold text-status-warning">輸出解析度</dt>
-            <dd className="mt-1 font-mono text-headline-4 tabular-nums text-amber-50">
+            <dd className="mt-1 font-mono text-headline-4 tabular-nums text-status-warning">
               {outputSize.width}×{outputSize.height}
-              <span className="ml-1 text-body-s-bold text-amber-200/70">px</span>
+              <span className="ml-1 text-body-s-bold text-status-warning">px</span>
             </dd>
           </div>
         </dl>

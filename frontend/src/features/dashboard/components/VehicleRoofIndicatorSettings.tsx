@@ -39,7 +39,7 @@ export function VehicleRoofIndicatorSettings({
   );
 
   return (
-    <div className="space-y-2 rounded-lg border border-sky-500/25 bg-surface-theme-light p-3">
+    <div className="space-y-2 rounded-lg border border-border-theme-light bg-surface-theme-light p-3">
       <div className="text-caption-2 uppercase text-text-theme">車頂軌道進度</div>
       <p className="text-caption-2 text-text-quaternary">
         名稱＝車目前判給的軌道；線段左端是這次通行的入口、箭頭是出口；百分比是這條軌道走了幾成（換軌道重算，不是整張訂單的進度）。停在格位、在場區移動（沒有對應軌道）時不顯示。

@@ -66,7 +66,7 @@ export function PlanExecutionDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-surface-secondary p-3 text-center text-text-tertiary">
                 <span className="block text-body-s">等級</span>
-                <b className="text-headline-5 font-normal text-yellow-300">
+                <b className="text-headline-5 font-normal text-status-warning">
                   Level {plan.level}
                 </b>
               </div>

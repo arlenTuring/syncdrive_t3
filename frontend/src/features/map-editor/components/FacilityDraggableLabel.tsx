@@ -292,8 +292,8 @@ export function FacilityDraggableLabel({
           interactive
             ? [
                 'cursor-grab rounded active:cursor-grabbing',
-                'hover:outline hover:outline-1 hover:outline-cyan-400/70',
-                selected ? 'ring-1 ring-cyan-400/40' : 'opacity-95',
+                'hover:outline hover:outline-1 hover:outline-border-theme-light',
+                selected ? 'ring-1 ring-border-theme-light' : 'opacity-95',
               ].join(' ')
             : 'pointer-events-none',
         ].join(' ')}
@@ -333,7 +333,7 @@ export function FacilityDraggableLabel({
           aria-label="旋轉名稱"
           title="拖曳以旋轉名稱"
           onPointerDown={onRotatePointerDown}
-          className="absolute top-1/2 flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full border border-cyan-400/80 bg-zinc-900/95 text-text-theme shadow-md active:cursor-grabbing hover:bg-cyan-950"
+          className="absolute top-1/2 flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full border border-border-theme-light bg-zinc-900/95 text-text-theme shadow-md active:cursor-grabbing hover:bg-surface-theme"
           style={{ left: handleDist }}
         >
           <RotateCw className="size-3" strokeWidth={2.25} aria-hidden />

@@ -82,7 +82,7 @@ function TimeColumn({
           onClick={() => onChange(n)}
           className={`flex h-8 w-full items-center justify-center font-mono text-body-s transition ${
             value === n
-              ? 'bg-sky-600/35 font-medium text-text-theme'
+              ? 'bg-surface-theme font-medium text-text-theme'
               : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
           }`}
         >
@@ -175,7 +175,7 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
                   onClick={() => pickDay(cell)}
                   className={`mx-auto flex size-8 items-center justify-center rounded-full text-body-s transition ${
                     selected
-                      ? 'bg-sky-600 font-medium text-text-primary'
+                      ? 'bg-link-theme-filled font-medium text-text-primary'
                       : cell.inMonth
                         ? 'text-text-primary hover:bg-link-standard-hover'
                         : 'text-text-disabled hover:bg-link-standard'

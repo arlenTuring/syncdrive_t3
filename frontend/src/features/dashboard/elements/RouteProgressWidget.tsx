@@ -353,7 +353,7 @@ function DispatchCardView({
               {etaRem || '—'}
               {etaDelay && (
                 <span
-                  className="ml-1 font-bold text-orange-400"
+                  className="ml-1 font-bold text-status-warning"
                   style={{ fontSize: Math.max(9, Math.round(10 * scale)) }}
                 >
                   {etaDelay}
@@ -1027,7 +1027,7 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
       title={progressState === 'stale' ? '車端回報暫停，顯示最後有效位置' : undefined}
     >
       {progressState === 'stale' ? (
-        <span className="pointer-events-none absolute right-0 top-0 z-30 rounded bg-surface-primary px-1 text-caption-2 text-amber-300/90">
+        <span className="pointer-events-none absolute right-0 top-0 z-30 rounded bg-surface-primary px-1 text-caption-2 text-status-warning">
           資料暫停
         </span>
       ) : null}

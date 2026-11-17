@@ -912,7 +912,7 @@ export const FacilityNode = memo(function FacilityNode({
 
   const slotOccCls =
     slotOcc === 'Occupied'
-      ? 'border-amber-500/90 bg-amber-950/35'
+      ? 'border-status-warning-light bg-status-warning-light'
       : 'border-border-tertiary'
   const slotEqCls =
     slotEq === 'Working'
@@ -2352,7 +2352,7 @@ export const FacilityNode = memo(function FacilityNode({
         !isDragging &&
         !isResizing && (
           <div
-            className="pointer-events-none absolute z-[120] whitespace-pre-wrap rounded-md border border-cyan-500/30 bg-surface-popup px-2 py-1 text-body-xs text-cyan-200 shadow-lg"
+            className="pointer-events-none absolute z-[120] whitespace-pre-wrap rounded-md border border-border-theme-light bg-surface-popup px-2 py-1 text-body-xs text-text-theme-light shadow-lg"
             style={{
               left: hitPadX + nw / 2,
               top: Math.max(0, hitPadY - 6),
@@ -2434,9 +2434,9 @@ export const FacilityNode = memo(function FacilityNode({
                 ? 'flex size-full items-center justify-center border-0 p-0 shadow-none bg-transparent'
                 : isFacilityFamily
                   ? isZoneEntranceBlock
-                    ? 'flex flex-col items-center justify-center rounded-md border-2 border-dashed border-cyan-400/70 bg-transparent p-1 text-text-primary'
+                    ? 'flex flex-col items-center justify-center rounded-md border-2 border-dashed border-border-theme-light bg-transparent p-1 text-text-primary'
                     : isZonePartitionBlock
-                      ? 'flex flex-col items-center justify-center rounded-md border border-solid border-cyan-400/45 p-1 text-text-primary shadow-none'
+                      ? 'flex flex-col items-center justify-center rounded-md border border-solid border-border-theme-light p-1 text-text-primary shadow-none'
                       : 'flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-400/60 p-1 text-text-primary shadow-md'
                   : [
                       'overflow-hidden rounded-md border text-text-primary shadow-lg',
@@ -2449,33 +2449,33 @@ export const FacilityNode = memo(function FacilityNode({
                   slotOccCls,
                   slotEqCls,
                   selected
-                    ? 'ring-2 ring-cyan-400/80 bg-zinc-800/95'
+                    ? 'ring-2 ring-border-theme-light bg-zinc-800/95'
                     : 'bg-zinc-800/90 hover:border-border-primary',
                 ].join(' ')
               : isPsd || isSignal || isDockingPoint || isWaypoint || isPole || (isFacilityArea && useDraggableMapLabel)
                 ? selected
-                  ? 'ring-2 ring-cyan-400/90 ring-offset-0'
-                  : 'hover:ring-1 hover:ring-cyan-500/40'
+                  ? 'ring-2 ring-border-theme-light ring-offset-0'
+                  : 'hover:ring-1 hover:ring-border-theme-light'
                 : isTrack || isRoadLine || isBasemap
                   ? selected
-                    ? 'ring-2 ring-cyan-400/90 ring-offset-0'
-                    : 'hover:ring-1 hover:ring-cyan-500/35'
+                    ? 'ring-2 ring-border-theme-light ring-offset-0'
+                    : 'hover:ring-1 hover:ring-border-theme-light'
                   : isFacilityFamily
                     ? selected
-                      ? 'ring-2 ring-cyan-400/95 ring-offset-0'
-                      : 'hover:ring-1 hover:ring-cyan-500/35'
+                      ? 'ring-2 ring-border-theme-light ring-offset-0'
+                      : 'hover:ring-1 hover:ring-border-theme-light'
                     : selected
-                      ? 'border-cyan-400 bg-zinc-800/95 ring-2 ring-cyan-400/80'
+                      ? 'border-border-theme bg-zinc-800/95 ring-2 ring-border-theme-light'
                       : 'border-border-tertiary bg-zinc-800/90 hover:border-border-primary',
             !isPsd && (mqttLive?.blinkSeq ?? 0) > 0 ? 'animate-mqtt-flash' : '',
             !isPsd && highlightFlash
-              ? 'outline outline-2 outline-amber-400/95 outline-offset-1'
+              ? 'outline outline-2 outline-status-warning-light outline-offset-1'
               : '',
             // 軌道檢查：圖面位置與現場座標對不上的軌道，紅（嚴重）或琥珀（注意）框起來
             isTrack && trackDiagStatus === 'error'
-              ? 'outline outline-2 outline-offset-1 outline-red-500/90'
+              ? 'outline outline-2 outline-offset-1 outline-border-danger-light'
               : isTrack && trackDiagStatus === 'warn'
-                ? 'outline outline-2 outline-offset-1 outline-amber-400/90'
+                ? 'outline outline-2 outline-offset-1 outline-status-warning-light'
                 : '',
           ]
             .filter(Boolean)
@@ -2543,7 +2543,7 @@ export const FacilityNode = memo(function FacilityNode({
                     'shrink-0 rounded-full shadow-md ring-2',
                     facility.currentState === 'Inactive'
                       ? 'bg-status-inactive ring-zinc-400/50'
-                      : 'bg-blue-500 ring-blue-300/70',
+                      : 'bg-link-theme-filled ring-border-theme-light',
                   ].join(' ')}
                   style={{ width: dockingDotSize, height: dockingDotSize }}
                   aria-hidden
@@ -2734,7 +2734,7 @@ export const FacilityNode = memo(function FacilityNode({
         {selected && (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 z-[74] border-2 border-cyan-400/95"
+            className="pointer-events-none absolute inset-0 z-[74] border-2 border-border-theme-light"
           />
         )}
         {selected && !readOnly && onResize && (
@@ -2768,7 +2768,7 @@ export const FacilityNode = memo(function FacilityNode({
               >
                 <div
                   className={[
-                    'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-cyan-400 bg-surface-primary shadow-md ring-1 ring-cyan-500/40 transition-opacity',
+                    'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-border-theme bg-surface-primary shadow-md ring-1 ring-border-theme-light transition-opacity',
                     isPole ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                   ].join(' ')}
                   title={t('mapEditor.inspector.node.resizeEdge')}
@@ -2799,7 +2799,7 @@ export const FacilityNode = memo(function FacilityNode({
                 onPointerCancel={endResize}
               >
                 <div
-                  className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-cyan-300 bg-surface-primary shadow-md ring-1 ring-cyan-500/40"
+                  className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-border-theme bg-surface-primary shadow-md ring-1 ring-border-theme-light"
                   title={
                     isCornerTrack || isTaperTrack || isSwitchTrack
                       ? t('mapEditor.inspector.node.resizeProportional')
@@ -3118,7 +3118,7 @@ export const FacilityNode = memo(function FacilityNode({
             onPointerUp={onRotateHandleEnd}
             onPointerCancel={onRotateHandleEnd}
           >
-            <div className="flex size-5 items-center justify-center rounded-full border-2 border-cyan-400 bg-surface-primary shadow-md ring-1 ring-cyan-500/40">
+            <div className="flex size-5 items-center justify-center rounded-full border-2 border-border-theme bg-surface-primary shadow-md ring-1 ring-border-theme-light">
               <RotateCw className="size-3 text-text-theme" aria-hidden />
             </div>
           </div>
@@ -3169,7 +3169,7 @@ export const FacilityNode = memo(function FacilityNode({
             ).map(([label, pt]) => (
               <div
                 key={`taper-corner-${label}`}
-                className="pointer-events-none absolute z-[87] flex size-4 items-center justify-center rounded-sm border border-emerald-300/90 bg-emerald-950/90 text-caption-2 text-emerald-100 shadow"
+                className="pointer-events-none absolute z-[87] flex size-4 items-center justify-center rounded-sm border border-status-success-light bg-status-success-light text-caption-2 text-status-success shadow"
                 style={{
                   left: pt.x,
                   top: pt.y,
@@ -3266,8 +3266,8 @@ export const FacilityNode = memo(function FacilityNode({
                         className={[
                           'size-3.5 rounded-full border-2 shadow-md',
                           joinDragKey === key && joinProbe
-                            ? 'border-emerald-300 bg-status-success'
-                            : 'border-white bg-blue-500',
+                            ? 'border-status-success bg-status-success'
+                            : 'border-white bg-link-theme-filled',
                         ].join(' ')}
                       />
                     </div>
@@ -3441,8 +3441,8 @@ export const FacilityNode = memo(function FacilityNode({
                   className={[
                     'pointer-events-none absolute inset-0 rounded-full',
                     dockingPointFocused
-                      ? 'bg-cyan-400/25 ring-2 ring-cyan-300/90'
-                      : 'bg-emerald-400/15 ring-1 ring-emerald-200/70',
+                      ? 'bg-surface-theme ring-2 ring-border-theme-light'
+                      : 'bg-status-success-light ring-1 ring-status-success-light',
                   ].join(' ')}
                   aria-hidden
                 />
@@ -3451,10 +3451,10 @@ export const FacilityNode = memo(function FacilityNode({
                 className={[
                   'rounded-full shadow-md ring-2 transition-colors',
                   dockingPointFocused
-                    ? 'bg-emerald-300 ring-cyan-200 shadow-cyan-400/40'
+                    ? 'bg-status-success ring-border-theme shadow-cyan-400/40'
                     : dockingPointHovered
-                      ? 'bg-status-success ring-emerald-100'
-                      : 'bg-status-success ring-emerald-300/70',
+                      ? 'bg-status-success ring-status-success'
+                      : 'bg-status-success ring-status-success-light',
                 ].join(' ')}
                 style={{
                   width: Math.max(7.5, Math.min(Math.min(nw, nh) * 0.135, 13.5)),
@@ -3464,7 +3464,7 @@ export const FacilityNode = memo(function FacilityNode({
               />
             </div>
             {dockingPointFocused && displayDockingPoint ? (
-              <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-cyan-500/40 bg-surface-popup px-1.5 py-0.5 font-mono text-caption-2 text-cyan-100 shadow-lg">
+              <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-border-theme-light bg-surface-popup px-1.5 py-0.5 font-mono text-caption-2 text-text-theme-light shadow-lg">
                 {displayDockingPoint.xM.toFixed(2)}, {displayDockingPoint.yM.toFixed(2)} m
               </div>
             ) : null}
@@ -3508,7 +3508,7 @@ export const FacilityNode = memo(function FacilityNode({
             offsetY={4}
           >
             <div
-              className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
+              className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-border-theme-light"
               role="toolbar"
               aria-label={t('mapEditor.inspector.node.toolbarRotate')}
             >
@@ -3534,7 +3534,7 @@ export const FacilityNode = memo(function FacilityNode({
                   >
                     <RotateCcw className="size-4" aria-hidden />
                   </button>
-                  <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-cyan-400/90">
+                  <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-text-theme">
                     {angleLabel}
                   </span>
                   <button
@@ -3600,7 +3600,7 @@ export const FacilityNode = memo(function FacilityNode({
                     e.preventDefault()
                     onAddFacilityInsideZone()
                   }}
-                  className="rounded-full p-1.5 text-emerald-200/95 transition hover:bg-emerald-950/70 hover:text-emerald-100"
+                  className="rounded-full p-1.5 text-status-success transition hover:bg-status-success-light hover:text-status-success"
                 >
                   <LayoutGrid className="size-4" aria-hidden />
                 </button>
@@ -3620,7 +3620,7 @@ export const FacilityNode = memo(function FacilityNode({
                     e.preventDefault()
                     onDelete()
                   }}
-                  className="rounded-full p-1.5 text-red-300/90 transition hover:bg-red-950/80 hover:text-status-error-emphasis"
+                  className="rounded-full p-1.5 text-status-error-emphasis transition hover:bg-status-error-light hover:text-status-error-emphasis"
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </button>

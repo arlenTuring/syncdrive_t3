@@ -49,7 +49,7 @@ export function SummaryCards({
         <div className="mt-3 flex flex-1 items-center justify-center rounded-xl bg-[#1B4332] px-4 py-8 text-center">
           <div>
             <div className="text-headline-2 text-text-primary">{mode.modeLabel}</div>
-            <div className="mt-1 text-body-s text-white/80">{mode.modeLevel}</div>
+            <div className="mt-1 text-body-s text-white-80">{mode.modeLevel}</div>
           </div>
         </div>
       </section>
@@ -113,13 +113,13 @@ export function SummaryCards({
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-body-xs ${
                 schedule.pending
-                  ? 'bg-orange-950 text-orange-300'
-                  : 'bg-emerald-900 text-status-success'
+                  ? 'bg-status-warning-light text-status-warning'
+                  : 'bg-status-success-light text-status-success'
               }`}
             >
               <span
                 className={`size-1.5 rounded-full ${
-                  schedule.pending ? 'bg-orange-400' : 'bg-status-success'
+                  schedule.pending ? 'bg-status-warning' : 'bg-status-success'
                 }`}
               />
               {schedule.statusLabel}
@@ -128,7 +128,7 @@ export function SummaryCards({
           <div className="mt-2 flex items-center gap-2">
             <span
               className={`h-5 w-0.5 rounded-full ${
-                schedule.pending ? 'bg-orange-400' : 'bg-status-success'
+                schedule.pending ? 'bg-status-warning' : 'bg-status-success'
               }`}
             />
             <span className="text-headline-5 text-text-primary">{schedule.scheduleName}</span>
@@ -159,7 +159,7 @@ export function SummaryCards({
         <button
           type="button"
           onClick={() => onAction({ kind: 'event-open' })}
-          className="mt-3 flex items-start gap-3 rounded-xl border border-red-400/80 bg-status-error-light p-3 text-left transition hover:bg-red-950/50"
+          className="mt-3 flex items-start gap-3 rounded-xl border border-border-danger-light bg-status-error-light p-3 text-left transition hover:bg-status-error-light"
         >
           <AlertTriangle className="mt-0.5 size-6 shrink-0 text-status-error-emphasis" />
           <div className="min-w-0 flex-1">
@@ -206,7 +206,7 @@ function DispatchControlPanel({
     ? 'bg-status-inactive'
     : dispatchEnabled
       ? 'bg-status-success'
-      : 'bg-orange-400';
+      : 'bg-status-warning';
 
   return (
     <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-surface-primary px-3 py-2">

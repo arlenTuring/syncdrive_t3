@@ -833,7 +833,7 @@ function SizeDialogBody({
         </div>
 
         <div
-          className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-surface-primary"
+          className="relative shrink-0 self-center overflow-hidden rounded-md border border-border-theme-light bg-surface-primary"
           style={{ width: stageW, height: stageH }}
         >
           {/*
@@ -1403,7 +1403,7 @@ function SizeDialogBody({
                   onClick={() => (editingId === g.id ? undefined : editGroup(g))}
                   className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-body-xs transition disabled:opacity-40 ${
                     editingId === g.id
-                      ? 'border-cyan-400 text-cyan-100'
+                      ? 'border-border-theme text-text-theme-light'
                       : 'border-border-tertiary text-text-secondary hover:border-border-secondary'
                   }`}
                 >
@@ -1564,8 +1564,8 @@ function SizeDialogBody({
                         key={x.name}
                         className={`rounded border px-1 py-0.5 font-mono ${
                           x.deltaM > 0
-                            ? 'border-emerald-600/50 text-status-success'
-                            : 'border-rose-600/50 text-status-error-emphasis'
+                            ? 'border-status-success-light text-status-success'
+                            : 'border-border-danger-light text-status-error-emphasis'
                         }`}
                       >
                         {x.name} {x.deltaM > 0 ? '+' : ''}
@@ -1591,7 +1591,7 @@ function SizeDialogBody({
                   <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-1to2 disabled={!mergeChecks.aToB.ok} onPress={() => commitMerge(picks[0]!, picks[1]!)}>{t('mapEditor.trackGen.merge.oneIntoTwo')}</Button>
                   <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-2to1 disabled={!mergeChecks.bToA.ok} onPress={() => commitMerge(picks[1]!, picks[0]!)}>{t('mapEditor.trackGen.merge.twoIntoOne')}</Button>
                   {!mergeChecks.aToB.ok && !mergeChecks.bToA.ok ? (
-                    <span className="text-caption-2 text-amber-300/80" data-trackgen-merge-reason>
+                    <span className="text-caption-2 text-status-warning" data-trackgen-merge-reason>
                       {t(
                         `mapEditor.trackGen.merge.reason.${
                           (mergeChecks.aToB as { reason: TrackGenMergeRefusal }).reason

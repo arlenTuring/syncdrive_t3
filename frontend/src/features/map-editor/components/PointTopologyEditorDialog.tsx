@@ -433,7 +433,7 @@ function EdgeArrow({
                 className={[
                   'rounded-md border px-1.5 py-0.5 shadow-sm whitespace-nowrap text-caption-2 tabular-nums',
                   selected
-                    ? 'border-cyan-500/60 bg-cyan-950/95 text-cyan-100'
+                    ? 'border-border-theme-light bg-surface-theme text-text-theme-light'
                     : 'border-zinc-600/80 bg-surface-sub-background text-text-primary',
                 ].join(' ')}
               >
@@ -1518,7 +1518,7 @@ export function PointTopologyEditorDialog({
             type="button"
             onClick={() => setListOpen((v) => !v)}
             className={[
-              'absolute top-1/2 z-40 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border border-zinc-500/80 bg-zinc-900/95 text-text-primary shadow-lg backdrop-blur-sm transition hover:bg-link-standard-hover hover:text-cyan-200',
+              'absolute top-1/2 z-40 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border border-zinc-500/80 bg-zinc-900/95 text-text-primary shadow-lg backdrop-blur-sm transition hover:bg-link-standard-hover hover:text-text-theme-light',
               listOpen
                 ? 'left-56 rounded-r-md border-l-0'
                 : 'left-0 rounded-r-xl border-l-0',
@@ -1574,7 +1574,7 @@ export function PointTopologyEditorDialog({
                           className={[
                             'flex items-center gap-1 rounded-md px-1.5 py-1 transition',
                             active
-                              ? 'bg-cyan-950/70 ring-1 ring-cyan-500/50'
+                              ? 'bg-surface-theme ring-1 ring-border-theme-light'
                               : 'hover:bg-surface-secondary',
                           ].join(' ')}
                         >
@@ -1820,7 +1820,7 @@ export function PointTopologyEditorDialog({
                 && Math.hypot(marquee.x1 - marquee.x0, marquee.y1 - marquee.y0)
                   > MARQUEE_THRESHOLD_PX ? (
                 <div
-                  className="pointer-events-none absolute z-[5] border border-cyan-400/80 bg-cyan-400/15"
+                  className="pointer-events-none absolute z-[5] border border-border-theme-light bg-surface-theme"
                   style={{
                     left: Math.min(marquee.x0, marquee.x1),
                     top: Math.min(marquee.y0, marquee.y1),
@@ -1884,9 +1884,9 @@ export function PointTopologyEditorDialog({
                     className={[
                       'absolute z-[10] flex select-none flex-col items-center justify-center rounded-full border-2 px-1.5 text-center shadow-lg transition duration-150',
                       linkReady
-                        ? 'z-20 scale-110 border-emerald-300 ring-4 ring-emerald-400/80'
+                        ? 'z-20 scale-110 border-status-success ring-4 ring-status-success-light'
                         : selected
-                          ? 'border-cyan-300 ring-2 ring-cyan-400/70'
+                          ? 'border-border-theme ring-2 ring-border-theme-light'
                           : 'border-border-tertiary',
                       linkBlocked ? 'opacity-40' : '',
                       'cursor-grab active:cursor-grabbing',
@@ -1941,7 +1941,7 @@ export function PointTopologyEditorDialog({
                         ? t('mapEditor.pointTopology.dragDispatch')
                         : t('mapEditor.pointTopology.dragConnect')
                     }
-                    className="absolute z-30 rounded-full border border-cyan-300 bg-cyan-950 shadow-md hover:bg-cyan-800"
+                    className="absolute z-30 rounded-full border border-border-theme bg-surface-theme shadow-md hover:bg-surface-theme"
                     style={{
                       left: anchor.x - ANCHOR_SIZE / 2,
                       top: anchor.y - ANCHOR_SIZE / 2,
@@ -1964,7 +1964,7 @@ export function PointTopologyEditorDialog({
                       <button
                         type="button"
                         title={t('mapEditor.pointTopology.dragSource')}
-                        className="absolute z-40 rounded-full border-2 border-white bg-cyan-500 shadow-lg hover:scale-110 hover:bg-cyan-400"
+                        className="absolute z-40 rounded-full border-2 border-white bg-link-theme-filled shadow-lg hover:scale-110 hover:bg-link-theme-filled"
                         style={{
                           left: selectedEdgePath.x1 - RECONNECT_HANDLE_SIZE / 2,
                           top: selectedEdgePath.y1 - RECONNECT_HANDLE_SIZE / 2,
@@ -1985,7 +1985,7 @@ export function PointTopologyEditorDialog({
                       <button
                         type="button"
                         title={t('mapEditor.pointTopology.dragTarget')}
-                        className="absolute z-40 rounded-full border-2 border-white bg-cyan-500 shadow-lg hover:scale-110 hover:bg-cyan-400"
+                        className="absolute z-40 rounded-full border-2 border-white bg-link-theme-filled shadow-lg hover:scale-110 hover:bg-link-theme-filled"
                         style={{
                           left: selectedEdgePath.x2 - RECONNECT_HANDLE_SIZE / 2,
                           top: selectedEdgePath.y2 - RECONNECT_HANDLE_SIZE / 2,
@@ -2219,11 +2219,11 @@ export function PointTopologyEditorDialog({
                   </SiteSelect>
                 </label>
                 {dockingNodes.length === 0 ? (
-                  <p className="text-caption-2 text-amber-300/90">
+                  <p className="text-caption-2 text-status-warning">
                     {t('mapEditor.pointTopology.needDockingFirst')}
                   </p>
                 ) : selectedFacilityDispatchId ? (
-                  <p className="text-caption-2 text-lime-200/80">
+                  <p className="text-caption-2 text-status-success">
                     {t('mapEditor.pointTopology.assignedDispatch', {
                       label: labelForTopologyNode(draft, selectedFacilityDispatchId, areas),
                     })}
@@ -2243,7 +2243,7 @@ export function PointTopologyEditorDialog({
             <Button hierarchy="subordinate" variant="outlined" disabled={!canUndo} onPress={undoDraft} title={t('mapEditor.pointTopology.undoTitle')}>{t('mapEditor.pointTopology.undo')}</Button>
             <Button hierarchy="subordinate" variant="outlined" disabled={!canRedo} onPress={redoDraft} title={t('mapEditor.pointTopology.redoTitle')}>{t('mapEditor.pointTopology.redo')}</Button>
             {hasInvalidTravelTimes ? (
-              <p className="min-w-0 text-caption-2 text-red-300/95">
+              <p className="min-w-0 text-caption-2 text-status-error-emphasis">
                 {t('mapEditor.pointTopology.invalidTravel', { count: invalidTravelEdges.length })}
               </p>
             ) : null}
@@ -2340,7 +2340,7 @@ function EdgePropertiesForm({
         <div className="space-y-1">
           {isBidirectional ? (
             <>
-              <div className="w-full rounded-lg border border-status-success-light bg-emerald-950/40 px-3 py-2 text-center text-body-xs-bold text-status-success">
+              <div className="w-full rounded-lg border border-status-success-light bg-status-success-light px-3 py-2 text-center text-body-xs-bold text-status-success">
                 {t('mapEditor.pointTopology.bidirectional')}
               </div>
               {oppositeEdge ? (
@@ -2353,7 +2353,7 @@ function EdgePropertiesForm({
                       className={`rounded-lg border px-2.5 py-2 text-body-xs leading-snug ${
                         oppositeHasTime
                           ? 'border-border-quaternary bg-surface-primary text-text-secondary'
-                          : 'border-status-warning-light bg-amber-950/40 text-status-warning'
+                          : 'border-status-warning-light bg-status-warning-light text-status-warning'
                       }`}
                     >
                       <p>
@@ -2385,7 +2385,7 @@ function EdgePropertiesForm({
                 : t('mapEditor.pointTopology.reverseBlocked')
             }>{t('mapEditor.pointTopology.reverseDirection', { from: fromLabel, to: toLabel })}</Button>
           {!canReverse ? (
-            <p className="text-caption-2 text-amber-300/80">
+            <p className="text-caption-2 text-status-warning">
               {t('mapEditor.pointTopology.reverseBlockedHint')}
             </p>
           ) : null}
@@ -2426,7 +2426,7 @@ function EdgePropertiesForm({
       {edge.minTravelTimeSeconds != null
         && edge.avgTravelTimeSeconds != null
         && edge.minTravelTimeSeconds > edge.avgTravelTimeSeconds ? (
-        <p className="text-caption-2 text-red-300/95">
+        <p className="text-caption-2 text-status-error-emphasis">
           {t('mapEditor.pointTopology.minGtAvg')}
         </p>
       ) : null}

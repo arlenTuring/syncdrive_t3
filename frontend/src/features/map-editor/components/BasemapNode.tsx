@@ -920,7 +920,7 @@ export const BasemapNode = memo(function BasemapNode({
         {selected ? (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 z-[2] border-2 border-cyan-400/90"
+            className="pointer-events-none absolute inset-0 z-[2] border-2 border-border-theme-light"
           />
         ) : null}
         {canEdit && selected && !isTrackGen ? (
@@ -966,7 +966,7 @@ export const BasemapNode = memo(function BasemapNode({
             >
               <div
                 data-basemap-toolbar
-                className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
+                className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-border-theme-light"
                 role="toolbar"
                 aria-label={
                   isTrackGen

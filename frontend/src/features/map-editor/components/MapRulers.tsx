@@ -97,7 +97,7 @@ export function HorizontalRuler({
                 : undefined
             }
           >
-            <div className="h-2.5 w-px bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
+            <div className="h-2.5 w-px bg-link-theme-filled shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
           </div>
         )}
       </div>
@@ -164,7 +164,7 @@ export function VerticalRuler({
                 : undefined
             }
           >
-            <div className="h-px w-2.5 shrink-0 bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
+            <div className="h-px w-2.5 shrink-0 bg-link-theme-filled shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
           </div>
         )}
       </div>

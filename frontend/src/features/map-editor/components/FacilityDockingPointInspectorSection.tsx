@@ -65,10 +65,10 @@ export function FacilityDockingPointInspectorSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/15 p-3">
+    <section className="space-y-2.5 rounded-lg border border-status-success-light bg-status-success-light p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-caption-2 uppercase text-emerald-400/90">
+          <h3 className="text-caption-2 uppercase text-status-success">
             設施停靠點
           </h3>
           <p className="mt-1 text-caption-2 text-text-quaternary">
@@ -77,7 +77,7 @@ export function FacilityDockingPointInspectorSection({
         </div>
         {point ? (
           <span
-            className="mt-0.5 size-2.5 shrink-0 rounded-full bg-status-success ring-2 ring-emerald-300/60"
+            className="mt-0.5 size-2.5 shrink-0 rounded-full bg-status-success ring-2 ring-status-success-light"
             aria-hidden
           />
         ) : null}

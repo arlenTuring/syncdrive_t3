@@ -22,7 +22,7 @@ export function VehicleContainerWidgetView({
   return (
     <div className="relative h-full w-full overflow-visible">
       {isEditMode && (
-        <span className="pointer-events-none absolute -top-4 left-0 z-30 rounded bg-amber-950/90 px-1.5 py-px text-[8px] font-semibold text-status-warning">
+        <span className="pointer-events-none absolute -top-4 left-0 z-30 rounded bg-status-warning-light px-1.5 py-px text-[8px] font-semibold text-status-warning">
           載具樣板
         </span>
       )}
@@ -35,7 +35,7 @@ export function VehicleContainerWidgetView({
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-1 rounded bg-[#0a0f1a]/90 text-text-quaternary">
-          <Bus size={20} className="text-amber-500/60" />
+          <Bus size={20} className="text-status-warning" />
           <span className="text-caption-2">請選擇車輛模型</span>
         </div>
       )}

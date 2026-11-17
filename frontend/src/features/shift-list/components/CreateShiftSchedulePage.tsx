@@ -189,7 +189,7 @@ function CreateStepSidebar({
                         : isStepLockedByInvalidation
                           ? 'border-status-warning bg-status-warning text-text-invert'
                           : completed
-                            ? 'border-emerald-600 bg-status-success-light text-status-success'
+                            ? 'border-status-success bg-status-success-light text-status-success'
                             : 'border-border-quaternary bg-surface-secondary text-text-secondary'
                     }`}
                   >

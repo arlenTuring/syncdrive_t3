@@ -79,7 +79,7 @@ function RouteAppendOptionGroup({
             className={[
               'w-full rounded px-2 py-1.5 text-left text-body-xs hover:bg-link-standard-hover',
               dropdownStationId === station.stationId
-                ? 'bg-amber-950/40 text-status-warning'
+                ? 'bg-status-warning-light text-status-warning'
                 : 'text-text-primary',
             ].join(' ')}
           >
@@ -309,7 +309,7 @@ export function RoutePlanningPanel({
               onChange={(e) => onDraftNameChange(e.target.value)}
               placeholder={t('mapEditor.routePlanning.namePlaceholder')}
               disabled={!editMode}
-              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary placeholder:text-text-quaternary focus:border-amber-500/60 focus:outline-none"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary placeholder:text-text-quaternary focus:border-status-warning-light focus:outline-none"
             />
           </div>
 
@@ -323,7 +323,7 @@ export function RoutePlanningPanel({
                   <button
                     type="button"
                     onClick={() => setPickerOpen((v) => !v)}
-                    className="flex w-full items-center justify-between gap-2 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-left text-body-xs text-text-primary hover:border-status-warning-light focus:border-amber-500/60 focus:outline-none"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-left text-body-xs text-text-primary hover:border-status-warning-light focus:border-status-warning-light focus:outline-none"
                   >
                     <span
                       className={
@@ -348,7 +348,7 @@ export function RoutePlanningPanel({
                         <>
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.docking')}
-                            titleClassName="text-blue-400/80"
+                            titleClassName="text-text-theme"
                             options={selectableGroups.docking}
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}
@@ -362,14 +362,14 @@ export function RoutePlanningPanel({
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.waypoint')}
-                            titleClassName="text-emerald-400/80"
+                            titleClassName="text-status-success"
                             options={selectableGroups.waypoint}
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.crossWaypoint')}
-                            titleClassName="text-teal-400/80"
+                            titleClassName="text-status-success"
                             options={selectableGroups.crossWaypoint}
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}
@@ -466,7 +466,7 @@ export function RoutePlanningPanel({
                             'ml-6 rounded border px-2 py-1 text-caption-2',
                             leg.pathFound && leg.metricsComplete
                               ? 'border-border-quaternary bg-black-30 text-text-tertiary'
-                              : 'border-amber-800/50 bg-amber-950/20 text-status-warning',
+                              : 'border-status-warning-light bg-status-warning-light text-status-warning',
                           ].join(' ')}
                         >
                           → {stationDisplayLabel(areas, leg.toStationId)}
@@ -495,7 +495,7 @@ export function RoutePlanningPanel({
               className={[
                 'shrink-0 rounded-lg border px-3 py-2.5 transition',
                 topologyBreakdown?.timesComplete
-                  ? 'border-cyan-700/50 bg-gradient-to-b from-cyan-950/40 to-zinc-950/80'
+                  ? 'border-border-theme-light bg-gradient-to-b from-cyan-950/40 to-zinc-950/80'
                   : 'border-border-quaternary bg-zinc-950/70',
               ].join(' ')}
             >

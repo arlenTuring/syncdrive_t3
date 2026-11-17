@@ -33,7 +33,7 @@ export function FacilityDragGuidesOverlay({
         <>
           {/* 中心十字線（全域延伸） */}
           <div
-            className="absolute bg-cyan-300/70"
+            className="absolute bg-surface-theme"
             style={{
               left: cx,
               top: bTop,
@@ -42,7 +42,7 @@ export function FacilityDragGuidesOverlay({
             }}
           />
           <div
-            className="absolute bg-cyan-300/70"
+            className="absolute bg-surface-theme"
             style={{
               left: bLeft,
               top: cy,
@@ -53,7 +53,7 @@ export function FacilityDragGuidesOverlay({
 
           {/* 元件四邊延伸輔助線（虛線） */}
           <div
-            className="absolute border-l border-dashed border-cyan-400/40"
+            className="absolute border-l border-dashed border-border-theme-light"
             style={{
               left: activeRect!.left,
               top: bTop,
@@ -61,7 +61,7 @@ export function FacilityDragGuidesOverlay({
             }}
           />
           <div
-            className="absolute border-l border-dashed border-cyan-400/40"
+            className="absolute border-l border-dashed border-border-theme-light"
             style={{
               left: activeRect!.left + activeRect!.width,
               top: bTop,
@@ -69,7 +69,7 @@ export function FacilityDragGuidesOverlay({
             }}
           />
           <div
-            className="absolute border-t border-dashed border-cyan-400/40"
+            className="absolute border-t border-dashed border-border-theme-light"
             style={{
               left: bLeft,
               top: activeRect!.top,
@@ -77,7 +77,7 @@ export function FacilityDragGuidesOverlay({
             }}
           />
           <div
-            className="absolute border-t border-dashed border-cyan-400/40"
+            className="absolute border-t border-dashed border-border-theme-light"
             style={{
               left: bLeft,
               top: activeRect!.top + activeRect!.height,
@@ -91,7 +91,7 @@ export function FacilityDragGuidesOverlay({
         g.axis === 'x' ? (
           <div
             key={`v-${i}`}
-            className="absolute bg-cyan-400/80"
+            className="absolute bg-surface-theme"
             style={{
               left: g.at,
               top: g.from,
@@ -102,7 +102,7 @@ export function FacilityDragGuidesOverlay({
         ) : (
           <div
             key={`h-${i}`}
-            className="absolute bg-cyan-400/80"
+            className="absolute bg-surface-theme"
             style={{
               left: g.from,
               top: g.at,

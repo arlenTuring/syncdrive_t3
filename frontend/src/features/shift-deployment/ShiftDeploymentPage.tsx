@@ -86,7 +86,7 @@ export function ShiftDeploymentPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {hint ? (
-        <div className="shrink-0 border-b border-sky-900/60 bg-sky-950/40 px-5 py-2 text-body-xs text-text-theme">
+        <div className="shrink-0 border-b border-border-theme-light bg-surface-theme px-5 py-2 text-body-xs text-text-theme">
           {hint}
           <Button variant="text" className="ml-3" onPress={() => setHint(null)}>{t('common.close')}</Button>
         </div>

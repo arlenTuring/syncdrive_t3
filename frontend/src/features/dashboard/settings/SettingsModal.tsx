@@ -27,7 +27,7 @@ interface Props {
 type PingState = 'idle' | 'loading' | 'ok' | 'error';
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-lg px-3 py-2 text-text-primary text-body-s
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChangePlaneDataSettings }: Props) {
   const { t } = useTranslation();
@@ -104,9 +104,9 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                 {t('dashboard.settings.datasourceIntro')}
               </div>
               {dataSourcesLoading && <div className="text-body-xs text-text-tertiary">正在讀取伺服器資料來源…</div>}
-              {dataSourcesError && <div className="rounded border border-red-700/50 bg-status-error-light p-2 text-body-xs text-status-error-emphasis">讀取失敗：{dataSourcesError}</div>}
+              {dataSourcesError && <div className="rounded border border-border-danger-light bg-status-error-light p-2 text-body-xs text-status-error-emphasis">讀取失敗：{dataSourcesError}</div>}
               {legacySources.length > 0 && (
-                <div className="rounded border border-amber-700/50 bg-amber-950/20 p-3 text-body-xs text-status-warning">
+                <div className="rounded border border-status-warning-light bg-status-warning-light p-3 text-body-xs text-status-warning">
                   偵測到這個瀏覽器的舊資料來源設定。伺服器同 ID 的設定不會被覆寫。
                   <Button hierarchy="subordinate" variant="text" className="ml-2" onPress={async () => {
                       try {
@@ -182,7 +182,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
               </div>
               <div>
                 <h3 className="text-text-primary text-body-s-bold mb-2">{t('dashboard.settings.demoDataTitle')}</h3>
-                <div className="p-4 border border-cyan-900/30 bg-cyan-950/10 rounded-xl flex items-center justify-between gap-4">
+                <div className="p-4 border border-border-theme-light bg-surface-theme rounded-xl flex items-center justify-between gap-4">
                   <div>
                     <div className="text-text-theme text-body-s-bold">{t('dashboard.settings.seedTitle')}</div>
                     <div className="text-text-quaternary text-body-xs mt-1">{t('dashboard.settings.seedHint')}</div>
@@ -209,7 +209,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
               </div>
               <div>
                 <h3 className="text-text-primary text-body-s-bold mb-2">{t('dashboard.settings.dangerZone')}</h3>
-                <div className="p-4 border border-red-900/30 bg-red-950/10 rounded-xl space-y-4">
+                <div className="p-4 border border-border-danger-light bg-status-error-light rounded-xl space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-status-error-emphasis text-body-s-bold">{t('dashboard.settings.clearAllTitle')}</div>
@@ -252,8 +252,8 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
 
   const pingIcon = {
     idle: null,
-    loading: <Loader size={13} className="animate-spin text-yellow-400" />,
-    ok: <CheckCircle size={13} className="text-green-400" />,
+    loading: <Loader size={13} className="animate-spin text-status-warning" />,
+    ok: <CheckCircle size={13} className="text-status-success" />,
     error: <AlertCircle size={13} className="text-status-error-emphasis" />,
   }[pingState];
 
@@ -304,7 +304,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
       {isEditing && (
         <div className="border-t border-border-quaternary px-4 py-4 space-y-3 bg-zinc-800/50">
           {usedBy.length > 1 && (
-            <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-body-xs text-status-warning">
+            <div className="rounded-lg border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-xs text-status-warning">
               這是共用連線，修改會同時影響 {usedBy.map((n) => `「${n}」`).join('、')}。
               只想改目前這張儀表板，請到「本儀表板」分頁按「建立本儀表板專用連線」。
             </div>

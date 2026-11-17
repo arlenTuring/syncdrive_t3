@@ -57,7 +57,7 @@ export function RunCodeRow({ code }: { code: string }) {
         <div
           key={toast.id}
           className={`fixed bottom-8 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-2 text-body-s shadow-xl ${
-            toast.ok ? 'bg-status-success-emphasis text-text-primary' : 'bg-red-600 text-text-primary'
+            toast.ok ? 'bg-status-success-emphasis text-text-primary' : 'bg-status-error text-text-primary'
           }`}
         >
           {toast.ok ? '班次唯一碼已複製' : '複製失敗，請手動選取班次唯一碼'}

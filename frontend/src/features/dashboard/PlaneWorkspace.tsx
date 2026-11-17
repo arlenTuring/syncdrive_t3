@@ -534,7 +534,7 @@ export function PlaneWorkspace({
         <button onClick={zoomReset}
           style={{ ...zoomBtnStyle, gap: 6, padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', color: '#94a3b8' }}
           title={scaleLocked ? t('dashboard.planeWorkspace.resetLocked') : t('dashboard.planeWorkspace.reset')}>
-          <Crosshair size={14} className="text-cyan-500" />
+          <Crosshair size={14} className="text-text-theme" />
           {Math.round(userZoom * 100)}%
         </button>
         <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />

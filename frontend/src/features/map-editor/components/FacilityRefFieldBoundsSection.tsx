@@ -115,8 +115,8 @@ export function FacilityRefFieldBoundsSection({
   ]
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/15 p-3">
-      <h3 className="text-caption-2 uppercase text-emerald-400/90">
+    <section className="space-y-2.5 rounded-lg border border-status-success-light bg-status-success-light p-3">
+      <h3 className="text-caption-2 uppercase text-status-success">
         場域範圍（公尺）
       </h3>
       <p className="text-caption-2 text-text-quaternary">
@@ -136,7 +136,7 @@ export function FacilityRefFieldBoundsSection({
       {isTaper ? (
         <>
           {!hasCorners && !isZero ? (
-            <p className="text-caption-2 text-amber-500/90">
+            <p className="text-caption-2 text-status-warning">
               請填齊 A／B／C／D 的橫向與縱向（共八個數字）。
             </p>
           ) : null}
@@ -149,9 +149,9 @@ export function FacilityRefFieldBoundsSection({
               return (
                 <div
                   key={label}
-                  className="rounded-md border border-emerald-900/30 bg-emerald-950/20 p-2"
+                  className="rounded-md border border-status-success-light bg-status-success-light p-2"
                 >
-                  <p className="mb-1.5 text-caption-2 text-emerald-300/80">
+                  <p className="mb-1.5 text-caption-2 text-status-success">
                     角 {label}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
@@ -195,7 +195,7 @@ export function FacilityRefFieldBoundsSection({
       ) : (
         <>
           {span ? (
-            <p className="rounded-md border border-emerald-900/30 bg-emerald-950/25 px-2 py-1.5 font-mono text-body-xs text-emerald-100/90">
+            <p className="rounded-md border border-status-success-light bg-status-success-light px-2 py-1.5 font-mono text-body-xs text-status-success">
               涵蓋範圍：橫向 {span.w.toFixed(2)} m × 縱向 {span.h.toFixed(2)} m
             </p>
           ) : null}
@@ -205,7 +205,7 @@ export function FacilityRefFieldBoundsSection({
             </p>
           ) : null}
           {!hasBounds && !isZero && boundsIssue ? (
-            <p className="text-caption-2 text-amber-500/90">{boundsIssue}</p>
+            <p className="text-caption-2 text-status-warning">{boundsIssue}</p>
           ) : null}
           {autoMapped && !readOnly ? (
             <Button hierarchy="subordinate" variant="outlined" onPress={handleResyncFromCanvas}>{hasBounds ? '依圖上形狀重算範圍' : '依圖上形狀推算範圍'}</Button>

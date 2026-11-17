@@ -56,7 +56,7 @@ export function TrackDiagnosticsPanel({ diagnostics, onLocate, onClose }: Props)
                   <span className="text-body-xs-bold text-text-primary">{issue.title}</span>
                 </div>
                 <p className="mt-1 text-body-xs text-text-tertiary">{issue.detail}</p>
-                <p className="mt-1 text-body-xs text-sky-300/80">{issue.suggestion}</p>
+                <p className="mt-1 text-body-xs text-text-theme-light">{issue.suggestion}</p>
               </button>
             </li>
           ))}

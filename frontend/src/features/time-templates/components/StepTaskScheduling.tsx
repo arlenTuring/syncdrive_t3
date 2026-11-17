@@ -561,7 +561,7 @@ function ScheduleGapCheckButton({
           : t('timeTemplates.scheduling.gapCheckOk')
       }>{t('timeTemplates.scheduling.gapCheck')}
       {hasGaps ? (
-        <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-caption-2 tabular-nums text-status-warning">
+        <span className="rounded-full bg-status-warning-light px-1.5 py-0.5 text-caption-2 tabular-nums text-status-warning">
           {gaps.length}
         </span>
       ) : null}</Button>
@@ -1495,7 +1495,7 @@ export function StepTaskScheduling({
                     })}
                     {rowHighlight ? (
                       <div
-                        className="pointer-events-none absolute inset-y-0.5 z-[3] rounded-md border border-amber-400/80 bg-amber-400/25 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                        className="pointer-events-none absolute inset-y-0.5 z-[3] rounded-md border border-status-warning-light bg-status-warning-light shadow-[0_0_12px_rgba(251,191,36,0.35)]"
                         style={{
                           left: (rowHighlight.start / SCHEDULE_SLOT_MINUTES) * slotWidthPx,
                           width:

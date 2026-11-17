@@ -4205,7 +4205,7 @@ export default function MapEditorApp({
                 onClick={() => setLibraryTab(value)}
                 className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium ${
                   libraryTab === value
-                    ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+                    ? 'border-border-tertiary bg-surface-primary text-text-theme-light'
                     : 'border-transparent text-text-quaternary hover:text-text-secondary'
                 }`}
               >
@@ -4223,7 +4223,7 @@ export default function MapEditorApp({
         </div>
       )}
       {isMapWorkspace && mapScreen === 'editor' && backendSyncFailed && (
-        <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-body-xs text-status-warning">
+        <div className="shrink-0 border-b border-status-warning-light bg-status-warning-light px-4 py-2 text-body-xs text-status-warning">
           {t('mapEditor.unsavedBannerBefore')}
           <strong className="text-status-warning">{t('mapEditor.unsavedBannerStrong')}</strong>
           {t('mapEditor.unsavedBannerAfter')}
@@ -4553,7 +4553,7 @@ export default function MapEditorApp({
           </div>
 
           {isMapWorkspace && mapScreen === 'editor' && simRouteEditRouteId ? (
-            <div className="pointer-events-none absolute bottom-4 left-1/2 z-[9500] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-sky-500/50 bg-surface-popup px-3 py-2 shadow-xl">
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-[9500] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-border-theme-light bg-surface-popup px-3 py-2 shadow-xl">
               <p className="max-w-[min(36rem,70vw)] text-body-xs text-text-theme">
                 {t('mapEditor.chrome.simRoutePathEditing')}
               </p>
@@ -4649,7 +4649,7 @@ export default function MapEditorApp({
               <button
                 type="button"
                 onClick={() => setInspectorCollapsed(true)}
-                className="pointer-events-auto absolute left-0 top-3 z-20 flex h-10 w-6 -translate-x-full items-center justify-center rounded-l-md border border-r-0 border-border-tertiary bg-surface-secondary text-text-secondary shadow-sm hover:bg-link-standard-hover focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="pointer-events-auto absolute left-0 top-3 z-20 flex h-10 w-6 -translate-x-full items-center justify-center rounded-l-md border border-r-0 border-border-tertiary bg-surface-secondary text-text-secondary shadow-sm hover:bg-link-standard-hover focus:outline-none focus:ring-2 focus:ring-border-theme-light"
                 title={t('mapEditor.chrome.collapseInspector')}
                 aria-label={t('mapEditor.chrome.collapseInspector')}
               >
@@ -4771,7 +4771,7 @@ export default function MapEditorApp({
                     data-inspector
                     className="flex h-full min-h-0 flex-col bg-surface-primary"
                   >
-                    <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-cyan-400/90">
+                    <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-text-theme">
                       {t('mapEditor.chrome.selectAllAreas', { count: areas.length })}
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto p-3 text-body-s text-text-tertiary">

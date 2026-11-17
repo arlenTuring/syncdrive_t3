@@ -173,7 +173,7 @@ export function DegradedOperationPage() {
     >
       <section className="flex min-h-[420px] min-w-0 flex-col border-b border-border-quaternary xl:min-h-0 xl:border-r xl:border-b-0">
         <div
-          className={`flex min-h-16 shrink-0 items-center justify-between gap-4 border-l-4 px-5 ${degraded ? "border-status-error bg-gradient-to-r from-red-950 to-black" : "border-emerald-400 bg-gradient-to-r from-emerald-950/80 to-black"}`}
+          className={`flex min-h-16 shrink-0 items-center justify-between gap-4 border-l-4 px-5 ${degraded ? "border-status-error bg-gradient-to-r from-red-950 to-black" : "border-status-success bg-gradient-to-r from-emerald-950/80 to-black"}`}
         >
           <span className="text-body-s text-text-secondary">目前營運模式</span>
           <span
@@ -246,7 +246,7 @@ export function DegradedOperationPage() {
         </div>
       </section>
       <aside
-        className={`flex min-h-[520px] min-w-0 flex-col p-4 xl:min-h-0 ${degraded ? "bg-red-950/20" : "bg-surface-primary"}`}
+        className={`flex min-h-[520px] min-w-0 flex-col p-4 xl:min-h-0 ${degraded ? "bg-status-error-light" : "bg-surface-primary"}`}
       >
         <div className="mb-3 flex items-center justify-between">
           <h2>降級資訊</h2>
@@ -264,7 +264,7 @@ export function DegradedOperationPage() {
             讀取營運狀態…
           </div>
         ) : side.kind === "error" ? (
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-red-900/60 px-6 text-center text-status-error-emphasis">
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border-danger-light px-6 text-center text-status-error-emphasis">
             <AlertTriangle className="size-6" />
             營運狀態未知：{side.message}
             <Button hierarchy="subordinate" variant="text" onPress={reload}>重新讀取</Button>
@@ -402,7 +402,7 @@ function PlanCards({
                 className="min-w-0 rounded-2xl border border-border-quaternary bg-[#202328] p-3 text-left hover:border-border-theme"
               >
                 <span
-                  className={`-ml-3 rounded-r px-4 py-1 text-body-xs ${plan.level === 1 ? "bg-status-error-light" : plan.level === 2 ? "bg-amber-800" : "bg-yellow-800"}`}
+                  className={`-ml-3 rounded-r px-4 py-1 text-body-xs ${plan.level === 1 ? "bg-status-error-light" : plan.level === 2 ? "bg-status-warning-light" : "bg-status-warning-light"}`}
                 >
                   Level {plan.level}
                 </span>
@@ -451,7 +451,7 @@ function ActiveSummary({
       <div className="rounded-xl bg-[#1d2024] p-4">
         <span className="text-body-s text-text-tertiary">計畫名稱</span>
         <h4 className="text-headline-5">{active.name}</h4>
-        <span className="float-right rounded bg-yellow-800 px-3 py-1 text-body-xs">
+        <span className="float-right rounded bg-status-warning-light px-3 py-1 text-body-xs">
           Level {active.level}
         </span>
         <p className="mt-4 whitespace-pre-wrap text-body-s text-text-secondary">

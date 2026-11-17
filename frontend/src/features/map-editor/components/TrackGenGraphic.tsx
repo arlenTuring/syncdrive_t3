@@ -98,7 +98,7 @@ export function TrackGenGraphic({
 
   if (parseFailed) {
     return (
-      <div className="flex size-full flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-rose-500/50 bg-rose-950/20 px-3 text-center">
+      <div className="flex size-full flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-border-danger-light bg-status-error-light px-3 text-center">
         <span className="text-body-xs text-status-error-emphasis">{t('mapEditor.trackGen.graphic.parseFailed')}</span>
         {!readOnly ? (
           <Button variant="text" data-trackgen-pick onPress={(e) => {
@@ -127,7 +127,7 @@ export function TrackGenGraphic({
               e.stopPropagation()
               onPickClick()
             }}
-            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-text-primary shadow-md transition hover:border-border-theme-light hover:bg-link-standard-hover hover:text-cyan-100"
+            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-text-primary shadow-md transition hover:border-border-theme-light hover:bg-link-standard-hover hover:text-text-theme-light"
             style={{ width: buttonSize, height: buttonSize }}
           >
             <Plus className="size-[55%]" strokeWidth={2.25} aria-hidden />
@@ -246,7 +246,7 @@ export function TrackGenGraphic({
               setCardSize({ w: wLocal, h: hLocal })
             }
           }}
-          className="pointer-events-none absolute z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-body-xs text-text-secondary shadow-lg"
+          className="pointer-events-none absolute z-[3] max-w-[250px] rounded-md border border-status-success-light bg-zinc-900/95 px-2.5 py-2 text-body-xs text-text-secondary shadow-lg"
           style={{
             // 預設放在滑鼠右下，靠近邊界就翻到另一邊，卡片才不會被切掉
             left: Math.max(
@@ -333,7 +333,7 @@ export function TrackGenGraphic({
             e.stopPropagation()
             onPickClick()
           }}
-          className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-surface-primary px-2 py-1 text-body-xs text-text-primary shadow-md transition hover:border-border-theme-light hover:text-cyan-100"
+          className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-surface-primary px-2 py-1 text-body-xs text-text-primary shadow-md transition hover:border-border-theme-light hover:text-text-theme-light"
         >
           {t('mapEditor.trackGen.graphic.replace')}
         </button>

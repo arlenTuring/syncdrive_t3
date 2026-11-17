@@ -55,7 +55,7 @@ import { Button, Checkbox, IconButton } from '../../components/ui';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
@@ -156,7 +156,7 @@ function AlertRulesEditor({
         {t('dashboard.properties.alertRules.hint')}<strong className="text-text-tertiary">{t('dashboard.properties.alertRules.hintMulti')}</strong>
       </p>
       {rules.length === 0 && (
-        <p className="text-caption-2 text-amber-500/90">{t('dashboard.properties.alertRules.empty')}</p>
+        <p className="text-caption-2 text-status-warning">{t('dashboard.properties.alertRules.empty')}</p>
       )}
       {rules.map((rule, i) => (
         <div key={rule.id} className="p-2.5 bg-zinc-800/40 rounded-md border border-border-quaternary space-y-2">
@@ -192,7 +192,7 @@ function AlertRulesEditor({
           </Field>
 
           <div className="pt-1 border-t border-border-quaternary space-y-2">
-            <p className="text-caption-2 text-emerald-500/90">{t('dashboard.properties.alertRules.startCondition')}</p>
+            <p className="text-caption-2 text-status-success">{t('dashboard.properties.alertRules.startCondition')}</p>
             <Field label={t('dashboard.properties.alertRules.watchField')}>
               <input value={rule.startField} onChange={e => patch(i, { startField: e.target.value })} className={inputCls} placeholder="alert_message" />
             </Field>
@@ -361,7 +361,7 @@ function TextSettings({
             <div className="flex flex-wrap gap-1 mt-2">
               {commonIcons.slice(0, 8).map(icon => (
                 <button key={icon} onClick={() => onUpdate({ icon })} 
-                  className={`p-1.5 rounded bg-surface-secondary border transition-all ${w.icon === icon ? 'border-cyan-500 bg-cyan-500/10' : 'border-border-quaternary hover:border-border-primary'}`}>
+                  className={`p-1.5 rounded bg-surface-secondary border transition-all ${w.icon === icon ? 'border-border-theme bg-surface-theme' : 'border-border-quaternary hover:border-border-primary'}`}>
                   {React.createElement((LucideIcons as any)[icon] || Type, { size: 14, className: w.icon === icon ? 'text-text-theme' : 'text-text-tertiary' })}
                 </button>
               ))}
@@ -477,7 +477,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
 
       <div className="pt-2 border-t border-border-quaternary space-y-3">
         <SH icon={<AlertTriangle size={13} />} label={t('dashboard.properties.alertRules.title')} color="#f97316" />
-        <div className="p-2.5 rounded-lg bg-amber-950/25 border border-status-warning-light text-caption-2 text-status-warning">
+        <div className="p-2.5 rounded-lg bg-status-warning-light border border-status-warning-light text-caption-2 text-status-warning">
           {t('dashboard.properties.alertRules.previewHint')}
           {(w.alertPresentation ?? 'stack') === 'carousel'
             ? <> {t('dashboard.properties.alertRules.multiCarousel')}</>
@@ -1455,7 +1455,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   const currentMode = plane.viewportMode ?? 'fixed-scale';
   return (
     <div className="space-y-6">
-      <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-2">
+      <div className="bg-surface-theme border border-border-theme-light rounded-xl p-4 mb-2">
         <SH icon={<Settings size={14} className="text-text-theme" />} label={t('dashboard.properties.plane.title')} color="#22d3ee" />
         <p className="text-caption-2 text-text-quaternary mt-1 uppercase">{t('dashboard.properties.plane.subtitle')}</p>
       </div>
@@ -1478,7 +1478,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
               onClick={() => onUpdate({ viewportMode: 'fixed-scale' })}
               className={`py-2 px-2 rounded-md text-body-xs font-medium flex flex-col items-center gap-1 transition-all ${
                 currentMode === 'fixed-scale'
-                  ? 'bg-blue-600 text-text-primary shadow-sm'
+                  ? 'bg-link-theme-filled text-text-primary shadow-sm'
                   : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
               }`}
               title={t('dashboard.properties.plane.fixedScaleTitle')}
@@ -1491,7 +1491,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
               onClick={() => onUpdate({ viewportMode: 'fit-width' })}
               className={`py-2 px-2 rounded-md text-body-xs font-medium flex flex-col items-center gap-1 transition-all ${
                 currentMode === 'fit-width'
-                  ? 'bg-blue-600 text-text-primary shadow-sm'
+                  ? 'bg-link-theme-filled text-text-primary shadow-sm'
                   : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
               }`}
               title={t('dashboard.properties.plane.fitWidthTitle')}
@@ -1651,7 +1651,7 @@ function BackgroundImagePicker({
               aria-checked={selected}
               title={option.label}
               onClick={() => onChange(option.url)}
-              className={`rounded-md border p-1 text-left ${selected ? 'border-cyan-500 ring-1 ring-cyan-500/40' : 'border-border-quaternary hover:border-border-primary'}`}
+              className={`rounded-md border p-1 text-left ${selected ? 'border-border-theme ring-1 ring-border-theme-light' : 'border-border-quaternary hover:border-border-primary'}`}
             >
               <div
                 className="w-full rounded"
@@ -1722,7 +1722,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
       ) : null}
 
       {isMap && (
-        <div className="space-y-3 rounded-lg border border-sky-500/25 bg-surface-theme-light p-3">
+        <div className="space-y-3 rounded-lg border border-border-theme-light bg-surface-theme-light p-3">
           <div className="text-caption-2 uppercase text-text-theme">{t('dashboard.properties.canvas.mapSource')}</div>
           <Field label={t('dashboard.properties.canvas.selectMap')}>
             <SiteSelect value={el.mapId ?? ''} onChange={e => onUpdate({ mapId: e.target.value })} className={selectCls}>
@@ -1755,7 +1755,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           onChange={(url) => onUpdate({ backgroundImage: url, backgroundImageFit: 'contain' })}
         />
       ) : null}
-      <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
+      <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-link-theme-filled" /></Field>
 
       {isShiftCenter && (
         <div className="space-y-3 rounded-lg border border-border-theme-light-trn bg-surface-theme-light p-3">
@@ -1952,7 +1952,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <NumberInput value={el.templateHeight || 180} onChange={n => onUpdate({ templateHeight: n })} className={inputCls} />
             </div>
             {(el.groupTileFit || 'fill') === 'slot' && (
-              <p className="mt-1 text-caption-2 text-amber-500/90">
+              <p className="mt-1 text-caption-2 text-status-warning">
                 {t('dashboard.properties.canvas.templateSuggest', {
                   cols: el.gridColumns || 11,
                   size: (() => {
@@ -2059,7 +2059,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
           </div>
         </Field>
         <Field label={t('dashboard.properties.opacityShort', { pct: w.opacity })}>
-          <input type="range" min={0} max={100} value={w.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" />
+          <input type="range" min={0} max={100} value={w.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-link-theme-filled" />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">
@@ -2501,7 +2501,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
           type="range" min={0.2} max={5} step={0.1}
           value={w.zoomFactor ?? 2.0}
           onChange={e => onUpdate({ zoomFactor: +e.target.value })}
-          className="w-full accent-sky-400"
+          className="w-full accent-link-theme-filled"
         />
         <div className="flex justify-between text-caption-2 text-text-quaternary mt-0.5">
           <span>{t('dashboard.properties.widgets.mapCanvas.zoomIn')}</span><span>{t('dashboard.properties.widgets.mapCanvas.zoomOut')}</span>
@@ -2552,7 +2552,7 @@ function VehicleContainerSettings({
       {managedByMap ? (
         <div className="space-y-2 rounded-lg border border-border-theme-light-trn bg-surface-theme p-3 text-body-xs text-text-theme">
           <p>這張地圖的車輛外觀由圖資管理設定（模型、顯示尺寸、行為圖示）。</p>
-          <p className="text-sky-200/80">
+          <p className="text-text-theme-light">
             目前使用：{mapModel.resolution?.definition?.name ?? mapModel.resolution?.setting?.definitionKey}
             {mapModel.resolution?.setting
               ? `（${mapModel.resolution.setting.displayWidthPx}×${mapModel.resolution.setting.displayHeightPx}）`
@@ -2586,7 +2586,7 @@ function VehicleContainerSettings({
           </Field>
           {error ? <p className="text-caption-2 text-status-error-emphasis">模型清單讀取失敗：{error}</p> : null}
           {mapId ? (
-            <p className="text-caption-2 text-amber-300/90">
+            <p className="text-caption-2 text-status-warning">
               這張地圖還沒在圖資管理設定車輛模型，暫用這個容器的模型與尺寸。可到圖資管理 → 車輛模型 → 遷移，把它搬成地圖設定。
             </p>
           ) : null}
@@ -2858,7 +2858,7 @@ function TabListSettings({
               onClick={() => selectTab(tab.id)}
               className={`px-2.5 py-1 rounded text-body-xs font-medium transition-colors ${
                 tab.id === (activeTab?.id ?? '')
-                  ? 'bg-blue-600 text-text-primary'
+                  ? 'bg-link-theme-filled text-text-primary'
                   : 'bg-surface-secondary text-text-tertiary hover:text-text-primary'
               }`}
             >
@@ -3279,14 +3279,14 @@ export function PropertiesPanel({
     <aside className="w-64 bg-surface-primary border-l border-border-quaternary overflow-y-auto">
       <div className="p-4">
         {dualGateSettingsActive && editingGroup ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-caption-2">
+          <div className="mb-3 p-2.5 rounded-lg bg-surface-theme border border-border-theme-light text-text-theme-light text-caption-2">
             <p className="font-semibold text-text-theme mb-1">{t('dashboard.properties.dualGateTitle', { label: editingGroupLabel })}</p>
             <p>{t('dashboard.properties.dualGateHint')}</p>
           </div>
         ) : editingGroupLabel && editingGroup && !selectedChild ? (
           <GroupInheritedVariablesSection group={editingGroup} />
         ) : editingGroupLabel ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-caption-2">
+          <div className="mb-3 p-2.5 rounded-lg bg-surface-theme border border-border-theme-light text-text-theme-light text-caption-2">
             <p className="font-semibold text-text-theme mb-1">{t('dashboard.properties.subcanvasTitle', { label: editingGroupLabel })}</p>
             <p>
               {editingGroup?.dualCanvasEnabled
@@ -3303,7 +3303,7 @@ export function PropertiesPanel({
             </p>
           </div>
         ) : editingTabListColumn ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200/90 text-caption-2">
+          <div className="mb-3 p-2.5 rounded-lg bg-surface-theme border border-border-theme-light text-text-theme-light text-caption-2">
             <p className="font-semibold text-text-theme mb-1">
               {t('dashboard.properties.cellTemplateTitle', {
                 tab: editingTabListColumn.tabLabel,
@@ -3313,7 +3313,7 @@ export function PropertiesPanel({
             <p>{t('dashboard.properties.cellTemplateHint')}</p>
           </div>
         ) : selectedIssue ? (
-          <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-amber-950/50 border border-amber-600/40 text-status-warning text-caption-2">
+          <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-status-warning-light border border-status-warning-light text-status-warning text-caption-2">
             <AlertTriangle size={14} className="shrink-0 mt-0.5 text-status-warning" />
             <span>{selectedIssue.detail}</span>
           </div>

@@ -41,7 +41,7 @@ export function NewVehicleDialog({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-s text-text-primary transition-colors focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-amber-500/30"
+            className="w-full rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-s text-text-primary transition-colors focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-status-warning-light"
           />
         </div>
 
@@ -58,7 +58,7 @@ export function NewVehicleDialog({
                 }}
                 className={`rounded-lg border px-3 py-2 text-left text-body-xs transition-all ${
                   width === p.width && height === p.height
-                    ? 'border-status-warning bg-amber-600/20 text-status-warning'
+                    ? 'border-status-warning bg-status-warning-light text-status-warning'
                     : 'border-border-tertiary bg-surface-secondary text-text-tertiary hover:border-border-primary hover:text-text-primary'
                 }`}
               >

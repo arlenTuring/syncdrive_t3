@@ -304,7 +304,7 @@ function TimelineEventNode({
           {event.label}
         </span>
         {event.delayLabel ? (
-          <span className="rounded bg-[#422006] px-1.5 py-0.5 text-caption-2 text-orange-400">
+          <span className="rounded bg-[#422006] px-1.5 py-0.5 text-caption-2 text-status-warning">
             {event.delayLabel}
           </span>
         ) : null}

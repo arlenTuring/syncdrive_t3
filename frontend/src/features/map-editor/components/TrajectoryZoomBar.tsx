@@ -51,7 +51,7 @@ export function TrajectoryZoomBar({
       <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
         <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>橫向（左右）</span>
-          <span className="font-mono text-cyan-400/90">
+          <span className="font-mono text-text-theme">
             {zoomFactorX.toFixed(2)}×
           </span>
         </span>
@@ -64,7 +64,7 @@ export function TrajectoryZoomBar({
           onChange={(e) =>
             onZoomFactorXChange(clampMapZoomFactor(Number(e.target.value)))
           }
-          className="h-1.5 w-full cursor-pointer accent-cyan-500"
+          className="h-1.5 w-full cursor-pointer accent-link-theme-filled"
         />
         <div className="flex justify-between text-caption-2 text-text-disabled">
           <span>{min}×</span>
@@ -76,7 +76,7 @@ export function TrajectoryZoomBar({
       <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
         <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>縱向（上下）</span>
-          <span className="font-mono text-cyan-400/90">
+          <span className="font-mono text-text-theme">
             {zoomFactorY.toFixed(2)}×
           </span>
         </span>
@@ -89,7 +89,7 @@ export function TrajectoryZoomBar({
           onChange={(e) =>
             onZoomFactorYChange(clampMapZoomFactor(Number(e.target.value)))
           }
-          className="h-1.5 w-full cursor-pointer accent-cyan-500"
+          className="h-1.5 w-full cursor-pointer accent-link-theme-filled"
         />
         <div className="flex justify-between text-caption-2 text-text-disabled">
           <span>{min}×</span>

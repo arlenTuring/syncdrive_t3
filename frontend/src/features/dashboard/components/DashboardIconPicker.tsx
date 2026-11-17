@@ -55,7 +55,7 @@ export function DashboardIconPicker({
               onClick={() => setActiveSetId(set.id)}
               className={`px-2 py-0.5 rounded text-caption-2 font-semibold transition-colors ${
                 activeSetId === set.id
-                  ? 'bg-cyan-600/30 text-text-theme border border-cyan-500/40'
+                  ? 'bg-surface-theme text-text-theme border border-border-theme-light'
                   : 'bg-surface-secondary text-text-quaternary border border-border-quaternary hover:text-text-secondary'
               }`}
             >
@@ -188,7 +188,7 @@ function IconThumb({
       onClick={onClick}
       className={`flex flex-col items-center gap-0.5 p-1.5 rounded border transition-all ${
         selected
-          ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/30'
+          ? 'border-border-theme bg-surface-theme ring-1 ring-border-theme-light'
           : 'border-border-quaternary bg-zinc-800/40 hover:border-border-primary'
       }`}
     >

@@ -86,12 +86,12 @@ export function NewMapPixelDialog({
                 className={`rounded-lg border px-3 py-2.5 text-left transition ${
                   selected
                     ? mode === 'trackGen'
-                      ? 'border-emerald-600/70 bg-emerald-950/40 ring-1 ring-emerald-500/40'
-                      : 'border-cyan-600/70 bg-cyan-950/40 ring-1 ring-cyan-500/40'
+                      ? 'border-status-success-light bg-status-success-light ring-1 ring-status-success-light'
+                      : 'border-border-theme-light bg-surface-theme ring-1 ring-border-theme-light'
                     : 'border-border-quaternary bg-black-30 hover:border-border-primary'
                 }`}
               >
-                <div className={`text-body-s-bold ${selected ? (mode === 'trackGen' ? 'text-emerald-100' : 'text-cyan-100') : 'text-text-primary'}`}>
+                <div className={`text-body-s-bold ${selected ? (mode === 'trackGen' ? 'text-status-success' : 'text-text-theme-light') : 'text-text-primary'}`}>
                   {t(titleKey)}
                 </div>
                 <p className="mt-1 text-body-xs text-text-quaternary">

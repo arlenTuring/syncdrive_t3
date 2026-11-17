@@ -257,7 +257,7 @@ function BlockIssueHoverCard({
               key={`${issue.code}-${index}`}
               className={
                 severity === 'error'
-                  ? 'rounded border border-red-800/50 bg-status-error-light px-1.5 py-1'
+                  ? 'rounded border border-border-danger-light bg-status-error-light px-1.5 py-1'
                   : 'rounded border border-status-warning-light bg-status-warning-light px-1.5 py-1'
               }
             >
@@ -368,7 +368,7 @@ function MoveCardHoverCard({
         {i18n.t('shiftList.planGrid.secondsParen', { seconds: block.travelSeconds })}
       </div>
       {block.plannedEndMinute - block.plannedStartMinute <= 1e-9 ? (
-        <div className="mt-0.5 text-caption-2 text-amber-300/90">
+        <div className="mt-0.5 text-caption-2 text-status-warning">
           {t('shiftList.planGrid.zeroTransferNote')}
         </div>
       ) : null}
@@ -602,9 +602,9 @@ function BlockAlgorithmHoverCard({
       ) : null}
 
       {summary.slackAdjustment && summary.addedSlackSeconds > 0 ? (
-        <div className="mt-1 rounded border border-sky-700/50 bg-sky-950/40 px-1.5 py-1 text-caption-2 leading-[14px] tabular-nums text-text-theme">
+        <div className="mt-1 rounded border border-border-theme-light bg-surface-theme px-1.5 py-1 text-caption-2 leading-[14px] tabular-nums text-text-theme">
           <p className="font-semibold">{t('shiftList.planGrid.slackAdjusted')}</p>
-          <p className="text-sky-200/90">{summary.slackAdjustment.reason.message}</p>
+          <p className="text-text-theme-light">{summary.slackAdjustment.reason.message}</p>
           {summary.slackAdjustment.affectedStops.map((stop) => {
             const now = stops.find((item) => item.order === stop.order);
             return (
@@ -1098,9 +1098,9 @@ function UnservedPulseMarkers({
             aria-label={message}
           >
             {/* 紅色豪線 */}
-            <div className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-red-500/70" />
+            <div className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-status-error-light" />
             {/* 上方小三角標記 */}
-            <div className="absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-red-500/90" />
+            <div className="absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-border-danger-light" />
             {/* Hover tooltip */}
             <div
               className="pointer-events-none absolute left-1/2 top-full z-[10060] mt-1 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-border-danger-light bg-surface-sub-background px-2.5 py-2 text-caption-2 text-status-error-emphasis shadow-xl shadow-black-50 group-hover:block"
@@ -1372,7 +1372,7 @@ function ShiftScheduleBlockBar({
   let extraBorderClass = '';
   let extraStyle: CSSProperties = {};
   if (highlighted) {
-    extraBorderClass = 'border-2 border-status-error ring-4 ring-red-500 shadow-[0_0_24px_rgba(239,68,68,1)] animate-pulse';
+    extraBorderClass = 'border-2 border-status-error ring-4 ring-status-error shadow-[0_0_24px_rgba(239,68,68,1)] animate-pulse';
   } else if (hasError) {
     extraBorderClass = 'border border-status-error shadow-[inset_0_0_4px_rgba(239,68,68,0.4),0_0_8px_rgba(239,68,68,0.5)] animate-pulse';
   } else if (hasWarning) {

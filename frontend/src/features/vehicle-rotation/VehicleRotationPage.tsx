@@ -621,7 +621,7 @@ export function VehicleRotationPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-surface-sub-background text-text-primary">
       <AutomationBar rules={today.rules} deployedAt={today.deployed_at} onOpen={() => setRulesOpen(true)} />
       {actionError ?? error ? (
-        <div className="border-b border-rose-500/20 bg-rose-500/5 px-6 py-2 text-body-xs text-status-error-emphasis">{actionError ?? error}</div>
+        <div className="border-b border-border-danger-light bg-status-error-light px-6 py-2 text-body-xs text-status-error-emphasis">{actionError ?? error}</div>
       ) : null}
       <div role="tablist" aria-label="車輛輪替管理" className="flex gap-1 border-b border-border-quaternary px-6">
         {tabs.map((item) => (

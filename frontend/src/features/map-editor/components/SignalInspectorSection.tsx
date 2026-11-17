@@ -52,8 +52,8 @@ export function SignalInspectorSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-amber-900/40 bg-amber-950/12 p-3">
-      <h3 className="text-caption-2 uppercase text-amber-500/90">
+    <section className="space-y-2.5 rounded-lg border border-status-warning-light bg-status-warning-light p-3">
+      <h3 className="text-caption-2 uppercase text-status-warning">
         {t('mapEditor.signal.title')}
       </h3>
 

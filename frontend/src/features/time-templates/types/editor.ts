@@ -232,16 +232,16 @@ export function isServicingWindowTaskType(key: TaskTypeKey | null | undefined): 
 
 export const PERIOD_LEGEND_FALLBACK: Array<{ label: string; chipClass: string }> = [
   { label: '凌晨時段', chipClass: 'border-violet-500/40 bg-violet-500/20 text-violet-200' },
-  { label: '離峰時段', chipClass: 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' },
-  { label: '尖峰時段', chipClass: 'border-orange-500/40 bg-orange-500/20 text-orange-200' },
+  { label: '離峰時段', chipClass: 'border-status-success-light bg-status-success-light text-status-success' },
+  { label: '尖峰時段', chipClass: 'border-status-warning-light bg-status-warning-light text-status-warning' },
 ];
 
 export const PERIOD_CHIP_CLASSES = [
   'border-violet-500/40 bg-violet-500/20 text-violet-200',
-  'border-emerald-500/40 bg-emerald-500/20 text-emerald-200',
-  'border-orange-500/40 bg-orange-500/20 text-orange-200',
-  'border-sky-500/40 bg-sky-500/20 text-sky-200',
-  'border-amber-500/40 bg-amber-500/20 text-amber-200',
+  'border-status-success-light bg-status-success-light text-status-success',
+  'border-status-warning-light bg-status-warning-light text-status-warning',
+  'border-border-theme-light bg-surface-theme text-text-theme',
+  'border-status-warning-light bg-status-warning-light text-status-warning',
 ];
 
 export const ATTRIBUTES_PANEL_HEIGHT_PX = 132;
@@ -310,7 +310,7 @@ export function clampGridZoom(zoom: number): number {
 }
 
 /** 班表時軸刻度文字色（00:00、00:30…） */
-export const SCHEDULE_TIME_AXIS_TEXT_CLASS = 'text-[#F3F4F6]';
+export const SCHEDULE_TIME_AXIS_TEXT_CLASS = 'text-text-primary';
 /** 無營運時段上的時軸刻度 */
 export const SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS = 'text-[#9CA3AF]';
 

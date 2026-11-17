@@ -451,7 +451,7 @@ export function MapListDrawer({
                     {t('mapEditor.listDrawer.dockingHint')}
                   </p>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-blue-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-text-theme">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.docking')}
                     </h4>
@@ -465,7 +465,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-status-success">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.facilityDocking')}
                     </h4>
@@ -479,7 +479,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-text-theme">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.waypoint')}
                     </h4>
@@ -541,7 +541,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-status-success">
                       <Zap className="size-3.5" />
                       {t('mapEditor.listDrawer.smartPole')}
                     </h4>
@@ -555,7 +555,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-text-theme">
                       <DoorOpen className="size-3.5" />
                       {t('mapEditor.listDrawer.psd')}
                     </h4>

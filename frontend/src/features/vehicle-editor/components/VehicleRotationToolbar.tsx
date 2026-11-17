@@ -25,13 +25,13 @@ export function VehicleRotationToolbar({
 
   const toolbar = (
       <div
-        className="flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-cyan-500/30"
+        className="flex items-center gap-1.5 rounded-full border border-zinc-500/90 bg-zinc-900/98 px-2 py-1.5 shadow-xl ring-1 ring-border-theme-light"
         role="toolbar"
         aria-label={t('vehicleEditor.rotationToolbar.aria')}
       >
         <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.left90')} onPress={onRotateLeft90} label={t('vehicleEditor.rotationToolbar.left90')} icon={<RotateCcw />} />
         <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.right90')} onPress={onRotateRight90} label={t('vehicleEditor.rotationToolbar.right90')} icon={<RotateCw />} />
-        <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-cyan-400/90">
+        <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-text-theme">
           {angleLabel}
         </span>
         <IconButton variant="standard" title={t('vehicleEditor.rotationToolbar.nudgeMinus')} onPress={() => onRotateDelta(-5)} label={t('vehicleEditor.rotationToolbar.nudgeMinus')} icon={<ChevronLeft />} />

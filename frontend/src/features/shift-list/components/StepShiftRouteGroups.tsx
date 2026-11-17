@@ -2035,7 +2035,7 @@ export function StepShiftRouteGroups({
                             className={[
                               'flex w-full items-start justify-between gap-6 rounded-md px-2 py-2.5 text-left text-body-s transition-colors',
                               isReference
-                                ? 'bg-status-success-light ring-1 ring-emerald-500/40'
+                                ? 'bg-status-success-light ring-1 ring-status-success-light'
                                 : listedIsStale
                                   ? 'opacity-80 hover:bg-link-standard'
                                   : 'hover:bg-link-standard',
@@ -2208,9 +2208,9 @@ export function StepShiftRouteGroups({
                         ? t('shiftList.routeGroups.recheckCycles')
                         : t('shiftList.routeGroups.generateCycles')}</Button>
                     {nextStepBlockers.length > 0 ? (
-                      <div className="w-full rounded-md border border-status-warning-light bg-status-warning-light px-3 py-2 text-left text-body-xs text-amber-100/90">
+                      <div className="w-full rounded-md border border-status-warning-light bg-status-warning-light px-3 py-2 text-left text-body-xs text-status-warning">
                         <p className="font-medium text-status-warning">{t('shiftList.routeGroups.nextBlocked')}</p>
-                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-amber-100/80">
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-status-warning">
                           {nextStepBlockers.map((item) => (
                             <li key={item}>{item}</li>
                           ))}

@@ -95,19 +95,19 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
             </dl>
 
             {check.blockers.length > 0 ? (
-              <ul className="space-y-1.5 rounded-xl border border-red-900/60 bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
+              <ul className="space-y-1.5 rounded-xl border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
                 {check.blockers.map((issue, i) => (
                   <li key={`${issue.code}-${i}`} className="flex gap-2">
                     <XCircle className="mt-0.5 size-4 shrink-0 text-status-error-emphasis" aria-hidden />
                     <span>{issue.message}</span>
                   </li>
                 ))}
-                <li className="pl-6 text-body-xs text-red-300/80">{t('mapLibrary.primary.blockedHint')}</li>
+                <li className="pl-6 text-body-xs text-status-error-emphasis">{t('mapLibrary.primary.blockedHint')}</li>
               </ul>
             ) : null}
 
             {check.warnings.length > 0 ? (
-              <ul className="space-y-1.5 rounded-xl border border-amber-900/60 bg-status-warning-light px-4 py-3 text-body-s text-status-warning">
+              <ul className="space-y-1.5 rounded-xl border border-status-warning-light bg-status-warning-light px-4 py-3 text-body-s text-status-warning">
                 {check.warnings.map((issue, i) => (
                   <li key={`${issue.code}-${i}`} className="flex gap-2">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-warning" aria-hidden />
@@ -129,7 +129,7 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
         ) : null}
 
         {error ? (
-          <p className="mt-4 rounded-xl border border-red-900/60 bg-status-error-light px-4 py-2 text-body-s text-status-error-emphasis">
+          <p className="mt-4 rounded-xl border border-border-danger-light bg-status-error-light px-4 py-2 text-body-s text-status-error-emphasis">
             {t('mapLibrary.primary.failed', { error })}
           </p>
         ) : null}

@@ -458,7 +458,7 @@ function IssueSearchLog({ lines }: { lines: string[] }) {
   const { t } = useTranslation();
   if (lines.length === 0) return null;
   return (
-    <details className="mt-1 rounded border border-border-quaternary bg-black/10 px-2 py-1 text-body-xs text-text-tertiary">
+    <details className="mt-1 rounded border border-border-quaternary bg-black-10 px-2 py-1 text-body-xs text-text-tertiary">
       <summary className="cursor-pointer select-none text-text-secondary">
         {t('shiftList.scheduleAdjust.searchLog', { count: lines.length })}
       </summary>
@@ -602,7 +602,7 @@ function CheckGroupCard({
   const meta = resolveFeasibilityIssueMeta(group.issues[0]!);
   const isError = group.severity === 'error';
   return (
-    <div className={`rounded-xl border ${isError ? 'border-red-500/60' : 'border-status-warning-light'} bg-surface-secondary`}>
+    <div className={`rounded-xl border ${isError ? 'border-border-danger-light' : 'border-status-warning-light'} bg-surface-secondary`}>
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
@@ -611,7 +611,7 @@ function CheckGroupCard({
       >
         <Info className={`size-5 shrink-0 ${isError ? 'text-status-error-emphasis' : 'text-status-warning'}`} aria-hidden />
         <span className="min-w-0 flex-1 truncate text-body-m text-text-primary">{meta.groupTitle}</span>
-        <span className={`shrink-0 rounded-md px-2.5 py-1 text-body-s ${isError ? 'bg-status-error-light text-status-error-emphasis' : 'bg-amber-900/50 text-status-warning'}`}>
+        <span className={`shrink-0 rounded-md px-2.5 py-1 text-body-s ${isError ? 'bg-status-error-light text-status-error-emphasis' : 'bg-status-warning-light text-status-warning'}`}>
           {isError ? t('shiftList.scheduleAdjust.blocksPublish') : t('shiftList.scheduleAdjust.unresolved')}
         </span>
         <span className="shrink-0 text-body-s tabular-nums text-text-tertiary">

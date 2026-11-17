@@ -2184,8 +2184,8 @@ export const AreaNode = memo(function AreaNode({
                     className={[
                       'pointer-events-none absolute z-[94] rounded-[2px] border',
                       taperHighlight.ok
-                        ? 'border-emerald-400/50 bg-emerald-400/10'
-                        : 'border-amber-400/40 bg-amber-400/5',
+                        ? 'border-status-success-light bg-status-success-light'
+                        : 'border-status-warning-light bg-status-warning-light',
                     ].join(' ')}
                     style={{
                       left: pos.x,
@@ -2247,7 +2247,7 @@ export const AreaNode = memo(function AreaNode({
         />
         {marqueeRect && (
           <div
-            className="pointer-events-none absolute z-[5000] border border-cyan-400/80 bg-cyan-400/10"
+            className="pointer-events-none absolute z-[5000] border border-border-theme-light bg-surface-theme"
             style={{
               left: Math.min(marqueeRect.x, marqueeRect.x + marqueeRect.w),
               top: Math.min(marqueeRect.y, marqueeRect.y + marqueeRect.h),
@@ -2258,16 +2258,16 @@ export const AreaNode = memo(function AreaNode({
         )}
         {showCenterLabel && (
           <div className="pointer-events-none absolute inset-0 z-[1400] grid place-items-center">
-            <div className="max-w-[88%] rounded-xl border border-amber-300/70 bg-amber-950/65 px-4 py-3 text-center shadow-[0_0_20px_rgba(251,191,36,0.35)] backdrop-blur-sm">
+            <div className="max-w-[88%] rounded-xl border border-status-warning-light bg-status-warning-light px-4 py-3 text-center shadow-[0_0_20px_rgba(251,191,36,0.35)] backdrop-blur-sm">
               <div className="text-headline-4 font-extrabold text-status-warning sm:text-headline-3">
                 {area.customName.trim() || area.id}
               </div>
-              <div className="mt-1 text-body-s-bold text-amber-200/95 sm:text-body-m">
+              <div className="mt-1 text-body-s-bold text-status-warning sm:text-body-m">
                 場域範圍：橫向 {displayDomain.xMinM.toFixed(1)} ~{' '}
                 {displayDomain.xMaxM.toFixed(1)} m，縱向 {displayDomain.yMinM.toFixed(1)} ~{' '}
                 {displayDomain.yMaxM.toFixed(1)} m
               </div>
-              <div className="mt-1 text-body-s-bold text-amber-200/95 sm:text-body-m">
+              <div className="mt-1 text-body-s-bold text-status-warning sm:text-body-m">
                 像素尺寸：橫向 {Math.round(committedLayout.wPx)} px，縱向{' '}
                 {Math.round(committedLayout.hPx)} px
               </div>

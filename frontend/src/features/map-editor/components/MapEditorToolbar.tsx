@@ -90,8 +90,8 @@ type ToolTone = 'blue' | 'amber' | 'emerald'
 
 const ACTIVE_TONE: Record<ToolTone, string> = {
   blue: 'bg-[rgba(43,127,255,0.2)] text-text-theme',
-  amber: 'bg-amber-950/70 text-status-warning',
-  emerald: 'bg-emerald-950/70 text-status-success',
+  amber: 'bg-status-warning-light text-status-warning',
+  emerald: 'bg-status-success-light text-status-success',
 }
 
 type ToolButtonProps = {
@@ -271,7 +271,7 @@ export function MapEditorToolbar({
             <ScanSearch className="size-[18px] shrink-0" aria-hidden />
             <span className="hidden 2xl:inline">{t('mapEditor.toolbar.trackCheck')}</span>
             {trackIssueCount === null ? null : hasTrackIssues ? (
-              <span className="rounded-full bg-amber-500 px-1.5 text-caption-2 text-text-invert">
+              <span className="rounded-full bg-status-warning px-1.5 text-caption-2 text-text-invert">
                 {trackIssueCount}
               </span>
             ) : (

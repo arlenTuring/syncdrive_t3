@@ -51,11 +51,11 @@ export function VehicleModelManagement({
         return <span className="text-caption-2 text-text-disabled">未被使用</span>;
       return (
         <span className="flex flex-wrap gap-1.5 text-caption-2">
-          {isDefault ? <span className="rounded bg-sky-600/30 px-1.5 py-px text-text-theme">系統預設</span> : null}
-          {maps ? <span className="rounded bg-emerald-600/25 px-1.5 py-px text-status-success">{maps} 張地圖</span> : null}
+          {isDefault ? <span className="rounded bg-surface-theme px-1.5 py-px text-text-theme">系統預設</span> : null}
+          {maps ? <span className="rounded bg-status-success-light px-1.5 py-px text-status-success">{maps} 張地圖</span> : null}
           {dashboards ? (
             <span
-              className="rounded bg-amber-600/25 px-1.5 py-px text-status-warning"
+              className="rounded bg-status-warning-light px-1.5 py-px text-status-warning"
               title={refs
                 .filter((ref): ref is Extract<VehicleModelReference, { kind: 'dashboard' }> => ref.kind === 'dashboard')
                 .map((ref) => `${ref.planeName}${ref.label ? `／${ref.label}` : ''}`)

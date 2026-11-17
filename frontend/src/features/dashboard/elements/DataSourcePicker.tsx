@@ -22,7 +22,7 @@ interface Props {
 }
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 
 export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChangeDataSource, onChangeSqlQuery, onColumnsDetected }: Props) {
   const { t } = useTranslation();
@@ -133,7 +133,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
                 {tables.map(t => (
                   <button key={t} onClick={() => handleSelectTable(t)}
                     className={`w-full text-left px-3 py-1.5 text-body-xs transition-colors font-mono
-                      ${selectedTable === t ? 'bg-cyan-600/20 text-text-theme' : 'text-text-secondary hover:bg-link-standard-hover'}`}>
+                      ${selectedTable === t ? 'bg-surface-theme text-text-theme' : 'text-text-secondary hover:bg-link-standard-hover'}`}>
                     {t}
                   </button>
                 ))}
@@ -174,7 +174,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
           />
           <p className="text-text-disabled text-body-xs mt-0.5">
             {t('dashboard.dataSourcePicker.sqlHintBefore')}
-            <code className="mx-0.5 text-cyan-600/90">{t('dashboard.dataSourcePicker.sqlHintCode')}</code>
+            <code className="mx-0.5 text-text-theme">{t('dashboard.dataSourcePicker.sqlHintCode')}</code>
             {t('dashboard.dataSourcePicker.sqlHintAfter')}
           </p>
         </div>
@@ -190,7 +190,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
         <div className="border border-border-quaternary rounded-lg overflow-hidden">
           {previewError
             ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-red-900/20 text-status-error-emphasis text-body-xs">
+              <div className="flex items-center gap-2 px-3 py-2 bg-status-error-light text-status-error-emphasis text-body-xs">
                 <AlertCircle size={12} /> {previewError}
               </div>
             )
@@ -201,7 +201,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
                     <thead>
                       <tr>
                         {previewCols.map(c => (
-                          <th key={c} className="px-2 py-1 text-left text-text-theme bg-cyan-900/20 border-b border-border-quaternary whitespace-nowrap">
+                          <th key={c} className="px-2 py-1 text-left text-text-theme bg-surface-theme border-b border-border-quaternary whitespace-nowrap">
                             {c}
                           </th>
                         ))}

@@ -22,7 +22,7 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         aria-selected={value === 'map'}
         className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium transition ${
           value === 'map'
-            ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+            ? 'border-border-tertiary bg-surface-primary text-text-theme-light'
             : 'border-transparent bg-transparent text-text-quaternary hover:text-text-secondary'
         }`}
         onClick={() => onChange('map')}
@@ -35,7 +35,7 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         aria-selected={value === 'trajectory'}
         className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium transition ${
           value === 'trajectory'
-            ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+            ? 'border-border-tertiary bg-surface-primary text-text-theme-light'
             : 'border-transparent bg-transparent text-text-quaternary hover:text-text-secondary'
         }`}
         onClick={() => onChange('trajectory')}

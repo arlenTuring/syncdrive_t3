@@ -230,7 +230,7 @@ export function CrossTrackInspectorSection({
                 ))}
               </div>
               {resolved[key].auto ? (
-                <p className="text-caption-2 text-emerald-400/80">
+                <p className="text-caption-2 text-status-success">
                   {t('mapEditor.inspector.crossTrack.autoValue')}
                 </p>
               ) : (

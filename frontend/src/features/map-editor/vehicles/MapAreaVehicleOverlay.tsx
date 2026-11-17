@@ -179,7 +179,7 @@ function MapVehicleMqttCoordLabel({
       <div className="whitespace-nowrap">
         {vehicleId} · 場域 {xM.toFixed(1)}, {yM.toFixed(1)} m{track}
       </div>
-      <div className="whitespace-nowrap text-cyan-200">
+      <div className="whitespace-nowrap text-text-theme-light">
         heading {formatHeadingDeg(headingRad, 1)} · 轉向角 {formatDeg(steeringRad, 1)}
         {containerRotateDeg != null && Number.isFinite(containerRotateDeg)
           ? ` · 旋轉 ${containerRotateDeg.toFixed(1)}°`
@@ -1086,7 +1086,7 @@ export function MapAreaVehicleOverlay({
         ) : null;
         const selectedBadge = selected ? (
           <div
-            className={`pointer-events-none absolute whitespace-nowrap rounded border border-white/70 px-1.5 py-0.5 text-caption-2 text-black shadow-lg ${investigated ? 'bg-status-warning' : 'bg-sky-500'}`}
+            className={`pointer-events-none absolute whitespace-nowrap rounded border border-white/70 px-1.5 py-0.5 text-caption-2 text-black shadow-lg ${investigated ? 'bg-status-warning' : 'bg-link-theme-filled'}`}
             style={{
               left: badgeCenterX,
               top: badgeTopY - (cellBadge ? 20 : 0),

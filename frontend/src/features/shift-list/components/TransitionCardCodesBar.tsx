@@ -98,7 +98,7 @@ export function TransitionCardCodesBar({
                 data-transition-code={key}
                 className={`h-9 w-full rounded-lg border bg-link-standard-hover px-3 text-body-s tracking-wider text-text-primary placeholder:text-text-quaternary focus:outline-none focus:ring-1 ${
                   fieldIssues.length > 0
-                    ? 'border-red-500/70 focus:border-status-error focus:ring-red-500'
+                    ? 'border-border-danger-light focus:border-status-error focus:ring-status-error'
                     : 'border-transparent focus:border-border-theme focus:ring-border-theme'
                 }`}
               />

@@ -52,7 +52,7 @@ function AppliedSlackItem({
   const { t } = useTranslation();
   const hms = formatScheduleClockHms;
   return (
-    <li className="rounded border border-sky-800/50 bg-sky-950/25 px-2 py-1.5">
+    <li className="rounded border border-border-theme-light bg-surface-theme px-2 py-1.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-body-xs text-text-primary">
           <span className="font-semibold tabular-nums text-text-theme">{item.tripCode}</span>
@@ -221,7 +221,7 @@ export function ScheduleAnalysisReportPanel({
         ) : null}
 
         {suggestions.length === 0 ? (
-          <p className="rounded border border-emerald-800/50 bg-emerald-950/30 px-2 py-1.5 text-body-xs text-status-success">
+          <p className="rounded border border-status-success-light bg-status-success-light px-2 py-1.5 text-body-xs text-status-success">
             {t('shiftList.analysisReport.noIssues')}
           </p>
         ) : (
@@ -233,9 +233,9 @@ export function ScheduleAnalysisReportPanel({
                 <details
                   key={code}
                   open={items.length <= 1}
-                  className="rounded border border-status-warning-light bg-amber-950/25 px-2 py-1.5"
+                  className="rounded border border-status-warning-light bg-status-warning-light px-2 py-1.5"
                 >
-                  <summary className="cursor-pointer text-body-xs-bold text-status-warning marker:text-amber-500/70">
+                  <summary className="cursor-pointer text-body-xs-bold text-status-warning marker:text-status-warning">
                     {t(`shiftList.analysisReport.suggestions.${code}.title`)}
                     <span className="ml-1 font-normal text-text-tertiary">
                       {t('shiftList.analysisReport.itemCount', { count: items.length })}

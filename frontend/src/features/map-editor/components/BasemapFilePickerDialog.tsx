@@ -177,8 +177,8 @@ export function BasemapFilePickerDialog({
           className={[
             'mt-4 flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-4 py-8 transition',
             dragOver
-              ? 'border-cyan-500 bg-cyan-950/40 text-cyan-100'
-              : 'border-border-tertiary bg-black-30 text-text-tertiary hover:border-cyan-600/60 hover:bg-surface-sub-background hover:text-text-primary',
+              ? 'border-border-theme bg-surface-theme text-text-theme-light'
+              : 'border-border-tertiary bg-black-30 text-text-tertiary hover:border-border-theme-light hover:bg-surface-sub-background hover:text-text-primary',
           ].join(' ')}
         >
           {previewUrl ? (

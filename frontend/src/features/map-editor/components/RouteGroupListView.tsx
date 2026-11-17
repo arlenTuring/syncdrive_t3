@@ -220,9 +220,9 @@ function RouteRow({
         'ml-3 flex items-stretch gap-1 rounded-md border',
         topologyAvailable
           ? isVisible
-            ? 'border-cyan-500/30 bg-black-30'
+            ? 'border-border-theme-light bg-black-30'
             : 'border-border-quaternary bg-black-30'
-          : 'border-amber-800/40 bg-amber-950/15',
+          : 'border-status-warning-light bg-status-warning-light',
       ].join(' ')}
       title={
         topologyAvailable
@@ -248,7 +248,7 @@ function RouteRow({
           !topologyAvailable
             ? 'cursor-not-allowed text-text-quaternary'
             : isVisible
-              ? 'text-text-theme hover:bg-cyan-950/40'
+              ? 'text-text-theme hover:bg-surface-theme'
               : 'text-text-disabled hover:bg-surface-secondary hover:text-text-secondary',
         ].join(' ')}
       >
@@ -264,7 +264,7 @@ function RouteRow({
             {route.displayName}
           </p>
           {!topologyAvailable ? (
-            <span className="shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-1 py-px text-[8px] font-semibold tracking-wide text-status-warning">
+            <span className="shrink-0 rounded border border-status-warning-light bg-status-warning-light px-1 py-px text-[8px] font-semibold tracking-wide text-status-warning">
               {t('mapEditor.routeGroupList.unavailableBadge')}
             </span>
           ) : null}
@@ -377,9 +377,9 @@ export function RouteGroupListView({
                     className={[
                       'flex shrink-0 items-center justify-center px-2 transition-colors disabled:cursor-default disabled:opacity-40',
                       groupVisibility === 'all'
-                        ? 'text-text-theme hover:bg-cyan-950/40'
+                        ? 'text-text-theme hover:bg-surface-theme'
                         : groupVisibility === 'partial'
-                          ? 'text-cyan-300/50 hover:bg-cyan-950/30'
+                          ? 'text-text-theme-light hover:bg-surface-theme'
                           : 'text-text-disabled hover:bg-surface-secondary hover:text-text-secondary',
                     ].join(' ')}
                   >
@@ -400,7 +400,7 @@ export function RouteGroupListView({
                       <ChevronRight className="mt-0.5 size-4 shrink-0 text-text-quaternary" />
                     )}
                     <p className="flex min-w-0 flex-1 items-center gap-1.5 text-body-xs-bold text-text-primary">
-                      <FolderOpen className="size-3.5 shrink-0 text-sky-400/90" />
+                      <FolderOpen className="size-3.5 shrink-0 text-text-theme" />
                       <span className="truncate">{group.displayName}</span>
                     </p>
                   </button>

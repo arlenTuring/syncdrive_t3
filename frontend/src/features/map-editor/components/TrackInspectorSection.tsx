@@ -62,7 +62,7 @@ export function TrackInspectorSection({
       />
 
       <section className="space-y-2 rounded-lg border border-border-quaternary bg-surface-primary p-3">
-        <h3 className="text-caption-2 uppercase text-sky-400/90">
+        <h3 className="text-caption-2 uppercase text-text-theme">
           軌道透明度
         </h3>
         <label className="flex items-center gap-2 text-body-xs text-text-secondary">
@@ -81,7 +81,7 @@ export function TrackInspectorSection({
               // 100（不透明）就把設定拿掉，不在每塊軌道上留一個預設值
               onPatchParameters({ [TRACK_FILL_OPACITY_KEY]: pct >= 100 ? undefined : pct / 100 })
             }}
-            className="min-w-0 flex-1 accent-sky-500 disabled:opacity-50"
+            className="min-w-0 flex-1 accent-link-theme-filled disabled:opacity-50"
             aria-label="軌道填色不透明度"
           />
           <span className="w-10 shrink-0 text-right font-mono text-text-tertiary">

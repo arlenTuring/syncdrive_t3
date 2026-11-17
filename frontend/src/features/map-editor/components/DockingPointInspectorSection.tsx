@@ -70,8 +70,8 @@ export function DockingPointInspectorSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/12 p-3">
-      <h3 className="text-caption-2 uppercase text-sky-400/90">
+    <section className="space-y-2.5 rounded-lg border border-border-theme-light bg-surface-theme p-3">
+      <h3 className="text-caption-2 uppercase text-text-theme">
         停靠點
       </h3>
       <p className="text-caption-2 text-text-quaternary">
@@ -105,7 +105,7 @@ export function DockingPointInspectorSection({
           }}
           placeholder="例：station_1"
           className={`w-full rounded border bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-60 ${
-            idError ? 'border-red-600' : 'border-border-tertiary'
+            idError ? 'border-status-error' : 'border-border-tertiary'
           }`}
         />
         {idError ? (

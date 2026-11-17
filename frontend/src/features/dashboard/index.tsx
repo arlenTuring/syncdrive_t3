@@ -1145,7 +1145,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             </div>
 
             {/* 平面名稱編輯器 */}
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-border-quaternary focus-within:border-cyan-500/50 transition-all">
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-border-quaternary focus-within:border-border-theme-light transition-all">
               <Monitor size={14} className="text-text-quaternary" />
               <input
                 value={activePlane?.name ?? ''}
@@ -1160,7 +1160,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <span
               className={`shrink-0 rounded-full px-2.5 py-0.5 text-caption-2 font-bold uppercase tracking-wide ${
                 isEditMode
-                  ? 'bg-cyan-950/80 text-text-theme ring-1 ring-cyan-700/60'
+                  ? 'bg-surface-theme text-text-theme ring-1 ring-border-theme-light'
                   : 'bg-surface-secondary text-text-tertiary ring-1 ring-zinc-600'
               }`}
             >
@@ -1209,7 +1209,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
         {/* 剪貼簿狀態提示 */}
         {clipboard && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-900/20 border border-status-warning-light text-status-warning text-body-xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-status-warning-light border border-status-warning-light text-status-warning text-body-xs">
             <Copy size={11} />
             <span className="font-mono text-caption-2">
               {clipboard.kind === 'canvas'

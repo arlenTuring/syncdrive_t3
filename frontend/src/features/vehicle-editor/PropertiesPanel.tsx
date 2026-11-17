@@ -22,7 +22,7 @@ import { VEHICLE_NUDGE_SHIFT_STEP, VEHICLE_NUDGE_STEP } from './utils/vehicleNud
 import { Button, Checkbox, IconButton } from '../../components/ui';
 
 const inputCls =
-  'w-full rounded-md border border-border-quaternary bg-surface-secondary px-2.5 py-1.5 text-body-xs text-text-primary focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-amber-500/20';
+  'w-full rounded-md border border-border-quaternary bg-surface-secondary px-2.5 py-1.5 text-body-xs text-text-primary focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-status-warning-light';
 const selectCls = `${inputCls} cursor-pointer`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -298,7 +298,7 @@ export function PropertiesPanel({
         <h2 className="mb-4 text-body-xs-bold uppercase text-text-quaternary">
           {t('vehicleEditor.properties.multiSelect')}
         </h2>
-        <p className="rounded-md border border-border-theme-light-trn bg-surface-theme-light px-2.5 py-2 text-caption-2 text-cyan-200">
+        <p className="rounded-md border border-border-theme-light-trn bg-surface-theme-light px-2.5 py-2 text-caption-2 text-text-theme-light">
           {t('vehicleEditor.properties.multiSelectHintAlt', {
             count: selectedCount,
             step: VEHICLE_NUDGE_STEP,

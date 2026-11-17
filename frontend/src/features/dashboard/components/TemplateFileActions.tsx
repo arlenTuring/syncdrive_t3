@@ -135,15 +135,15 @@ export function ImportTemplateButton({ onImported, variant = 'card' }: ImportPro
 
   return (
     <div
-      className="flex flex-col gap-3 p-5 rounded-2xl border border-dashed border-status-warning-light bg-amber-950/10"
+      className="flex flex-col gap-3 p-5 rounded-2xl border border-dashed border-status-warning-light bg-status-warning-light"
     >
       <div className="flex items-center gap-2 text-status-warning text-body-s-bold">
         <FileJson size={18} />
         匯入儀表板樣板
       </div>
       <p className="text-body-xs text-text-quaternary">
-        選擇 <code className="text-amber-300/80">.json</code> 樣板檔；檔案開頭的{' '}
-        <code className="text-amber-300/80">dataSources</code> 會合併至本機連線設定，並建立新平面。
+        選擇 <code className="text-status-warning">.json</code> 樣板檔；檔案開頭的{' '}
+        <code className="text-status-warning">dataSources</code> 會合併至本機連線設定，並建立新平面。
       </p>
       <label className="flex items-center gap-2 text-body-xs text-text-tertiary cursor-pointer">
         <Checkbox checked={applyConnections} onCheckedChange={e => setApplyConnections(e)} />

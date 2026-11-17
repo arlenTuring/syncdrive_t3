@@ -582,7 +582,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           {offline && (
             <span
               title={t('mapLibrary.offlineTitle')}
-              className="rounded-lg border border-amber-800/70 px-2 py-1 text-body-xs text-status-warning"
+              className="rounded-lg border border-status-warning-light px-2 py-1 text-body-xs text-status-warning"
             >
               {t('mapLibrary.offline')}
             </span>
@@ -663,7 +663,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           </p>
 
           {serverError ? (
-            <p className="mt-2 rounded-md border border-border-danger-light bg-red-950/40 px-2 py-1.5 text-body-xs text-status-error-emphasis">
+            <p className="mt-2 rounded-md border border-border-danger-light bg-status-error-light px-2 py-1.5 text-body-xs text-status-error-emphasis">
               {t('mapLibrary.serverListFailed', { error: serverError })}
             </p>
           ) : serverMaps === null ? (

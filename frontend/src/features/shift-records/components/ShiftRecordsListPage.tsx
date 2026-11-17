@@ -230,7 +230,7 @@ export function ShiftRecordsListPage({
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-sky-600 focus:outline-none"
+            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none"
           />
         </div>
         <SiteSelect

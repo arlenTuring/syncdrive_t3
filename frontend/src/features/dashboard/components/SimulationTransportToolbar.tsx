@@ -202,7 +202,7 @@ export function SimulationTransportToolbar() {
       <button
         type="button"
         onClick={() => setToolbarVisible(true)}
-        className="fixed bottom-3 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border-tertiary bg-zinc-900/95 px-4 py-2 text-body-xs-bold text-text-primary shadow-lg backdrop-blur-sm hover:border-cyan-600 hover:text-text-theme"
+        className="fixed bottom-3 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border-tertiary bg-zinc-900/95 px-4 py-2 text-body-xs-bold text-text-primary shadow-lg backdrop-blur-sm hover:border-border-theme hover:text-text-theme"
         title={t('dashboard.simulation.show')}
         style={{ transform: 'translateX(-50%)' }}
       >
@@ -260,7 +260,7 @@ export function SimulationTransportToolbar() {
           </div>
 
           {managed && transportPaused && (
-            <p className="text-body-xs text-amber-300/90">
+            <p className="text-body-xs text-status-warning">
               {t('dashboard.simulation.pausedHint')}
             </p>
           )}
@@ -282,7 +282,7 @@ export function SimulationTransportToolbar() {
                     const idx = Number(e.target.value);
                     void setSpeedMultiplier(SPEED_STOPS[idx] ?? 1);
                   }}
-                  className="h-2 w-full cursor-pointer accent-cyan-500"
+                  className="h-2 w-full cursor-pointer accent-link-theme-filled"
                   aria-label={t('dashboard.simulation.sendSpeedAria')}
                 />
                 <div className="flex justify-between font-mono text-caption-2 text-text-disabled">
@@ -306,7 +306,7 @@ export function SimulationTransportToolbar() {
           )}
 
           {managed && (
-            <div className="rounded-lg border border-border-danger-light bg-red-950/20 p-3">
+            <div className="rounded-lg border border-border-danger-light bg-status-error-light p-3">
               <div className="mb-2 flex items-center gap-1.5 text-body-xs-bold text-status-error-emphasis">
                 <TriangleAlert size={13} />
                 {t('dashboard.simulation.faultTitle')}

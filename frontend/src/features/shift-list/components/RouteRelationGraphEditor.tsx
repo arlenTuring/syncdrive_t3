@@ -807,7 +807,7 @@ export function RouteRelationGraphEditor({
                     className={[
                       'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-body-xs',
                       startSet.has(selectedNodeId)
-                        ? 'border-sky-500/50 bg-sky-500/20 text-text-theme'
+                        ? 'border-border-theme-light bg-surface-theme text-text-theme'
                         : endSet.has(selectedNodeId)
                           ? 'cursor-not-allowed border-border-quaternary text-text-disabled'
                           : 'border-border-quaternary text-text-secondary hover:border-border-theme-light hover:text-text-theme',
@@ -951,12 +951,12 @@ export function RouteRelationGraphEditor({
                 className={[
                   'absolute z-0 select-none rounded-lg border shadow-sm',
                   isHead
-                    ? 'border-amber-400/70 bg-amber-950/55'
+                    ? 'border-status-warning-light bg-status-warning-light'
                     : 'border-border-quaternary bg-zinc-900/95',
                   hovered
                     ? 'ring-2 ring-[#2B7FFF]/50'
                     : isSelected
-                      ? 'ring-1 ring-amber-400/50'
+                      ? 'ring-1 ring-status-warning-light'
                       : '',
                 ].join(' ')}
                 style={{
@@ -974,13 +974,13 @@ export function RouteRelationGraphEditor({
                 }}
               >
                 {isHead ? (
-                  <div className="pointer-events-none absolute left-1.5 top-1 z-30 rounded bg-amber-500/90 px-1 py-px text-[8px] font-semibold tracking-wide text-text-invert">
+                  <div className="pointer-events-none absolute left-1.5 top-1 z-30 rounded bg-status-warning-light px-1 py-px text-[8px] font-semibold tracking-wide text-text-invert">
                     {t('shiftList.routeRelation.firstTrip')}
                   </div>
                 ) : null}
                 {isStart ? (
                   <span
-                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-sky-500/35 text-caption-2 text-sky-50"
+                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-surface-theme text-caption-2 text-text-theme-light"
                     title={t('shiftList.routeRelation.startFrom')}
                     aria-label={t('shiftList.routeRelation.startFrom')}
                   >

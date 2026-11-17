@@ -96,7 +96,7 @@ export function BasemapInspectorSection({
               className="mb-1 flex items-center justify-between text-caption-2 text-text-quaternary"
             >
               <span>{t('mapEditor.inspector.basemap.opacity')}</span>
-              <span className="font-mono text-cyan-400/90">{opacityPct}%</span>
+              <span className="font-mono text-text-theme">{opacityPct}%</span>
             </label>
             <input
               id="basemap-opacity"
@@ -114,7 +114,7 @@ export function BasemapInspectorSection({
                   [BASEMAP_OPACITY_KEY]: Number(e.target.value) / 100,
                 })
               }}
-              className="h-2 w-full cursor-pointer accent-cyan-500 disabled:opacity-40"
+              className="h-2 w-full cursor-pointer accent-link-theme-filled disabled:opacity-40"
             />
             <div className="mt-1 flex justify-between text-caption-2 text-text-disabled">
               <span>{t('mapEditor.inspector.fullyTransparent')}</span>

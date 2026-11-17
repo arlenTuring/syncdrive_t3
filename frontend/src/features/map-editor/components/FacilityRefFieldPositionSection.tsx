@@ -63,8 +63,8 @@ export function FacilityRefFieldPositionSection({
   ]
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/15 p-3">
-      <h3 className="text-caption-2 uppercase text-sky-400/90">
+    <section className="space-y-2.5 rounded-lg border border-border-theme-light bg-surface-theme p-3">
+      <h3 className="text-caption-2 uppercase text-text-theme">
         場域座標（公尺）
       </h3>
       <p className="text-caption-2 text-text-quaternary">
@@ -75,11 +75,11 @@ export function FacilityRefFieldPositionSection({
             : '此元件在實際場域中的代表點；僅能在此手動設定。圖台拖曳或調整像素尺寸不會改變此位置。座標為場域公尺（原點左下，橫向／縱向）。'}
       </p>
       {hasPosition ? (
-        <p className="rounded-md border border-sky-900/30 bg-sky-950/25 px-2 py-1.5 font-mono text-body-xs text-sky-100/90">
+        <p className="rounded-md border border-border-theme-light bg-surface-theme px-2 py-1.5 font-mono text-body-xs text-text-theme-light">
           代表點：({position.xM!.toFixed(2)}, {position.yM!.toFixed(2)}) m
         </p>
       ) : (
-        <p className="text-caption-2 text-amber-500/90">
+        <p className="text-caption-2 text-status-warning">
           {autoMapped
             ? '尚未設定場域座標（目前無法由圖台映射帶入）。'
             : '尚未設定場域座標。'}

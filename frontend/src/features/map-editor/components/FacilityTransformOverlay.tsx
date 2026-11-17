@@ -26,7 +26,7 @@ export function FacilityTransformOverlay({
     : `W: ${widthM.toFixed(1)} m · H: ${heightM.toFixed(1)} m`
   return (
     <div
-      className="pointer-events-none absolute z-[5020] whitespace-nowrap rounded bg-cyan-500 px-3 py-0.5 font-mono text-body-xs-bold text-text-primary shadow-lg"
+      className="pointer-events-none absolute z-[5020] whitespace-nowrap rounded bg-link-theme-filled px-3 py-0.5 font-mono text-body-xs-bold text-text-primary shadow-lg"
       style={{
         left: anchorLeft,
         top: anchorTop,

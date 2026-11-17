@@ -236,7 +236,7 @@ export function YardEntryAllowancePanel({ templateId, maintenance, lockedRotatio
           {invalid.map((row) => <li key={`${row.section}-${row.taskId}`}>• {row.message}</li>)}
         </ul>
       ) : (
-        <p className="text-emerald-300/90">沒有整備會被正線開頭額度吃光。</p>
+        <p className="text-status-success">沒有整備會被正線開頭額度吃光。</p>
       )}
       {notes.length > 0 ? (
         <ul className="space-y-1 text-status-warning">

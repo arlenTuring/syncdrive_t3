@@ -259,10 +259,10 @@ export function BasemapCellOverlay({
           isSelected
             ? isIndependent
               ? 'border-2 border-violet-400/95 bg-violet-400/8'
-              : 'border-2 border-amber-400/90 bg-amber-400/5'
+              : 'border-2 border-status-warning-light bg-status-warning-light'
             : isIndependent
               ? 'border border-violet-400/45 bg-violet-400/5'
-              : 'border border-dashed border-cyan-400/20'
+              : 'border border-dashed border-border-theme-light'
         }`}
         style={{
           left: cell.x,
@@ -341,7 +341,7 @@ export function BasemapCellOverlay({
               <div
                 key={d.id}
                 data-basemap-cell-divider
-                className="pointer-events-auto absolute z-[4] bg-cyan-400/50"
+                className="pointer-events-auto absolute z-[4] bg-surface-theme"
                 style={
                   d.axis === 'col'
                     ? {

@@ -147,7 +147,7 @@ export function TrajectoryPanel({
           </div>
 
           {mapMismatch && (
-            <p className="text-body-xs text-amber-400/95">
+            <p className="text-body-xs text-status-warning">
               {t('mapEditor.trajectory.mapMismatch')}
             </p>
           )}

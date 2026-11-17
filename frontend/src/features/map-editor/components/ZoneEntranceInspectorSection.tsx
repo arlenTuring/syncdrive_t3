@@ -104,7 +104,7 @@ export function ZoneEntranceInspectorSection({
               : t('mapEditor.inspector.zoneEntrance.waypointNone')}
           </p>
         ) : waypoints.length === 0 ? (
-          <p className="text-caption-2 text-amber-300/80">
+          <p className="text-caption-2 text-status-warning">
             {t('mapEditor.inspector.zoneEntrance.waypointEmpty')}
           </p>
         ) : (
@@ -132,7 +132,7 @@ export function ZoneEntranceInspectorSection({
           </SiteSelect>
         )}
         {boundWaypointId && !boundWaypoint ? (
-          <p className="text-caption-2 text-amber-300/80">
+          <p className="text-caption-2 text-status-warning">
             {t('mapEditor.inspector.zoneEntrance.waypointMissing', { id: boundWaypointId })}
           </p>
         ) : null}
@@ -185,11 +185,11 @@ export function ZoneEntranceInspectorSection({
                 */}
                 {!readOnly && !bound ? (
                   available.length === 0 ? (
-                    <p className="text-caption-2 text-amber-300/80">
+                    <p className="text-caption-2 text-status-warning">
                       {t('mapEditor.inspector.zoneEntrance.noAvailable')}
                     </p>
                   ) : (
-                    <label className="block text-caption-2 text-amber-300/80">
+                    <label className="block text-caption-2 text-status-warning">
                       {t('mapEditor.inspector.zoneEntrance.rebind')}
                       <SiteSelect
                         value=""

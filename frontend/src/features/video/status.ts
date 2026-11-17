@@ -4,11 +4,11 @@ import type { SourceOption, VideoSourceItem } from './api';
 export type Badge = { text: string; tone: 'zinc' | 'sky' | 'green' | 'red' | 'amber' };
 
 export const BADGE_TONE: Record<Badge['tone'], string> = {
-  zinc: 'bg-zinc-700/70 text-zinc-200',
-  sky: 'bg-sky-500/20 text-sky-200',
-  green: 'bg-emerald-500/20 text-emerald-200',
-  red: 'bg-red-500/25 text-red-200',
-  amber: 'bg-amber-500/20 text-amber-100',
+  zinc: 'bg-zinc-700/70 text-text-primary',
+  sky: 'bg-surface-theme text-text-theme',
+  green: 'bg-status-success-light text-status-success',
+  red: 'bg-status-error-light text-status-error-emphasis',
+  amber: 'bg-status-warning-light text-status-warning',
 };
 
 /**

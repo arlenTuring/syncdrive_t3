@@ -36,7 +36,7 @@ const HARD = {
   rgb: /\b(?:rgba?|hsla?)\((?!\s*from\b)[^)]*\)/g,
 };
 const HUES = 'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
-const PALETTE = new RegExp(`\\b(?:bg|text|border|ring|fill|stroke|from|via|to|outline|divide|placeholder|decoration|accent|caret|shadow)(?:-[trblxy])?-(?:(?:${HUES})-\\d{2,3}|white|black)\\b`, 'g');
+const PALETTE = new RegExp(`\\b(?:bg|text|border|ring|fill|stroke|from|via|to|outline|divide|placeholder|decoration|accent|caret|shadow)(?:-[trblxy])?-(?:(?:${HUES})-\\d{2,3}|white|black)\\b(?!-\\d)`, 'g'); // bg-black-30、white-40 是設計 token，不算
 
 function walk(dir) {
   const out = [];

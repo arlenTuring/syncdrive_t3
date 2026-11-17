@@ -32,7 +32,7 @@ export function MapCanvasInspectorSection({
 
   return (
     <aside data-inspector className="flex h-full min-h-0 flex-col bg-surface-primary">
-      <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-amber-500/90">
+      <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-status-warning">
         {t('mapEditor.inspector.mapCanvas.title')}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-4 text-body-s">

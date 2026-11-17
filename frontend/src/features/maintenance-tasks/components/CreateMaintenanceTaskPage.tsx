@@ -150,7 +150,7 @@ function CreateStepSidebar({
                       active
                         ? 'bg-link-theme-filled text-text-primary'
                         : completed
-                          ? 'bg-emerald-500/20 text-status-success'
+                          ? 'bg-status-success-light text-status-success'
                           : 'bg-surface-secondary text-text-quaternary'
                     }`}
                   >
@@ -210,7 +210,7 @@ function StepBasicInfo({
               value={draft.name}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
               placeholder={t('maintenanceTasks.createWizard.placeholder')}
-              className={`${INPUT_CLASS} ${nameInvalid ? 'border-red-500/80 pr-9 focus:border-status-error focus:ring-red-500/30' : ''}`}
+              className={`${INPUT_CLASS} ${nameInvalid ? 'border-status-error pr-9 focus:border-status-error focus:ring-status-error-light' : ''}`}
             />
             {nameInvalid && (
               <AlertCircle className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-status-error" />
@@ -590,7 +590,7 @@ export function CreateMaintenanceTaskPage({
         </div>
 
         <div ref={previewScrollRef} className="min-h-0 flex-1 overflow-auto p-8">
-          <div className="relative min-h-full rounded-2xl border border-border-quaternary bg-[#111113] p-8 pt-14">
+          <div className="relative min-h-full rounded-2xl border border-border-quaternary bg-surface-sub-background p-8 pt-14">
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
             {loading ? (
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">

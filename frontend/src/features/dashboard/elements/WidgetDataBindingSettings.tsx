@@ -12,7 +12,7 @@ import { getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessor
 import { SegmentedControl } from '../../../components/ui';
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
 const readonlyCls = `${inputCls} bg-black-30 text-text-secondary font-mono`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -90,9 +90,9 @@ function PostProcessMqtt({ source, fields }: { source: GroupDataSource; fields: 
   const inputs = fields.flatMap((field) => definition.mqtt?.inputsByOutput[field] ?? []);
   if (inputs.length === 0) return null;
   return (
-    <div className="space-y-2 rounded-md border border-cyan-700/40 bg-cyan-950/20 p-2.5">
+    <div className="space-y-2 rounded-md border border-border-theme-light bg-surface-theme p-2.5">
       <div className="flex flex-wrap items-center gap-1.5 text-caption-2">
-        <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-bold text-cyan-200">即時覆寫</span>
+        <span className="rounded bg-surface-theme px-1.5 py-0.5 font-bold text-text-theme-light">即時覆寫</span>
         <span className="text-text-secondary">後處理：{definition.label}</span>
       </div>
       <ReadonlyValue label="MQTT 資料來源" value={sourceName(definition.mqtt.dataSourceId)} />

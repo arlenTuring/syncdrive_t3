@@ -45,8 +45,8 @@ export function RoadLineInspectorSection({
       : null
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/12 p-3">
-      <h3 className="text-caption-2 uppercase text-sky-400/90">
+    <section className="space-y-2.5 rounded-lg border border-border-theme-light bg-surface-theme p-3">
+      <h3 className="text-caption-2 uppercase text-text-theme">
         {t('mapEditor.inspector.roadLine.title')}
       </h3>
       <p className="text-caption-2 text-text-quaternary">
