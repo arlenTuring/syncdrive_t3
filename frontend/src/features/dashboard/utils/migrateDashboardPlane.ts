@@ -1,4 +1,6 @@
 import type { DashboardPlane, CanvasElementProps, ChildWidget } from '../types';
+import { bindOperationStatusBadges } from './operationStatusBadge';
+import { mergeLegacyPlatformStations } from './mergeLegacyPlatformStations';
 import { migrateChildWidgetGenerics } from './migrateWidgetGenerics';
 import {
   needsDashboardRuntimePatch,
@@ -125,7 +127,9 @@ function migrateCanvasElement(el: CanvasElementProps): CanvasElementProps {
     ...el,
     children: migrateStationEtaChildren((el.children ?? [])
       .filter(c => !REMOVED_WIDGET_TYPES.has(c.type))
-      .map(stripWidgetDemoBehavior)),
+      .map(stripWidgetDemoBehavior))
+      // 地圖 v0.5 起一個月台一個點：進站動態卡片的舊站點代號（xxx_start／xxx_end）合回新代號
+      .map(mergeLegacyPlatformStations),
   };
   if (!next.shiftCenterRange && next.children.some(child =>
     'dataUrl' in child && child.dataUrl?.startsWith('/syncdrive-api/operation-metrics/shift-center'))) {
@@ -195,7 +199,8 @@ export function migratePlane(plane: DashboardPlane): DashboardPlane {
   const upgraded = upgradeSystemQueries(patched).plane;
   // 班次群組補上獨立的過渡班次卡（已經有就不動）；三種班次卡統一成「班次在前、車號在底列中間」
   const withTransition = ensureTransitionShiftTemplate(upgraded).plane;
-  return switchEventCarouselKey(alignShiftCardLayouts(withTransition).plane);
+  // 範本留下、從沒接資料的「營運狀態」標籤補上綁定（已綁定或使用者改過的不動）
+  return bindOperationStatusBadges(switchEventCarouselKey(alignShiftCardLayouts(withTransition).plane)).plane;
 }
 
 /**
