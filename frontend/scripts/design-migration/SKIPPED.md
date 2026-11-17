@@ -276,3 +276,214 @@
 | `features/time-templates/components/TimeOfDayPicker.tsx:68` | {pad2(n)} | — |
 | `features/time-templates/components/TimeSlotAttributeCard.tsx:63` | — | — |
 | `features/vehicle-editor/VehicleList.tsx:141` | {v.name} | Bus |
+
+# 保留的寫死色值（hex／rgb()）
+
+共 **1794** 處。能對應設計 token 的已由 `codemod-design-tokens.mjs --families` 換掉；下面這些是資料或繪圖用色，要先決定「畫布元件／範本是否跟著設計系統走」。
+
+| 類型 | 處數 | 檔案數 |
+|---|---:|---:|
+| 儀表板畫布元件（顏色來自元件設定） | 483 | 26 |
+| 儀表板範本／示範資料（存成資料的顏色） | 337 | 10 |
+| 畫布／SVG／圖表繪圖色 | 336 | 54 |
+| 儀表板編輯器（多為設定面板的色票與預設值） | 281 | 23 |
+| 其他（逐檔判斷） | 192 | 49 |
+| 元件或屬性的預設色（使用者可改，存進設定） | 165 | 6 |
+
+## 儀表板畫布元件（顏色來自元件設定）
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/dashboard/CanvasElement.tsx` | 90 |
+| `features/dashboard/elements/UnitTelemetryCardWidget.tsx` | 51 |
+| `features/dashboard/ComponentPalette.tsx` | 41 |
+| `features/dashboard/elements/RouteProgressWidget.tsx` | 39 |
+| `features/dashboard/elements/ShiftListWidget.tsx` | 37 |
+| `features/dashboard/elements/LineChartWidget.tsx` | 32 |
+| `features/dashboard/elements/TabListWidget.tsx` | 25 |
+| `features/dashboard/elements/GaugeWidget.tsx` | 24 |
+| `features/dashboard/elements/MaintenanceDistributionWidget.tsx` | 18 |
+| `features/dashboard/elements/SlotGridWidget.tsx` | 18 |
+| `features/dashboard/elements/BarChartWidget.tsx` | 17 |
+| `features/dashboard/elements/GroupCanvasRenderer.tsx` | 15 |
+| `features/dashboard/elements/DatabaseWidget.tsx` | 14 |
+| `features/dashboard/elements/EmptyStateWidget.tsx` | 10 |
+| `features/dashboard/elements/ImageWidget.tsx` | 7 |
+| `features/dashboard/elements/VehicleAlertBannerWidget.tsx` | 7 |
+| `features/dashboard/elements/SegmentBarWidget.tsx` | 6 |
+| `features/dashboard/elements/gaugeBand.ts` | 6 |
+| `features/dashboard/elements/lineChartSeries.ts` | 6 |
+| `features/dashboard/elements/ProgressBarWidget.tsx` | 5 |
+| `features/dashboard/elements/StatCardWidget.tsx` | 4 |
+| `features/dashboard/elements/WidgetRenderer.tsx` | 4 |
+| `features/dashboard/elements/chartAxis.ts` | 4 |
+| `features/dashboard/elements/ClockWidget.tsx` | 1 |
+| `features/dashboard/elements/StatusBadgeWidget.tsx` | 1 |
+| `features/dashboard/elements/VehicleContainerWidgetView.tsx` | 1 |
+
+## 儀表板範本／示範資料（存成資料的顏色）
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/dashboard/constants/demoPlane.ts` | 128 |
+| `features/dashboard/constants/deploymentPlane.ts` | 98 |
+| `features/dashboard/constants/demoSql.ts` | 43 |
+| `features/dashboard/constants/mapPlatformTheme.ts` | 22 |
+| `features/dashboard/constants/alertBannerDemoRules.ts` | 15 |
+| `features/dashboard/constants/vehicleMonitorTheme.ts` | 9 |
+| `features/dashboard/constants/healthStatusTheme.ts` | 8 |
+| `features/dashboard/constants/severityTheme.ts` | 6 |
+| `features/vehicle-editor/constants/palette.ts` | 6 |
+| `features/vehicle-editor/constants/userRestoredVtmsVehicle.ts` | 2 |
+
+## 畫布／SVG／圖表繪圖色
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/shift-list/components/RouteRelationGraphEditor.tsx` | 34 |
+| `features/map-editor/components/FacilityNode.tsx` | 28 |
+| `features/map-editor/components/SimRoutePathOverlay.tsx` | 27 |
+| `features/map-editor/components/TrackGenSizeDialog.tsx` | 25 |
+| `features/map-editor/components/PointTopologyEditorDialog.tsx` | 23 |
+| `features/map-editor/components/RoutePlanningOverlay.tsx` | 11 |
+| `features/map-editor/components/TrajectoryLayer.tsx` | 11 |
+| `features/map-editor/components/MapListDrawer.tsx` | 10 |
+| `features/shift-list/components/CapacityTrendChart.tsx` | 10 |
+| `features/map-editor/utils/trackGenLayout.ts` | 9 |
+| `features/map-editor/components/AreaNode.tsx` | 8 |
+| `features/map-editor/components/SignalLightGraphic.tsx` | 8 |
+| `features/map-editor/opendrive/lanePolygons.ts` | 8 |
+| `features/map-editor/components/MapPixelFrameOverlay.tsx` | 7 |
+| `features/map-editor/components/AreaDragTrack.tsx` | 6 |
+| `features/map-editor/components/AreaRulerOverlay.tsx` | 6 |
+| `features/map-editor/index.tsx` | 6 |
+| `features/map-editor/utils/mqttColorSimulation.ts` | 6 |
+| `features/map-editor/utils/trackGenGroups.ts` | 6 |
+| `features/map-editor/vehicles/MapAreaVehicleOverlay.tsx` | 6 |
+| `features/map-editor/vehicles/defaultMapVehicleIcon.ts` | 6 |
+| `features/map-editor/components/GeofenceNode.tsx` | 5 |
+| `features/map-editor/utils/geofence.ts` | 5 |
+| `features/map-editor/utils/pointTopology.ts` | 5 |
+| `features/map-editor/components/BasemapGridOverlay.tsx` | 4 |
+| `features/map-editor/components/MapAreaCanvas.tsx` | 4 |
+| `features/map-editor/components/PlatformDoorGraphic.tsx` | 4 |
+| `features/map-editor/vehicles/vehicleRoofIndicator.ts` | 4 |
+| `features/map-editor/components/AreaInspectorSection.tsx` | 3 |
+| `features/map-editor/components/MapCanvas.tsx` | 3 |
+| `features/map-editor/components/TrackGenGraphic.tsx` | 3 |
+| `features/map-editor/utils/trackFacility.ts` | 3 |
+| `features/vehicle-editor/elements/VehicleDoorSvg.tsx` | 3 |
+| `features/map-editor/components/FrameInspectorSection.tsx` | 2 |
+| `features/map-editor/components/Inspector.tsx` | 2 |
+| `features/map-editor/components/MapCropModeOverlay.tsx` | 2 |
+| `features/map-editor/components/MapLibraryPage.tsx` | 2 |
+| `features/map-editor/components/MapRulers.tsx` | 2 |
+| `features/map-editor/components/RoutePlanningPanel.tsx` | 2 |
+| `features/map-editor/utils/crossTrackPortals.ts` | 2 |
+| `features/map-editor/utils/facilityArea.ts` | 2 |
+| `features/dashboard/vehicle-operation-actions/VehicleBodySvg.tsx` | 1 |
+| `features/map-editor/components/BasemapNode.tsx` | 1 |
+| `features/map-editor/components/FacilityDraggableLabel.tsx` | 1 |
+| `features/map-editor/components/FacilityInspectorSection.tsx` | 1 |
+| `features/map-editor/components/FillColorRulesSection.tsx` | 1 |
+| `features/map-editor/components/MapAuxiliaryLinesOverlay.tsx` | 1 |
+| `features/map-editor/components/RouteGroupListView.tsx` | 1 |
+| `features/map-editor/components/ZonePartitionInspectorSection.tsx` | 1 |
+| `features/map-editor/utils/facilityLabelStyle.ts` | 1 |
+| `features/map-editor/utils/roadLineFacility.ts` | 1 |
+| `features/map-editor/utils/zonePartition.ts` | 1 |
+| `features/map-editor/vehicles/VehicleTrackProgressBadge.tsx` | 1 |
+| `features/map-editor/vehicles/resolveMapVehicleAppearance.ts` | 1 |
+
+## 儀表板編輯器（多為設定面板的色票與預設值）
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/dashboard/PropertiesPanel.tsx` | 82 |
+| `features/dashboard/PlaneWorkspace.tsx` | 58 |
+| `features/dashboard/route-progress/RouteTrackView.tsx` | 17 |
+| `features/dashboard/utils/mainlineTaskModel.ts` | 15 |
+| `features/dashboard/utils/maintenanceTaskModel.ts` | 12 |
+| `features/dashboard/components/CanvasChildListPortal.tsx` | 11 |
+| `features/dashboard/components/EditPreviewChrome.tsx` | 11 |
+| `features/dashboard/utils/resolveVehicleMonitorBadge.ts` | 11 |
+| `features/dashboard/index.tsx` | 10 |
+| `features/dashboard/utils/operationStatusBadge.ts` | 10 |
+| `features/dashboard/route-progress/RouteProgressSettings.tsx` | 6 |
+| `features/dashboard/components/LayoutValidationIcon.tsx` | 5 |
+| `features/dashboard/utils/migrateDashboardPlane.ts` | 5 |
+| `features/dashboard/utils/migrateVehicleMonitorProtocol.ts` | 5 |
+| `features/dashboard/utils/migrateWidgetGenerics.ts` | 4 |
+| `features/dashboard/utils/shiftCardTemplates.ts` | 4 |
+| `features/dashboard/components/BindingWarningIcon.tsx` | 3 |
+| `features/dashboard/route-progress/RouteVehicleMarker.tsx` | 3 |
+| `features/dashboard/utils/alertTrigger.ts` | 3 |
+| `features/dashboard/DashboardList.tsx` | 2 |
+| `features/dashboard/useDashboardEditor.ts` | 2 |
+| `features/dashboard/components/SnapGuideLines.tsx` | 1 |
+| `features/dashboard/utils/vehicleInfoCardTemplate.ts` | 1 |
+
+## 其他（逐檔判斷）
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/shift-list/utils/scheduleEngineLastIssues.ts` | 21 |
+| `features/shift-list/components/ShiftSchedulePlanGrid.tsx` | 20 |
+| `components/SiteColorInput.tsx` | 13 |
+| `features/shift-records/components/DrivingCapabilityModal.tsx` | 13 |
+| `features/shift-deployment/diffScheduleTasks.ts` | 11 |
+| `features/shift-list/utils/buildCapacityTrend.ts` | 8 |
+| `features/vehicle-editor/VehicleWorkspace.tsx` | 8 |
+| `features/time-templates/components/StepOverallPreview.tsx` | 7 |
+| `features/psd-control/components/DoorLinkIndicator.tsx` | 6 |
+| `features/shift-deployment/fallback.ts` | 6 |
+| `features/degraded-operation/DegradedOperationPage.tsx` | 5 |
+| `features/shift-deployment/components/ShiftRouteTrack.tsx` | 5 |
+| `features/shift-deployment/components/SummaryCards.tsx` | 5 |
+| `features/dispatch-scheduling/components/VehicleAssignSelect.tsx` | 4 |
+| `features/shift-list/components/StepShiftRouteGroups.tsx` | 4 |
+| `features/time-templates/components/AttributeColorPalette.tsx` | 4 |
+| `features/psd-control/components/DoorMonitorCard.tsx` | 3 |
+| `features/time-templates/components/StepTaskScheduling.tsx` | 3 |
+| `features/time-templates/components/TimeSlotIntervalsPanel.tsx` | 3 |
+| `features/degraded-operation/DegradedHistoryView.tsx` | 2 |
+| `features/degraded-operation/DegradedPlanDialog.tsx` | 2 |
+| `features/degraded-operation/PlanManagementView.tsx` | 2 |
+| `features/shift-deployment/components/DeploymentShiftTable.tsx` | 2 |
+| `features/shift-deployment/components/RingProgress.tsx` | 2 |
+| `features/shift-deployment/hooks/useDeploymentData.ts` | 2 |
+| `features/shift-list/components/CreateShiftSchedulePage.tsx` | 2 |
+| `features/shift-list/components/StepShiftActionSettings.tsx` | 2 |
+| `features/time-templates/components/CreateTimeTemplateModal.tsx` | 2 |
+| `features/time-templates/components/ScheduleIntervalSelection.tsx` | 2 |
+| `features/time-templates/components/VehicleCapacitySlider.tsx` | 2 |
+| `features/vehicle-rotation/VehicleRotationPage.tsx` | 2 |
+| `features/virtual-fence-management/components/FenceShapeOverlay.tsx` | 2 |
+| `features/degraded-operation/ActiveExecutionDialogs.tsx` | 1 |
+| `features/degraded-operation/DegradedPlanForm.tsx` | 1 |
+| `features/dispatch-scheduling/DispatchSchedulingPage.tsx` | 1 |
+| `features/maintenance-tasks/components/CreateMaintenanceTaskPage.tsx` | 1 |
+| `features/psd-control/PsdControlPage.tsx` | 1 |
+| `features/shift-deployment/components/ExecutionTimeField.tsx` | 1 |
+| `features/shift-records/components/DateTimeRangePicker.tsx` | 1 |
+| `features/time-templates/components/TimeOfDayPicker.tsx` | 1 |
+| `features/time-templates/components/scheduleTimelineBackground.tsx` | 1 |
+| `features/vehicle-editor/elements/VehicleElementNode.tsx` | 1 |
+| `features/vehicle-editor/elements/VehicleImageLayer.tsx` | 1 |
+| `features/vehicle-editor/useVehicleEditor.ts` | 1 |
+| `features/vehicle-editor/utils/bodyColor.ts` | 1 |
+| `features/vehicle-editor/utils/colorInput.ts` | 1 |
+| `features/vehicle-editor/utils/createElement.ts` | 1 |
+| `features/virtual-fence-management/components/FenceListPanel.tsx` | 1 |
+| `styles/tokens.ts` | 1 |
+
+## 元件或屬性的預設色（使用者可改，存進設定）
+
+| 檔案 | 處數 |
+|---|---:|
+| `features/dashboard/types.ts` | 96 |
+| `features/time-templates/types/editor.ts` | 56 |
+| `features/shift-records/types.ts` | 6 |
+| `features/dispatch-scheduling/types.ts` | 4 |
+| `features/shift-list/types.ts` | 2 |
+| `features/virtual-fence-management/types.ts` | 1 |

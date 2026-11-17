@@ -62,3 +62,25 @@ for key,name,why,need in CATS:
     print(f'\n## {name}（{len(rows[key])}）\n')
     print('| 位置 | 內容 | 圖示 |\n|---|---|---|')
     for f,l,txt,icons in rows[key]: print(f'| `{f}:{l}` | {txt or "—"} | {icons or "—"} |')
+
+# ── 第二部分：保留的寫死色值（hex／rgb()）──
+HEX=re.compile(r'#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\(\s*\d')
+def color_reason(f):
+    if '/constants/' in f: return '儀表板範本／示範資料（存成資料的顏色）'
+    if f.endswith('/types.ts') or '/types/' in f: return '元件或屬性的預設色（使用者可改，存進設定）'
+    if '/dashboard/elements/' in f or 'CanvasElement' in f or 'ComponentPalette' in f: return '儀表板畫布元件（顏色來自元件設定）'
+    if '/map-editor/' in f or 'Graph' in f or 'Svg' in f or 'Chart' in f: return '畫布／SVG／圖表繪圖色'
+    if '/dashboard/' in f: return '儀表板編輯器（多為設定面板的色票與預設值）'
+    return '其他（逐檔判斷）'
+groups=collections.defaultdict(list)
+for f in sorted(glob.glob('src/**/*.ts*',recursive=True)):
+    if '/components/ui/' in f or '.spec.' in f or not f.endswith(('.ts','.tsx')): continue
+    n=len(HEX.findall(open(f,encoding='utf-8').read()))
+    if n: groups[color_reason(f)].append((f[4:],n))
+total=sum(n for v in groups.values() for _,n in v)
+print(f'\n# 保留的寫死色值（hex／rgb()）\n\n共 **{total}** 處。能對應設計 token 的已由 `codemod-design-tokens.mjs --families` 換掉；下面這些是資料或繪圖用色，要先決定「畫布元件／範本是否跟著設計系統走」。\n')
+print('| 類型 | 處數 | 檔案數 |\n|---|---:|---:|')
+for k,v in sorted(groups.items(),key=lambda kv:-sum(n for _,n in kv[1])): print(f'| {k} | {sum(n for _,n in v)} | {len(v)} |')
+for k,v in sorted(groups.items(),key=lambda kv:-sum(n for _,n in kv[1])):
+    print(f'\n## {k}\n\n| 檔案 | 處數 |\n|---|---:|')
+    for f,n in sorted(v,key=lambda x:-x[1]): print(f'| `{f}` | {n} |')

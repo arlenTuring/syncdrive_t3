@@ -607,8 +607,7 @@
     "button": 1
   },
   "features/psd-control/components/DockTimeDialog.tsx": {
-    "hex": 6,
-    "arbitrary": 4
+    "arbitrary": 2
   },
   "features/psd-control/components/DoorDetailPage.tsx": {
     "arbitrary": 1

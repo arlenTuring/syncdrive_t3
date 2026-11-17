@@ -133,9 +133,9 @@ export function DockTimeDialog({
               max={maxSeconds}
               value={value}
               onChange={(e) => setValue(Number(e.target.value))}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2B7FFF] [&::-webkit-slider-thumb]:shadow-[0_0_0_6px_rgba(43,127,255,0.28)] [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[#2B7FFF]"
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-link-theme-filled [&::-webkit-slider-thumb]:shadow-[0_0_0_6px_var(--link-tonal)] [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-link-theme-filled"
               style={{
-                background: `linear-gradient(to right, #2B7FFF 0%, #2B7FFF ${pct}%, #3f3f46 ${pct}%, #3f3f46 100%)`,
+                background: `linear-gradient(to right, var(--link-theme-filled) 0%, var(--link-theme-filled) ${pct}%, var(--link-standard-hover) ${pct}%, var(--link-standard-hover) 100%)`,
               }}
             />
             <span className="w-14 shrink-0 text-right text-body-s text-text-primary">
