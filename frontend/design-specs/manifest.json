@@ -1,0 +1,54 @@
+{
+  "$comment": "設計交付文件與程式實作的對應表。新增或更新規格時在這裡登記；src/components/ui/designSpecs.spec.ts 依此檢查實作跟規格一致。路徑相對於 frontend/。",
+  "tokens": {
+    "source": "design-specs/t3-design-tokens.source.css",
+    "implementation": "src/styles/design-tokens.css"
+  },
+  "components": [
+    {
+      "name": "Button",
+      "spec": "design-specs/t3-text-button-engineering-spec.md",
+      "css": "src/components/ui/button/button.css",
+      "component": "src/components/ui/button/Button.tsx",
+      "figma": "83:2151",
+      "variants": 60,
+      "playground": null
+    },
+    {
+      "name": "IconButton",
+      "spec": "design-specs/t3-icon-button-engineering-spec.md",
+      "css": "src/components/ui/button/button.css",
+      "component": "src/components/ui/button/Button.tsx",
+      "figma": "83:2781",
+      "variants": 150,
+      "playground": "design-specs/t3-icon-button-playground.html"
+    },
+    {
+      "name": "Checkbox",
+      "spec": "design-specs/t3-checkbox-engineering-spec.md",
+      "css": "src/components/ui/checkbox/checkbox.css",
+      "component": "src/components/ui/checkbox/Checkbox.tsx",
+      "figma": "92:3330",
+      "variants": 42,
+      "playground": "design-specs/t3-checkbox-playground.html"
+    },
+    {
+      "name": "Radio",
+      "spec": "design-specs/t3-radio-engineering-spec.md",
+      "css": "src/components/ui/radio/radio.css",
+      "component": "src/components/ui/radio/Radio.tsx",
+      "figma": "69:6847",
+      "variants": 16,
+      "playground": "design-specs/t3-radio-playground.html"
+    },
+    {
+      "name": "Switch",
+      "spec": "design-specs/t3-switch-engineering-spec.md",
+      "css": "src/components/ui/switch/switch.css",
+      "component": "src/components/ui/switch/Switch.tsx",
+      "figma": "70:13852",
+      "variants": 12,
+      "playground": "design-specs/t3-switch-playground.html"
+    }
+  ]
+}

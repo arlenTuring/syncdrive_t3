@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { isChunkLoadError, reloadForNewBuild } from '../lib/chunkReload'
+import { Button } from './ui'
 
 type Props = {
   title?: string
@@ -43,25 +44,21 @@ export class ViewErrorBoundary extends Component<Props, State> {
     const { error, remountKey } = this.state
     if (error) {
       return (
-        <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 bg-[#0a0a0b] px-6 text-center">
+        <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 bg-surface-background px-6 text-center">
           <div className="max-w-lg space-y-2">
-            <h2 className="text-base font-semibold text-zinc-100">
+            <h2 className="text-headline-5 text-text-primary">
               {this.props.title ?? '畫面載入失敗'}
             </h2>
             <p className="break-words font-mono text-xs text-rose-300">
               {error.message}
             </p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-body-xs text-text-quaternary">
               若剛更新過程式，請先按重試；仍失敗再硬重新整理（Cmd+Shift+R）。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={this.handleRetry}
-            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500"
-          >
+          <Button hierarchy="superior" variant="filled" onPress={this.handleRetry}>
             重試
-          </button>
+          </Button>
         </div>
       )
     }

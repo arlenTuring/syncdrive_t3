@@ -45,4 +45,9 @@ if (vitest.length > 0) {
   const r = spawnSync('npx', ['vitest', 'run', ...vitest], { stdio: 'inherit' })
   if (r.status !== 0) failed = true
 }
+// 設計系統檢查：新程式不能再寫死色碼、任意字級（見 scripts/check-design-tokens.mjs）
+{
+  const r = spawnSync('node', ['scripts/check-design-tokens.mjs'], { stdio: 'inherit' })
+  if (r.status !== 0) failed = true
+}
 process.exit(failed ? 1 : 0)

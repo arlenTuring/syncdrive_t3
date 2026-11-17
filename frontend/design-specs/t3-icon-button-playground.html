@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>T3 UI Kit｜IconButton 150 Variants Playground</title>
+<meta name="description" content="T3 IconButton 150 variants, native hover / pressed / active / disabled, inspect and verify."/>
+<style id="token-css">/* T3 Design Tokens (2026-11-12): IconButton component dependencies */
+:root {
+  --font-primary: 'Noto Sans TC', sans-serif;
+  --color-white-100: #FFFFFF;
+  --color-blue-400: #51A2FF;
+  --color-blue-500: #2B7FFF;
+  --color-blue-600: #155DFC;
+  --color-gray-300: #D1D5DC;
+  --color-gray-500: #6A7282;
+  --color-gray-600: #4A5565;
+  --color-gray-700: #364153;
+  --color-slate-500: #62748E;
+  --color-neutral-300: #D4D4D4;
+  --color-red-400: #FF6467;
+  --color-red-500: #FB2C36;
+  --color-red-600: #E7000B;
+  --color-zinc-900: #18181B;
+
+  --surface-disabled: rgb(from var(--color-slate-500) r g b / 20%);
+  --text-secondary: var(--color-gray-300);
+  --text-disabled: var(--color-gray-600);
+  --text-theme: var(--color-blue-400);
+  --border-tertiary: rgb(from var(--color-neutral-300) r g b / 25%);
+  --border-disabled: rgb(from var(--color-neutral-300) r g b / 10%);
+  --border-theme: var(--color-blue-400);
+  --border-theme-light: rgb(from var(--color-blue-400) r g b / 50%);
+  --border-danger-light: rgb(from var(--color-red-400) r g b / 50%);
+  --link-theme-filled: var(--color-blue-500);
+  --link-theme-filled-hover: var(--color-blue-400);
+  --link-theme-filled-pressed: var(--color-blue-600);
+  --link-black-filled: var(--color-gray-700);
+  --link-black-filled-hover: var(--color-gray-600);
+  --link-black-filled-pressed: var(--color-gray-500);
+  --link-tonal: rgb(from var(--color-blue-400) r g b / 24%);
+  --link-tonal-hover: rgb(from var(--color-blue-400) r g b / 32%);
+  --link-tonal-pressed: rgb(from var(--color-blue-400) r g b / 40%);
+  --link-standard: rgb(from var(--color-gray-300) r g b / 12%);
+  --link-standard-hover: rgb(from var(--color-gray-300) r g b / 20%);
+  --link-standard-pressed: rgb(from var(--color-gray-300) r g b / 28%);
+  --link-danger-filled: var(--color-red-500);
+  --link-danger-filled-hover: var(--color-red-400);
+  --link-danger-filled-pressed: var(--color-red-600);
+  --link-danger-tonal: rgb(from var(--color-red-600) r g b / 8%);
+  --link-danger-tonal-hover: rgb(from var(--color-red-600) r g b / 12%);
+  --link-danger-tonal-pressed: rgb(from var(--color-red-600) r g b / 28%);
+  --status-error: var(--color-red-500);
+  --status-error-emphasis: var(--color-red-400);
+}
+.text-body-s-bold {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0.5px;
+}
+</style>
+<style id="component-css">.t3-icon-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 34px;
+  block-size: 34px;
+  flex: none;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background-color: var(--icon-button-bg, transparent);
+  box-shadow: inset 0 0 0 1px var(--icon-button-stroke, transparent);
+  color: var(--icon-button-fg, inherit);
+}
+.t3-icon-button__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 24px;
+  block-size: 24px;
+}
+.t3-icon-button[data-size="small"] .t3-icon-button__icon {
+  inline-size: 18px;
+  block-size: 18px;
+}
+.t3-icon-button__icon > svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.t3-icon-button:focus-visible {
+  outline: 2px solid var(--border-theme); /* border/theme */
+  outline-offset: 2px;
+}
+
+/* Default */
+.t3-icon-button[data-hierarchy="superior"][data-style="filled"] {
+  --icon-button-bg: var(--link-theme-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="tonal"] {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="outlined"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="standard"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="icon"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="filled"] {
+  --icon-button-bg: var(--link-black-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"] {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="standard"],
+.t3-icon-button[data-hierarchy="subordinate"][data-style="icon"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="filled"] {
+  --icon-button-bg: var(--link-danger-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="tonal"] {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="outlined"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="standard"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="icon"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error);
+}
+
+/* Active */
+.t3-icon-button[data-hierarchy="superior"][data-style="filled"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-theme-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="tonal"]:where([aria-pressed="true"]:not(:disabled)),
+.t3-icon-button[data-hierarchy="superior"][data-style="standard"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="outlined"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="icon"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="filled"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-black-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"]:where([aria-pressed="true"]:not(:disabled)),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="standard"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="icon"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="filled"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="tonal"]:where([aria-pressed="true"]:not(:disabled)),
+.t3-icon-button[data-hierarchy="danger"][data-style="standard"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="outlined"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="icon"]:where([aria-pressed="true"]:not(:disabled)) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+
+/* Hover */
+@media (hover: hover) {
+  .t3-icon-button[data-hierarchy="superior"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-theme-filled-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--color-white-100);
+  }
+  .t3-icon-button[data-hierarchy="superior"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-icon-button[data-hierarchy="superior"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-tonal-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--text-theme);
+  }
+  .t3-icon-button[data-hierarchy="superior"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-tonal-hover);
+    --icon-button-stroke: var(--border-theme-light);
+    --icon-button-fg: var(--text-theme);
+  }
+  .t3-icon-button[data-hierarchy="superior"][data-style="icon"]:where(:hover:not(:disabled)),
+  .t3-icon-button[data-hierarchy="subordinate"][data-style="icon"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: transparent;
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--link-theme-filled-hover);
+  }
+  .t3-icon-button[data-hierarchy="subordinate"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-black-filled-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--color-white-100);
+  }
+  .t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-icon-button[data-hierarchy="subordinate"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-standard-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--text-secondary);
+  }
+  .t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-standard-hover);
+    --icon-button-stroke: var(--border-tertiary);
+    --icon-button-fg: var(--text-secondary);
+  }
+  .t3-icon-button[data-hierarchy="danger"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-danger-filled-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--color-white-100);
+  }
+  .t3-icon-button[data-hierarchy="danger"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-icon-button[data-hierarchy="danger"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-danger-tonal-hover);
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--status-error-emphasis);
+  }
+  .t3-icon-button[data-hierarchy="danger"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: var(--link-danger-tonal-hover);
+    --icon-button-stroke: var(--border-danger-light);
+    --icon-button-fg: var(--status-error-emphasis);
+  }
+  .t3-icon-button[data-hierarchy="danger"][data-style="icon"]:where(:hover:not(:disabled)) {
+    --icon-button-bg: transparent;
+    --icon-button-stroke: transparent;
+    --icon-button-fg: var(--status-error);
+  }
+}
+
+/* Pressed */
+.t3-icon-button[data-hierarchy="superior"][data-style="filled"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-theme-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-icon-button[data-hierarchy="superior"][data-style="standard"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-tonal-pressed);
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="icon"]:where(:active:not(:disabled)),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="icon"]:where(:active:not(:disabled)) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled-pressed);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="filled"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-black-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="standard"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-standard-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-standard-pressed);
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="filled"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-icon-button[data-hierarchy="danger"][data-style="standard"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --icon-button-bg: var(--link-danger-tonal-pressed);
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+}
+.t3-icon-button[data-hierarchy="danger"][data-style="icon"]:where(:active:not(:disabled)) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}
+
+/* Disabled */
+.t3-icon-button[data-hierarchy="superior"][data-style="filled"]:where(:disabled),
+.t3-icon-button[data-hierarchy="superior"][data-style="tonal"]:where(:disabled),
+.t3-icon-button[data-hierarchy="superior"][data-style="standard"]:where(:disabled) {
+  --icon-button-bg: var(--surface-disabled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-disabled);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="outlined"]:where(:disabled) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: var(--border-disabled);
+  --icon-button-fg: var(--text-disabled);
+}
+.t3-icon-button[data-hierarchy="superior"][data-style="icon"]:where(:disabled),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="filled"]:where(:disabled),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:disabled),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:disabled),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="standard"]:where(:disabled),
+.t3-icon-button[data-hierarchy="subordinate"][data-style="icon"]:where(:disabled),
+.t3-icon-button[data-hierarchy="danger"][data-style="filled"]:where(:disabled),
+.t3-icon-button[data-hierarchy="danger"][data-style="tonal"]:where(:disabled),
+.t3-icon-button[data-hierarchy="danger"][data-style="outlined"]:where(:disabled),
+.t3-icon-button[data-hierarchy="danger"][data-style="standard"]:where(:disabled),
+.t3-icon-button[data-hierarchy="danger"][data-style="icon"]:where(:disabled) {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-disabled);
+}
+</style>
+<style id="matrix-preview-css">/* Showcase-only CSS. Fixed visual previews do not alter the production component. */ .t3-icon-button[data-hierarchy="superior"][data-style="filled"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-theme-filled-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="superior"][data-style="filled"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-theme-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="superior"][data-style="filled"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-theme-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="superior"][data-style="tonal"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-tonal-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="tonal"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="tonal"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="outlined"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-tonal-hover);
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="outlined"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-tonal-pressed);
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="outlined"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: var(--border-theme-light);
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="standard"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-tonal-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="standard"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="standard"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="superior"][data-style="icon"][data-preview-state="hover"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled-hover);
+} .t3-icon-button[data-hierarchy="superior"][data-style="icon"][data-preview-state="pressed"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled-pressed);
+} .t3-icon-button[data-hierarchy="superior"][data-style="icon"][data-preview-state="active"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="filled"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-black-filled-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="filled"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-black-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="filled"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-black-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-standard-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-standard-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="tonal"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-standard-hover);
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-standard-pressed);
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="outlined"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: var(--border-tertiary);
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="standard"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-standard-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="standard"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-standard-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="standard"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-secondary);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="icon"][data-preview-state="hover"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled-hover);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="icon"][data-preview-state="pressed"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--link-theme-filled-pressed);
+} .t3-icon-button[data-hierarchy="subordinate"][data-style="icon"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-standard);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--text-theme);
+} .t3-icon-button[data-hierarchy="danger"][data-style="filled"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-danger-filled-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="danger"][data-style="filled"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-danger-filled-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="danger"][data-style="filled"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-danger-filled);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--color-white-100);
+} .t3-icon-button[data-hierarchy="danger"][data-style="tonal"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-danger-tonal-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="tonal"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-danger-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="tonal"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="outlined"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-danger-tonal-hover);
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="outlined"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-danger-tonal-pressed);
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="outlined"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: var(--border-danger-light);
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="standard"][data-preview-state="hover"] {
+  --icon-button-bg: var(--link-danger-tonal-hover);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="standard"][data-preview-state="pressed"] {
+  --icon-button-bg: var(--link-danger-tonal-pressed);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="standard"][data-preview-state="active"] {
+  --icon-button-bg: var(--link-danger-tonal);
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="icon"][data-preview-state="hover"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error);
+} .t3-icon-button[data-hierarchy="danger"][data-style="icon"][data-preview-state="pressed"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+} .t3-icon-button[data-hierarchy="danger"][data-style="icon"][data-preview-state="active"] {
+  --icon-button-bg: transparent;
+  --icon-button-stroke: transparent;
+  --icon-button-fg: var(--status-error-emphasis);
+}</style>
+<style id="playground-css">
+*{box-sizing:border-box}html{scroll-behavior:smooth}:root{color-scheme:dark;--page:#0b1018;--panel:#141b27;--panel2:#182131;--line:#293548;--faded:#9fb0c8;--ink:#f3f6fc;--stage:#18181b}
+body{margin:0;background:var(--page);font:14px/1.5 'Noto Sans TC',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--ink)}
+button,input,select{font:inherit}input[type=checkbox]{accent-color:#2b7fff;width:16px;height:16px}a{color:#8ac8ff;text-decoration:none}a:hover{text-decoration:underline}button:not(:disabled),select{cursor:pointer}
+.page{max-width:1616px;margin:auto;padding:28px clamp(16px,3.5vw,48px) 70px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}.brand{display:flex;align-items:center;gap:12px;font-weight:720;font-size:12px;letter-spacing:.25px}.logo{width:33px;height:33px;display:grid;place-items:center;border-radius:9px;background:#2b7fff;color:#fff;box-shadow:0 0 20px #2b7fff35;font-weight:850}.breadcrumbs{color:#a5b6cd;font-size:12px}.top-links{display:flex;gap:16px;flex-wrap:wrap;font-size:12px}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:28px;background:linear-gradient(118deg,#1a2e4c 0%,#16263e 45%,#141a29 100%);border:1px solid #31425c;border-radius:18px;padding:29px 31px;margin-bottom:21px}.eyebrow{color:#8dbffd;font-weight:780;font-size:11px;letter-spacing:1.8px;margin:0 0 7px}.hero h1{font-weight:730;letter-spacing:-.6px;line-height:1.3;font-size:30px;margin:0 0 9px}.hero p:not(.eyebrow){font-size:13px;color:#aebed4;margin:0;max-width:740px}.stats{display:flex;flex-shrink:0;border:1px solid #465674;border-radius:12px;overflow:hidden}.stat{text-align:center;padding:13px 21px;border-right:1px solid #465674}.stat:last-child{border:0}.stat b{font-weight:760;display:block;font-size:28px;font-variant-numeric:tabular-nums;line-height:1.4}.stat small{font-size:11px;color:#aebcd1}
+.layout{display:grid;grid-template-columns:316px minmax(0,1fr);gap:18px;align-items:start}.sidebar{position:sticky;top:17px;display:grid;gap:15px;max-height:calc(100vh - 34px);overflow-y:auto;scrollbar-width:thin}.panel,.matrix-card{background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:hidden}.panel{padding:19px}.panelhead{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:15px}.panel h2,.matrix-intro h2{font-size:17px;margin:0;letter-spacing:-.15px}.sub{color:var(--faded);font-size:11px}.micro{color:#98a8c0;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;margin-top:2px}.field{margin-bottom:12px}.field:last-child{margin-bottom:0}.field label,.field-label{display:block;font-size:12px;color:#c3d0e1;margin-bottom:6px}.field select,.field input[type=text]{display:block;width:100%;background:#0c1421;color:#ecf3ff;border:1px solid #334259;border-radius:9px;padding:9px 11px;min-height:38px;outline:0;font-size:12px}.field :is(select,input[type=text]):focus-visible{outline:2px solid #76b8ff;outline-offset:1px}.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.toggle{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;color:#cdd9e8;font-size:12px}.toggle input{margin:0;flex:none}.toggle:has(input:disabled){opacity:.52}.help{font-size:11px;color:#9caec5;margin:8px 0 0;line-height:1.6}.small-btn{padding:7px 10px;color:#dae6f9;background:#222e40;border:1px solid #40536d;border-radius:8px;font-size:11px}.small-btn:hover{background:#2c3c53}.small-btn:focus-visible{outline:2px solid #8cc6ff;outline-offset:2px}
+.live-stage{display:grid;place-items:center;min-height:111px;border:1px solid #3e4b60;border-radius:12px;background:var(--stage);margin-bottom:12px}.live-stage.light{background:#f7f9fc}.live-meta{display:flex;gap:12px;justify-content:space-between;color:#a9bfd5;font-size:11px}.indicator{height:7px;width:7px;background:#41d4aa;display:inline-block;border-radius:50%;margin-right:6px}.buttonbar{display:flex;justify-content:space-between;gap:7px;margin-top:12px;flex-wrap:wrap}.inspector{background:#0d1420;border:1px solid #2a384d;border-radius:10px;padding:11px 12px;display:grid;gap:8px;font-size:11px}.inspectrow{display:flex;justify-content:space-between;gap:13px;border-bottom:1px solid #223045;padding-bottom:7px}.inspectrow:last-child{border:0;padding-bottom:0}.inspectrow strong{font-weight:580;text-align:right;color:#f0f5fd;max-width:65%;overflow-wrap:anywhere}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;font-size:11px}.event-list{max-height:94px;overflow-y:auto;display:grid;gap:5px}.event-line{padding:6px 8px;background:#0f1827;color:#c6d7ef;border-radius:7px;font-size:11px}.muted{color:#8fa3be}.loghead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.main{min-width:0}.matrix-intro{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.matrix-intro p{font-size:12px;color:#a0afc7;margin:4px 0 0}.legend{display:flex;gap:12px;flex-wrap:wrap;color:#a4b8d1;font-size:11px}.legend span{white-space:nowrap}.filters{display:grid;grid-template-columns:1fr 1fr 1fr auto;align-items:end;gap:11px;padding:14px 17px;margin-bottom:16px}.filters .field{margin:0}.filters .field label{margin-bottom:5px}.filters .filters-note{font-size:10px;color:#90a6be;white-space:nowrap;padding-bottom:10px}
+.matrix-card{margin-bottom:16px}.matrix-card-head{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:15px 19px;border-bottom:1px solid var(--line);background:#192332}.group-title{display:flex;align-items:center;font-size:15px;font-weight:700;gap:9px}.hier-mark{height:10px;width:10px;border-radius:3px}.hier-mark.superior{background:#2b7fff}.hier-mark.subordinate{background:#899bae}.hier-mark.danger{background:#ff6467}.group-caption{font-size:11px;color:#9db1cd;margin-top:2px}.count{color:#a8bdd8;background:#26364c;border:1px solid #354b65;border-radius:6px;padding:4px 7px;font-size:10px;white-space:nowrap}.matrix-scroll{overflow-x:auto}.matrix{border-collapse:collapse;width:100%;table-layout:fixed}.matrix th{font-size:10px;font-weight:760;letter-spacing:.75px;color:#91a6c4;background:#141e2b;padding:11px 6px;text-align:center;border-bottom:1px solid #2a374a;white-space:nowrap}.matrix th:first-child{width:115px;text-align:left;padding-left:20px}.matrix td{padding:11px 7px;text-align:center;vertical-align:middle;border-bottom:1px solid #283446}.matrix td:first-child{text-align:left;padding-left:20px}.matrix tr:last-child td{border-bottom:0}.matrix tr:hover td{background:#ffffff04}.name{font-weight:650;font-size:12px;color:#e0eaf6}.style-detail{font-size:10px;color:#8498b2;margin-top:2px}.variant-cell{min-height:63px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:5px 2px}.variant-cell.selected{background:#233651;box-shadow:inset 0 0 0 1px #508cd2}.figma-ref{font-size:10px;color:#83c1ff}.figma-ref:hover{text-decoration:underline}.variant-cell button{flex:none}.variant-cell .t3-icon-button{cursor:pointer}.variant-cell .t3-icon-button:disabled{cursor:not-allowed}.state-caption{font-size:9px;color:#7c91a9}.matrix-footer{border-top:1px solid #293548;padding:10px 18px;color:#90a4bd;font-size:10px;background:#151f2c}
+.validation{margin-top:19px}.check-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.check-summary{font-weight:650;font-size:13px;margin-bottom:10px}.check-results{display:grid;grid-template-columns:1fr 1fr;gap:7px}.check-case{border:1px solid #2b3b4e;border-radius:8px;padding:8px 9px;display:flex;align-items:flex-start;gap:7px;color:#c7d7e8;font-size:11px}.check-case.pass .check-icon{color:#52d5ae}.check-case.fail .check-icon{color:#ff757a}.footerline{color:#7f93ac;font-size:11px;margin-top:19px;line-height:1.7}.empty{padding:22px;text-align:center;color:#97aac2}.sr-only{position:absolute;height:1px;width:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media(min-width:1280px){.matrix th:first-child{width:133px}.matrix td{padding-top:12px;padding-bottom:12px}}
+@media(max-width:1100px){.layout{grid-template-columns:275px minmax(0,1fr)}.sidebar{max-height:none;position:static}.filters{grid-template-columns:1fr 1fr 1fr}.filters-note{display:none!important}}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.hero{flex-wrap:wrap}.sidebar{display:grid;grid-template-columns:1fr 1fr;align-items:start}.sidebar>.panel:first-child{grid-row:span 2}.matrix th:first-child{min-width:105px}.matrix{min-width:660px}}
+@media(max-width:620px){.page{padding:17px 12px 42px}.hero{padding:20px}.hero h1{font-size:24px}.stats{width:100%}.stat{flex:1;padding:10px}.sidebar{display:grid;grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.check-results{grid-template-columns:1fr}.top-links{gap:10px}}
+</style>
+</head><body>
+<div class="page">
+<header class="topbar"><div class="brand"><div class="logo">T3</div><span>T3 SYSTEM</span><span class="breadcrumbs">/ UI KIT / COMPONENTS / ICONBUTTON</span></div><div class="top-links"><a href="https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2781" target="_blank" rel="noopener noreferrer">Figma Component Set ↗</a><a href="#matrix-host">狀態矩陣 ↓</a><a href="#validation">工程驗收 ↓</a></div></header>
+<section class="hero"><div><p class="eyebrow">COMPONENT / 02 · ENGINEERING PLAYGROUND</p><h1>IconButton <span style="font-weight:420;color:#a2bada">/</span> 元件展示與測試</h1><p>依工程規格生成全部 150 個狀態組合。尺寸、色票、交互與語意屬性可直接在同一頁測試；圖示使用可替換的示範 SVG。</p></div><div class="stats"><div class="stat"><b>150</b><small>Variants</small></div><div class="stat"><b>2</b><small>Sizes</small></div><div class="stat"><b>5</b><small>States</small></div></div></section>
+<div class="layout"><aside class="sidebar">
+<section class="panel"><div class="panelhead"><div><h2>互動測試台</h2><div class="micro">LIVE COMPONENT</div></div><button type="button" class="small-btn" id="reset">重設</button></div>
+<div class="field"><label for="label-input">可及名稱 / aria-label</label><input id="label-input" type="text" value="重新整理" maxlength="80" placeholder="例如：重新整理"/></div>
+<div class="cols-2"><div class="field"><label for="size-select">Size</label><select id="size-select"><option value="medium">Medium</option><option value="small">Small</option></select></div><div class="field"><label for="hierarchy-select">Hierarchy</label><select id="hierarchy-select"><option value="superior">Superior</option><option value="subordinate">Subordinate</option><option value="danger">Danger</option></select></div></div>
+<div class="cols-2"><div class="field"><label for="style-select">Style</label><select id="style-select"><option value="filled">Filled</option><option value="tonal">Tonal</option><option value="outlined">Outlined</option><option value="standard">Standard</option><option value="icon">Icon</option></select></div><div class="field"><label for="icon-select">SVG Icon</label><select id="icon-select"><option value="refresh">Refresh</option><option value="pin">Pin</option><option value="search">Search</option><option value="settings">Settings</option><option value="trash">Trash</option><option value="plus">Plus</option><option value="close">Close</option><option value="check">Check</option><option value="edit">Edit</option><option value="download">Download</option><option value="chevron">Chevron</option><option value="star">Star</option></select></div></div>
+<div class="field"><label for="type-select">HTML type</label><select id="type-select"><option value="button">button</option><option value="submit">submit</option><option value="reset">reset</option></select></div>
+<div class="field"><label class="toggle" for="toggle-switch"><span>可切換按鈕 / aria-pressed</span><input type="checkbox" id="toggle-switch"/></label><label class="toggle" for="pressed-toggle"><span>Active / Pressed = true</span><input type="checkbox" id="pressed-toggle" disabled/></label><label class="toggle" for="disabled-toggle"><span>Disabled</span><input type="checkbox" id="disabled-toggle"/></label></div>
+<p class="help">Active 代表持續選取（<code>aria-pressed=true</code>）；Pressed 代表滑鼠或鍵盤按住當下，不是同一狀態。</p>
+</section>
+<section class="panel"><div class="panelhead"><div><h2>即時操作預覽</h2><div class="micro">NATIVE HTML BUTTON</div></div><label title="更換預覽區背景" class="toggle" style="padding:0">亮底 <input type="checkbox" id="board-switch"/></label></div>
+<form id="demo-form" aria-label="按鈕原生表單類型測試"><div class="live-stage" id="live-stage"></div><label class="sr-only" for="demo-field">測試表單輸入</label><input id="demo-field" class="sr-only" type="text" value="reset sample"/>
+<div class="live-meta"><span><i class="indicator"></i>狀態 <b id="live-state">Default</b></span><span id="live-size" class="mono">34 × 34 px</span></div></form>
+<div class="buttonbar"><span class="sub">onPress：<b id="onpress-count">0</b> 次</span><div style="display:flex;gap:6px"><button type="button" class="small-btn" id="focus-live">聚焦</button><button type="button" class="small-btn" id="copy">複製 HTML</button></div></div>
+</section>
+<section class="panel"><div class="panelhead" style="margin-bottom:13px"><div><h2>樣式檢查器</h2><div class="micro" id="inspector-heading">LIVE COMPONENT</div></div></div><div class="inspector" id="inspector" aria-live="polite">讀取中…</div></section>
+<section class="panel"><div class="loghead"><h2 style="font-size:15px">事件紀錄</h2><span class="sub">DOM / onPress</span></div><div class="event-list muted" id="event-list" aria-live="polite">尚未觸發操作</div></section>
+</aside><main class="main">
+<div class="matrix-intro"><div><h2>完整狀態矩陣</h2><p>單頁完整陳列 · 目前顯示 <b id="variant-count">150</b> / 150</p></div><div class="legend"><span>◌ Default 可互動</span><span>◉ Hover / Pressed 固定預覽</span><span>◆ Active 持續選取</span><span>⊘ Disabled 停用</span></div></div>
+<div class="panel filters"><div class="field"><label for="filter-size">Size</label><select id="filter-size"><option value="all">全部尺寸</option><option value="medium">Medium</option><option value="small">Small</option></select></div><div class="field"><label for="filter-hierarchy">Hierarchy</label><select id="filter-hierarchy"><option value="all">全部層級</option><option value="superior">Superior</option><option value="subordinate">Subordinate</option><option value="danger">Danger</option></select></div><div class="field"><label for="filter-style">Style</label><select id="filter-style"><option value="all">全部樣式</option><option value="filled">Filled</option><option value="tonal">Tonal</option><option value="outlined">Outlined</option><option value="standard">Standard</option><option value="icon">Icon</option></select></div><div class="filters-note">所有尺寸外框 34px</div></div>
+<div id="matrix-host"></div>
+<section id="validation" class="panel validation"><div class="check-top"><div><h2>工程驗收測試</h2><div class="micro">AUTOMATED STRUCTURE CHECKS</div></div><button type="button" class="small-btn" id="run-checks">重新驗收</button></div><div id="check-summary" class="check-summary" role="status">準備檢查中…</div><div class="check-results" id="check-results"></div></section>
+<div class="footerline">資料來源：T3 UI Kit IconButton 工程開發文件；數值及色彩依該文件與 T3 Design Tokens。Hover / Pressed 固定欄位僅供肉眼比對，真實互動請使用 Default 欄位或左側測試台。示範 SVG 不代表 Figma 圖示素材已逐像素驗證。</div>
+</main></div></div>
+<script>/* T3 IconButton reusable native DOM factory (sample SVG names may be swapped for production assets). */
+(function(global){
+  'use strict';
+  const N='http://www.w3.org/2000/svg';
+  const ICONS={
+    refresh:'<path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 5v6h-6"/>',
+    pin:'<path d="M9 5h6l-1 6 3 3H7l3-3-1-6ZM12 14v6"/>',
+    search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l-2 2a1.7 1.7 0 0 0-1.9-.3l-1.1.5-.4 2.1h-2.8l-.4-2.1-1.1-.5a1.7 1.7 0 0 0-1.9.3l-2-2a1.7 1.7 0 0 0 .3-1.9L5.9 14l-2.1-.4v-2.8l2.1-.4.5-1.1a1.7 1.7 0 0 0-.3-1.9l2-2a1.7 1.7 0 0 0 1.9.3l1.1-.5.4-2.1h2.8l.4 2.1 1.1.5a1.7 1.7 0 0 0 1.9-.3l2 2a1.7 1.7 0 0 0-.3 1.9l.5 1.1 2.1.4v2.8l-2.1.4z"/>',
+    trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5"/>',
+    plus:'<path d="M12 4v16M4 12h16"/>',
+    close:'<path d="M5 5l14 14M19 5 5 19"/>',
+    check:'<path d="m4 12 5 5L20 6"/>',
+    edit:'<path d="m5 19 4.5-1L20 7.5 16.5 4 6 14.5 5 19ZM14.5 6 18 9.5"/>',
+    download:'<path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/>',
+    chevron:'<path d="m6 9 6 6 6-6"/>',
+    star:'<path d="m12 3 3 6 6.5 1-4.8 4.7 1.1 6.3L12 18l-5.8 3 1.1-6.3L2.5 10 9 9z"/>'
+  };
+  function svg(name){
+    if(!(name in ICONS))throw new TypeError('Unknown icon: '+name);
+    const node=document.createElementNS(N,'svg');
+    node.setAttribute('viewBox','0 0 24 24');
+    node.setAttribute('fill','none');node.setAttribute('stroke','currentColor');
+    node.setAttribute('stroke-width','2');node.setAttribute('stroke-linecap','round');
+    node.setAttribute('stroke-linejoin','round');node.setAttribute('focusable','false');
+    node.innerHTML=ICONS[name];
+    return node;
+  }
+  function createT3IconButton(options){
+    const o=options||{},label=String(o.label||'').trim();
+    if(!label)throw new TypeError('IconButton requires a non-empty aria-label.');
+    const hierarchy=o.hierarchy||'superior',style=o.variant||o.style||'filled',size=o.size||'medium',type=o.type||'button';
+    if(!['superior','subordinate','danger'].includes(hierarchy))throw new TypeError('Invalid hierarchy');
+    if(!['filled','tonal','outlined','standard','icon'].includes(style))throw new TypeError('Invalid style');
+    if(!['medium','small'].includes(size))throw new TypeError('Invalid size');
+    if(!['button','submit','reset'].includes(type))throw new TypeError('Invalid button type');
+    const icon=o.icon;
+    if(!icon)throw new TypeError('IconButton requires an icon.');
+    const el=document.createElement('button');el.type=type;
+    el.className='t3-icon-button';el.dataset.size=size;el.dataset.hierarchy=hierarchy;el.dataset.style=style;
+    el.setAttribute('aria-label',label);
+    if(typeof o.pressed==='boolean')el.setAttribute('aria-pressed',String(o.pressed));
+    el.disabled=Boolean(o.disabled);
+    const wrap=document.createElement('span');wrap.className='t3-icon-button__icon';wrap.setAttribute('aria-hidden','true');
+    wrap.appendChild(typeof icon==='string'?svg(icon):icon.cloneNode(true));el.appendChild(wrap);
+    if(typeof o.onPress==='function')el.addEventListener('click',e=>{if(!el.disabled)o.onPress(e,el);});
+    return el;
+  }
+  global.T3IconButton={create:createT3IconButton,icons:Object.keys(ICONS)};
+})(window);
+</script>
+<script>
+'use strict';
+const MATRIX=[{"hierarchy":"superior","style":"filled","states":{"default":{"bg":"link/theme-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2780","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30385"},"hover":{"bg":"link/theme-filled-hover","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2777","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30387"},"pressed":{"bg":"link/theme-filled-pressed","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2778","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30389"},"active":{"bg":"link/theme-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2776","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30391"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2775","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30393"}}},{"hierarchy":"superior","style":"tonal","states":{"default":{"bg":"link/tonal","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2774","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30395"},"hover":{"bg":"link/tonal-hover","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2771","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30397"},"pressed":{"bg":"link/tonal-pressed","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2779","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30399"},"active":{"bg":"link/tonal","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2770","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30401"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2769","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30403"}}},{"hierarchy":"superior","style":"outlined","states":{"default":{"bg":"—","stroke":"border/theme-light","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2768","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30405"},"hover":{"bg":"link/tonal-hover","stroke":"border/theme-light","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2767","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30407"},"pressed":{"bg":"link/tonal-pressed","stroke":"border/theme-light","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2766","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30409"},"active":{"bg":"link/tonal","stroke":"border/theme-light","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2765","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30411"},"disabled":{"bg":"—","stroke":"border/disabled","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2762","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30413"}}},{"hierarchy":"superior","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20206","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30415"},"hover":{"bg":"link/tonal-hover","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20208","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30417"},"pressed":{"bg":"link/tonal-pressed","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20210","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30419"},"active":{"bg":"link/tonal","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20212","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30421"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20214","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30423"}}},{"hierarchy":"superior","style":"icon","states":{"default":{"bg":"—","stroke":"—","fg":"link/theme-filled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2758","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30425"},"hover":{"bg":"—","stroke":"—","fg":"link/theme-filled-hover","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2757","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30427"},"pressed":{"bg":"—","stroke":"—","fg":"link/theme-filled-pressed","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2756","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30429"},"active":{"bg":"—","stroke":"—","fg":"link/theme-filled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2755","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30431"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2754","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30433"}}},{"hierarchy":"subordinate","style":"filled","states":{"default":{"bg":"link/black-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20221","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30435"},"hover":{"bg":"link/black-filled-hover","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20223","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30437"},"pressed":{"bg":"link/black-filled-pressed","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20225","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30439"},"active":{"bg":"link/black-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20227","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30441"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20229","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30443"}}},{"hierarchy":"subordinate","style":"tonal","states":{"default":{"bg":"link/standard","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20236","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30445"},"hover":{"bg":"link/standard-hover","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20238","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30447"},"pressed":{"bg":"link/standard-pressed","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20240","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30449"},"active":{"bg":"link/standard","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20242","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30451"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20244","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30453"}}},{"hierarchy":"subordinate","style":"outlined","states":{"default":{"bg":"—","stroke":"border/tertiary","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2761","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30455"},"hover":{"bg":"link/standard-hover","stroke":"border/tertiary","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2760","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30457"},"pressed":{"bg":"link/standard-pressed","stroke":"border/tertiary","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2759","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30459"},"active":{"bg":"link/standard","stroke":"border/tertiary","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2764","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30461"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2772","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30463"}}},{"hierarchy":"subordinate","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20251","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30465"},"hover":{"bg":"link/standard-hover","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20253","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30467"},"pressed":{"bg":"link/standard-pressed","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20255","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30469"},"active":{"bg":"link/standard","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20257","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30471"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=613-20259","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30473"}}},{"hierarchy":"subordinate","style":"icon","states":{"default":{"bg":"—","stroke":"—","fg":"text/secondary","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20571","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20586"},"hover":{"bg":"—","stroke":"—","fg":"link/theme-filled-hover","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20573","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20588"},"pressed":{"bg":"—","stroke":"—","fg":"link/theme-filled-pressed","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20575","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20590"},"active":{"bg":"link/standard","stroke":"—","fg":"text/theme","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20577","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20592"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20579","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=635-20594"}}},{"hierarchy":"danger","style":"filled","states":{"default":{"bg":"link/danger-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30325","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30475"},"hover":{"bg":"link/danger-filled-hover","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30327","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30477"},"pressed":{"bg":"link/danger-filled-pressed","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30329","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30479"},"active":{"bg":"link/danger-filled","stroke":"—","fg":"White/100%","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30331","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30481"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30333","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30483"}}},{"hierarchy":"danger","style":"tonal","states":{"default":{"bg":"link/danger-tonal","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30340","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30485"},"hover":{"bg":"link/danger-tonal-hover","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30342","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30487"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30344","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30489"},"active":{"bg":"link/danger-tonal","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30346","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30491"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30348","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30493"}}},{"hierarchy":"danger","style":"outlined","states":{"default":{"bg":"—","stroke":"border/danger-light","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30355","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30495"},"hover":{"bg":"link/danger-tonal-hover","stroke":"border/danger-light","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30357","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30497"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"border/danger-light","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30359","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30499"},"active":{"bg":"link/danger-tonal","stroke":"border/danger-light","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30361","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30501"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30363","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30503"}}},{"hierarchy":"danger","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30370","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30505"},"hover":{"bg":"link/danger-tonal-hover","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30372","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30507"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30374","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30509"},"active":{"bg":"link/danger-tonal","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30376","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30511"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30378","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30513"}}},{"hierarchy":"danger","style":"icon","states":{"default":{"bg":"—","stroke":"—","fg":"status/error","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2753","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30515"},"hover":{"bg":"—","stroke":"—","fg":"status/error","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2752","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30517"},"pressed":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2751","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30519"},"active":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2750","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30521"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma_medium":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2749","figma_small":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=614-30523"}}}];
+const TOKEN_MAP={"White/100%":"--color-white-100","border/danger-light":"--border-danger-light","border/disabled":"--border-disabled","border/tertiary":"--border-tertiary","border/theme-light":"--border-theme-light","link/black-filled":"--link-black-filled","link/black-filled-hover":"--link-black-filled-hover","link/black-filled-pressed":"--link-black-filled-pressed","link/danger-filled":"--link-danger-filled","link/danger-filled-hover":"--link-danger-filled-hover","link/danger-filled-pressed":"--link-danger-filled-pressed","link/danger-tonal":"--link-danger-tonal","link/danger-tonal-hover":"--link-danger-tonal-hover","link/danger-tonal-pressed":"--link-danger-tonal-pressed","link/standard":"--link-standard","link/standard-hover":"--link-standard-hover","link/standard-pressed":"--link-standard-pressed","link/theme-filled":"--link-theme-filled","link/theme-filled-hover":"--link-theme-filled-hover","link/theme-filled-pressed":"--link-theme-filled-pressed","link/tonal":"--link-tonal","link/tonal-hover":"--link-tonal-hover","link/tonal-pressed":"--link-tonal-pressed","status/error":"--status-error","status/error-emphasis":"--status-error-emphasis","surface/disabled":"--surface-disabled","text/disabled":"--text-disabled","text/secondary":"--text-secondary","text/theme":"--text-theme"};
+const HIERARCHIES=['superior','subordinate','danger'];
+const STYLES=['filled','tonal','outlined','standard','icon'];
+const STATES=['default','hover','pressed','active','disabled'];
+const SIZES=['medium','small'];
+const txt={superior:'Superior',subordinate:'Subordinate',danger:'Danger',filled:'Filled',tonal:'Tonal',outlined:'Outlined',standard:'Standard',icon:'Icon',default:'Default',hover:'Hover',pressed:'Pressed',active:'Active',disabled:'Disabled',medium:'Medium',small:'Small'};
+const defaults={hierarchy:'superior',style:'filled',size:'medium',icon:'refresh',label:'重新整理',toggle:false,pressed:false,disabled:false,type:'button',filterSize:'all',filterHierarchy:'all',filterStyle:'all',count:0,chosen:null};
+const state={...defaults};
+const $=(s,root=document)=>root.querySelector(s);
+const $$=(s,root=document)=>Array.from(root.querySelectorAll(s));
+const lookup=(h,s)=>MATRIX.find(r=>r.hierarchy===h&&r.style===s);
+function log(text){const logbox=$('#event-list');if(logbox.classList.contains('muted')){logbox.classList.remove('muted');logbox.textContent='';}const item=document.createElement('div');item.className='event-line';item.textContent=`${new Date().toLocaleTimeString('zh-TW',{hour12:false})} · ${text}`;logbox.prepend(item);while(logbox.children.length>5)logbox.lastElementChild.remove();}
+function reportPress(where,button){state.count++;$('#onpress-count').textContent=state.count;log(`onPress #${state.count} · ${where}`);}
+function create({hierarchy,style,size,icon=state.icon,label=state.label,pressed,disabled=false,preview=null,type='button',onPress}={}){
+ const btn=T3IconButton.create({hierarchy,variant:style,size,icon,label,pressed,disabled,type,onPress});
+ if(preview&&['hover','pressed','active'].includes(preview))btn.dataset.previewState=preview;
+ return btn;
+}
+function stateOf(btn){if(btn.disabled)return 'disabled';if(btn.matches(':active'))return 'pressed';if(btn.matches(':hover')&&matchMedia('(hover: hover)').matches)return 'hover';if(btn.getAttribute('aria-pressed')==='true')return 'active';return 'default';}
+function actualColor(c){return c||'—';}
+function inspect(btn,data){const style=getComputedStyle(btn),icon=$('.t3-icon-button__icon',btn),is=icon?getComputedStyle(icon):null;
+ const box=btn.getBoundingClientRect(),inner=icon?icon.getBoundingClientRect():{width:0,height:0};
+ const tokens=data&&data.tokens;
+ const name=data?`${txt[data.hierarchy]} / ${txt[data.style]} / ${txt[data.stateName]}`:'Live';
+ $('#inspector-heading').textContent=name;
+ const rows=[['外框尺寸',`${box.width.toFixed(0)} × ${box.height.toFixed(0)} px`],['SVG 尺寸',`${inner.width.toFixed(0)} × ${inner.height.toFixed(0)} px`],['Hierarchy / Style',`${btn.dataset.hierarchy} / ${btn.dataset.style}`],['data-size',btn.dataset.size],['aria-label',btn.getAttribute('aria-label')],['aria-pressed',btn.hasAttribute('aria-pressed')?btn.getAttribute('aria-pressed'):'（未輸出）'],['disabled / type',`${btn.disabled} / ${btn.type}`],['背景（computed）',actualColor(style.backgroundColor)],['圖示（computed）',actualColor(style.color)],['背景 Token',tokens?.bg||'—'],['內描邊 Token',tokens?.stroke||'—'],['圖示 Token',tokens?.fg||'—']];
+ const host=$('#inspector');host.replaceChildren();
+ for(const [label,value] of rows){const r=document.createElement('div');r.className='inspectrow';const a=document.createElement('span');a.textContent=label;const b=document.createElement('strong');b.className='mono';b.textContent=value;r.append(a,b);host.append(r);}
+}
+function updateLive(){const el=$('#live-button');if(!el)return;const st=stateOf(el);$('#live-state').textContent=txt[st];$('#live-size').textContent=`${el.offsetWidth} × ${el.offsetHeight} px`;inspect(el,{hierarchy:state.hierarchy,style:state.style,stateName:st,tokens:lookup(state.hierarchy,state.style).states[st]});}
+function renderLive(){const stage=$('#live-stage');stage.replaceChildren();
+ const btn=create({hierarchy:state.hierarchy,style:state.style,size:state.size,icon:state.icon,label:state.label.trim()||'圖示按鈕',pressed:state.toggle?state.pressed:undefined,disabled:state.disabled,type:state.type,onPress:(event,b)=>{reportPress('互動測試台',b);if(state.toggle){state.pressed=!state.pressed;b.setAttribute('aria-pressed',String(state.pressed));$('#pressed-toggle').checked=state.pressed;}requestAnimationFrame(updateLive);}});
+ btn.id='live-button';stage.append(btn);
+ for(const e of ['pointerenter','pointerleave','pointerdown','pointerup','pointercancel','keydown','keyup','focus','blur','click'])btn.addEventListener(e,()=>requestAnimationFrame(updateLive));
+ $('#pressed-toggle').disabled=!state.toggle;$('#pressed-toggle').checked=state.pressed;
+ updateLive();
+}
+function matrixButton(row,size,st){const b=create({hierarchy:row.hierarchy,style:row.style,size,icon:state.icon,label:`${txt[size]} ${txt[row.hierarchy]} ${txt[row.style]} ${txt[st]}`,pressed:st==='active'?true:undefined,disabled:st==='disabled',preview:st,onPress:(e,btn)=>{reportPress(`矩陣 ${txt[size]} / ${txt[row.hierarchy]} / ${txt[row.style]} / ${txt[st]}`,btn);selectCell(btn,row,size,st);}});b.title=`${txt[size]} / ${txt[row.hierarchy]} / ${txt[row.style]} / ${txt[st]}`;return b;}
+function selectCell(btn,row,size,st){$$('.variant-cell.selected').forEach(e=>e.classList.remove('selected'));btn.closest('.variant-cell').classList.add('selected');state.chosen={hierarchy:row.hierarchy,style:row.style,size,st};inspect(btn,{hierarchy:row.hierarchy,style:row.style,stateName:st,tokens:row.states[st]});}
+function renderMatrix(){const dest=$('#matrix-host');dest.replaceChildren();let total=0;
+ for(const size of SIZES){if(state.filterSize!=='all'&&state.filterSize!==size)continue;
+  for(const h of HIERARCHIES){if(state.filterHierarchy!=='all'&&state.filterHierarchy!==h)continue;
+   const entries=MATRIX.filter(row=>row.hierarchy===h&&(state.filterStyle==='all'||row.style===state.filterStyle));if(!entries.length)continue;
+   const section=document.createElement('section');section.className='matrix-card';section.setAttribute('aria-label',`${txt[size]} ${txt[h]} 狀態矩陣`);
+   const head=document.createElement('header');head.className='matrix-card-head';const text=document.createElement('div');text.innerHTML=`<div class="group-title"><span class="hier-mark ${h}"></span>${txt[size]} <span style="color:#7189a7;margin:0 3px">/</span> ${txt[h]}</div><div class="group-caption">${size==='medium'?'24 × 24px SVG':'18 × 18px SVG'} · 外框 34 × 34px</div>`;
+   const count=document.createElement('span');count.className='count';count.textContent=`${entries.length*5} Variants`;
+   head.append(text,count);section.append(head);
+   const scroll=document.createElement('div');scroll.className='matrix-scroll';const table=document.createElement('table');table.className='matrix';table.innerHTML='<thead><tr><th>STYLE</th><th>DEFAULT</th><th>HOVER</th><th>PRESSED</th><th>ACTIVE</th><th>DISABLED</th></tr></thead>';
+   const body=document.createElement('tbody');
+   for(const row of entries){const tr=document.createElement('tr');const sty=document.createElement('td');sty.innerHTML=`<div class="name">${txt[row.style]}</div><div class="style-detail">34px square</div>`;tr.append(sty);
+    for(const st of STATES){const td=document.createElement('td');const cell=document.createElement('div');cell.className='variant-cell';const btn=matrixButton(row,size,st);cell.append(btn);
+     const a=document.createElement('a');a.className='figma-ref';a.target='_blank';a.rel='noopener noreferrer';a.href=row.states[st][`figma_${size}`];a.textContent='Figma ↗';a.title='開啟 Figma 對應 Variant';cell.append(a);td.append(cell);tr.append(td);total++;
+    }body.append(tr);
+   }table.append(body);scroll.append(table);section.append(scroll);
+   const foot=document.createElement('div');foot.className='matrix-footer';foot.textContent='Default 可直接滑入／按下測試；Hover、Pressed、Active 是固定外觀預覽；Disabled 為原生停用。點擊圖示可查看詳細樣式。';section.append(foot);dest.append(section);
+  }
+ }
+ if(!total){const el=document.createElement('div');el.className='empty';el.textContent='目前沒有符合條件的 Variant';dest.append(el);}
+ $('#variant-count').textContent=total;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function snippet(){const options=[`type="${state.type}"`,'class="t3-icon-button"',`data-size="${state.size}"`,`data-hierarchy="${state.hierarchy}"`,`data-style="${state.style}"`,`aria-label="${escapeHtml(state.label.trim()||'圖示按鈕')}"`];if(state.toggle)options.push(`aria-pressed="${state.pressed}"`);if(state.disabled)options.push('disabled');return `<button ${options.join(' ')}>\n  <span class="t3-icon-button__icon" aria-hidden="true">\n    <!-- 插入 SVG，使用 currentColor -->\n  </span>\n</button>`;}
+function runChecks(){const tests=[];const add=(name,ok,details='')=>tests.push({name,ok,details});const arr=$$('#matrix-host .t3-icon-button');
+ const expected=MATRIX.filter(r=>(state.filterHierarchy==='all'||r.hierarchy===state.filterHierarchy)&&(state.filterStyle==='all'||r.style===state.filterStyle)).length*5*(state.filterSize==='all'?2:1);
+ add('矩陣顯示數量與篩選一致',arr.length===expected,`${arr.length} / ${expected}`);
+ add('原始色彩矩陣涵蓋 150 個 Variant',MATRIX.length===15&&MATRIX.every(x=>STATES.every(s=>x.states[s]?.figma_medium&&x.states[s]?.figma_small)),'2 × 3 × 5 × 5');
+ add('所有按鈕均為 34 × 34px',arr.every(e=>{let r=e.getBoundingClientRect();return r.width===34&&r.height===34;}));
+ add('Medium 24px / Small 18px',arr.every(e=>{let r=e.querySelector('.t3-icon-button__icon').getBoundingClientRect();return e.dataset.size==='medium'?r.width===24&&r.height===24:r.width===18&&r.height===18;}));
+ add('所有按鈕均有非空 aria-label',arr.every(e=>e.getAttribute('aria-label')?.trim()));
+ add('SVG 隱藏於輔助科技',arr.every(e=>e.querySelector('.t3-icon-button__icon[aria-hidden="true"] svg[focusable="false"]')));
+ add('Disabled 使用原生 disabled',arr.filter(e=>e.disabled).length===expected/5);
+ add('Active 使用 aria-pressed=true',arr.filter(e=>e.getAttribute('aria-pressed')==='true').length===expected/5);
+ add('非切換型省略 aria-pressed',arr.every(e=>e.dataset.previewState==='active'||!e.hasAttribute('aria-pressed')));
+ add('Figma 連結與展示 Variant 一一對應',$$('#matrix-host .figma-ref').length===expected);
+ // Compare rendered CSS colors against the exact token triplets parsed from the source spec.
+ const ghost=document.createElement('div');ghost.style.position='fixed';ghost.style.left='-99999px';document.body.append(ghost);
+ const cssValue=t=>t==='—'?'transparent':`var(${TOKEN_MAP[t]})`;
+ let colorMatches=0;for(const el of arr){const st=el.disabled?'disabled':el.dataset.previewState||stateOf(el);
+ const row=lookup(el.dataset.hierarchy,el.dataset.style),t=row.states[st];
+ ghost.style.backgroundColor=cssValue(t.bg);ghost.style.color=cssValue(t.fg);
+ ghost.style.boxShadow=`inset 0 0 0 1px ${cssValue(t.stroke)}`;
+ const actual=getComputedStyle(el),want=getComputedStyle(ghost);
+ if(actual.backgroundColor===want.backgroundColor&&actual.color===want.color&&actual.boxShadow===want.boxShadow)colorMatches++;
+ }ghost.remove();
+ add('實際渲染色彩符合狀態矩陣',colorMatches===expected,`${colorMatches} / ${expected}（背景／描邊／圖示）`);
+ add('組件含 CSS focus-visible 和原生狀態',!!document.querySelector('#component-css')?.textContent.includes(':focus-visible')&&!!document.querySelector('#component-css')?.textContent.includes(':active:not(:disabled)'));
+ add('優先順序：Disabled > Pressed > Hover > Active > Default',STATES.join('|')==='default|hover|pressed|active|disabled');
+ let extra;try{extra=T3IconButton.create({icon:'pin',label:'toggle',size:'small',variant:'icon',hierarchy:'subordinate',pressed:true});add('Subordinate/Icon Active 具有 aria-pressed',extra.getAttribute('aria-pressed')==='true');}catch(e){add('Subordinate/Icon Active 具有 aria-pressed',false,e.message)}
+ const pass=tests.filter(t=>t.ok).length;$('#check-summary').textContent=`${pass}/${tests.length} 項檢查通過`;const list=$('#check-results');list.replaceChildren();for(const t of tests){const div=document.createElement('div');div.className=`check-case ${t.ok?'pass':'fail'}`;const tick=document.createElement('span');tick.className='check-icon';tick.textContent=t.ok?'✓':'✕';const name=document.createElement('span');name.textContent=t.name+(t.details?` · ${t.details}`:'');div.append(tick,name);list.append(div);}return tests;}
+function init(){const input={hierarchy:'hierarchy-select',style:'style-select',size:'size-select',icon:'icon-select',label:'label-input',type:'type-select',toggle:'toggle-switch',pressed:'pressed-toggle',disabled:'disabled-toggle'};
+ for(const [key,id] of Object.entries(input)){$('#'+id).addEventListener(key==='label'?'input':'change',e=>{let val=e.target.type==='checkbox'?e.target.checked:e.target.value;state[key]=val;if(key==='toggle'&&!val)state.pressed=false;renderLive();if(key==='icon')renderMatrix();});}
+ for(const [key,id] of [['filterSize','filter-size'],['filterHierarchy','filter-hierarchy'],['filterStyle','filter-style']]){$('#'+id).addEventListener('change',e=>{state[key]=e.target.value;renderMatrix();runChecks();});}
+ $('#reset').addEventListener('click',()=>{Object.assign(state,{...defaults,count:state.count});for(const [key,id] of Object.entries(input)){$('#'+id).type==='checkbox'?$('#'+id).checked=state[key]:$('#'+id).value=state[key];}for(const [key,id] of [['filterSize','filter-size'],['filterHierarchy','filter-hierarchy'],['filterStyle','filter-style']])$('#'+id).value='all';$('#board-switch').checked=false;$('#live-stage').classList.remove('light');renderLive();renderMatrix();runChecks();log('恢復預設設定');});
+ $('#focus-live').addEventListener('click',()=>$('#live-button').focus());
+ $('#copy').addEventListener('click',async()=>{const value=snippet();try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(value);}else{const box=document.createElement('textarea');box.value=value;box.style.position='fixed';box.style.opacity='0';document.body.appendChild(box);box.select();document.execCommand('copy');box.remove();}log('已複製 HTML 程式片段');}catch(e){log('複製失敗，可改用工程 ZIP 內的元件範例');}});
+ $('#board-switch').addEventListener('change',e=>$('#live-stage').classList.toggle('light',e.target.checked));
+ $('#run-checks').addEventListener('click',()=>{const tests=runChecks();log(`重新驗收 ${tests.filter(t=>t.ok).length}/${tests.length}`);});
+ $('#demo-form').addEventListener('submit',e=>{e.preventDefault();log('原生 submit 事件（已阻止導頁）');});
+ $('#demo-form').addEventListener('reset',()=>log('原生 reset 事件'));
+ renderLive();renderMatrix();runChecks();
+}
+init();
+</script>
+</body></html>

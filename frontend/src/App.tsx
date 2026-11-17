@@ -28,7 +28,7 @@ function App() {
   }, [auth.user]);
 
   if (auth.loading) {
-    return <div className="flex h-screen w-screen items-center justify-center bg-black text-zinc-500">正在確認登入狀態…</div>;
+    return <div className="flex h-screen w-screen items-center justify-center bg-surface-sub-background text-text-quaternary">正在確認登入狀態…</div>;
   }
   if (!auth.user) return <LoginPage />;
   const initialView = SIDEBAR_MODULE_GROUPS.flatMap((group) => group.items ?? [])
@@ -37,7 +37,7 @@ function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
       <ViewErrorBoundary title="應用程式載入失敗">
-        <Suspense fallback={<div className="flex h-full items-center justify-center bg-black text-zinc-500">正在載入工作區…</div>}>
+        <Suspense fallback={<div className="flex h-full items-center justify-center bg-surface-sub-background text-text-quaternary">正在載入工作區…</div>}>
           <ScheduleManagementApp initialView={initialView as ShellView} />
         </Suspense>
       </ViewErrorBoundary>

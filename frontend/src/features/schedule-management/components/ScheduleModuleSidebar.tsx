@@ -267,7 +267,7 @@ export function ScheduleModuleSidebar({
 
   return (
     <aside
-      className={`flex shrink-0 flex-col bg-black transition-[width] duration-200 ease-out ${
+      className={`flex shrink-0 flex-col bg-surface-sub-background transition-[width] duration-200 ease-out ${
         collapsed ? "w-[64px]" : "w-[240px]"
       }`}
     >
@@ -283,7 +283,7 @@ export function ScheduleModuleSidebar({
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex size-9 items-center justify-center rounded-md text-zinc-300 transition hover:bg-white/5 hover:text-white"
+              className="inline-flex size-9 items-center justify-center rounded-md text-text-secondary transition hover:bg-link-standard hover:text-text-primary"
               title={t("shell.expandSidebar")}
               aria-label={t("shell.expandSidebar")}
               aria-expanded={false}
@@ -293,7 +293,7 @@ export function ScheduleModuleSidebar({
             <button
               type="button"
               onClick={() => onViewChange("shift-records")}
-              className="inline-flex size-9 items-center justify-center rounded-md transition hover:bg-white/5"
+              className="inline-flex size-9 items-center justify-center rounded-md transition hover:bg-link-standard"
               title="SyncDrive VTMS"
             >
               <VtmsMark className="size-7" />
@@ -304,18 +304,18 @@ export function ScheduleModuleSidebar({
             <button
               type="button"
               onClick={() => onViewChange("shift-records")}
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1 text-left transition hover:bg-white/5"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1 text-left transition hover:bg-link-standard"
               title="SyncDrive VTMS"
             >
               <VtmsMark className="size-7 shrink-0" />
-              <span className="truncate text-[17px] font-semibold tracking-wide text-white">
+              <span className="truncate text-headline-5 text-text-primary">
                 VTMS
               </span>
             </button>
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/5 hover:text-white"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-standard hover:text-text-primary"
               title={t("shell.collapseSidebar")}
               aria-label={t("shell.collapseSidebar")}
               aria-expanded
@@ -366,16 +366,16 @@ export function ScheduleModuleSidebar({
           return (
             <div key={group.id} className="mb-0.5">
               <div
-                className={`flex w-full items-center rounded-lg text-[14px] transition ${
+                className={`flex w-full items-center rounded-lg text-body-s transition ${
                   collapsed ? "justify-center" : "gap-1"
                 } ${
                   !rowInteractive
-                    ? "text-zinc-600"
+                    ? "text-text-disabled"
                     : groupActive && (!hasChildren || collapsed)
-                      ? "bg-[#1a3a5c] font-medium text-[#5B9BD5]"
+                      ? "bg-link-tonal font-medium text-text-theme"
                       : groupActive
-                        ? "text-[#5B9BD5]"
-                        : "text-zinc-200"
+                        ? "text-text-theme"
+                        : "text-text-primary"
                 }`}
               >
                 <button
@@ -417,7 +417,7 @@ export function ScheduleModuleSidebar({
                       ? "justify-center px-0 py-2.5"
                       : "gap-2.5 px-3 py-2.5"
                   } ${
-                    !rowInteractive ? "cursor-not-allowed" : "hover:bg-white/5"
+                    !rowInteractive ? "cursor-not-allowed" : "hover:bg-link-standard"
                   }`}
                   title={groupLabel}
                 >
@@ -435,9 +435,9 @@ export function ScheduleModuleSidebar({
                       </span>
                       {canExpand ? (
                         isOpen ? (
-                          <ChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+                          <ChevronDown className="size-3.5 shrink-0 text-text-quaternary" />
                         ) : (
-                          <ChevronRight className="size-3.5 shrink-0 text-zinc-500" />
+                          <ChevronRight className="size-3.5 shrink-0 text-text-quaternary" />
                         )
                       ) : null}
                     </>
@@ -452,7 +452,7 @@ export function ScheduleModuleSidebar({
                       onAddModuleDashboard?.(group.id);
                       setExpanded((prev) => ({ ...prev, [group.id]: true }));
                     }}
-                    className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-sky-600/20 hover:text-sky-300"
+                    className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-tonal hover:text-text-theme"
                     title={t("shell.addModulePage", { module: groupLabel })}
                     aria-label={t("shell.addModulePageAria", {
                       module: groupLabel,
@@ -478,12 +478,12 @@ export function ScheduleModuleSidebar({
                             onClick={() =>
                               item.enabled && onViewChange(item.id)
                             }
-                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-body-s transition ${
                               !item.enabled
-                                ? "cursor-not-allowed text-zinc-600"
+                                ? "cursor-not-allowed text-text-disabled"
                                 : active
-                                  ? "bg-[#1a3a5c] font-medium text-white"
-                                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                  ? "bg-link-tonal font-medium text-text-primary"
+                                  : "text-text-tertiary hover:bg-link-standard hover:text-text-primary"
                             }`}
                             title={
                               !item.enabled ? t("shell.comingSoon") : itemLabel
@@ -508,10 +508,10 @@ export function ScheduleModuleSidebar({
                         {isRenaming ? (
                           <div
                             className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1.5 ${
-                              active ? "bg-[#1a3a5c]" : "bg-white/5"
+                              active ? "bg-link-tonal" : "bg-link-standard"
                             }`}
                           >
-                            <LayoutDashboard className="size-3.5 shrink-0 text-zinc-300 opacity-80" />
+                            <LayoutDashboard className="size-3.5 shrink-0 text-text-secondary opacity-80" />
                             <input
                               ref={renameInputRef}
                               value={renameDraft}
@@ -529,7 +529,7 @@ export function ScheduleModuleSidebar({
                                   setRenamingPageId(null);
                                 }
                               }}
-                              className="min-w-0 flex-1 rounded border border-sky-500/60 bg-zinc-950 px-1.5 py-0.5 text-[13px] text-white outline-none"
+                              className="min-w-0 flex-1 rounded border border-border-theme-light bg-surface-sub-background px-1.5 py-0.5 text-body-s text-text-primary outline-none"
                               aria-label={t("shell.renamePageInput")}
                             />
                           </div>
@@ -542,10 +542,10 @@ export function ScheduleModuleSidebar({
                               event.preventDefault();
                               startRename(page);
                             }}
-                            className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
+                            className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-body-s transition ${
                               active
-                                ? "bg-[#1a3a5c] font-medium text-white"
-                                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                ? "bg-link-tonal font-medium text-text-primary"
+                                : "text-text-tertiary hover:bg-link-standard hover:text-text-primary"
                             }`}
                             title={
                               adminMode
@@ -564,7 +564,7 @@ export function ScheduleModuleSidebar({
                             <button
                               type="button"
                               onClick={() => startRename(page)}
-                              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-sky-600/15 hover:text-sky-300 group-hover/item:opacity-100"
+                              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-disabled opacity-0 transition hover:bg-surface-theme hover:text-text-theme group-hover/item:opacity-100"
                               title={t("shell.renamePage")}
                               aria-label={t("shell.renamePageAria", {
                                 name: page.label,
@@ -575,7 +575,7 @@ export function ScheduleModuleSidebar({
                             <button
                               type="button"
                               onClick={() => onRemoveModuleDashboard?.(page.id)}
-                              className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-600 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover/item:opacity-100"
+                              className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-disabled opacity-0 transition hover:bg-status-error-light hover:text-status-error-emphasis group-hover/item:opacity-100"
                               title={t("shell.removePage")}
                               aria-label={t("shell.removePageAria", {
                                 name: page.label,
@@ -596,7 +596,7 @@ export function ScheduleModuleSidebar({
       </nav>
 
       <div
-        className={`shrink-0 space-y-0.5 border-t border-white/10 py-3 ${
+        className={`shrink-0 space-y-0.5 border-t border-border-quaternary py-3 ${
           collapsed ? "px-1.5" : "px-2"
         }`}
       >

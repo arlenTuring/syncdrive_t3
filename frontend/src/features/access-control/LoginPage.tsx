@@ -1,5 +1,6 @@
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '../../components/ui';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
@@ -25,29 +26,29 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-5 text-zinc-100">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(37,99,235,0.12),transparent_38%)]" />
-      <section className="relative w-full max-w-md rounded-3xl border border-zinc-800 bg-[#151619] p-8 shadow-2xl shadow-blue-950/20" aria-labelledby="login-title">
+    <main className="flex min-h-screen items-center justify-center bg-surface-sub-background px-5 text-text-primary">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,var(--surface-theme),transparent_38%)]" />
+      <section className="relative w-full max-w-md rounded-3xl border border-border-quaternary bg-surface-primary p-8 shadow-2xl shadow-black-30" aria-labelledby="login-title">
         <div className="mb-8 flex items-center gap-3">
           <img src="/logo.svg" alt="" className="size-11" />
-          <div><div className="text-2xl font-semibold tracking-wide">VTMS</div><div className="text-sm text-zinc-500">SyncDrive 管理系統</div></div>
+          <div><div className="text-headline-3">VTMS</div><div className="text-body-s text-text-quaternary">SyncDrive 管理系統</div></div>
         </div>
-        <h1 id="login-title" className="text-xl font-semibold">登入系統</h1>
-        <p className="mt-2 text-sm text-zinc-500">請使用系統管理員提供的帳號與密碼。</p>
+        <h1 id="login-title" className="text-headline-4">登入系統</h1>
+        <p className="mt-2 text-body-s text-text-quaternary">請使用系統管理員提供的帳號與密碼。</p>
         <form onSubmit={submit} className="mt-7 space-y-5">
-          <label className="block text-sm text-zinc-300">帳號
-            <input autoFocus autoComplete="username" value={account} onChange={(event) => setAccount(event.target.value)} className="mt-2 w-full rounded-xl border border-transparent bg-[#232933] px-4 py-3.5 outline-none placeholder:text-zinc-600 focus:border-blue-500" placeholder="請輸入帳號" />
+          <label className="block text-body-s text-text-secondary">帳號
+            <input autoFocus autoComplete="username" value={account} onChange={(event) => setAccount(event.target.value)} className="mt-2 w-full rounded-xl border border-transparent bg-surface-secondary px-4 py-3.5 outline-none placeholder:text-text-quaternary focus:border-border-theme" placeholder="請輸入帳號" />
           </label>
-          <label className="block text-sm text-zinc-300">密碼
+          <label className="block text-body-s text-text-secondary">密碼
             <span className="relative mt-2 block">
-              <input autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} type={show ? 'text' : 'password'} className="w-full rounded-xl border border-transparent bg-[#232933] px-4 py-3.5 pr-12 outline-none placeholder:text-zinc-600 focus:border-blue-500" placeholder="請輸入密碼" />
-              <button type="button" onClick={() => setShow((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-zinc-500 hover:text-white" aria-label={show ? '隱藏密碼' : '顯示密碼'}>{show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button>
+              <input autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} type={show ? 'text' : 'password'} className="w-full rounded-xl border border-transparent bg-surface-secondary px-4 py-3.5 pr-12 outline-none placeholder:text-text-quaternary focus:border-border-theme" placeholder="請輸入密碼" />
+              <button type="button" onClick={() => setShow((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-text-quaternary hover:text-text-primary" aria-label={show ? '隱藏密碼' : '顯示密碼'}>{show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button>
             </span>
           </label>
-          {error ? <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
-          <button type="submit" disabled={!valid || busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-medium transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500">
-            <LogIn className="size-5" />{busy ? '登入中…' : '登入'}
-          </button>
+          {error ? <p role="alert" className="rounded-xl border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">{error}</p> : null}
+          <Button type="submit" hierarchy="superior" variant="filled" block disabled={!valid || busy} leadingIcon={<LogIn />}>
+            {busy ? '登入中…' : '登入'}
+          </Button>
         </form>
       </section>
     </main>

@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
+import { cn } from './ui'
 
 type BackToHomeButtonProps = {
   onClick: () => void
@@ -13,7 +14,7 @@ export function BackToHomeButton({ onClick, className = '' }: BackToHomeButtonPr
       onClick={onClick}
       title="返回首頁"
       aria-label="返回首頁"
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-900/90 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 sm:px-2.5 sm:py-1.5 sm:text-sm ${className}`}
+      className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-primary px-2 py-1 text-body-xs text-text-secondary transition hover:bg-link-standard-hover hover:text-text-primary sm:px-2.5 sm:py-1.5 sm:text-body-s', className)}
     >
       <ArrowLeft className="size-3.5 shrink-0 sm:size-4" aria-hidden />
       <span className="hidden sm:inline">首頁</span>

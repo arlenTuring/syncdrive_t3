@@ -1,0 +1,112 @@
+/*
+ * T3 UI Kit Radio：Figma 69:6847，Radio Basic：2 Size × 2 Select × 4 State（16 Variant）
+ *
+ * 樣式逐字取自設計交付的工程文件 frontend/design-specs/t3-radio-engineering-spec.md（§5 參考實作）。
+ * 正式元件不輸出 data-preview-state；On／Off 跟著原生 :checked。
+ * React 端請用 components/ui 的 Radio，不要直接寫這些 class 與屬性。改外觀請先更新設計文件，
+ * 再同步這裡；components/ui/designSpecs.spec.ts 會檢查兩者一致。
+ */
+
+@layer components {
+  .t3-radio {
+    --radio-ring-size: 20px;
+    --radio-dot-size: 10px;
+    --radio-halo-outset: 4px;
+    --radio-stroke: 1.2px;
+    --radio-stroke-on: 1.5px;
+    --radio-ring-color: var(--border-primary);
+    --radio-dot-color: var(--text-theme);
+    --radio-halo-color: transparent;
+    position: relative;
+    isolation: isolate;
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 24px;
+    block-size: 24px;
+    vertical-align: middle;
+  }
+  .t3-radio[data-size="small"] {
+    --radio-ring-size: 14px;
+    --radio-dot-size: 7px;
+    --radio-halo-outset: 0px;
+    --radio-stroke-on: 1.2px;
+  }
+  .t3-radio:has(.t3-radio__input:checked) {
+    --radio-stroke: var(--radio-stroke-on);
+    --radio-ring-color: var(--text-theme);
+  }
+  @media (hover: hover) {
+    .t3-radio:where(:not([data-preview-state])):has(.t3-radio__input:hover:not(:disabled)) {
+      --radio-halo-color: var(--link-tonal-hover);
+    }
+  }
+  .t3-radio[data-preview-state="hover"] {
+    --radio-halo-color: var(--link-tonal-hover);
+  }
+  .t3-radio[data-preview-state="pressed"],
+  .t3-radio:where(:not([data-preview-state])):has(.t3-radio__input:active:not(:disabled)) {
+    --radio-halo-color: var(--link-tonal-pressed);
+    --radio-ring-color: var(--text-theme);
+  }
+  .t3-radio:has(.t3-radio__input:disabled) {
+    --radio-ring-color: var(--border-disabled);
+    --radio-dot-color: var(--border-disabled);
+    --radio-halo-color: transparent;
+  }
+  .t3-radio::before {
+    position: absolute;
+    inset: calc(-1 * var(--radio-halo-outset));
+    z-index: -1;
+    border-radius: 50%;
+    background-color: var(--radio-halo-color);
+    content: "";
+    pointer-events: none;
+  }
+  .t3-radio__input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    inline-size: 100%;
+    block-size: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .t3-radio__input:disabled { cursor: default; }
+  .t3-radio__ring {
+    display: grid;
+    place-items: center;
+    inline-size: var(--radio-ring-size);
+    block-size: var(--radio-ring-size);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 var(--radio-stroke) var(--radio-ring-color);
+    pointer-events: none;
+  }
+  .t3-radio__dot {
+    display: none;
+    inline-size: var(--radio-dot-size);
+    block-size: var(--radio-dot-size);
+    border-radius: 50%;
+    background-color: var(--radio-dot-color);
+  }
+  .t3-radio__input:checked + .t3-radio__ring .t3-radio__dot { display: block; }
+  .t3-radio__input:focus-visible + .t3-radio__ring {
+    outline: 2px solid var(--border-theme);
+    outline-offset: 2px;
+  }
+  .t3-radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-block: 4px;
+    color: var(--text-primary);
+  }
+  @media (forced-colors: active) {
+    .t3-radio__ring { box-sizing: border-box; box-shadow: none; border: 1px solid ButtonText; }
+    .t3-radio__dot { forced-color-adjust: none; background: ButtonText; }
+    .t3-radio__input:disabled + .t3-radio__ring { border-color: GrayText; }
+    .t3-radio__input:disabled + .t3-radio__ring .t3-radio__dot { background: GrayText; }
+    .t3-radio__input:focus-visible + .t3-radio__ring { outline-color: Highlight; }
+  }
+}

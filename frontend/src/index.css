@@ -2,6 +2,7 @@
 /* 設計稿字型 Noto Sans TC 自帶在專案裡（可變字重 100～900，依字元分段載入），現場不用連外網 */
 @import '@fontsource-variable/noto-sans-tc';
 @import './styles/design-tokens.css';
+@import './components/ui/styles.css';
 
 html,
 body,
@@ -11,7 +12,7 @@ body,
 }
 
 body {
-  @apply bg-zinc-950 font-primary text-zinc-100 antialiased;
+  @apply bg-surface-background font-primary text-text-primary antialiased;
 }
 
 /*

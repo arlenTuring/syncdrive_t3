@@ -63,54 +63,54 @@ export function ShellAccountToolbar({
         <button
           type="button"
           onClick={cycleLocale}
-          className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#1f1f22] px-2.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+          className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-surface-secondary px-2.5 text-body-xs-bold text-text-primary transition hover:bg-link-standard-hover"
           title={t('shell.language')}
           aria-label={t('shell.language')}
         >
           {localeToolbarCode(currentLocale)}
         </button>
-        <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
+        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
         <button
           type="button"
-          className="relative inline-flex size-8 items-center justify-center rounded-full bg-[#1f1f22] text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+          className="relative inline-flex size-8 items-center justify-center rounded-full bg-surface-secondary text-text-secondary transition hover:bg-link-standard-hover hover:text-text-primary"
           title={t('shell.notifications')}
           aria-label={t('shell.notificationsCount', { count: notificationCount })}
         >
           <Bell className="size-4" />
           {notificationCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-error px-1 text-caption-2 leading-none text-text-primary">
               {notificationCount > 99 ? '99+' : notificationCount}
             </span>
           ) : null}
         </button>
-        <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
+        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
         <button
           type="button"
           onClick={() => setSettingsOpen((open) => !open)}
           aria-expanded={settingsOpen}
           aria-controls={panelId}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#1f1f22] pl-2 pr-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 hover:text-white"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-secondary pl-2 pr-2.5 text-body-s text-text-primary transition hover:bg-link-standard-hover hover:text-text-primary"
           aria-label={auth.user ? `登入帳號 ${auth.user.display_name}` : '登入'}
         >
-          <span className="inline-flex size-6 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
+          <span className="inline-flex size-6 items-center justify-center rounded-full bg-surface-secondary text-text-secondary">
             <User className="size-3.5" />
           </span>
           <span className="max-w-[7rem] truncate font-medium">
             {auth.loading ? '讀取中…' : auth.user?.display_name ?? '登入'}
           </span>
-          <ChevronDown className="size-3.5 text-zinc-500" />
+          <ChevronDown className="size-3.5 text-text-quaternary" />
         </button>
         {/* 沒有系統基礎模組權限的帳號（例如廠商）看不到齒輪，不是點了才說權限不足 */}
         {auth.can('system.health.view') ? (
         <>
-        <span className="h-4 w-px bg-zinc-700/80" aria-hidden />
+        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
         <button
           type="button"
           onClick={() => {
             setSettingsOpen(false);
             onOpenSystemFoundation();
           }}
-          className="inline-flex size-8 items-center justify-center rounded-full bg-[#1f1f22] text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+          className="inline-flex size-8 items-center justify-center rounded-full bg-surface-secondary text-text-secondary transition hover:bg-link-standard-hover hover:text-text-primary"
           title={t('shell.settings')}
           aria-label={t('shell.settings')}
         >
@@ -120,22 +120,22 @@ export function ShellAccountToolbar({
         ) : null}
 
         {settingsOpen && auth.user ? (
-          <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-              <h2 className="text-sm font-semibold text-zinc-100">帳號資訊</h2>
-              <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200" aria-label="關閉">
+          <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50">
+            <div className="flex items-center justify-between border-b border-border-quaternary px-4 py-3">
+              <h2 className="text-body-s-bold text-text-primary">帳號資訊</h2>
+              <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-md p-1 text-text-quaternary transition hover:bg-link-standard-hover hover:text-text-primary" aria-label="關閉">
                 <X className="size-4" />
               </button>
             </div>
             <div className="space-y-4 px-4 py-4">
-              <div className="rounded-xl bg-zinc-900 p-3">
-                <div className="font-medium text-zinc-100">{auth.user.display_name}</div>
-                <div className="text-sm text-zinc-500">{auth.user.account_name}</div>
+              <div className="rounded-xl bg-surface-primary p-3">
+                <div className="font-medium text-text-primary">{auth.user.display_name}</div>
+                <div className="text-body-s text-text-quaternary">{auth.user.account_name}</div>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {auth.user.roles.map((role) => <span key={role.id} className="rounded bg-zinc-700 px-2 py-0.5 text-xs">{role.name}</span>)}
+                  {auth.user.roles.map((role) => <span key={role.id} className="rounded bg-link-standard-hover px-2 py-0.5 text-body-xs">{role.name}</span>)}
                 </div>
               </div>
-              <button type="button" onClick={() => { setSettingsOpen(false); void auth.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 py-2 text-zinc-300 transition hover:bg-white/5 hover:text-white">
+              <button type="button" onClick={() => { setSettingsOpen(false); void auth.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-border-quaternary py-2 text-text-secondary transition hover:bg-link-standard hover:text-text-primary">
                 <LogOut className="size-4" />登出
               </button>
             </div>

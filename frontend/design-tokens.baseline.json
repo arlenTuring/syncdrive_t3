@@ -1,0 +1,1843 @@
+{
+  "components/BackToHomeButton.tsx": {
+    "button": 1
+  },
+  "components/SiteColorInput.tsx": {
+    "hex": 14,
+    "arbitrary": 1,
+    "rgb": 1,
+    "palette": 13,
+    "button": 2
+  },
+  "components/SiteDateTimeInput.tsx": {
+    "palette": 1,
+    "button": 1
+  },
+  "components/SiteMultiSelect.tsx": {
+    "button": 3
+  },
+  "components/SiteSelect.tsx": {
+    "button": 2
+  },
+  "components/TextAlignmentControls.tsx": {
+    "arbitrary": 2,
+    "palette": 10,
+    "button": 1
+  },
+  "components/TextLayoutControls.tsx": {
+    "arbitrary": 8,
+    "palette": 26,
+    "button": 3
+  },
+  "components/ui/variants.ts": {
+    "palette": 2
+  },
+  "components/ViewErrorBoundary.tsx": {
+    "palette": 1
+  },
+  "features/access-control/AccountDialogs.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 40,
+    "button": 4
+  },
+  "features/access-control/AccountManagementPage.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 28,
+    "button": 9
+  },
+  "features/access-control/AuthContext.tsx": {
+    "palette": 2
+  },
+  "features/access-control/LoginDialog.tsx": {
+    "palette": 6,
+    "button": 1
+  },
+  "features/access-control/LoginPage.tsx": {
+    "palette": 1,
+    "button": 1
+  },
+  "features/access-control/RoleManagementPage.tsx": {
+    "hex": 10,
+    "arbitrary": 10,
+    "palette": 40,
+    "button": 13
+  },
+  "features/dashboard/CanvasElement.tsx": {
+    "hex": 48,
+    "rgb": 42,
+    "button": 5
+  },
+  "features/dashboard/ComponentPalette.tsx": {
+    "hex": 28,
+    "rgb": 13,
+    "button": 1
+  },
+  "features/dashboard/components/BindingIssuesBar.tsx": {
+    "palette": 4,
+    "button": 1
+  },
+  "features/dashboard/components/BindingWarningIcon.tsx": {
+    "hex": 1,
+    "rgb": 2
+  },
+  "features/dashboard/components/CanvasChildListPortal.tsx": {
+    "hex": 3,
+    "rgb": 8,
+    "button": 1
+  },
+  "features/dashboard/components/DashboardIconPicker.tsx": {
+    "arbitrary": 8,
+    "palette": 28,
+    "button": 3
+  },
+  "features/dashboard/components/DualCanvasSettings.tsx": {
+    "arbitrary": 5,
+    "palette": 25,
+    "selection": 2
+  },
+  "features/dashboard/components/EditPreviewChrome.tsx": {
+    "hex": 6,
+    "rgb": 5
+  },
+  "features/dashboard/components/GenericGroupSettings.tsx": {
+    "arbitrary": 30,
+    "palette": 84,
+    "button": 14,
+    "selection": 4
+  },
+  "features/dashboard/components/GroupTemplateExitDialog.tsx": {
+    "palette": 20,
+    "button": 4
+  },
+  "features/dashboard/components/IconImageField.tsx": {
+    "arbitrary": 4,
+    "palette": 23,
+    "button": 2
+  },
+  "features/dashboard/components/LayoutValidationIcon.tsx": {
+    "hex": 3,
+    "rgb": 2
+  },
+  "features/dashboard/components/SimulationTransportToolbar.tsx": {
+    "arbitrary": 14,
+    "palette": 75,
+    "button": 10
+  },
+  "features/dashboard/components/SnapGuideLines.tsx": {
+    "hex": 1
+  },
+  "features/dashboard/components/TemplateFileActions.tsx": {
+    "hex": 11,
+    "arbitrary": 15,
+    "rgb": 4,
+    "palette": 26,
+    "button": 6,
+    "selection": 2
+  },
+  "features/dashboard/components/VehicleRoofIndicatorSettings.tsx": {
+    "arbitrary": 6,
+    "palette": 12,
+    "selection": 1
+  },
+  "features/dashboard/constants/alertBannerDemoRules.ts": {
+    "hex": 15
+  },
+  "features/dashboard/constants/demoPlane.ts": {
+    "hex": 114,
+    "rgb": 14
+  },
+  "features/dashboard/constants/demoSql.ts": {
+    "hex": 34,
+    "rgb": 9
+  },
+  "features/dashboard/constants/deploymentPlane.ts": {
+    "hex": 83,
+    "rgb": 15
+  },
+  "features/dashboard/constants/healthStatusTheme.ts": {
+    "hex": 8
+  },
+  "features/dashboard/constants/mapPlatformTheme.ts": {
+    "hex": 22
+  },
+  "features/dashboard/constants/severityTheme.ts": {
+    "hex": 6
+  },
+  "features/dashboard/constants/vehicleMonitorTheme.ts": {
+    "hex": 5,
+    "rgb": 4
+  },
+  "features/dashboard/DashboardList.tsx": {
+    "hex": 33,
+    "arbitrary": 60,
+    "rgb": 14,
+    "palette": 2,
+    "button": 10
+  },
+  "features/dashboard/elements/BarChartWidget.tsx": {
+    "hex": 7,
+    "rgb": 10
+  },
+  "features/dashboard/elements/chartAxis.ts": {
+    "rgb": 4
+  },
+  "features/dashboard/elements/ClockWidget.tsx": {
+    "hex": 1
+  },
+  "features/dashboard/elements/DatabaseWidget.tsx": {
+    "hex": 5,
+    "rgb": 9
+  },
+  "features/dashboard/elements/DataSourceIdSelect.tsx": {
+    "arbitrary": 2,
+    "palette": 8
+  },
+  "features/dashboard/elements/DataSourcePicker.tsx": {
+    "palette": 40,
+    "button": 5
+  },
+  "features/dashboard/elements/DualCanvasDefaultView.tsx": {
+    "palette": 3,
+    "button": 1
+  },
+  "features/dashboard/elements/EmptyStateWidget.tsx": {
+    "hex": 5,
+    "rgb": 5
+  },
+  "features/dashboard/elements/gaugeBand.ts": {
+    "hex": 6
+  },
+  "features/dashboard/elements/GaugeWidget.tsx": {
+    "hex": 17,
+    "rgb": 7
+  },
+  "features/dashboard/elements/GroupCanvasRenderer.tsx": {
+    "hex": 3,
+    "arbitrary": 2,
+    "rgb": 12,
+    "palette": 12,
+    "button": 1
+  },
+  "features/dashboard/elements/ImageWidget.tsx": {
+    "hex": 1,
+    "rgb": 6
+  },
+  "features/dashboard/elements/lineChartSeries.ts": {
+    "hex": 6
+  },
+  "features/dashboard/elements/LineChartWidget.tsx": {
+    "hex": 17,
+    "rgb": 15
+  },
+  "features/dashboard/elements/MaintenanceDistributionWidget.tsx": {
+    "hex": 9,
+    "rgb": 9
+  },
+  "features/dashboard/elements/MapPlatformLayer.tsx": {
+    "palette": 5
+  },
+  "features/dashboard/elements/ProgressBarWidget.tsx": {
+    "hex": 2,
+    "rgb": 3
+  },
+  "features/dashboard/elements/RouteProgressWidget.tsx": {
+    "hex": 25,
+    "arbitrary": 1,
+    "rgb": 14,
+    "palette": 15
+  },
+  "features/dashboard/elements/SegmentBarWidget.tsx": {
+    "hex": 6
+  },
+  "features/dashboard/elements/ShiftListWidget.tsx": {
+    "hex": 27,
+    "rgb": 10,
+    "button": 2
+  },
+  "features/dashboard/elements/SlotGridWidget.tsx": {
+    "hex": 14,
+    "rgb": 4
+  },
+  "features/dashboard/elements/StatCardWidget.tsx": {
+    "hex": 4
+  },
+  "features/dashboard/elements/StatusBadgeWidget.tsx": {
+    "rgb": 1
+  },
+  "features/dashboard/elements/TabListWidget.tsx": {
+    "hex": 13,
+    "rgb": 12,
+    "button": 3
+  },
+  "features/dashboard/elements/UnitTelemetryCardWidget.tsx": {
+    "hex": 42,
+    "arbitrary": 4,
+    "rgb": 9,
+    "palette": 6
+  },
+  "features/dashboard/elements/VehicleAlertBannerWidget.tsx": {
+    "hex": 3,
+    "rgb": 4
+  },
+  "features/dashboard/elements/VehicleContainerBehaviorOverlay.tsx": {
+    "arbitrary": 2,
+    "palette": 7
+  },
+  "features/dashboard/elements/VehicleContainerWidgetView.tsx": {
+    "hex": 1,
+    "arbitrary": 3,
+    "palette": 4
+  },
+  "features/dashboard/elements/WidgetDataBindingSettings.tsx": {
+    "arbitrary": 14,
+    "palette": 41,
+    "button": 1
+  },
+  "features/dashboard/elements/WidgetRenderer.tsx": {
+    "hex": 2,
+    "rgb": 2
+  },
+  "features/dashboard/index.tsx": {
+    "hex": 7,
+    "arbitrary": 10,
+    "rgb": 3,
+    "palette": 109,
+    "button": 18
+  },
+  "features/dashboard/NewPlaneDialog.tsx": {
+    "palette": 43,
+    "button": 4
+  },
+  "features/dashboard/PlaneWorkspace.tsx": {
+    "hex": 16,
+    "rgb": 42,
+    "palette": 3,
+    "button": 7
+  },
+  "features/dashboard/PropertiesPanel.tsx": {
+    "hex": 79,
+    "arbitrary": 123,
+    "rgb": 3,
+    "palette": 440,
+    "button": 37,
+    "selection": 20
+  },
+  "features/dashboard/route-progress/RouteProgressSettings.tsx": {
+    "hex": 6,
+    "arbitrary": 12,
+    "palette": 54,
+    "button": 8,
+    "selection": 1
+  },
+  "features/dashboard/route-progress/RouteTrackView.tsx": {
+    "hex": 16,
+    "rgb": 1
+  },
+  "features/dashboard/route-progress/RouteVehicleMarker.tsx": {
+    "hex": 1,
+    "rgb": 2
+  },
+  "features/dashboard/settings/PlaneDataSettingsPanel.tsx": {
+    "arbitrary": 4,
+    "palette": 23,
+    "button": 1
+  },
+  "features/dashboard/settings/SettingsModal.tsx": {
+    "arbitrary": 2,
+    "palette": 133,
+    "button": 17
+  },
+  "features/dashboard/types.ts": {
+    "hex": 91,
+    "rgb": 5
+  },
+  "features/dashboard/useDashboardEditor.ts": {
+    "hex": 2
+  },
+  "features/dashboard/utils/alertTrigger.ts": {
+    "hex": 1,
+    "rgb": 2
+  },
+  "features/dashboard/utils/mainlineTaskModel.ts": {
+    "hex": 11,
+    "rgb": 4
+  },
+  "features/dashboard/utils/maintenanceTaskModel.ts": {
+    "hex": 11,
+    "rgb": 1
+  },
+  "features/dashboard/utils/migrateDashboardPlane.ts": {
+    "hex": 5
+  },
+  "features/dashboard/utils/migrateVehicleMonitorProtocol.ts": {
+    "hex": 5
+  },
+  "features/dashboard/utils/migrateWidgetGenerics.ts": {
+    "hex": 4
+  },
+  "features/dashboard/utils/operationStatusBadge.ts": {
+    "hex": 10
+  },
+  "features/dashboard/utils/resolveVehicleMonitorBadge.ts": {
+    "hex": 11
+  },
+  "features/dashboard/utils/shiftCardTemplates.ts": {
+    "hex": 4
+  },
+  "features/dashboard/utils/vehicleInfoCardTemplate.ts": {
+    "rgb": 1
+  },
+  "features/dashboard/vehicle-operation-actions/VehicleBodySvg.tsx": {
+    "hex": 1
+  },
+  "features/degraded-operation/ActiveExecutionDialogs.tsx": {
+    "hex": 6,
+    "arbitrary": 6,
+    "palette": 31,
+    "button": 7,
+    "selection": 2
+  },
+  "features/degraded-operation/DegradedHistoryView.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 75,
+    "button": 5
+  },
+  "features/degraded-operation/DegradedIcons.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 3
+  },
+  "features/degraded-operation/DegradedOperationPage.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 61,
+    "button": 13
+  },
+  "features/degraded-operation/DegradedPlanDialog.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 34,
+    "button": 4
+  },
+  "features/degraded-operation/DegradedPlanForm.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 19,
+    "button": 1,
+    "selection": 2
+  },
+  "features/degraded-operation/ExecutionScheduleFields.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 11,
+    "button": 2
+  },
+  "features/degraded-operation/MapViewport.tsx": {
+    "palette": 6,
+    "button": 4
+  },
+  "features/degraded-operation/PlanExecutionDialog.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 26,
+    "button": 3
+  },
+  "features/degraded-operation/PlanManagementView.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 22,
+    "button": 10
+  },
+  "features/dispatch-scheduling/components/CreateDispatchConfirmStep.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 25,
+    "button": 1
+  },
+  "features/dispatch-scheduling/components/CreateDispatchDialog.tsx": {
+    "hex": 16,
+    "arbitrary": 20,
+    "palette": 43,
+    "button": 10
+  },
+  "features/dispatch-scheduling/components/DispatchReviewDialog.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 11,
+    "button": 3
+  },
+  "features/dispatch-scheduling/components/DispatchStationActionRow.tsx": {
+    "hex": 2,
+    "arbitrary": 3,
+    "palette": 8,
+    "button": 1
+  },
+  "features/dispatch-scheduling/components/VehicleAssignSelect.tsx": {
+    "hex": 13,
+    "arbitrary": 22,
+    "rgb": 3,
+    "palette": 5,
+    "button": 2
+  },
+  "features/dispatch-scheduling/DispatchSchedulingPage.tsx": {
+    "hex": 11,
+    "arbitrary": 13,
+    "palette": 37,
+    "button": 9
+  },
+  "features/dispatch-scheduling/types.ts": {
+    "hex": 6,
+    "arbitrary": 12,
+    "rgb": 6
+  },
+  "features/event-log-shared/ui.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 54,
+    "button": 6
+  },
+  "features/event-management/eventBadges.tsx": {
+    "hex": 8,
+    "arbitrary": 8,
+    "palette": 2
+  },
+  "features/event-management/EventDetailDialog.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 19,
+    "button": 2
+  },
+  "features/event-management/EventManagementPage.tsx": {
+    "palette": 1
+  },
+  "features/event-management/EventReplayDialog.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 18,
+    "button": 1
+  },
+  "features/event-management/EventTypesDialog.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 27,
+    "button": 5
+  },
+  "features/event-management/HistoryEventsPage.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 14
+  },
+  "features/event-management/LiveEventsPage.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 24,
+    "button": 7
+  },
+  "features/event-management/ReportDialogs.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 15
+  },
+  "features/log-management/LogDetailDialog.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 11
+  },
+  "features/log-management/LogPage.tsx": {
+    "palette": 6
+  },
+  "features/maintenance-tasks/components/CreateMaintenanceTaskPage.tsx": {
+    "hex": 11,
+    "arbitrary": 14,
+    "rgb": 1,
+    "palette": 54,
+    "button": 5
+  },
+  "features/maintenance-tasks/components/FacilityEquipmentRowsEditor.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 22,
+    "button": 2
+  },
+  "features/maintenance-tasks/components/MaintenanceTaskListPage.tsx": {
+    "hex": 5,
+    "arbitrary": 7,
+    "palette": 66,
+    "button": 10
+  },
+  "features/maintenance-tasks/components/MaintenanceTaskPreviewContent.tsx": {
+    "hex": 3,
+    "arbitrary": 5,
+    "palette": 28,
+    "button": 1
+  },
+  "features/maintenance-tasks/components/MaintenanceTaskResultPreviewPage.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 12,
+    "button": 1
+  },
+  "features/maintenance-tasks/components/NavigateToSetupModal.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 11,
+    "button": 3
+  },
+  "features/maintenance-tasks/components/StepCarWashParams.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 7
+  },
+  "features/maintenance-tasks/components/StepChargingParams.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 6
+  },
+  "features/maintenance-tasks/components/StepMaintenanceParams.tsx": {
+    "hex": 8,
+    "arbitrary": 8,
+    "palette": 22,
+    "button": 2
+  },
+  "features/maintenance-tasks/components/StepSchedulePreview.tsx": {
+    "palette": 2
+  },
+  "features/maintenance-tasks/components/StepSectionToggle.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 5,
+    "selection": 1
+  },
+  "features/maintenance-tasks/components/StepStationDurationParams.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 11,
+    "selection": 1
+  },
+  "features/maintenance-tasks/components/TriggerFieldRow.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 11,
+    "selection": 1
+  },
+  "features/map-editor/components/AreaDragTrack.tsx": {
+    "rgb": 6
+  },
+  "features/map-editor/components/AreaInspectorSection.tsx": {
+    "hex": 3,
+    "arbitrary": 24,
+    "palette": 76,
+    "button": 2,
+    "selection": 2
+  },
+  "features/map-editor/components/AreaNode.tsx": {
+    "hex": 7,
+    "arbitrary": 1,
+    "palette": 11
+  },
+  "features/map-editor/components/AreaRulerOverlay.tsx": {
+    "hex": 2,
+    "rgb": 4,
+    "palette": 38
+  },
+  "features/map-editor/components/AssetPaletteBar.tsx": {
+    "hex": 6,
+    "arbitrary": 17,
+    "rgb": 5,
+    "palette": 2,
+    "button": 2
+  },
+  "features/map-editor/components/BasemapCellOverlay.tsx": {
+    "arbitrary": 1,
+    "palette": 13
+  },
+  "features/map-editor/components/BasemapFilePickerDialog.tsx": {
+    "palette": 26,
+    "button": 3
+  },
+  "features/map-editor/components/BasemapGraphic.tsx": {
+    "arbitrary": 4,
+    "palette": 22,
+    "button": 3
+  },
+  "features/map-editor/components/BasemapGridOverlay.tsx": {
+    "rgb": 4
+  },
+  "features/map-editor/components/BasemapInspectorSection.tsx": {
+    "arbitrary": 9,
+    "palette": 32,
+    "button": 1
+  },
+  "features/map-editor/components/BasemapNode.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 33,
+    "button": 8
+  },
+  "features/map-editor/components/CrossTrackInspectorSection.tsx": {
+    "arbitrary": 18,
+    "palette": 51,
+    "button": 1,
+    "selection": 1
+  },
+  "features/map-editor/components/DockingPointInspectorSection.tsx": {
+    "arbitrary": 10,
+    "palette": 22
+  },
+  "features/map-editor/components/FacilityDockingPointInspectorSection.tsx": {
+    "arbitrary": 14,
+    "palette": 38,
+    "button": 3
+  },
+  "features/map-editor/components/FacilityDraggableLabel.tsx": {
+    "rgb": 1,
+    "palette": 6,
+    "button": 1
+  },
+  "features/map-editor/components/FacilityDragGuidesOverlay.tsx": {
+    "palette": 8
+  },
+  "features/map-editor/components/FacilityInspectorSection.tsx": {
+    "hex": 1,
+    "arbitrary": 7,
+    "palette": 18
+  },
+  "features/map-editor/components/FacilityLayerSection.tsx": {
+    "arbitrary": 3,
+    "palette": 8,
+    "button": 1
+  },
+  "features/map-editor/components/FacilityNode.tsx": {
+    "hex": 23,
+    "arbitrary": 7,
+    "rgb": 1,
+    "palette": 102,
+    "button": 6
+  },
+  "features/map-editor/components/FacilityRefFieldBoundsSection.tsx": {
+    "arbitrary": 13,
+    "palette": 33,
+    "button": 2
+  },
+  "features/map-editor/components/FacilityRefFieldPositionSection.tsx": {
+    "arbitrary": 6,
+    "palette": 13
+  },
+  "features/map-editor/components/FacilityTransformOverlay.tsx": {
+    "palette": 2
+  },
+  "features/map-editor/components/FillColorRulesSection.tsx": {
+    "hex": 1,
+    "arbitrary": 11,
+    "palette": 38,
+    "button": 2
+  },
+  "features/map-editor/components/FrameInspectorSection.tsx": {
+    "hex": 2,
+    "arbitrary": 7,
+    "palette": 19,
+    "selection": 1
+  },
+  "features/map-editor/components/GeofenceInspectorSection.tsx": {
+    "arbitrary": 19,
+    "palette": 63,
+    "button": 3,
+    "selection": 2
+  },
+  "features/map-editor/components/GeofenceNode.tsx": {
+    "hex": 3,
+    "arbitrary": 2,
+    "palette": 27,
+    "button": 4
+  },
+  "features/map-editor/components/Inspector.tsx": {
+    "hex": 2,
+    "arbitrary": 61,
+    "palette": 218,
+    "button": 6,
+    "selection": 7
+  },
+  "features/map-editor/components/LeaveEditConfirmDialog.tsx": {
+    "palette": 17,
+    "button": 3
+  },
+  "features/map-editor/components/MapAreaCanvas.tsx": {
+    "hex": 2,
+    "rgb": 2,
+    "palette": 2
+  },
+  "features/map-editor/components/MapAuxiliaryLinesOverlay.tsx": {
+    "rgb": 1
+  },
+  "features/map-editor/components/MapCanvas.tsx": {
+    "hex": 1,
+    "rgb": 2,
+    "palette": 7
+  },
+  "features/map-editor/components/MapCanvasInspectorSection.tsx": {
+    "arbitrary": 1,
+    "palette": 15
+  },
+  "features/map-editor/components/MapCropInspectorSection.tsx": {
+    "arbitrary": 1,
+    "palette": 16
+  },
+  "features/map-editor/components/MapCropModeOverlay.tsx": {
+    "arbitrary": 3,
+    "rgb": 1,
+    "palette": 16
+  },
+  "features/map-editor/components/MapEditorToolbar.tsx": {
+    "hex": 21,
+    "arbitrary": 47,
+    "rgb": 13,
+    "palette": 17,
+    "button": 9
+  },
+  "features/map-editor/components/MapLibraryPage.tsx": {
+    "hex": 63,
+    "arbitrary": 107,
+    "rgb": 28,
+    "palette": 11,
+    "button": 22
+  },
+  "features/map-editor/components/MapListDrawer.tsx": {
+    "hex": 23,
+    "arbitrary": 44,
+    "rgb": 12,
+    "palette": 10,
+    "button": 4
+  },
+  "features/map-editor/components/MapPixelFrameOverlay.tsx": {
+    "arbitrary": 1,
+    "rgb": 7,
+    "palette": 3
+  },
+  "features/map-editor/components/MapRevisionHistoryDialog.tsx": {
+    "arbitrary": 3,
+    "palette": 37,
+    "button": 5
+  },
+  "features/map-editor/components/MapRulers.tsx": {
+    "arbitrary": 8,
+    "palette": 10
+  },
+  "features/map-editor/components/NewMapPixelDialog.tsx": {
+    "arbitrary": 2,
+    "palette": 36,
+    "button": 3
+  },
+  "features/map-editor/components/PlatformDoorGraphic.tsx": {
+    "hex": 2,
+    "rgb": 2
+  },
+  "features/map-editor/components/PointTopologyEditorDialog.tsx": {
+    "hex": 21,
+    "arbitrary": 53,
+    "rgb": 2,
+    "palette": 207,
+    "button": 27
+  },
+  "features/map-editor/components/RoadLineInspectorSection.tsx": {
+    "arbitrary": 9,
+    "palette": 22
+  },
+  "features/map-editor/components/RouteGroupEditorView.tsx": {
+    "arbitrary": 5,
+    "palette": 17,
+    "button": 2
+  },
+  "features/map-editor/components/RouteGroupListView.tsx": {
+    "arbitrary": 17,
+    "rgb": 1,
+    "palette": 69,
+    "button": 10
+  },
+  "features/map-editor/components/RoutePlanningOverlay.tsx": {
+    "rgb": 11
+  },
+  "features/map-editor/components/RoutePlanningPanel.tsx": {
+    "arbitrary": 31,
+    "rgb": 2,
+    "palette": 108,
+    "button": 10
+  },
+  "features/map-editor/components/SetPrimaryMapDialog.tsx": {
+    "hex": 11,
+    "arbitrary": 19,
+    "rgb": 4,
+    "palette": 15,
+    "button": 2
+  },
+  "features/map-editor/components/SignalInspectorSection.tsx": {
+    "arbitrary": 15,
+    "palette": 46,
+    "button": 2
+  },
+  "features/map-editor/components/SignalLightGraphic.tsx": {
+    "hex": 8,
+    "arbitrary": 3
+  },
+  "features/map-editor/components/SimRoutePathOverlay.tsx": {
+    "hex": 27
+  },
+  "features/map-editor/components/TrackCornerRadiusSection.tsx": {
+    "arbitrary": 9,
+    "palette": 23,
+    "button": 2
+  },
+  "features/map-editor/components/TrackDiagnosticsPanel.tsx": {
+    "arbitrary": 2,
+    "palette": 17,
+    "button": 2
+  },
+  "features/map-editor/components/TrackGenGraphic.tsx": {
+    "hex": 3,
+    "arbitrary": 4,
+    "palette": 36,
+    "button": 3
+  },
+  "features/map-editor/components/TrackGenInspectorSection.tsx": {
+    "arbitrary": 4,
+    "palette": 10
+  },
+  "features/map-editor/components/TrackGenSizeDialog.tsx": {
+    "hex": 25,
+    "arbitrary": 35,
+    "palette": 118,
+    "button": 15
+  },
+  "features/map-editor/components/TrackInspectorSection.tsx": {
+    "arbitrary": 3,
+    "palette": 7
+  },
+  "features/map-editor/components/TrackPartInspectorSection.tsx": {
+    "arbitrary": 8,
+    "palette": 23,
+    "selection": 1
+  },
+  "features/map-editor/components/TrajectoryHud.tsx": {
+    "arbitrary": 2,
+    "palette": 11
+  },
+  "features/map-editor/components/TrajectoryLayer.tsx": {
+    "rgb": 11
+  },
+  "features/map-editor/components/TrajectoryPanel.tsx": {
+    "palette": 37,
+    "button": 4
+  },
+  "features/map-editor/components/TrajectoryRawDataList.tsx": {
+    "arbitrary": 1,
+    "palette": 9,
+    "button": 1
+  },
+  "features/map-editor/components/TrajectoryZoomBar.tsx": {
+    "arbitrary": 7,
+    "palette": 18,
+    "button": 1
+  },
+  "features/map-editor/components/WaypointInspectorSection.tsx": {
+    "arbitrary": 6,
+    "palette": 12
+  },
+  "features/map-editor/components/WorkspaceTabs.tsx": {
+    "palette": 12,
+    "button": 2
+  },
+  "features/map-editor/components/ZoneEntranceInspectorSection.tsx": {
+    "arbitrary": 23,
+    "palette": 44,
+    "button": 1
+  },
+  "features/map-editor/components/ZonePartitionInspectorSection.tsx": {
+    "arbitrary": 26,
+    "palette": 61
+  },
+  "features/map-editor/index.tsx": {
+    "hex": 7,
+    "arbitrary": 11,
+    "rgb": 5,
+    "palette": 46,
+    "button": 4
+  },
+  "features/map-editor/opendrive/lanePolygons.ts": {
+    "hex": 8
+  },
+  "features/map-editor/utils/crossTrackPortals.ts": {
+    "hex": 2
+  },
+  "features/map-editor/utils/facilityArea.ts": {
+    "hex": 2
+  },
+  "features/map-editor/utils/facilityLabelStyle.ts": {
+    "hex": 1
+  },
+  "features/map-editor/utils/geofence.ts": {
+    "hex": 2,
+    "rgb": 4
+  },
+  "features/map-editor/utils/mqttColorSimulation.ts": {
+    "hex": 6
+  },
+  "features/map-editor/utils/pointTopology.ts": {
+    "hex": 5
+  },
+  "features/map-editor/utils/roadLineFacility.ts": {
+    "hex": 1
+  },
+  "features/map-editor/utils/trackFacility.ts": {
+    "hex": 3,
+    "rgb": 1
+  },
+  "features/map-editor/utils/trackGenGroups.ts": {
+    "hex": 6
+  },
+  "features/map-editor/utils/trackGenLayout.ts": {
+    "hex": 9
+  },
+  "features/map-editor/utils/zonePartition.ts": {
+    "hex": 1
+  },
+  "features/map-editor/vehicles/defaultMapVehicleIcon.ts": {
+    "hex": 2,
+    "rgb": 4
+  },
+  "features/map-editor/vehicles/MapAreaVehicleOverlay.tsx": {
+    "hex": 4,
+    "arbitrary": 2,
+    "rgb": 2,
+    "palette": 12
+  },
+  "features/map-editor/vehicles/resolveMapVehicleAppearance.ts": {
+    "hex": 1
+  },
+  "features/map-editor/vehicles/vehicleRoofIndicator.ts": {
+    "hex": 2,
+    "rgb": 2
+  },
+  "features/map-editor/vehicles/VehicleTrackProgressBadge.tsx": {
+    "rgb": 1
+  },
+  "features/media-content/MediaContentPage.tsx": {
+    "hex": 10,
+    "arbitrary": 10,
+    "palette": 54,
+    "button": 16,
+    "selection": 1
+  },
+  "features/media-groups/dialogs.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 32,
+    "button": 3
+  },
+  "features/media-groups/MediaGroupsPage.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 37,
+    "button": 11
+  },
+  "features/media-groups/MediaPickerDialog.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 16,
+    "button": 1
+  },
+  "features/media-groups/widgets.tsx": {
+    "palette": 12,
+    "button": 3,
+    "selection": 1
+  },
+  "features/media-schedules/dialogs.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 13
+  },
+  "features/media-schedules/GroupPickerDialog.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 20,
+    "button": 1,
+    "selection": 1
+  },
+  "features/media-schedules/MediaSchedulesPage.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 21,
+    "button": 10
+  },
+  "features/media-schedules/ScheduleEditorDialog.tsx": {
+    "hex": 7,
+    "arbitrary": 7,
+    "palette": 58,
+    "button": 6,
+    "selection": 2
+  },
+  "features/media-schedules/WeeklyTimesDialog.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 11,
+    "button": 2
+  },
+  "features/order-records/index.tsx": {
+    "palette": 5
+  },
+  "features/psd-control/components/DockTimeDialog.tsx": {
+    "hex": 16,
+    "arbitrary": 29,
+    "palette": 27,
+    "button": 6
+  },
+  "features/psd-control/components/DoorDetailPage.tsx": {
+    "hex": 3,
+    "arbitrary": 9,
+    "palette": 6,
+    "button": 2
+  },
+  "features/psd-control/components/DoorLinkIndicator.tsx": {
+    "hex": 8,
+    "arbitrary": 3,
+    "palette": 1
+  },
+  "features/psd-control/components/DoorMonitorCard.tsx": {
+    "hex": 8,
+    "arbitrary": 21,
+    "palette": 21,
+    "button": 3
+  },
+  "features/psd-control/PsdControlPage.tsx": {
+    "hex": 7,
+    "arbitrary": 10,
+    "palette": 14,
+    "button": 3
+  },
+  "features/replay-core/PlaybackControls.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 21,
+    "button": 3
+  },
+  "features/replay-core/ReplayMapLayer.tsx": {
+    "palette": 2
+  },
+  "features/replay-core/VehicleDataPanel.tsx": {
+    "arbitrary": 5,
+    "palette": 75,
+    "button": 1
+  },
+  "features/schedule-management/components/AttachModuleDashboardDialog.tsx": {
+    "hex": 1,
+    "arbitrary": 2,
+    "palette": 32,
+    "button": 3
+  },
+  "features/schedule-management/components/ModuleDashboardRuntimeView.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 9,
+    "button": 1
+  },
+  "features/schedule-management/components/ScheduleModuleSidebar.tsx": {
+    "button": 10
+  },
+  "features/schedule-management/components/ShellAccountToolbar.tsx": {
+    "palette": 1,
+    "button": 6
+  },
+  "features/schedule-management/components/ShellWorkspaceFrame.tsx": {
+    "palette": 1
+  },
+  "features/schedule-task-types/TaskTypeBadge.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "rgb": 1
+  },
+  "features/scheduled-orders/ScheduledOrdersPage.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 89,
+    "button": 15,
+    "selection": 1
+  },
+  "features/shift-deployment/components/DeploymentShiftTable.tsx": {
+    "hex": 2,
+    "arbitrary": 7,
+    "rgb": 2,
+    "palette": 23,
+    "button": 4
+  },
+  "features/shift-deployment/components/ExecutionTimeField.tsx": {
+    "hex": 11,
+    "arbitrary": 19,
+    "rgb": 4,
+    "palette": 9,
+    "button": 4
+  },
+  "features/shift-deployment/components/RingProgress.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "rgb": 1,
+    "palette": 2
+  },
+  "features/shift-deployment/components/ScheduleAdjustApplyDialog.tsx": {
+    "hex": 12,
+    "arbitrary": 13,
+    "palette": 48,
+    "button": 9
+  },
+  "features/shift-deployment/components/ScheduleAdjustDiffStep.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 30,
+    "button": 2
+  },
+  "features/shift-deployment/components/ShiftRouteTrack.tsx": {
+    "hex": 5
+  },
+  "features/shift-deployment/components/SummaryCards.tsx": {
+    "hex": 9,
+    "arbitrary": 25,
+    "palette": 60,
+    "button": 4
+  },
+  "features/shift-deployment/components/VehicleControlSection.tsx": {
+    "hex": 6,
+    "arbitrary": 10,
+    "palette": 7,
+    "button": 4
+  },
+  "features/shift-deployment/diffScheduleTasks.ts": {
+    "hex": 7,
+    "arbitrary": 13,
+    "rgb": 6,
+    "palette": 5
+  },
+  "features/shift-deployment/fallback.ts": {
+    "hex": 3,
+    "rgb": 3
+  },
+  "features/shift-deployment/hooks/useDeploymentData.ts": {
+    "hex": 1,
+    "rgb": 1
+  },
+  "features/shift-deployment/ShiftDeploymentPage.tsx": {
+    "arbitrary": 1,
+    "palette": 4,
+    "button": 1
+  },
+  "features/shift-list/components/CapacityTrendChart.tsx": {
+    "hex": 7,
+    "arbitrary": 5,
+    "rgb": 3,
+    "palette": 26,
+    "button": 1
+  },
+  "features/shift-list/components/CreateShiftSchedulePage.tsx": {
+    "hex": 15,
+    "arbitrary": 16,
+    "palette": 61,
+    "button": 7
+  },
+  "features/shift-list/components/HelpTip.tsx": {
+    "arbitrary": 1,
+    "palette": 7,
+    "button": 1
+  },
+  "features/shift-list/components/ManualScheduleEditorSidebar.tsx": {
+    "hex": 4,
+    "arbitrary": 15,
+    "palette": 32,
+    "button": 1
+  },
+  "features/shift-list/components/RouteRelationGraphEditor.tsx": {
+    "hex": 40,
+    "arbitrary": 23,
+    "palette": 82,
+    "button": 8
+  },
+  "features/shift-list/components/ScheduleAnalysisReportPanel.tsx": {
+    "arbitrary": 22,
+    "palette": 76,
+    "button": 3
+  },
+  "features/shift-list/components/ScheduleDataCheckPanel.tsx": {
+    "palette": 36,
+    "button": 2
+  },
+  "features/shift-list/components/ScheduleTimeZoomToolbar.tsx": {
+    "arbitrary": 1,
+    "palette": 13,
+    "button": 3
+  },
+  "features/shift-list/components/ShiftListPage.tsx": {
+    "hex": 14,
+    "arbitrary": 16,
+    "palette": 57,
+    "button": 11
+  },
+  "features/shift-list/components/ShiftMenuSelect.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 4
+  },
+  "features/shift-list/components/ShiftSchedulePlanGrid.tsx": {
+    "hex": 21,
+    "arbitrary": 69,
+    "rgb": 2,
+    "palette": 143,
+    "button": 7
+  },
+  "features/shift-list/components/ShiftScheduleResultPreviewPage.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 12,
+    "button": 1
+  },
+  "features/shift-list/components/ShiftSelectionEmptyState.tsx": {
+    "palette": 1
+  },
+  "features/shift-list/components/StepShiftActionSettings.tsx": {
+    "hex": 22,
+    "arbitrary": 34,
+    "rgb": 1,
+    "palette": 46,
+    "button": 9
+  },
+  "features/shift-list/components/StepShiftMaintenanceTask.tsx": {
+    "hex": 6,
+    "arbitrary": 6,
+    "palette": 29
+  },
+  "features/shift-list/components/StepShiftRouteGroups.tsx": {
+    "hex": 31,
+    "arbitrary": 46,
+    "rgb": 2,
+    "palette": 144,
+    "button": 13
+  },
+  "features/shift-list/components/StepShiftScheduleAdjust.tsx": {
+    "hex": 12,
+    "arbitrary": 14,
+    "palette": 113,
+    "button": 16
+  },
+  "features/shift-list/components/StepShiftSchedulePreview.tsx": {
+    "hex": 16,
+    "arbitrary": 25,
+    "rgb": 1,
+    "palette": 113,
+    "button": 5
+  },
+  "features/shift-list/components/StepShiftTimeTemplate.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 18
+  },
+  "features/shift-list/components/TransitionCardCodesBar.tsx": {
+    "hex": 5,
+    "arbitrary": 5,
+    "palette": 23,
+    "button": 1
+  },
+  "features/shift-list/components/YardEntryAllowancePanel.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 37
+  },
+  "features/shift-list/types.ts": {
+    "hex": 6,
+    "arbitrary": 12,
+    "rgb": 6,
+    "palette": 6
+  },
+  "features/shift-list/utils/buildCapacityTrend.ts": {
+    "hex": 8
+  },
+  "features/shift-list/utils/scheduleEngineLastIssues.ts": {
+    "hex": 21
+  },
+  "features/shift-records/components/CustomDateTimePanel.tsx": {
+    "palette": 33,
+    "button": 7
+  },
+  "features/shift-records/components/DateTimeRangePicker.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 9,
+    "button": 3
+  },
+  "features/shift-records/components/DrivingCapabilityModal.tsx": {
+    "hex": 19,
+    "arbitrary": 29,
+    "palette": 35,
+    "button": 3
+  },
+  "features/shift-records/components/RunCodeRow.tsx": {
+    "arbitrary": 1,
+    "palette": 11,
+    "button": 1
+  },
+  "features/shift-records/components/ShiftRecordDetailPage.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 45,
+    "button": 2
+  },
+  "features/shift-records/components/ShiftRecordsListPage.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 69,
+    "button": 8,
+    "selection": 2
+  },
+  "features/shift-records/types.ts": {
+    "hex": 7,
+    "arbitrary": 14,
+    "rgb": 7
+  },
+  "features/system-foundation/components/AdvancedManagementPanel.tsx": {
+    "palette": 8,
+    "button": 1
+  },
+  "features/system-foundation/components/BackupSettings.tsx": {
+    "arbitrary": 19,
+    "palette": 47,
+    "button": 5,
+    "selection": 2
+  },
+  "features/system-foundation/components/DataManagementPanel.tsx": {
+    "arbitrary": 2,
+    "palette": 93,
+    "button": 13
+  },
+  "features/system-foundation/components/DataRetentionPanel.tsx": {
+    "arbitrary": 2,
+    "palette": 37,
+    "button": 6
+  },
+  "features/system-foundation/components/DataRetentionSettings.tsx": {
+    "arbitrary": 6,
+    "palette": 17,
+    "button": 2,
+    "selection": 1
+  },
+  "features/system-foundation/components/HealthMetricCards.tsx": {
+    "hex": 3,
+    "arbitrary": 10,
+    "palette": 19
+  },
+  "features/system-foundation/components/HealthTrendChart.tsx": {
+    "hex": 9,
+    "arbitrary": 1,
+    "palette": 7
+  },
+  "features/system-foundation/components/SettingsFormControls.tsx": {
+    "hex": 8,
+    "arbitrary": 23,
+    "palette": 44,
+    "button": 7
+  },
+  "features/system-foundation/components/SystemFoundationSettingsPanel.tsx": {
+    "hex": 15,
+    "arbitrary": 51,
+    "palette": 71,
+    "button": 4
+  },
+  "features/system-foundation/components/ThresholdSettingsDialog.tsx": {
+    "hex": 7,
+    "arbitrary": 24,
+    "palette": 58,
+    "button": 12
+  },
+  "features/system-foundation/SystemFoundationPage.tsx": {
+    "hex": 10,
+    "arbitrary": 14,
+    "palette": 27,
+    "button": 4
+  },
+  "features/time-templates/components/AttributeColorPalette.tsx": {
+    "hex": 3,
+    "arbitrary": 2,
+    "rgb": 3,
+    "palette": 1,
+    "button": 1
+  },
+  "features/time-templates/components/CreateTimeTemplateModal.tsx": {
+    "hex": 21,
+    "arbitrary": 30,
+    "rgb": 4,
+    "palette": 47,
+    "button": 6
+  },
+  "features/time-templates/components/FillEmptySlotsConfirmModal.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 9,
+    "button": 3
+  },
+  "features/time-templates/components/PanelNoData.tsx": {
+    "hex": 1,
+    "arbitrary": 3
+  },
+  "features/time-templates/components/ScheduleIntervalSelection.tsx": {
+    "hex": 2,
+    "arbitrary": 3,
+    "palette": 6,
+    "button": 1
+  },
+  "features/time-templates/components/scheduleTimelineBackground.tsx": {
+    "hex": 1
+  },
+  "features/time-templates/components/StepOverallPreview.tsx": {
+    "hex": 13,
+    "arbitrary": 16,
+    "rgb": 2,
+    "palette": 24
+  },
+  "features/time-templates/components/StepTaskScheduling.tsx": {
+    "hex": 8,
+    "arbitrary": 26,
+    "rgb": 2,
+    "palette": 78,
+    "button": 8
+  },
+  "features/time-templates/components/TaskSettingsForm.tsx": {
+    "hex": 2,
+    "arbitrary": 4,
+    "palette": 10
+  },
+  "features/time-templates/components/TaskTypeHelpAnchor.tsx": {
+    "arbitrary": 3,
+    "palette": 7
+  },
+  "features/time-templates/components/TimeOfDayPicker.tsx": {
+    "hex": 13,
+    "arbitrary": 23,
+    "rgb": 5,
+    "palette": 2,
+    "button": 4
+  },
+  "features/time-templates/components/TimeRangeField.tsx": {
+    "hex": 5,
+    "arbitrary": 7,
+    "palette": 6,
+    "button": 3
+  },
+  "features/time-templates/components/TimeSlotAttributeCard.tsx": {
+    "hex": 17,
+    "arbitrary": 27,
+    "rgb": 3,
+    "palette": 12,
+    "button": 5
+  },
+  "features/time-templates/components/TimeSlotAttributesPanel.tsx": {
+    "arbitrary": 1,
+    "rgb": 1
+  },
+  "features/time-templates/components/TimeSlotIntervalsPanel.tsx": {
+    "hex": 15,
+    "arbitrary": 38,
+    "rgb": 11,
+    "palette": 14,
+    "button": 3
+  },
+  "features/time-templates/components/TimeTemplateListPage.tsx": {
+    "hex": 5,
+    "arbitrary": 7,
+    "palette": 78,
+    "button": 13,
+    "selection": 2
+  },
+  "features/time-templates/components/TimeTemplatePanelHeader.tsx": {
+    "hex": 3,
+    "arbitrary": 9,
+    "rgb": 2,
+    "button": 1
+  },
+  "features/time-templates/components/TimeTemplatePreviewModal.tsx": {
+    "hex": 4,
+    "arbitrary": 5,
+    "palette": 4,
+    "button": 1
+  },
+  "features/time-templates/components/TurnaroundLimitGrid.tsx": {
+    "hex": 2,
+    "arbitrary": 8,
+    "palette": 14
+  },
+  "features/time-templates/components/VehicleCapacitySlider.tsx": {
+    "hex": 5,
+    "arbitrary": 7,
+    "palette": 1
+  },
+  "features/time-templates/types.ts": {
+    "hex": 2,
+    "arbitrary": 4,
+    "rgb": 2,
+    "palette": 4
+  },
+  "features/time-templates/types/editor.ts": {
+    "hex": 57,
+    "arbitrary": 2,
+    "rgb": 3,
+    "palette": 24
+  },
+  "features/vehicle-editor/ComponentPalette.tsx": {
+    "arbitrary": 2,
+    "palette": 9,
+    "button": 1
+  },
+  "features/vehicle-editor/components/VehicleAssetPicker.tsx": {
+    "arbitrary": 3,
+    "palette": 14,
+    "button": 1
+  },
+  "features/vehicle-editor/components/VehicleCanvasResizeOverlay.tsx": {
+    "arbitrary": 1,
+    "palette": 3
+  },
+  "features/vehicle-editor/components/VehiclePreviewTestPanel.tsx": {
+    "arbitrary": 8,
+    "palette": 40,
+    "button": 5,
+    "selection": 2
+  },
+  "features/vehicle-editor/components/VehicleRotationToolbar.tsx": {
+    "palette": 16,
+    "button": 4
+  },
+  "features/vehicle-editor/constants/palette.ts": {
+    "hex": 6
+  },
+  "features/vehicle-editor/constants/userRestoredVtmsVehicle.ts": {
+    "hex": 2
+  },
+  "features/vehicle-editor/elements/VehicleDoorSvg.tsx": {
+    "hex": 1,
+    "rgb": 2
+  },
+  "features/vehicle-editor/elements/VehicleElementNode.tsx": {
+    "arbitrary": 1,
+    "rgb": 1,
+    "palette": 2
+  },
+  "features/vehicle-editor/elements/VehicleImageLayer.tsx": {
+    "hex": 1
+  },
+  "features/vehicle-editor/index.tsx": {
+    "hex": 2,
+    "arbitrary": 8,
+    "palette": 48,
+    "button": 11
+  },
+  "features/vehicle-editor/management/LegacyVehicleModelPanel.tsx": {
+    "hex": 1,
+    "arbitrary": 4,
+    "palette": 35,
+    "button": 6
+  },
+  "features/vehicle-editor/management/MapVehicleSettingsPanel.tsx": {
+    "hex": 1,
+    "arbitrary": 7,
+    "palette": 35,
+    "button": 3
+  },
+  "features/vehicle-editor/management/VehicleModelManagement.tsx": {
+    "arbitrary": 2,
+    "palette": 13,
+    "button": 1
+  },
+  "features/vehicle-editor/model/VehicleBehaviorSettingsFields.tsx": {
+    "arbitrary": 5,
+    "palette": 25,
+    "button": 3
+  },
+  "features/vehicle-editor/NewVehicleDialog.tsx": {
+    "palette": 39,
+    "button": 4
+  },
+  "features/vehicle-editor/PropertiesPanel.tsx": {
+    "arbitrary": 9,
+    "palette": 44,
+    "button": 3,
+    "selection": 1
+  },
+  "features/vehicle-editor/useVehicleEditor.ts": {
+    "hex": 1
+  },
+  "features/vehicle-editor/utils/bodyColor.ts": {
+    "hex": 1
+  },
+  "features/vehicle-editor/utils/colorInput.ts": {
+    "hex": 1
+  },
+  "features/vehicle-editor/utils/createElement.ts": {
+    "hex": 1
+  },
+  "features/vehicle-editor/VehicleList.tsx": {
+    "hex": 1,
+    "arbitrary": 5,
+    "palette": 47,
+    "button": 8
+  },
+  "features/vehicle-editor/VehicleWorkspace.tsx": {
+    "hex": 7,
+    "arbitrary": 3,
+    "rgb": 2,
+    "palette": 14,
+    "button": 3
+  },
+  "features/vehicle-realtime/VehicleLocationDialog.tsx": {
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 13,
+    "button": 1
+  },
+  "features/vehicle-realtime/VehicleRealtimePage.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 39,
+    "button": 7
+  },
+  "features/vehicle-registry/VehicleRegistryPage.tsx": {
+    "hex": 10,
+    "arbitrary": 10,
+    "palette": 58,
+    "button": 20
+  },
+  "features/vehicle-rotation/VehicleRotationPage.tsx": {
+    "hex": 16,
+    "arbitrary": 16,
+    "palette": 150,
+    "button": 11
+  },
+  "features/vehicle-run-history/QueryPanel.tsx": {
+    "arbitrary": 1,
+    "palette": 106,
+    "button": 5
+  },
+  "features/vehicle-run-history/RunHistoryPage.tsx": {
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 27,
+    "button": 3
+  },
+  "features/vehicle-run-history/VehiclePicker.tsx": {
+    "arbitrary": 2,
+    "palette": 13
+  },
+  "features/video/LayoutEditorDialog.tsx": {
+    "hex": 5,
+    "arbitrary": 3,
+    "rgb": 2,
+    "palette": 27,
+    "button": 3
+  },
+  "features/video/LivePlayer.tsx": {
+    "palette": 1
+  },
+  "features/video/SegmentFollower.tsx": {
+    "palette": 8,
+    "button": 1
+  },
+  "features/video/SourceDialog.tsx": {
+    "hex": 3,
+    "arbitrary": 4,
+    "palette": 39,
+    "button": 3,
+    "selection": 3
+  },
+  "features/video/SourcePicker.tsx": {
+    "hex": 3,
+    "arbitrary": 4,
+    "rgb": 1,
+    "palette": 24,
+    "button": 2
+  },
+  "features/video/status.ts": {
+    "palette": 10
+  },
+  "features/video/StorageDialog.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 38,
+    "selection": 6
+  },
+  "features/video/TileView.tsx": {
+    "hex": 1,
+    "arbitrary": 3,
+    "palette": 14,
+    "button": 4
+  },
+  "features/video/VideoHistoryPage.tsx": {
+    "hex": 7,
+    "arbitrary": 9,
+    "rgb": 2,
+    "palette": 55,
+    "button": 10
+  },
+  "features/video/VideoMonitorPage.tsx": {
+    "hex": 4,
+    "arbitrary": 4,
+    "palette": 37,
+    "button": 10
+  },
+  "features/video/VideoResourcesPage.tsx": {
+    "hex": 2,
+    "arbitrary": 3,
+    "palette": 39,
+    "button": 9,
+    "selection": 1
+  },
+  "features/virtual-fence-management/components/FenceFormPanel.tsx": {
+    "hex": 12,
+    "arbitrary": 14,
+    "palette": 35,
+    "button": 5,
+    "selection": 2
+  },
+  "features/virtual-fence-management/components/FenceListPanel.tsx": {
+    "hex": 14,
+    "arbitrary": 16,
+    "palette": 35,
+    "button": 8
+  },
+  "features/virtual-fence-management/components/FenceMapPanel.tsx": {
+    "hex": 10,
+    "arbitrary": 11,
+    "palette": 13,
+    "button": 7
+  },
+  "features/virtual-fence-management/components/FenceShapeOverlay.tsx": {
+    "hex": 5,
+    "arbitrary": 4,
+    "rgb": 1,
+    "palette": 1,
+    "button": 2
+  },
+  "features/virtual-fence-management/components/FenceViewPanel.tsx": {
+    "hex": 3,
+    "arbitrary": 3,
+    "palette": 10,
+    "button": 3
+  },
+  "features/virtual-fence-management/types.ts": {
+    "hex": 2,
+    "arbitrary": 3,
+    "rgb": 1,
+    "palette": 1
+  },
+  "features/virtual-fence-management/VirtualFencePage.tsx": {
+    "hex": 8,
+    "arbitrary": 11,
+    "palette": 10,
+    "button": 2
+  },
+  "lib/RotatedElementResizeHandles.tsx": {
+    "palette": 5
+  }
+}

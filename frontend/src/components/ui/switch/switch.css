@@ -1,0 +1,111 @@
+/*
+ * T3 UI Kit Switch：Figma 70:13852，2 Configuration × 2 Select × 3 State（12 Variant）
+ *
+ * 樣式逐字取自設計交付的工程文件 frontend/design-specs/t3-switch-engineering-spec.md（§5 參考實作）。
+ * 規格的正式範例是 Ant Design Vue；本專案是 React，採規格提供的原生範例（input[type=checkbox][role=switch]），同一份 CSS 由 :checked 讀狀態。
+ * React 端請用 components/ui 的 Switch，不要直接寫這些 class 與屬性。改外觀請先更新設計文件，
+ * 再同步這裡；components/ui/designSpecs.spec.ts 會檢查兩者一致。
+ */
+
+@layer components {
+  .t3-switch {
+    --switch-duration: 200ms;
+    --switch-easing: cubic-bezier(0.2, 0, 0, 1);
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    vertical-align: middle;
+    flex: none;
+  }
+  .t3-switch > .t3-switch__input {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-inline-size: 0;
+    block-size: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .t3-switch__track {
+    --switch-grow: 0px;
+    --switch-label-shift: var(--switch-grow);
+    position: relative;
+    z-index: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+    display: inline-grid;
+    align-items: center;
+    flex: none;
+    min-inline-size: 44px;
+    block-size: 26px;
+    border-radius: 999px;
+    background-color: var(--border-primary);
+    color: var(--color-white-100);
+    transition: background-color var(--switch-duration) var(--switch-easing),
+                color var(--switch-duration) var(--switch-easing);
+  }
+  .t3-switch__thumb {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 4px;
+    inset-inline-start: 4px;
+    inline-size: calc(18px + var(--switch-grow));
+    block-size: 18px;
+    border-radius: 32px;
+    background-color: var(--color-white-100);
+    transition: inset-inline-start var(--switch-duration) var(--switch-easing),
+                inline-size var(--switch-duration) var(--switch-easing),
+                background-color var(--switch-duration) var(--switch-easing);
+  }
+  .t3-switch__label {
+    position: relative;
+    inset-inline-start: var(--switch-label-shift);
+    justify-self: start;
+    margin-inline: 26px 8px;
+    white-space: nowrap;
+    transition: inset-inline-start var(--switch-duration) var(--switch-easing);
+  }
+  .t3-switch[data-configuration="basic"] .t3-switch__label { display: none; }
+  .t3-switch__input:is(:checked, [aria-checked="true"]) + .t3-switch__track {
+    --switch-label-shift: calc(-18px - var(--switch-grow));
+    background-color: var(--cta);
+  }
+  .t3-switch__input:is(:checked, [aria-checked="true"]) + .t3-switch__track .t3-switch__thumb {
+    inset-inline-start: calc(100% - 22px - var(--switch-grow));
+  }
+  .t3-switch__input:active:not(:disabled) + .t3-switch__track,
+  .t3-switch[data-preview-state="pressed"] .t3-switch__input:not(:disabled) + .t3-switch__track {
+    --switch-grow: 4px;
+  }
+  .t3-switch > .t3-switch__input:disabled { cursor: default; }
+  .t3-switch__input:disabled + .t3-switch__track {
+    background-color: var(--border-disabled);
+    color: var(--text-disabled);
+  }
+  .t3-switch__input:disabled + .t3-switch__track .t3-switch__thumb {
+    background-color: var(--surface-disabled);
+  }
+  .t3-switch__input:focus-visible + .t3-switch__track {
+    outline: 2px solid var(--border-theme);
+    outline-offset: 2px;
+  }
+  .t3-switch[data-preview-state] {
+    --switch-duration: 0ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .t3-switch { --switch-duration: 0ms; }
+  }
+  @media (forced-colors: active) {
+    .t3-switch__track { outline: 1px solid ButtonText; color: ButtonText; background: Canvas; }
+    .t3-switch__thumb { forced-color-adjust: none; background: ButtonText; }
+    .t3-switch__input:is(:checked, [aria-checked="true"]) + .t3-switch__track .t3-switch__thumb { background: Highlight; }
+    .t3-switch__input:disabled + .t3-switch__track { color: GrayText; outline-color: GrayText; }
+    .t3-switch__input:disabled + .t3-switch__track .t3-switch__thumb { background: GrayText; }
+    .t3-switch__input:focus-visible + .t3-switch__track { outline: 2px solid Highlight; }
+  }
+}

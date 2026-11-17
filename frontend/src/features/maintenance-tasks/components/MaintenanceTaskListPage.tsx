@@ -24,9 +24,9 @@ import {
 } from '../api/maintenanceTasksApi';
 import {
   PUBLISH_STATUS_OPTIONS,
-  PUBLISH_TAG_STYLE,
+  PUBLISH_TAG_TONE,
   USAGE_STATUS_OPTIONS,
-  USAGE_TAG_STYLE,
+  USAGE_TAG_TONE,
   type MaintenanceTaskListItem,
   type PublishStatusKey,
   type UsageStatusKey,
@@ -299,13 +299,13 @@ export function MaintenanceTaskListPage({
                   <td className="py-3 pr-4">
                     <StatusTag
                       label={t(`common.usageStatus.${row.usage_status}`)}
-                      style={USAGE_TAG_STYLE[row.usage_status]}
+                      tone={USAGE_TAG_TONE[row.usage_status]}
                     />
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
                       label={t(`common.publishStatus.${row.publish_status}`)}
-                      style={PUBLISH_TAG_STYLE[row.publish_status]}
+                      tone={PUBLISH_TAG_TONE[row.publish_status]}
                     />
                   </td>
                   <td className="py-3 pr-4 font-mono text-zinc-400">{row.created_at}</td>

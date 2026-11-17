@@ -1,3 +1,5 @@
+import type { BadgeTone } from '../../components/ui';
+
 export type PublishStatusKey = 'draft' | 'published';
 
 export type UsageStatusKey = 'idle' | 'in_use';
@@ -25,29 +27,13 @@ export const PUBLISH_STATUS_OPTIONS: Array<{ value: PublishStatusKey | 'all'; la
   { value: 'draft', label: '草稿區' },
 ];
 
-export type StatusTagStyle = {
-  container: string;
-  dot: string;
+/** 狀態標籤的語意（顏色由設計系統決定，見 components/ui 的 BadgeTone） */
+export const USAGE_TAG_TONE: Record<UsageStatusKey, BadgeTone> = {
+  in_use: 'success',
+  idle: 'inactive',
 };
 
-export const USAGE_TAG_STYLE: Record<UsageStatusKey, StatusTagStyle> = {
-  in_use: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
-  },
-  idle: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
-  },
-};
-
-export const PUBLISH_TAG_STYLE: Record<PublishStatusKey, StatusTagStyle> = {
-  published: {
-    container: 'bg-[rgba(43,127,255,0.2)]',
-    dot: 'bg-[#2B7FFF]',
-  },
-  draft: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
-  },
+export const PUBLISH_TAG_TONE: Record<PublishStatusKey, BadgeTone> = {
+  published: 'theme',
+  draft: 'inactive',
 };

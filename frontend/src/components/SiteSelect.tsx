@@ -10,6 +10,7 @@ import {
   type SelectHTMLAttributes,
 } from 'react';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
+import { cn, MENU_BADGE_CLASS, MENU_CHECK_CLASS, MENU_EMPTY_CLASS, MENU_GROUP_LABEL_CLASS, MENU_PANEL_CLASS, menuItemClass, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 export type SiteSelectOption = {
   value: string;
@@ -109,10 +110,10 @@ export function SiteSelect({
           }
         }}
       >
-        <span className={`min-w-0 flex-1 truncate ${selected ? '' : 'text-zinc-500'}`}>
+        <span className={cn('min-w-0 flex-1 truncate', !selected && PLACEHOLDER_TEXT_CLASS)}>
           {selected?.label ?? (selectedValue || placeholder)}
         </span>
-        <ChevronDown className={`size-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        <ChevronDown className={cn(TRIGGER_ICON_CLASS, 'transition-transform', open && 'rotate-180')} aria-hidden />
       </button>
       <AnchoredPopover
         open={open}
@@ -121,12 +122,12 @@ export function SiteSelect({
         role="listbox"
         ariaLabel={ariaLabel || title}
         align="start"
-        className="max-h-80 overflow-y-auto rounded-lg border border-zinc-700 bg-[#18181b] py-1 shadow-xl shadow-black/50 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]"
+        className={cn(MENU_PANEL_CLASS, 'max-h-80')}
         style={{ width: panelWidth ?? Math.max(anchorRef.current?.getBoundingClientRect().width ?? 0, 140) }}
       >
         {(groups ?? [{ label: null, options: flatOptions }]).map((group, groupIndex) => (
           <div key={groupIndex} role="group" aria-label={typeof group.label === 'string' ? group.label : undefined}>
-            {group.label ? <div className="px-3 py-2 text-xs font-medium text-zinc-500">{group.label}</div> : null}
+            {group.label ? <div className={MENU_GROUP_LABEL_CLASS}>{group.label}</div> : null}
             {group.options.map((option) => {
               const active = option.value === selectedValue;
               return (
@@ -137,18 +138,18 @@ export function SiteSelect({
                   aria-selected={active}
                   aria-disabled={option.disabled || undefined}
                   disabled={option.disabled}
-                  className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-zinc-600 ${active ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'}`}
+                  className={menuItemClass(active)}
                   onClick={() => pick(option.value)}
                 >
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  {option.badge ? <span className="shrink-0 text-xs text-zinc-500">{option.badge}</span> : null}
-                  {active ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : null}
+                  {option.badge ? <span className={MENU_BADGE_CLASS}>{option.badge}</span> : null}
+                  {active ? <Check className={MENU_CHECK_CLASS} aria-hidden /> : null}
                 </button>
               );
             })}
           </div>
         ))}
-        {flatOptions.length === 0 ? <div className="px-3 py-2 text-sm text-zinc-500">無可用選項</div> : null}
+        {flatOptions.length === 0 ? <div className={MENU_EMPTY_CLASS}>無可用選項</div> : null}
       </AnchoredPopover>
       {name ? <input type="hidden" name={name} value={selectedValue} /> : null}
     </>

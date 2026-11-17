@@ -21,12 +21,12 @@ export function ShellWorkspaceFrame({
   onOpenSystemFoundation,
 }: ShellWorkspaceFrameProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#121214] p-3">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800/90 bg-[#0a0a0b] shadow-[0_0_0_1px_rgba(0,0,0,0.4)]">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-zinc-800/90 px-5">
-          <div className="flex min-w-0 items-center gap-2.5 text-zinc-100">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-primary p-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background ring-1 ring-black-30">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border-quaternary px-5">
+          <div className="flex min-w-0 items-center gap-2.5 text-text-primary">
             {titleIcon}
-            <h1 className="truncate text-[15px] font-semibold tracking-tight">{title}</h1>
+            <h1 className="truncate text-body-m-bold">{title}</h1>
           </div>
           <ShellAccountToolbar
             onOpenSystemFoundation={onOpenSystemFoundation}

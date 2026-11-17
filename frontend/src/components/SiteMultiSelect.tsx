@@ -1,6 +1,7 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
+import { CheckboxIndicator, cn, fieldClass, MENU_BADGE_CLASS, MENU_CHECK_CLASS, MENU_EMPTY_CLASS, MENU_PANEL_CLASS, menuItemClass, TRIGGER_ICON_CLASS } from './ui';
 
 export type SiteMultiSelectOption = {
   value: string;
@@ -57,7 +58,7 @@ export function SiteMultiSelect({
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex min-h-10 items-center justify-between gap-2 rounded-xl bg-[#222831] px-3 text-left text-sm text-zinc-100 outline-none focus:ring-1 focus:ring-sky-500 ${className}`}
+        className={cn(fieldClass(), 'flex h-auto min-h-10 items-center justify-between gap-2 text-left', className)}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
@@ -67,7 +68,7 @@ export function SiteMultiSelect({
         }}
       >
         <span className="min-w-0 flex-1 truncate" title={labels.join('、') || allLabel}>{triggerLabel ?? summary}</span>
-        <ChevronDown className={`size-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        <ChevronDown className={cn(TRIGGER_ICON_CLASS, 'transition-transform', open && 'rotate-180')} aria-hidden />
       </button>
       <AnchoredPopover
         open={open}
@@ -77,18 +78,18 @@ export function SiteMultiSelect({
         ariaLabel={ariaLabel}
         ariaMultiselectable
         align="start"
-        className="max-h-80 overflow-y-auto rounded-lg border border-zinc-700 bg-[#18181b] py-1 shadow-xl shadow-black/50 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]"
+        className={cn(MENU_PANEL_CLASS, 'max-h-80')}
         style={{ width: 280, maxWidth: 'calc(100vw - 24px)' }}
       >
         {filterPlaceholder ? (
-          <div className="sticky top-0 z-10 border-b border-zinc-800 bg-[#18181b] p-2">
+          <div className="sticky top-0 z-10 border-b border-border-quaternary bg-surface-popup p-2">
             <input
               type="text"
               value={filter}
               placeholder={filterPlaceholder}
               aria-label={filterPlaceholder}
               onChange={(event) => setFilter(event.target.value)}
-              className="h-7 w-full rounded-md bg-[#222831] px-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500"
+              className={fieldClass({ size: 'sm' })}
             />
           </div>
         ) : null}
@@ -97,11 +98,11 @@ export function SiteMultiSelect({
             type="button"
             role="option"
             aria-selected={values.length === 0}
-            className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm ${values.length === 0 ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'}`}
+            className={menuItemClass(values.length === 0)}
             onClick={() => onChange([])}
           >
             <span className="min-w-0 flex-1 truncate">{allLabel}</span>
-            {values.length === 0 ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : null}
+            {values.length === 0 ? <Check className={MENU_CHECK_CLASS} aria-hidden /> : null}
           </button>
         )}
         {visible.map((option) => {
@@ -115,16 +116,16 @@ export function SiteMultiSelect({
               aria-selected={active}
               aria-disabled={disabled || undefined}
               disabled={disabled}
-              className={`flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm disabled:cursor-not-allowed disabled:text-zinc-600 ${active ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'}`}
+              className={menuItemClass(active)}
               onClick={() => toggle(option.value)}
             >
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {option.badge !== undefined ? <span className="shrink-0 text-xs text-zinc-500">{option.badge}</span> : null}
-              {active ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : <span className="size-4 shrink-0 rounded border border-zinc-600" aria-hidden />}
+              {option.badge !== undefined ? <span className={MENU_BADGE_CLASS}>{option.badge}</span> : null}
+              <CheckboxIndicator checked={active} disabled={option.disabled} />
             </button>
           );
         })}
-        {visible.length === 0 ? <div className="px-3 py-2 text-sm text-zinc-500">{keyword ? '沒有符合的項目' : '目前沒有來源標籤'}</div> : null}
+        {visible.length === 0 ? <div className={MENU_EMPTY_CLASS}>{keyword ? '沒有符合的項目' : '目前沒有來源標籤'}</div> : null}
       </AnchoredPopover>
     </>
   );

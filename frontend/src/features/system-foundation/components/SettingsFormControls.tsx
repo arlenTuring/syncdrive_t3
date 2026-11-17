@@ -2,7 +2,8 @@ import { SiteDateTimeInput } from '../../../components/SiteDateTimeInput';
 import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, Clock, UserRound, X } from 'lucide-react'
+import { ChevronDown, Clock, UserRound, X } from 'lucide-react'
+import { Checkbox, Switch } from '../../../components/ui'
 
 export function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="mb-1.5 block text-[12px] text-zinc-400">{children}</span>
@@ -160,37 +161,27 @@ export function TimeField({
   )
 }
 
+/** 設定開關列：左邊文字、右邊 Switch（T3 UI Kit，basic）。文字同時是開關的可及名稱 */
 export function ToggleRow({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string
   checked: boolean
   onChange: (checked: boolean) => void
+  disabled?: boolean
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-[13px] text-zinc-200">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-          checked ? 'bg-[#2B7FFF]' : 'bg-zinc-700'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition ${
-            checked ? 'left-[22px]' : 'left-0.5'
-          }`}
-        />
-      </button>
-    </div>
+    <label className="flex items-center justify-between gap-3 py-1">
+      <span className={disabled ? 'text-body-s text-text-disabled' : 'text-body-s text-text-primary'}>{label}</span>
+      <Switch checked={checked} disabled={disabled} aria-label={label} onCheckedChange={onChange} />
+    </label>
   )
 }
 
+/** 勾選項：Checkbox（T3 UI Kit）＋可見標籤 */
 export function CheckboxOption({
   label,
   checked,
@@ -203,27 +194,14 @@ export function CheckboxOption({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <button
-      type="button"
+    <Checkbox
+      className="py-1"
+      label={label}
+      labelClassName="text-body-s text-text-primary"
+      checked={checked}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`flex items-center gap-2.5 rounded-lg px-1 py-1.5 text-left text-[13px] transition ${
-        disabled
-          ? 'cursor-not-allowed text-zinc-500'
-          : 'text-zinc-200 hover:text-white'
-      }`}
-    >
-      <span
-        className={`flex size-4 shrink-0 items-center justify-center rounded border ${
-          checked && !disabled
-            ? 'border-[#2B7FFF] bg-[#2B7FFF] text-white'
-            : 'border-zinc-600 bg-transparent'
-        } ${disabled ? 'opacity-50' : ''}`}
-      >
-        {checked ? <Check className="size-3" strokeWidth={3} /> : null}
-      </span>
-      {label}
-    </button>
+      onCheckedChange={onChange}
+    />
   )
 }
 

@@ -1,7 +1,7 @@
 /*
  * SyncDrive T3 設計系統 tokens（字型、顏色）。
  * 來源：Syncdrive UI Design Kit（2026-11-12）匯出的 t3-design-tokens.css，原檔保存在
- * .claude/skills/t3-ui-design/references/t3-design-tokens.source.css。
+ * frontend/design-specs/t3-design-tokens.source.css。
  * 規則與用法見 .claude/skills/t3-ui-design/SKILL.md。改值請先改設計稿來源，再同步這裡。
  *
  * 原檔兩處語法錯誤已修正（值不變）：--link-danger-filled 少分號、--status-warning-emphasis 少右括號。

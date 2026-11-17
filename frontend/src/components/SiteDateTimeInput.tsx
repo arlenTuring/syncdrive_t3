@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 're
 import { CustomDateTimePanel } from '../features/shift-records/components/CustomDateTimePanel';
 import { TimePickerPanel } from '../features/time-templates/components/TimeOfDayPicker';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
+import { cn, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 type Kind = 'date' | 'time' | 'datetime-local';
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { type: Kind };
@@ -104,8 +105,8 @@ export function SiteDateTimeInput({
         onClick={() => setOpen((currentOpen) => !currentOpen)}
         className={`flex min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       >
-        <span className={`min-w-0 whitespace-nowrap tabular-nums ${current ? '' : 'text-zinc-500'}`}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
-        {timeOnly ? <Clock className="size-4 shrink-0 text-zinc-500" aria-hidden /> : <CalendarClock className="size-4 shrink-0 text-zinc-500" aria-hidden />}
+        <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
+        {timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}
       </button>
       <AnchoredPopover
         open={open}
@@ -116,7 +117,7 @@ export function SiteDateTimeInput({
         align="start"
         offset={8}
         autoFocus={false}
-        className={timeOnly ? undefined : 'w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-xl border border-zinc-700/90 bg-[#141416] shadow-2xl shadow-black/50'}
+        className={timeOnly ? undefined : 'w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50'}
       >
         {timeOnly ? (
           <TimeOnlyPanel key={current} value={parse(current, type)} onConfirm={emit} />

@@ -1,0 +1,9 @@
+/*
+ * 共用元件樣式的唯一入口（index.css 只引入這一支）。
+ * 每支 CSS 逐字取自 frontend/design-specs/ 的 T3 UI Kit 工程文件，對應關係登記在
+ * design-specs/manifest.json；新增元件時在這裡加一行、在 manifest 登記一筆。
+ */
+@import './button/button.css';
+@import './checkbox/checkbox.css';
+@import './radio/radio.css';
+@import './switch/switch.css';
