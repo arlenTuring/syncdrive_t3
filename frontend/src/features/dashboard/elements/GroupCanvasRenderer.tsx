@@ -451,7 +451,7 @@ function ScrollGroupView({
 
   if (isLoading && !isEditMode) {
     return (
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-500">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-body-xs text-text-quaternary">
         <span className="animate-pulse">載入資料…</span>
       </div>
     );
@@ -468,7 +468,7 @@ function ScrollGroupView({
       );
     }
     return (
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-600">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-body-xs text-text-disabled">
         尚無資料
       </div>
     );
@@ -714,7 +714,7 @@ function GenericSlotsGroupView({
   if (isPreviewMode && !isEditMode) {
     // 執行畫面不顯示範本卡：沒有接資料來源就是沒有資料
     return (
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-600" data-group-empty="no-source">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-body-xs text-text-disabled" data-group-empty="no-source">
         尚無資料
       </div>
     );
@@ -742,12 +742,12 @@ function GenericSlotsGroupView({
       {fetchers}
       <div className="relative w-full h-full overflow-hidden" data-generic-group={element.id} style={{ padding: `${padY}px ${padX}px` }}>
         {isInitialLoading && occupiedCount === 0 ? (
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-xs text-zinc-500">
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-body-xs text-text-quaternary">
             <span className="animate-pulse">載入資料…</span>
           </div>
         ) : occupiedCount === 0 ? (
           <div
-            className={`relative flex h-full w-full items-center justify-center overflow-hidden text-xs ${sourceError ? 'text-rose-400' : 'text-zinc-600'}`}
+            className={`relative flex h-full w-full items-center justify-center overflow-hidden text-body-xs ${sourceError ? 'text-status-error-emphasis' : 'text-text-disabled'}`}
             title={sourceError}
             data-group-empty={sourceError ? 'error' : 'empty'}
           >
@@ -791,7 +791,7 @@ function GenericSlotsGroupView({
         )}
         {sourceError && occupiedCount > 0 && (
           <div
-            className="absolute top-1 right-1 rounded px-2 py-0.5 text-[10px] text-rose-300"
+            className="absolute top-1 right-1 rounded px-2 py-0.5 text-caption-2 text-status-error-emphasis"
             style={{ background: 'rgba(15,23,42,0.75)', pointerEvents: 'none' }}
             title={sourceError}
           >
@@ -800,7 +800,7 @@ function GenericSlotsGroupView({
         )}
         {showPendingCount && pendingCount > 0 && (
           <div
-            className="absolute bottom-1 right-1 rounded px-2 py-0.5 text-[10px] text-zinc-400"
+            className="absolute bottom-1 right-1 rounded px-2 py-0.5 text-caption-2 text-text-tertiary"
             style={{ background: 'rgba(15,23,42,0.6)', pointerEvents: 'none' }}
           >
             +{pendingCount} 未顯示
@@ -840,7 +840,7 @@ function TileGroupView({
           style={{ height: headerH, pointerEvents: 'none' }}
         >
           <span
-            className="font-bold tracking-wide text-zinc-400"
+            className="font-bold tracking-wide text-text-tertiary"
             style={{ fontSize: titleFs, lineHeight: 1.2 }}
           >
             {titleText}
@@ -993,7 +993,7 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
               e.stopPropagation();
               onEnterEditMode();
             }}
-            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded shadow-lg flex items-center gap-2 text-sm font-bold pointer-events-auto"
+            className="bg-purple-600 hover:bg-purple-500 text-text-primary px-4 py-2 rounded shadow-lg flex items-center gap-2 text-body-s-bold pointer-events-auto"
           >
             <Edit3 size={16} /> 編輯子畫布範本
           </button>

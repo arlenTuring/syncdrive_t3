@@ -281,7 +281,7 @@ export function BasemapCellOverlay({
         }
       >
         {showMultiCell ? (
-          <span className="pointer-events-none absolute left-1 top-1 flex items-center gap-0.5 rounded bg-zinc-950/70 px-1 py-0.5 font-mono text-[9px] text-zinc-400/80">
+          <span className="pointer-events-none absolute left-1 top-1 flex items-center gap-0.5 rounded bg-zinc-950/70 px-1 py-0.5 font-mono text-caption-2 text-zinc-400/80">
             {isIndependent ? (
               <Grid2x2 className="size-2.5 text-violet-300/90" />
             ) : null}

@@ -13,6 +13,7 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 interface Props {
   onClose: () => void;
@@ -25,8 +26,8 @@ interface Props {
 
 type PingState = 'idle' | 'loading' | 'ok' | 'error';
 
-const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 text-sm
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-lg px-3 py-2 text-text-primary text-body-s
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
 export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChangePlaneDataSettings }: Props) {
   const { t } = useTranslation();
@@ -71,23 +72,23 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 backdrop-blur-sm"
+    <div className="fixed inset-0 bg-black-50 flex items-center justify-center z-50 backdrop-blur-sm"
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+      <div className="bg-surface-primary border border-border-quaternary rounded-2xl shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-quaternary">
           <div className="flex items-center gap-4">
             {plane && (
-              <span className="text-sm font-bold text-zinc-100 pr-2 border-r border-zinc-700 -mb-0">
+              <span className="text-body-s-bold text-text-primary pr-2 border-r border-border-quaternary -mb-0">
                 資料設定 · {plane.name}
               </span>
             )}
             {plane && onChangePlaneDataSettings && (
-              <button onClick={() => setActiveTab('plane')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'plane' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>本儀表板</button>
+              <button onClick={() => setActiveTab('plane')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'plane' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>本儀表板</button>
             )}
-            <button onClick={() => setActiveTab('datasource')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabDatasource')}</button>
-            <button onClick={() => setActiveTab('general')} className={`text-sm font-semibold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>{t('dashboard.settings.tabGeneral')}</button>
+            <button onClick={() => setActiveTab('datasource')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabDatasource')}</button>
+            <button onClick={() => setActiveTab('general')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabGeneral')}</button>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors p-1">
+          <button onClick={onClose} className="text-text-quaternary hover:text-text-primary transition-colors p-1">
             <X size={18} />
           </button>
         </div>
@@ -97,26 +98,22 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
             <PlaneDataSettingsPanel plane={plane} planes={planes} onChange={onChangePlaneDataSettings} />
           ) : activeTab === 'datasource' ? (
             <>
-              <div className="bg-purple-900/20 border border-purple-800/40 rounded-lg px-4 py-3 text-xs text-purple-300 leading-relaxed">
+              <div className="bg-purple-900/20 border border-purple-800/40 rounded-lg px-4 py-3 text-body-xs text-purple-300">
                 {t('dashboard.settings.datasourceIntro')}
               </div>
-              {dataSourcesLoading && <div className="text-xs text-zinc-400">正在讀取伺服器資料來源…</div>}
-              {dataSourcesError && <div className="rounded border border-red-700/50 bg-red-950/30 p-2 text-xs text-red-300">讀取失敗：{dataSourcesError}</div>}
+              {dataSourcesLoading && <div className="text-body-xs text-text-tertiary">正在讀取伺服器資料來源…</div>}
+              {dataSourcesError && <div className="rounded border border-red-700/50 bg-status-error-light p-2 text-body-xs text-status-error-emphasis">讀取失敗：{dataSourcesError}</div>}
               {legacySources.length > 0 && (
-                <div className="rounded border border-amber-700/50 bg-amber-950/20 p-3 text-xs text-amber-200">
+                <div className="rounded border border-amber-700/50 bg-amber-950/20 p-3 text-body-xs text-status-warning">
                   偵測到這個瀏覽器的舊資料來源設定。伺服器同 ID 的設定不會被覆寫。
-                  <button
-                    type="button"
-                    className="ml-2 underline"
-                    onClick={async () => {
+                  <Button hierarchy="subordinate" variant="text" className="ml-2" onPress={async () => {
                       try {
                         const conflicts = await importLegacyDataSources();
                         void systemAlert(conflicts.length ? `匯入完成：\n${conflicts.join('\n')}` : '舊資料來源已匯入伺服器');
                       } catch (e) {
                         void systemAlert(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
                       }
-                    }}
-                  >匯入舊設定</button>
+                    }}>匯入舊設定</Button>
                 </div>
               )}
 
@@ -125,14 +122,14 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                 return (
                   <div key={section.type} className="space-y-2">
                     <div className="flex items-center gap-2 pt-1">
-                      <h3 className="text-zinc-300 text-sm font-semibold">{section.title}</h3>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700">
+                      <h3 className="text-text-secondary text-body-s-bold">{section.title}</h3>
+                      <span className="text-caption-2 px-1.5 py-0.5 rounded bg-surface-secondary text-text-quaternary border border-border-quaternary">
                         {getDataSourceTypeLabel(section.type)}
                       </span>
                     </div>
-                    <p className="text-zinc-500 text-xs leading-relaxed -mt-1">{section.hint}</p>
+                    <p className="text-text-quaternary text-body-xs -mt-1">{section.hint}</p>
                     {sectionSources.length === 0 ? (
-                      <div className="text-zinc-600 text-xs px-3 py-2 border border-dashed border-zinc-700 rounded-lg">
+                      <div className="text-text-disabled text-body-xs px-3 py-2 border border-dashed border-border-quaternary rounded-lg">
                         {t('dashboard.settings.emptySection')}
                       </div>
                     ) : (
@@ -171,7 +168,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                 : (
                   <button
                     onClick={() => setShowAddForm(true)}
-                    className="w-full py-3 border-2 border-dashed border-zinc-700 rounded-xl text-zinc-500 text-sm
+                    className="w-full py-3 border-2 border-dashed border-border-quaternary rounded-xl text-text-quaternary text-body-s
                                hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus size={16} /> {t('dashboard.settings.addDatasource')}
@@ -181,23 +178,20 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
             </>
           ) : (
             <div className="space-y-6">
-              <div className="p-4 border border-zinc-700/60 bg-zinc-800/30 rounded-xl">
-                <div className="text-zinc-300 text-sm font-semibold">{t('dashboard.settings.restoreExamplesTitle')}</div>
-                <p className="text-zinc-500 text-xs mt-1 leading-relaxed">
+              <div className="p-4 border border-border-quaternary bg-link-standard rounded-xl">
+                <div className="text-text-secondary text-body-s-bold">{t('dashboard.settings.restoreExamplesTitle')}</div>
+                <p className="text-text-quaternary text-body-xs mt-1">
                   {t('dashboard.settings.restoreExamplesBody')}
                 </p>
               </div>
               <div>
-                <h3 className="text-zinc-200 text-sm font-semibold mb-2">{t('dashboard.settings.demoDataTitle')}</h3>
+                <h3 className="text-text-primary text-body-s-bold mb-2">{t('dashboard.settings.demoDataTitle')}</h3>
                 <div className="p-4 border border-cyan-900/30 bg-cyan-950/10 rounded-xl flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-cyan-300 text-sm font-bold">{t('dashboard.settings.seedTitle')}</div>
-                    <div className="text-zinc-500 text-xs mt-1">{t('dashboard.settings.seedHint')}</div>
+                    <div className="text-text-theme text-body-s-bold">{t('dashboard.settings.seedTitle')}</div>
+                    <div className="text-text-quaternary text-body-xs mt-1">{t('dashboard.settings.seedHint')}</div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={seedState === 'loading'}
-                    onClick={async () => {
+                  <Button variant="outlined" disabled={seedState === 'loading'} onPress={async () => {
                       setSeedState('loading');
                       try {
                         await seedDashboardAll();
@@ -208,33 +202,24 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                         void systemAlert(e instanceof Error ? e.message : t('dashboard.settings.seedFailAlert'));
                       }
                       setTimeout(() => setSeedState('idle'), 3000);
-                    }}
-                    className="px-4 py-2 rounded-lg bg-cyan-600/20 border border-cyan-600/40 text-cyan-300 text-xs font-bold uppercase hover:bg-cyan-600 hover:text-white transition-all whitespace-nowrap disabled:opacity-50"
-                  >
-                    {seedState === 'loading'
+                    }}>{seedState === 'loading'
                       ? t('dashboard.settings.seedLoading')
                       : seedState === 'ok'
                         ? t('dashboard.settings.seedDone')
                         : seedState === 'error'
                           ? t('dashboard.settings.seedError')
-                          : t('dashboard.settings.seedIdle')}
-                  </button>
+                          : t('dashboard.settings.seedIdle')}</Button>
                 </div>
               </div>
               <div>
-                <h3 className="text-zinc-200 text-sm font-semibold mb-2">{t('dashboard.settings.dangerZone')}</h3>
+                <h3 className="text-text-primary text-body-s-bold mb-2">{t('dashboard.settings.dangerZone')}</h3>
                 <div className="p-4 border border-red-900/30 bg-red-950/10 rounded-xl space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <div className="text-red-400 text-sm font-bold">{t('dashboard.settings.clearAllTitle')}</div>
-                      <div className="text-zinc-500 text-xs mt-1">{t('dashboard.settings.clearAllHint')}</div>
+                      <div className="text-status-error-emphasis text-body-s-bold">{t('dashboard.settings.clearAllTitle')}</div>
+                      <div className="text-text-quaternary text-body-xs mt-1">{t('dashboard.settings.clearAllHint')}</div>
                     </div>
-                    <button 
-                      onClick={async () => { if((await systemConfirm(t('dashboard.settings.clearAllConfirm'), { tone: 'danger' }))) { onClearAll(); onClose(); } }}
-                      className="px-4 py-2 rounded-lg bg-red-600/20 border border-red-600/40 text-red-400 text-xs font-bold uppercase hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
-                    >
-                      {t('dashboard.settings.clearAllAction')}
-                    </button>
+                    <Button hierarchy="danger" onPress={async () => { if((await systemConfirm(t('dashboard.settings.clearAllConfirm'), { tone: 'danger' }))) { onClearAll(); onClose(); } }} type="submit">{t('dashboard.settings.clearAllAction')}</Button>
                   </div>
                 </div>
               </div>
@@ -242,12 +227,8 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-zinc-800 flex justify-end">
-          <button onClick={onClose}
-            className="px-5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm
-                       hover:border-zinc-500 transition-colors">
-            {t('dashboard.settings.close')}
-          </button>
+        <div className="px-6 py-4 border-t border-border-quaternary flex justify-end">
+          <Button hierarchy="subordinate" variant="outlined" onPress={onClose} type="submit">{t('dashboard.settings.close')}</Button>
         </div>
       </div>
     </div>
@@ -278,7 +259,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
     idle: null,
     loading: <Loader size={13} className="animate-spin text-yellow-400" />,
     ok: <CheckCircle size={13} className="text-green-400" />,
-    error: <AlertCircle size={13} className="text-red-400" />,
+    error: <AlertCircle size={13} className="text-status-error-emphasis" />,
   }[pingState];
 
   const pingLabel = {
@@ -289,46 +270,46 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
   }[pingState];
 
   return (
-    <div className="border border-zinc-700/60 rounded-xl bg-zinc-800/30 overflow-hidden">
+    <div className="border border-border-quaternary rounded-xl bg-link-standard overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="w-8 h-8 rounded-lg bg-purple-900/40 border border-purple-800/40 flex items-center justify-center flex-shrink-0">
           <Database size={14} className="text-purple-400" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-zinc-200 text-sm font-medium truncate">{ds.name}</span>
-            {isDefault && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 border border-purple-800/40">{t('dashboard.settings.defaultBadge')}</span>}
-            <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400">
+            <span className="text-text-primary text-body-s-bold truncate">{ds.name}</span>
+            {isDefault && <span className="text-body-xs px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 border border-purple-800/40">{t('dashboard.settings.defaultBadge')}</span>}
+            <span className="text-body-xs px-1.5 py-0.5 rounded bg-link-standard-hover text-text-tertiary">
               {ds.type === 'internal' ? 'PostgreSQL' : ds.type === 'mqtt' ? 'Socket.IO' : 'REST'}
             </span>
           </div>
-          <div className="text-zinc-500 text-xs mt-0.5 truncate">
+          <div className="text-text-quaternary text-body-xs mt-0.5 truncate">
             {ds.type === 'internal' ? ds.backendUrl : ''} {ds.description && `· ${ds.description}`}
           </div>
-          <div className="text-[11px] mt-0.5 text-zinc-500">
+          <div className="text-body-xs mt-0.5 text-text-quaternary">
             {usedBy.length > 0 ? `使用中的儀表板：${usedBy.join('、')}` : '目前沒有儀表板使用'}
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {ds.type === 'internal' && (
             <button onClick={onPing}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-zinc-600
-                         text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-colors">
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-body-xs border border-border-tertiary
+                         text-text-tertiary hover:border-border-primary hover:text-text-primary transition-colors">
               {pingIcon ?? <CheckCircle size={12} />} {pingLabel}
             </button>
           )}
           {!isDefault && (
             <>
-              <button onClick={onEdit} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors">
+              <button onClick={onEdit} className="p-1.5 rounded-lg text-text-quaternary hover:text-text-primary hover:bg-link-standard-hover transition-colors">
                 <Edit2 size={13} />
               </button>
-              <button onClick={onDelete} className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-900/20 transition-colors">
+              <button onClick={onDelete} className="p-1.5 rounded-lg text-text-quaternary hover:text-status-error-emphasis hover:bg-red-900/20 transition-colors">
                 <Trash2 size={13} />
               </button>
             </>
           )}
           {isDefault && (
-            <button onClick={onEdit} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors">
+            <button onClick={onEdit} className="p-1.5 rounded-lg text-text-quaternary hover:text-text-primary hover:bg-link-standard-hover transition-colors">
               <Edit2 size={13} />
             </button>
           )}
@@ -336,26 +317,26 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
       </div>
 
       {isEditing && (
-        <div className="border-t border-zinc-700/60 px-4 py-4 space-y-3 bg-zinc-800/50">
+        <div className="border-t border-border-quaternary px-4 py-4 space-y-3 bg-zinc-800/50">
           {usedBy.length > 1 && (
-            <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+            <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-body-xs text-status-warning">
               這是共用連線，修改會同時影響 {usedBy.map((n) => `「${n}」`).join('、')}。
               只想改目前這張儀表板，請到「本儀表板」分頁按「建立本儀表板專用連線」。
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.name')}</label>
+              <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.name')}</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inputCls} />
             </div>
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrl')}</label>
+              <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.backendUrl')}</label>
               <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder="http://localhost:3000" />
             </div>
           </div>
           {ds.type === 'mqtt' && (
             <div>
-              <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
+              <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
               <input
                 value={form.mqttTopic ?? ''}
                 onChange={e => setForm(f => ({ ...f, mqttTopic: e.target.value }))}
@@ -365,18 +346,15 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
             </div>
           )}
           <div>
-            <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.description')}</label>
+            <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.description')}</label>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={() => onSave(form)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-500 transition-colors">
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-600 text-text-primary text-body-xs hover:bg-purple-500 transition-colors">
               <Save size={12} /> {t('dashboard.settings.save')}
             </button>
-            <button onClick={onEdit}
-              className="px-4 py-1.5 rounded-lg border border-zinc-600 text-zinc-400 text-xs hover:text-zinc-200 transition-colors">
-              {t('dashboard.settings.cancel')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={onEdit} type="submit">{t('dashboard.settings.cancel')}</Button>
           </div>
         </div>
       )}
@@ -399,10 +377,10 @@ function AddDataSourceForm({ onAdd, onCancel }: {
 
   return (
     <div className="border-2 border-purple-700/40 rounded-xl bg-purple-900/10 p-4 space-y-3">
-      <h3 className="text-purple-300 text-sm font-medium">{t('dashboard.settings.addFormTitle')}</h3>
+      <h3 className="text-purple-300 text-body-s-bold">{t('dashboard.settings.addFormTitle')}</h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.nameRequired')}</label>
+          <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.nameRequired')}</label>
           <input
             value={form.name}
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -411,7 +389,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
           />
         </div>
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.typeRequired')}</label>
+          <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.typeRequired')}</label>
           <SiteSelect
             value={form.type}
             onChange={e => setForm(f => ({ ...f, type: e.target.value as DataSourceType }))}
@@ -423,12 +401,12 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         </div>
       </div>
       <div>
-        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.backendUrlOptional')}</label>
+        <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.backendUrlOptional')}</label>
         <input value={form.backendUrl} onChange={e => setForm(f => ({ ...f, backendUrl: e.target.value }))} className={inputCls} placeholder={t('dashboard.settings.backendUrlPlaceholder')} />
       </div>
       {form.type === 'mqtt' && (
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
+          <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.mqttTopic')}</label>
           <input
             value={form.mqttTopic}
             onChange={e => setForm(f => ({ ...f, mqttTopic: e.target.value }))}
@@ -438,7 +416,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         </div>
       )}
       <div>
-        <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.settings.description')}</label>
+        <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.settings.description')}</label>
         <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
       </div>
       <div className="flex gap-2 pt-1">
@@ -453,13 +431,11 @@ function AddDataSourceForm({ onAdd, onCancel }: {
             );
           }}
           disabled={!form.name}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-white text-xs hover:bg-purple-500 disabled:opacity-40 transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-text-primary text-body-xs hover:bg-purple-500 disabled:opacity-40 transition-colors"
         >
           <Plus size={12} /> {t('dashboard.settings.add')}
         </button>
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-zinc-600 text-zinc-400 text-xs hover:text-zinc-200 transition-colors">
-          {t('dashboard.settings.cancel')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" onPress={onCancel} type="submit">{t('dashboard.settings.cancel')}</Button>
       </div>
     </div>
   );

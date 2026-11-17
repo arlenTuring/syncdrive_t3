@@ -80,17 +80,17 @@ type MapEditorToolbarProps = {
  * outline＝1px 半透明框（清單、置中）；ghost＝無框（編輯工具列裡的工具）。
  */
 const BTN_BASE =
-  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium leading-[18px] tracking-[0.5px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60 disabled:cursor-not-allowed disabled:opacity-40'
-const BTN_OUTLINE = `${BTN_BASE} border border-[rgba(212,212,212,0.25)] text-[#D1D5DC] enabled:hover:bg-[rgba(209,213,220,0.08)]`
+  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-body-s-bold leading-[18px] tracking-[0.5px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60 disabled:cursor-not-allowed disabled:opacity-40'
+const BTN_OUTLINE = `${BTN_BASE} border border-[rgba(212,212,212,0.25)] text-text-secondary enabled:hover:bg-[rgba(209,213,220,0.08)]`
 const INPUT_CLASS =
-  'h-[34px] w-[120px] shrink-0 rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] outline-none placeholder:text-[#99A1AF] focus:ring-1 focus:ring-[#51A2FF]'
+  'h-[34px] w-[120px] shrink-0 rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary outline-none placeholder:text-text-tertiary focus:ring-1 focus:ring-[#51A2FF]'
 
 type ToolTone = 'blue' | 'amber' | 'emerald'
 
 const ACTIVE_TONE: Record<ToolTone, string> = {
-  blue: 'bg-[rgba(43,127,255,0.2)] text-[#51A2FF]',
-  amber: 'bg-amber-950/70 text-amber-200',
-  emerald: 'bg-emerald-950/70 text-emerald-200',
+  blue: 'bg-[rgba(43,127,255,0.2)] text-text-theme',
+  amber: 'bg-amber-950/70 text-status-warning',
+  emerald: 'bg-emerald-950/70 text-status-success',
 }
 
 type ToolButtonProps = {
@@ -130,7 +130,7 @@ function ToolButton({
       className={[
         BTN_BASE,
         'px-2.5',
-        active ? ACTIVE_TONE[tone] : 'text-[#D1D5DC] enabled:hover:bg-[rgba(209,213,220,0.08)]',
+        active ? ACTIVE_TONE[tone] : 'text-text-secondary enabled:hover:bg-[rgba(209,213,220,0.08)]',
       ].join(' ')}
     >
       <Icon className="size-[18px] shrink-0" aria-hidden />
@@ -253,7 +253,7 @@ export function MapEditorToolbar({
           />
 
           <div
-            className="ml-auto hidden h-[34px] min-w-0 items-center gap-3 rounded-lg xl:flex bg-[rgba(142,197,255,0.04)] px-4 py-2 text-sm leading-[18px] tracking-[0.5px] text-[#99A1AF]"
+            className="ml-auto hidden h-[34px] min-w-0 items-center gap-3 rounded-lg xl:flex bg-[rgba(142,197,255,0.04)] px-4 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-tertiary"
             role="status"
             aria-live="polite"
             title={infoTitle}
@@ -271,18 +271,18 @@ export function MapEditorToolbar({
             aria-pressed={trackIssuesOpen}
             data-testid="track-check-button"
             className={`${BTN_OUTLINE} ${
-              trackIssuesOpen ? 'border-[rgba(81,162,255,0.5)] text-[#51A2FF]' : ''
+              trackIssuesOpen ? 'border-[rgba(81,162,255,0.5)] text-text-theme' : ''
             }`}
             title={t('mapEditor.toolbar.trackCheckTitle')}
           >
             <ScanSearch className="size-[18px] shrink-0" aria-hidden />
             <span className="hidden 2xl:inline">{t('mapEditor.toolbar.trackCheck')}</span>
             {trackIssueCount === null ? null : hasTrackIssues ? (
-              <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold leading-4 text-zinc-950">
+              <span className="rounded-full bg-amber-500 px-1.5 text-caption-2 text-text-invert">
                 {trackIssueCount}
               </span>
             ) : (
-              <span className="text-emerald-400" aria-label={t('mapEditor.toolbar.trackCheckOk')}>
+              <span className="text-status-success" aria-label={t('mapEditor.toolbar.trackCheckOk')}>
                 ✓
               </span>
             )}
@@ -313,8 +313,8 @@ export function MapEditorToolbar({
               if (isEdit) onLeaveEdit()
             }}
             title={isEdit ? t('mapEditor.toolbar.leaveEditTitle') : undefined}
-            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-sm leading-[18px] tracking-[0.5px] transition ${
-              !isEdit ? 'bg-[#2B7FFF] font-medium text-white' : 'text-[#6A7282] hover:text-[#D1D5DC]'
+            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-body-s leading-[18px] tracking-[0.5px] transition ${
+              !isEdit ? 'bg-link-theme-filled font-medium text-text-primary' : 'text-text-quaternary hover:text-text-secondary'
             }`}
           >
             <Eye className="size-4 shrink-0" aria-hidden />
@@ -328,8 +328,8 @@ export function MapEditorToolbar({
               if (!isEdit) onEnterEdit()
             }}
             title={isEdit ? undefined : t('mapEditor.toolbar.enterEditTitle')}
-            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-sm leading-[18px] tracking-[0.5px] transition ${
-              isEdit ? 'bg-[#2B7FFF] font-medium text-white' : 'text-[#6A7282] hover:text-[#D1D5DC]'
+            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-body-s leading-[18px] tracking-[0.5px] transition ${
+              isEdit ? 'bg-link-theme-filled font-medium text-text-primary' : 'text-text-quaternary hover:text-text-secondary'
             }`}
           >
             <Pencil className="size-4 shrink-0" aria-hidden />
@@ -413,7 +413,7 @@ export function MapEditorToolbar({
                 <button
                   type="button"
                   onClick={onApplyMapCrop}
-                  className={`${BTN_BASE} border border-amber-600/70 bg-amber-950/70 text-amber-100 hover:bg-amber-900/60`}
+                  className={`${BTN_BASE} border border-amber-600/70 bg-amber-950/70 text-status-warning hover:bg-amber-900/60`}
                   title={t('mapEditor.toolbar.applyCropTitle')}
                 >
                   {t('mapEditor.toolbar.applyCrop')}
@@ -423,7 +423,7 @@ export function MapEditorToolbar({
                 <button
                   type="button"
                   onClick={onCancelMapCrop}
-                  className={`${BTN_BASE} text-[#99A1AF] hover:bg-[rgba(209,213,220,0.08)] hover:text-[#D1D5DC]`}
+                  className={`${BTN_BASE} text-text-tertiary hover:bg-[rgba(209,213,220,0.08)] hover:text-text-secondary`}
                   title={t('mapEditor.toolbar.cancelCropTitle')}
                 >
                   {t('mapEditor.toolbar.cancel')}
@@ -436,7 +436,7 @@ export function MapEditorToolbar({
             右：自動儲存狀態。每次儲存都送後端，沒有「發布」這一步；哪一張是系統在讀的，
             由地圖清單的「設為主要地圖」決定。
           */}
-          <div className="ml-auto flex shrink-0 items-center gap-3 text-sm leading-[18px] tracking-[0.5px]">
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-body-s leading-[18px] tracking-[0.5px]">
             {!isPrimaryMap && onSetPrimaryMap && (
               <ToolButton
                 Icon={MapPin}
@@ -448,7 +448,7 @@ export function MapEditorToolbar({
             )}
             {isPrimaryMap && (
               <span
-                className="inline-flex h-[26px] items-center gap-1 rounded-lg bg-[rgba(0,212,146,0.2)] px-3 text-sm font-medium text-[#F3F4F6]"
+                className="inline-flex h-[26px] items-center gap-1 rounded-lg bg-[rgba(0,212,146,0.2)] px-3 text-body-s-bold text-text-primary"
                 title={t('mapEditor.chrome.primaryMapLiveTitle')}
               >
                 <span className="size-2 rounded-full bg-[#00D492]" aria-hidden />
@@ -457,13 +457,13 @@ export function MapEditorToolbar({
             )}
             {syncFailed ? (
               <>
-                <span className="text-amber-300">{t('mapEditor.chrome.syncFailed')}</span>
+                <span className="text-status-warning">{t('mapEditor.chrome.syncFailed')}</span>
                 {onRetrySync && (
                   <button
                     type="button"
                     onClick={onRetrySync}
                     disabled={retryingSync}
-                    className={`${BTN_BASE} border border-amber-600/60 text-amber-200 enabled:hover:bg-amber-950/60`}
+                    className={`${BTN_BASE} border border-status-warning-light text-status-warning enabled:hover:bg-amber-950/60`}
                   >
                     {retryingSync && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
                     {t('mapEditor.chrome.retrySync')}
@@ -471,8 +471,8 @@ export function MapEditorToolbar({
                 )}
               </>
             ) : (
-              <span className="hidden items-center gap-1.5 text-[#99A1AF] sm:inline-flex">
-                {autosaving && <Loader2 className="size-3.5 shrink-0 animate-spin text-[#51A2FF]" aria-hidden />}
+              <span className="hidden items-center gap-1.5 text-text-tertiary sm:inline-flex">
+                {autosaving && <Loader2 className="size-3.5 shrink-0 animate-spin text-text-theme" aria-hidden />}
                 {autosaveLabel}
               </span>
             )}

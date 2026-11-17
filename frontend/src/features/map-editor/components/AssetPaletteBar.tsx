@@ -120,7 +120,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
 
   return (
     <div
-      className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex ${PALETTE_DRAWER_HEIGHT_CLASS} items-center border-t border-[rgba(212,212,212,0.15)] bg-black p-2`}
+      className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex ${PALETTE_DRAWER_HEIGHT_CLASS} items-center border-t border-[rgba(212,212,212,0.15)] bg-surface-sub-background p-2`}
       role="toolbar"
       aria-label={t('mapEditor.palette.library')}
     >
@@ -128,7 +128,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
         type="button"
         title={t('mapEditor.palette.collapse')}
         onClick={onToggle}
-        className="flex h-[88px] w-[46px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg bg-[#2B7FFF] px-1.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
+        className="flex h-[88px] w-[46px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg bg-link-theme-filled px-1.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
       >
         <KeyboardArrowLeft className="size-4 shrink-0" />
         <span style={{ writingMode: 'vertical-rl', letterSpacing: '4px' }}>
@@ -142,7 +142,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
             {groupIndex > 0 ? (
               <span className="h-16 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
             ) : null}
-            <span className="shrink-0 text-sm leading-[18px] tracking-[0.5px] text-[#6A7282]">
+            <span className="shrink-0 text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary">
               {t(group.labelKey)}
             </span>
             <span className="h-4 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
@@ -177,12 +177,12 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                     {'src' in icon ? (
                       <img src={icon.src} alt="" draggable={false} className="size-12" />
                     ) : (
-                      <span className="flex size-12 items-center justify-center rounded-full border border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.08)] text-[#99A1AF]">
+                      <span className="flex size-12 items-center justify-center rounded-full border border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.08)] text-text-tertiary">
                         <icon.Symbol className="size-7" />
                       </span>
                     )}
                   </button>
-                  <span className="w-full select-none truncate text-center text-sm leading-[18px] tracking-[0.5px] text-[#6A7282]">
+                  <span className="w-full select-none truncate text-center text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary">
                     {itemLabel}
                   </span>
                 </div>

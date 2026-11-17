@@ -17,6 +17,7 @@ import { useDemoSimulation } from '../context/DemoSimulationContext';
 import { VTMS_DEMO_VEHICLE_CODES } from '../api/demoSimulation';
 import type { DemoSimulationTransport } from '../api/demoSimulation';
 import { useSimClockFrame } from '../utils/simClockFrame';
+import { Button } from '../../../components/ui';
 
 const SPEED_STOPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8] as const;
 const HOLD_REPEAT_DELAY_MS = 350;
@@ -201,7 +202,7 @@ export function SimulationTransportToolbar() {
       <button
         type="button"
         onClick={() => setToolbarVisible(true)}
-        className="fixed bottom-3 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-zinc-600 bg-zinc-900/95 px-4 py-2 text-xs font-medium text-zinc-200 shadow-lg backdrop-blur-sm hover:border-cyan-600 hover:text-cyan-300"
+        className="fixed bottom-3 left-1/2 z-[10000] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border-tertiary bg-zinc-900/95 px-4 py-2 text-body-xs-bold text-text-primary shadow-lg backdrop-blur-sm hover:border-cyan-600 hover:text-text-theme"
         title={t('dashboard.simulation.show')}
         style={{ transform: 'translateX(-50%)' }}
       >
@@ -219,11 +220,11 @@ export function SimulationTransportToolbar() {
       aria-label={t('dashboard.simulation.title')}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
-          <Gauge size={14} className="text-cyan-400" />
+        <div className="flex items-center gap-2 text-body-xs-bold text-text-primary">
+          <Gauge size={14} className="text-text-theme" />
           {t('dashboard.simulation.title')}
           {running && (
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">
+            <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-caption-2 font-normal text-text-tertiary">
               {managed ? t('dashboard.simulation.running') : t('dashboard.simulation.external')}
             </span>
           )}
@@ -231,7 +232,7 @@ export function SimulationTransportToolbar() {
         <button
           type="button"
           onClick={() => setToolbarVisible(false)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary"
           title={t('dashboard.simulation.hideTitle')}
         >
           {t('dashboard.simulation.hide')}
@@ -245,13 +246,13 @@ export function SimulationTransportToolbar() {
             type="button"
             disabled={loading}
             onClick={() => void toggle()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-xs font-medium text-emerald-200 transition hover:bg-emerald-900/40 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-status-success-light bg-emerald-950/40 px-4 py-2 text-body-xs-bold text-status-success transition hover:bg-emerald-900/40 disabled:opacity-50"
             title={t('dashboard.simulation.startTitle')}
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
             {t('dashboard.simulation.start')}
           </button>
-          <p className="text-[11px] text-zinc-500">{t('dashboard.simulation.startHint')}</p>
+          <p className="text-body-xs text-text-quaternary">{t('dashboard.simulation.startHint')}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -260,7 +261,7 @@ export function SimulationTransportToolbar() {
               type="button"
               disabled={loading}
               onClick={() => void toggle()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-800/60 bg-red-950/30 px-3 py-2 text-xs font-medium text-red-200 transition hover:bg-red-900/30 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-xs-bold text-status-error-emphasis transition hover:bg-red-900/30 disabled:opacity-50"
               title={t('dashboard.simulation.stopTitle')}
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
@@ -273,10 +274,10 @@ export function SimulationTransportToolbar() {
                   type="button"
                   disabled={loading}
                   onClick={() => void setTransportPaused(!transportPaused)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition disabled:opacity-50 ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-body-xs font-medium transition disabled:opacity-50 ${
                     transportPaused
-                      ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-200 hover:bg-emerald-900/40'
-                      : 'border-amber-700/60 bg-amber-950/40 text-amber-200 hover:bg-amber-900/40'
+                      ? 'border-status-success-light bg-emerald-950/40 text-status-success hover:bg-emerald-900/40'
+                      : 'border-status-warning-light bg-amber-950/40 text-status-warning hover:bg-amber-900/40'
                   }`}
                   title={
                     transportPaused
@@ -294,7 +295,7 @@ export function SimulationTransportToolbar() {
                   type="button"
                   disabled={loading}
                   {...holdPrev}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-200 transition enabled:hover:border-cyan-600 enabled:hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:border-cyan-600 enabled:hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
                   title={t('dashboard.simulation.prevFrameTitle')}
                 >
                   <SkipBack size={14} />
@@ -305,7 +306,7 @@ export function SimulationTransportToolbar() {
                   type="button"
                   disabled={loading}
                   {...holdNext}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-200 transition enabled:hover:border-cyan-600 enabled:hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:border-cyan-600 enabled:hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
                   title={t('dashboard.simulation.nextFrameTitle')}
                 >
                   <SkipForward size={14} />
@@ -316,7 +317,7 @@ export function SimulationTransportToolbar() {
           </div>
 
           {managed && transportPaused && (
-            <p className="text-[11px] text-amber-300/90">
+            <p className="text-body-xs text-amber-300/90">
               {t('dashboard.simulation.pausedHint')}
             </p>
           )}
@@ -324,9 +325,9 @@ export function SimulationTransportToolbar() {
           {managed ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex items-center justify-between text-[10px] text-zinc-500">
+                <div className="flex items-center justify-between text-caption-2 text-text-quaternary">
                   <span>{t('dashboard.simulation.sendSpeed')}</span>
-                  <span className="font-mono text-zinc-300">{speed.toFixed(2)}×</span>
+                  <span className="font-mono text-text-secondary">{speed.toFixed(2)}×</span>
                 </div>
                 <input
                   type="range"
@@ -341,39 +342,39 @@ export function SimulationTransportToolbar() {
                   className="h-2 w-full cursor-pointer accent-cyan-500"
                   aria-label={t('dashboard.simulation.sendSpeedAria')}
                 />
-                <div className="flex justify-between font-mono text-[9px] text-zinc-600">
+                <div className="flex justify-between font-mono text-caption-2 text-text-disabled">
                   {SPEED_STOPS.map((v) => (
                     <span key={v}>{v}×</span>
                   ))}
                 </div>
               </div>
 
-              <div className="shrink-0 text-right text-[10px] text-zinc-500">
+              <div className="shrink-0 text-right text-caption-2 text-text-quaternary">
                 <div>{t('dashboard.simulation.virtualTime')}</div>
-                <div className="font-mono text-sm text-cyan-300">
+                <div className="font-mono text-body-s text-text-theme">
                   {formatElapsed(liveVirtualMs)}
                 </div>
               </div>
             </div>
           ) : (
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-body-xs text-text-quaternary">
               {t('dashboard.simulation.externalHint')}
             </p>
           )}
 
           {managed && (
-            <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-red-200">
+            <div className="rounded-lg border border-border-danger-light bg-red-950/20 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-body-xs-bold text-status-error-emphasis">
                 <TriangleAlert size={13} />
                 {t('dashboard.simulation.faultTitle')}
               </div>
               <div className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
+                <label className="flex flex-col gap-1 text-caption-2 text-text-tertiary">
                   <span>{t('dashboard.simulation.pickVehicle')}</span>
                   <SiteSelect
                     value={faultVehicleCode}
                     onChange={(e) => setFaultVehicleCode(e.target.value)}
-                    className="rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100"
+                    size="sm"
                     aria-label={t('dashboard.simulation.pickVehicleAria')}
                   >
                     {VTMS_DEMO_VEHICLE_CODES.map((code) => (
@@ -387,38 +388,22 @@ export function SimulationTransportToolbar() {
                   type="button"
                   disabled={loading}
                   onClick={() => void triggerVehicleFault(faultVehicleCode)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-xs font-medium text-red-100 transition hover:bg-red-900/40 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-body-xs-bold text-status-error-emphasis transition hover:bg-status-error-light disabled:opacity-50"
                   title={t('dashboard.simulation.emergencyStopTitle')}
                 >
                   {loading ? <Loader2 size={14} className="animate-spin" /> : <TriangleAlert size={14} />}
                   {t('dashboard.simulation.emergencyStop')}
                 </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void clearVehicleFault(faultVehicleCode)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-200 transition hover:bg-emerald-900/30 disabled:opacity-50"
-                  title={t('dashboard.simulation.clearFaultTitle')}
-                >
-                  {t('dashboard.simulation.clearFault')}
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void simulateVehicleObstacle(faultVehicleCode)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-900/30 disabled:opacity-50"
-                  title={t('dashboard.simulation.obstacleTitle')}
-                >
-                  {t('dashboard.simulation.obstacle')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" disabled={loading} onPress={() => void clearVehicleFault(faultVehicleCode)} title={t('dashboard.simulation.clearFaultTitle')}>{t('dashboard.simulation.clearFault')}</Button>
+                <Button hierarchy="subordinate" variant="outlined" disabled={loading} onPress={() => void simulateVehicleObstacle(faultVehicleCode)} title={t('dashboard.simulation.obstacleTitle')}>{t('dashboard.simulation.obstacle')}</Button>
               </div>
               {lastSimulatedEvent && (
-                <div className="mt-2 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2.5 py-2 text-[11px] text-zinc-300">
-                  <div className="font-mono text-[10px] text-zinc-500">
+                <div className="mt-2 rounded-md border border-border-quaternary bg-surface-primary px-2.5 py-2 text-body-xs text-text-secondary">
+                  <div className="font-mono text-caption-2 text-text-quaternary">
                     {lastSimulatedEvent.vehicleCode} · {lastSimulatedEvent.eventCode} · {lastSimulatedEvent.severity}
                   </div>
-                  <div className="mt-0.5 text-red-200">{lastSimulatedEvent.message}</div>
-                  <div className="mt-1 text-[10px] text-zinc-500">
+                  <div className="mt-0.5 text-status-error-emphasis">{lastSimulatedEvent.message}</div>
+                  <div className="mt-1 text-caption-2 text-text-quaternary">
                     {t('dashboard.simulation.faultHint')}
                   </div>
                 </div>
@@ -429,7 +414,7 @@ export function SimulationTransportToolbar() {
       )}
 
       {error && (
-        <p className="mt-2 truncate text-[10px] text-red-400" title={error}>
+        <p className="mt-2 truncate text-caption-2 text-status-error-emphasis" title={error}>
           {error}
         </p>
       )}

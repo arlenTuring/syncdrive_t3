@@ -81,8 +81,8 @@ export function HorizontalRuler({
             className="absolute top-0 flex flex-col items-center"
             style={{ left: xPx, transform: 'translateX(-50%)' }}
           >
-            <div className="h-2 w-px bg-zinc-500" />
-            <span className="mt-0.5 whitespace-nowrap font-mono text-[8px] text-zinc-400 sm:text-[9px]">
+            <div className="h-2 w-px bg-status-inactive" />
+            <span className="mt-0.5 whitespace-nowrap font-mono text-[8px] text-text-tertiary sm:text-caption-2">
               {formatMeterRulerLabel(m, 2)}
             </span>
           </div>
@@ -101,7 +101,7 @@ export function HorizontalRuler({
           </div>
         )}
       </div>
-      <div className="pointer-events-none absolute bottom-0 left-2 text-[9px] text-zinc-600">
+      <div className="pointer-events-none absolute bottom-0 left-2 text-caption-2 text-text-disabled">
         x 刻度 (m)
       </div>
     </div>
@@ -148,8 +148,8 @@ export function VerticalRuler({
             className="absolute left-0 flex items-center gap-0.5"
             style={{ top: yPx, transform: 'translateY(-50%)' }}
           >
-            <div className="h-px w-2 shrink-0 bg-zinc-500" />
-            <span className="font-mono text-[8px] leading-none text-zinc-400 sm:text-[9px]">
+            <div className="h-px w-2 shrink-0 bg-status-inactive" />
+            <span className="font-mono text-[8px] leading-none text-text-tertiary sm:text-caption-2">
               {formatMeterRulerLabel(m, 2)}
             </span>
           </div>
@@ -168,7 +168,7 @@ export function VerticalRuler({
           </div>
         )}
       </div>
-      <div className="pointer-events-none absolute bottom-1 right-0.5 origin-bottom-right rotate-[-90deg] translate-y-[-100%] text-[9px] text-zinc-600">
+      <div className="pointer-events-none absolute bottom-1 right-0.5 origin-bottom-right rotate-[-90deg] translate-y-[-100%] text-caption-2 text-text-disabled">
         y 刻度 (m)
       </div>
     </div>

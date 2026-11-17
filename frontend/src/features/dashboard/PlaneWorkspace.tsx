@@ -885,8 +885,8 @@ export function PlaneWorkspace({
             className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-center"
             style={{ top: 30, left: 30, width: plane.width, height: plane.height }}
           >
-            <p className="text-sm font-medium text-zinc-300">{t('dashboard.planeWorkspace.emptyTitle')}</p>
-            <p className="max-w-md text-xs leading-relaxed text-zinc-500">
+            <p className="text-body-s-bold text-text-secondary">{t('dashboard.planeWorkspace.emptyTitle')}</p>
+            <p className="max-w-md text-body-xs text-text-quaternary">
               {t('dashboard.planeWorkspace.emptyHint')}
             </p>
           </div>

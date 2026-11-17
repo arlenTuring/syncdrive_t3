@@ -8,6 +8,7 @@ import {
   uniformTrackCornerRadii,
   type TrackCornerKey,
 } from '../utils/trackCornerRadius'
+import { Button } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -48,35 +49,21 @@ export function TrackCornerRadiusSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-violet-900/40 bg-violet-950/15 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-violet-400/90">
+      <h3 className="text-caption-2 uppercase text-violet-400/90">
         {t('mapEditor.inspector.cornerRadius.title')}
       </h3>
-      <p className="text-[10px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         {t('mapEditor.inspector.cornerRadius.hint')}
       </p>
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={readOnly}
-          onClick={() => applyCorners(roundedRectTrackCornerRadii(sizeMeters))}
-          className="rounded-md border border-violet-600/60 bg-violet-950/50 px-2.5 py-1 text-[10px] text-violet-100 hover:bg-violet-900/40 disabled:opacity-50"
-        >
-          {t('mapEditor.inspector.cornerRadius.setRoundedRect')}
-        </button>
-        <button
-          type="button"
-          disabled={readOnly}
-          onClick={() =>
+        <Button hierarchy="subordinate" variant="outlined" disabled={readOnly} onPress={() => applyCorners(roundedRectTrackCornerRadii(sizeMeters))}>{t('mapEditor.inspector.cornerRadius.setRoundedRect')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" disabled={readOnly} onPress={() =>
             applyCorners({ tl: 0, tr: 0, br: 0, bl: 0 })
-          }
-          className="rounded-md border border-zinc-600 bg-zinc-900/80 px-2.5 py-1 text-[10px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-        >
-          {t('mapEditor.inspector.cornerRadius.clear')}
-        </button>
+          }>{t('mapEditor.inspector.cornerRadius.clear')}</Button>
       </div>
 
-      <label className="block text-[10px] text-zinc-500">
+      <label className="block text-caption-2 text-text-quaternary">
         {t('mapEditor.inspector.cornerRadius.uniform')}
         <input
           type="number"
@@ -99,10 +86,10 @@ export function TrackCornerRadiusSection({
           }}
           onFocus={onFieldFocus}
           onBlur={onFieldBlur}
-          className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-violet-500 read-only:opacity-90"
+          className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-violet-500 read-only:opacity-90"
         />
       </label>
-      <p className="text-[9px] text-zinc-600">
+      <p className="text-caption-2 text-text-disabled">
         {t('mapEditor.inspector.cornerRadius.maxHint', {
           max: maxR.toFixed(2),
         })}
@@ -110,7 +97,7 @@ export function TrackCornerRadiusSection({
 
       <div className="grid grid-cols-2 gap-2">
         {CORNER_KEYS.map((key) => (
-          <label key={key} className="block text-[10px] text-zinc-500">
+          <label key={key} className="block text-caption-2 text-text-quaternary">
             {t(`mapEditor.inspector.cornerRadius.${key}`)}
             <NumberInput
               min={0}
@@ -121,7 +108,7 @@ export function TrackCornerRadiusSection({
               onChange={(n) => applyCorners({ ...corners, [key]: n })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-violet-500 read-only:opacity-90"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-violet-500 read-only:opacity-90"
             />
           </label>
         ))}

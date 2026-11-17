@@ -333,7 +333,7 @@ export function FacilityDraggableLabel({
           aria-label="旋轉名稱"
           title="拖曳以旋轉名稱"
           onPointerDown={onRotatePointerDown}
-          className="absolute top-1/2 flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full border border-cyan-400/80 bg-zinc-900/95 text-cyan-300 shadow-md active:cursor-grabbing hover:bg-cyan-950"
+          className="absolute top-1/2 flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full border border-cyan-400/80 bg-zinc-900/95 text-text-theme shadow-md active:cursor-grabbing hover:bg-cyan-950"
           style={{ left: handleDist }}
         >
           <RotateCw className="size-3" strokeWidth={2.25} aria-hidden />

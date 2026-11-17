@@ -9,6 +9,7 @@ import {
   type FacilityDockingPoint,
 } from '../utils/facilityDockingPoint'
 import type { FacilityObject } from '../types/facility'
+import { Button } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -67,40 +68,33 @@ export function FacilityDockingPointInspectorSection({
     <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/15 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+          <h3 className="text-caption-2 uppercase text-emerald-400/90">
             設施停靠點
           </h3>
-          <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+          <p className="mt-1 text-caption-2 text-text-quaternary">
             設於本設施場域範圍內；圖上為綠色圓點，可拖曳但不可離開設施外框。設定後會出現在點位清單「設施停靠點」。
           </p>
         </div>
         {point ? (
           <span
-            className="mt-0.5 size-2.5 shrink-0 rounded-full bg-emerald-500 ring-2 ring-emerald-300/60"
+            className="mt-0.5 size-2.5 shrink-0 rounded-full bg-status-success ring-2 ring-emerald-300/60"
             aria-hidden
           />
         ) : null}
       </div>
 
       {!bounds ? (
-        <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-2 text-[10px] text-zinc-500">
+        <p className="rounded-md border border-dashed border-border-quaternary px-2 py-2 text-caption-2 text-text-quaternary">
           請先填寫有效的「場域範圍」，才能設定設施停靠點。
         </p>
       ) : !point ? (
-        <button
-          type="button"
-          disabled={readOnly}
-          onClick={() => commitPoint(defaultFacilityDockingPoint(bounds))}
-          className="w-full rounded-md border border-emerald-700/60 bg-emerald-950/50 px-2 py-1.5 text-[11px] text-emerald-100 transition hover:bg-emerald-900/50 disabled:opacity-50"
-        >
-          新增設施停靠點（左側 1/3、上下置中）
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" className="w-full" disabled={readOnly} onPress={() => commitPoint(defaultFacilityDockingPoint(bounds))}>新增設施停靠點（左側 1/3、上下置中）</Button>
       ) : (
         <>
           <div>
             <label
               htmlFor={`facility-dock-alias-${facility.id}`}
-              className="mb-1 block text-[10px] text-zinc-500"
+              className="mb-1 block text-caption-2 text-text-quaternary"
             >
               別名
             </label>
@@ -121,22 +115,22 @@ export function FacilityDockingPointInspectorSection({
                   e.currentTarget.blur()
                 }
               }}
-              className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500 disabled:opacity-60"
+              className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary outline-none placeholder:text-text-quaternary focus:border-status-success disabled:opacity-60"
               aria-label="設施停靠點別名"
             />
-            <p className="mt-1 text-[10px] text-zinc-600">
+            <p className="mt-1 text-caption-2 text-text-disabled">
               預設為「{defaultAlias}」；留空則使用預設。
             </p>
           </div>
 
-          <p className="font-mono text-[10px] text-zinc-500">
+          <p className="font-mono text-caption-2 text-text-quaternary">
             允許範圍：{describeFacilityDockingPointBounds(bounds)} m
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label
                 htmlFor={`facility-dock-xm-${facility.id}`}
-                className="mb-1 block text-[10px] text-zinc-500"
+                className="mb-1 block text-caption-2 text-text-quaternary"
               >
                 橫向 X（公尺）
               </label>
@@ -159,13 +153,13 @@ export function FacilityDockingPointInspectorSection({
                     e.currentTarget.blur()
                   }
                 }}
-                className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-emerald-500 disabled:opacity-60"
+                className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success disabled:opacity-60"
               />
             </div>
             <div>
               <label
                 htmlFor={`facility-dock-ym-${facility.id}`}
-                className="mb-1 block text-[10px] text-zinc-500"
+                className="mb-1 block text-caption-2 text-text-quaternary"
               >
                 縱向 Y（公尺）
               </label>
@@ -188,32 +182,18 @@ export function FacilityDockingPointInspectorSection({
                     e.currentTarget.blur()
                   }
                 }}
-                className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-emerald-500 disabled:opacity-60"
+                className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success disabled:opacity-60"
               />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="outlined" disabled={readOnly} onPress={() =>
                 commitPoint({
                   ...defaultFacilityDockingPoint(bounds),
                   ...(point.alias ? { alias: point.alias } : {}),
                 })
-              }
-              className="rounded border border-zinc-600 bg-zinc-900/80 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-            >
-              重設為左側 1/3
-            </button>
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={() => commitPoint(null)}
-              className="rounded border border-rose-800/50 bg-rose-950/40 px-2 py-1 text-[10px] text-rose-200/90 hover:bg-rose-900/40 disabled:opacity-50"
-            >
-              移除停靠點
-            </button>
+              }>重設為左側 1/3</Button>
+            <Button hierarchy="subordinate" variant="outlined" disabled={readOnly} onPress={() => commitPoint(null)}>移除停靠點</Button>
           </div>
         </>
       )}

@@ -610,8 +610,8 @@ export function MapAreaCanvas({
       ref={viewportRef}
       className={
         isEmbedded
-          ? 'relative flex h-full w-full items-center justify-center overflow-hidden bg-zinc-950'
-          : 'relative h-full w-full overflow-auto bg-zinc-950'
+          ? 'relative flex h-full w-full items-center justify-center overflow-hidden bg-surface-sub-background'
+          : 'relative h-full w-full overflow-auto bg-surface-sub-background'
       }
       style={{
         ...(isEmbedded ? {} : { scrollbarGutter: 'stable both-edges' }),

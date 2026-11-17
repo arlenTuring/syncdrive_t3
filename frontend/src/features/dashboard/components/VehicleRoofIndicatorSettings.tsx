@@ -4,8 +4,9 @@ import {
   resolveRoofIndicatorConfig,
   type VehicleRoofIndicatorConfig,
 } from '../../map-editor/vehicles/vehicleRoofIndicator';
+import { Checkbox } from '../../../components/ui';
 
-const inputCls = 'w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-200';
+const inputCls = 'w-full rounded bg-surface-secondary border border-border-quaternary px-2 py-1 text-body-xs text-text-primary';
 
 /** 圖台容器：車頂軌道進度指標（軌道名稱、進度線、百分比） */
 export function VehicleRoofIndicatorSettings({
@@ -20,18 +21,13 @@ export function VehicleRoofIndicatorSettings({
     onUpdate({ vehicleRoofIndicator: { ...current, ...p } });
 
   const check = (key: 'enabled' | 'showTrackName' | 'showPercent', label: string) => (
-    <label className="flex items-center gap-2 text-[11px] text-zinc-300 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={current[key]}
-        onChange={e => patch({ [key]: e.target.checked })}
-        className="accent-sky-500 w-3 h-3"
-      />
+    <label className="flex items-center gap-2 text-body-xs text-text-secondary cursor-pointer">
+      <Checkbox checked={current[key]} onCheckedChange={e => patch({ [key]: e })} />
       {label}
     </label>
   );
   const color = (key: 'progressColor' | 'railColor' | 'backgroundColor' | 'textColor', label: string) => (
-    <label className="block text-[9px] text-zinc-500">
+    <label className="block text-caption-2 text-text-quaternary">
       {label}
       <input
         value={current[key]}
@@ -43,9 +39,9 @@ export function VehicleRoofIndicatorSettings({
   );
 
   return (
-    <div className="space-y-2 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">車頂軌道進度</div>
-      <p className="text-[9px] leading-relaxed text-zinc-500">
+    <div className="space-y-2 rounded-lg border border-sky-500/25 bg-surface-theme-light p-3">
+      <div className="text-caption-2 uppercase text-text-theme">車頂軌道進度</div>
+      <p className="text-caption-2 text-text-quaternary">
         名稱＝車目前判給的軌道；線段左端是這次通行的入口、箭頭是出口；百分比是這條軌道走了幾成（換軌道重算，不是整張訂單的進度）。停在格位、在場區移動（沒有對應軌道）時不顯示。
       </p>
       {check('enabled', '顯示')}
@@ -56,7 +52,7 @@ export function VehicleRoofIndicatorSettings({
             {check('showPercent', '百分比')}
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <label className="block text-[9px] text-zinc-500">
+            <label className="block text-caption-2 text-text-quaternary">
               字級（px）
               <input
                 type="number"
@@ -67,7 +63,7 @@ export function VehicleRoofIndicatorSettings({
                 className={inputCls}
               />
             </label>
-            <label className="block text-[9px] text-zinc-500">
+            <label className="block text-caption-2 text-text-quaternary">
               線段長度（px）
               <input
                 type="number"

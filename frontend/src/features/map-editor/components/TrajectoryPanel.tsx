@@ -58,17 +58,17 @@ export function TrajectoryPanel({
   return (
     <aside
       data-trajectory-panel
-      className="flex h-full min-h-0 w-[22rem] shrink-0 flex-col border-l border-zinc-700/80 bg-zinc-900"
+      className="flex h-full min-h-0 w-[22rem] shrink-0 flex-col border-l border-border-quaternary bg-surface-primary"
     >
-      <div className="shrink-0 border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+      <div className="shrink-0 border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-text-quaternary">
         {t('mapEditor.trajectory.title')}
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="shrink-0 flex flex-col gap-4 p-4 text-sm">
+        <div className="shrink-0 flex flex-col gap-4 p-4 text-body-s">
           <div>
             <label
               htmlFor="vehicle-select"
-              className="mb-1.5 block text-xs font-medium text-zinc-400"
+              className="mb-1.5 block text-body-xs-bold text-text-tertiary"
             >
               {t('mapEditor.trajectory.vehicle')}
             </label>
@@ -80,7 +80,7 @@ export function TrajectoryPanel({
                   const v = e.target.value
                   if (v) onVehicleIdChange(v)
                 }}
-                className="min-w-0 flex-1 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-2 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                size="md" className="min-w-0 flex-1"
               >
                 <option value="">{t('mapEditor.trajectory.selectVehicle')}</option>
                 {VEHICLE_IDS.map((id) => (
@@ -93,14 +93,14 @@ export function TrajectoryPanel({
                 type="button"
                 disabled={!hasTrajectory}
                 onClick={onLocateVehicle}
-                className="inline-flex shrink-0 items-center justify-center rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-2 text-zinc-100 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-tertiary bg-surface-secondary px-2.5 py-2 text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
                 title={t('mapEditor.trajectory.locateTitle')}
                 aria-label={t('mapEditor.trajectory.locateAria')}
               >
-                <LocateFixed className="size-4 text-cyan-300" aria-hidden />
+                <LocateFixed className="size-4 text-text-theme" aria-hidden />
               </button>
             </div>
-            <p className="mt-1.5 text-xs text-zinc-600">
+            <p className="mt-1.5 text-body-xs text-text-disabled">
               {t('mapEditor.trajectory.loadHint')}
             </p>
           </div>
@@ -108,7 +108,7 @@ export function TrajectoryPanel({
           <div>
             <label
               htmlFor="traj-file-select"
-              className="mb-1.5 block text-xs font-medium text-zinc-400"
+              className="mb-1.5 block text-body-xs-bold text-text-tertiary"
             >
               {t('mapEditor.trajectory.fileList')}
             </label>
@@ -120,7 +120,7 @@ export function TrajectoryPanel({
                 const id = e.target.value
                 if (id) onTrajectoryEntryChange(id)
               }}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-2 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-40"
+              size="md" className="w-full"
             >
               {trajectoryEntries.length === 0 ? (
                 <option value="">—</option>
@@ -139,7 +139,7 @@ export function TrajectoryPanel({
               type="button"
               disabled={!hasTrajectory}
               onClick={replayPlaying ? onPause : onPlay}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               {replayPlaying ? (
                 <Pause className="size-4 shrink-0" aria-hidden />
@@ -152,7 +152,7 @@ export function TrajectoryPanel({
               type="button"
               disabled={!hasTrajectory}
               onClick={onRewind}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               <RotateCcw className="size-4 shrink-0" aria-hidden />
               {t('mapEditor.trajectory.rewind')}
@@ -174,7 +174,7 @@ export function TrajectoryPanel({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-100 transition hover:bg-zinc-700"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition hover:bg-link-standard-hover"
             >
               <FolderOpen className="size-4 shrink-0" aria-hidden />
               {t('mapEditor.trajectory.importJson')}
@@ -182,15 +182,15 @@ export function TrajectoryPanel({
           </div>
 
           {mapMismatch && (
-            <p className="text-xs text-amber-400/95">
+            <p className="text-body-xs text-amber-400/95">
               {t('mapEditor.trajectory.mapMismatch')}
             </p>
           )}
         </div>
 
         {showRawList && (
-          <div className="flex min-h-0 flex-1 flex-col border-t border-zinc-700/80">
-            <div className="shrink-0 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div className="flex min-h-0 flex-1 flex-col border-t border-border-quaternary">
+            <div className="shrink-0 px-3 py-2 text-body-xs-bold uppercase text-text-quaternary">
               {t('mapEditor.trajectory.rawData')}
             </div>
             <TrajectoryRawDataList

@@ -993,7 +993,7 @@ export const BasemapNode = memo(function BasemapNode({
                         e.preventDefault()
                         openSizeDialog()
                       }}
-                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-body-xs text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <Route className="size-4" aria-hidden />
                       {generating
@@ -1019,7 +1019,7 @@ export const BasemapNode = memo(function BasemapNode({
                         e.preventDefault()
                         expandToCanvas()
                       }}
-                      className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                      className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <Maximize className="size-4" aria-hidden />
                     </button>
@@ -1034,12 +1034,12 @@ export const BasemapNode = memo(function BasemapNode({
                           e.preventDefault()
                           onPatchParameters(basemap.id, { [TRACKGEN_RESULT_KEY]: undefined })
                         }}
-                        className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300"
+                        className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme"
                       >
                         <Eraser className="size-4" aria-hidden />
                       </button>
                     ) : null}
-                    <span className="mx-0.5 h-4 w-px bg-zinc-600" aria-hidden />
+                    <span className="mx-0.5 h-4 w-px bg-link-black-filled-hover" aria-hidden />
                   </>
                 ) : null}
                 <button
@@ -1060,7 +1060,7 @@ export const BasemapNode = memo(function BasemapNode({
                     e.preventDefault()
                     onSplitCell('row')
                   }}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <Rows2 className="size-4" aria-hidden />
                 </button>
@@ -1082,7 +1082,7 @@ export const BasemapNode = memo(function BasemapNode({
                     e.preventDefault()
                     onSplitCell('col')
                   }}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <Columns2 className="size-4" aria-hidden />
                 </button>
@@ -1108,7 +1108,7 @@ export const BasemapNode = memo(function BasemapNode({
                   className={`rounded-full p-1.5 transition disabled:cursor-not-allowed disabled:opacity-35 ${
                     canReopenCuts
                       ? 'text-violet-200 hover:bg-violet-950/80 hover:text-violet-100'
-                      : 'text-zinc-200 hover:bg-zinc-700 hover:text-cyan-300'
+                      : 'text-text-primary hover:bg-link-standard-hover hover:text-text-theme'
                   }`}
                 >
                   {canReopenCuts ? (
@@ -1134,7 +1134,7 @@ export const BasemapNode = memo(function BasemapNode({
                     e.preventDefault()
                     onSendToBack?.(basemap.id)
                   }}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ArrowDownToLine className="size-4" aria-hidden />
                 </button>
@@ -1149,7 +1149,7 @@ export const BasemapNode = memo(function BasemapNode({
                     e.preventDefault()
                     onBringToFront?.(basemap.id)
                   }}
-                  className="rounded-full p-1.5 text-zinc-200 transition hover:bg-zinc-700 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="rounded-full p-1.5 text-text-primary transition hover:bg-link-standard-hover hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ArrowUpToLine className="size-4" aria-hidden />
                 </button>

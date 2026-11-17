@@ -171,7 +171,7 @@ export function VehicleContainerBehaviorOverlay({
           </div>
         ))}
         {isEditMode && showUrls.length === 0 && (
-          <div className="flex h-full w-full items-center justify-center text-[9px] text-violet-300/80">
+          <div className="flex h-full w-full items-center justify-center text-caption-2 text-violet-300/80">
             行為
           </div>
         )}

@@ -56,17 +56,17 @@ export function WaypointInspectorSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/12 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+      <h3 className="text-caption-2 uppercase text-emerald-400/90">
         途經點
       </h3>
-      <p className="text-[10px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         自駕車前往目標時必須經過的點位；顯示名稱請填上方「自訂顯示名稱」。
       </p>
 
       <div>
         <label
           htmlFor="waypoint-code"
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           途經點代號
         </label>
@@ -89,14 +89,14 @@ export function WaypointInspectorSection({
             }
           }}
           placeholder="例：waypoint_1"
-          className={`w-full rounded border bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-emerald-500 disabled:opacity-60 ${
-            codeError ? 'border-red-600' : 'border-zinc-600'
+          className={`w-full rounded border bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success disabled:opacity-60 ${
+            codeError ? 'border-red-600' : 'border-border-tertiary'
           }`}
         />
         {codeError ? (
-          <p className="mt-1 text-[10px] text-red-400">{codeError}</p>
+          <p className="mt-1 text-caption-2 text-status-error-emphasis">{codeError}</p>
         ) : (
-          <p className="mt-1 text-[10px] text-zinc-600">
+          <p className="mt-1 text-caption-2 text-text-disabled">
             全圖唯一；新建預設 waypoint_1、waypoint_2…，可自行修改。
           </p>
         )}

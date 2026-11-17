@@ -17,6 +17,7 @@ import type {
 import { createGroupTemplate, duplicateGroupTemplate } from '../utils/groupTemplateEdit';
 import { DataSourceIdSelect } from '../elements/DataSourceIdSelect';
 import { POST_PROCESSOR_DEFINITIONS, getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
+import { Checkbox, Radio } from '../../../components/ui';
 
 /**
  * 泛用群組的設定介面：資料來源、有效性、優先程度、排序、樣板、容量、轉場。
@@ -26,11 +27,11 @@ import { POST_PROCESSOR_DEFINITIONS, getPostProcessorDefinition } from '../hooks
  * `PropertiesPanel.tsx` 的 `CanvasSettings`（`el.isGroup` 區塊）裡。
  */
 
-const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-zinc-200 text-[11px]
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1 text-text-primary text-body-xs
   focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-colors`;
-const selectCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-1.5 py-1 text-zinc-200 text-[11px]
+const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-1.5 py-1 text-text-primary text-body-xs
   focus:outline-none focus:border-purple-500 transition-colors cursor-pointer`;
-const smallBtn = `flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors`;
+const smallBtn = `flex items-center gap-1 px-2 py-1 rounded-md text-caption-2 transition-colors`;
 
 const OPERATORS: GroupConditionOperator[] = [
   'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'not_contains', 'empty', 'not_empty', 'before_now', 'after_now',
@@ -44,9 +45,9 @@ const NO_VALUE_OPS = new Set<GroupConditionOperator>(['empty', 'not_empty', 'bef
 
 function Section({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   return (
-    <div className="pt-3 border-t border-zinc-800 space-y-2">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-purple-400">{title}</div>
-      {hint && <p className="text-[10px] text-zinc-500 leading-relaxed">{hint}</p>}
+    <div className="pt-3 border-t border-border-quaternary space-y-2">
+      <div className="text-caption-2 uppercase text-purple-400">{title}</div>
+      {hint && <p className="text-caption-2 text-text-quaternary">{hint}</p>}
       {children}
     </div>
   );
@@ -82,7 +83,7 @@ function ConditionRow({
           className={`${inputCls} flex-1`}
         />
       )}
-      <button type="button" onClick={onRemove} className="p-1 text-zinc-600 hover:text-red-400">
+      <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis">
         <Trash2 size={12} />
       </button>
     </div>
@@ -100,9 +101,9 @@ function SourceEditor({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-2 space-y-2">
+    <div className="rounded-lg border border-border-quaternary bg-zinc-800/40 p-2 space-y-2">
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => setOpen(v => !v)} className="text-zinc-500">
+        <button type="button" onClick={() => setOpen(v => !v)} className="text-text-quaternary">
           {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
         <input
@@ -111,15 +112,15 @@ function SourceEditor({
           placeholder={source.id}
           className={`${inputCls} flex-1 font-bold`}
         />
-        <span className="text-[9px] text-zinc-600 font-mono">{source.id}</span>
-        <button type="button" onClick={onRemove} className="p-1 text-zinc-600 hover:text-red-400">
+        <span className="text-caption-2 text-text-disabled font-mono">{source.id}</span>
+        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis">
           <Trash2 size={12} />
         </button>
       </div>
       {open && (
         <div className="space-y-2 pl-4">
           <div>
-            <label className="block text-[9px] text-zinc-500 mb-0.5">後處理</label>
+            <label className="block text-caption-2 text-text-quaternary mb-0.5">後處理</label>
             <SiteSelect
               value={source.postProcessId ?? ''}
               onChange={e => onUpdate({ postProcessId: e.target.value || undefined })}
@@ -131,7 +132,7 @@ function SourceEditor({
                 <option value={source.postProcessId}>設定問題：未知處理器 {source.postProcessId}</option>
               )}
             </SiteSelect>
-            <p className={`mt-1 text-[9px] ${source.postProcessId && !getPostProcessorDefinition(source.postProcessId) ? 'text-amber-300' : 'text-zinc-500'}`}>
+            <p className={`mt-1 text-caption-2 ${source.postProcessId && !getPostProcessorDefinition(source.postProcessId) ? 'text-status-warning' : 'text-text-quaternary'}`}>
               {source.postProcessId
                 ? getPostProcessorDefinition(source.postProcessId)?.description ?? `找不到處理器「${source.postProcessId}」，執行時不會套用。`
                 : '直接使用來源回傳的資料列。'}
@@ -146,7 +147,7 @@ function SourceEditor({
               />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">更新策略</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">更新策略</label>
               <SiteSelect
                 value={source.freshnessPolicy ?? 'auto'}
                 onChange={e => onUpdate({ freshnessPolicy: e.target.value as FreshnessPolicy })}
@@ -161,7 +162,7 @@ function SourceEditor({
             </div>
           </div>
           <div>
-            <label className="block text-[9px] text-zinc-500 mb-0.5">SQL 查詢</label>
+            <label className="block text-caption-2 text-text-quaternary mb-0.5">SQL 查詢</label>
             <textarea
               value={source.sqlQuery ?? ''}
               onChange={e => onUpdate({ sqlQuery: e.target.value })}
@@ -172,27 +173,27 @@ function SourceEditor({
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">項目識別欄位</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">項目識別欄位</label>
               <input value={source.itemIdField ?? ''} onChange={e => onUpdate({ itemIdField: e.target.value })} placeholder="order_id" className={inputCls} />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">內容版本欄位</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">內容版本欄位</label>
               <input value={source.contentVersionField ?? ''} onChange={e => onUpdate({ contentVersionField: e.target.value })} placeholder="updated_at" className={inputCls} />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">有效開始欄位</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">有效開始欄位</label>
               <input value={source.validStartField ?? ''} onChange={e => onUpdate({ validStartField: e.target.value })} placeholder="（可留空）" className={inputCls} />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">有效結束欄位</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">有效結束欄位</label>
               <input value={source.validEndField ?? ''} onChange={e => onUpdate({ validEndField: e.target.value })} placeholder="（可留空，不自動判斷結束）" className={inputCls} />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">失效狀態欄位</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">失效狀態欄位</label>
               <input value={source.invalidStatusField ?? ''} onChange={e => onUpdate({ invalidStatusField: e.target.value })} placeholder="status" className={inputCls} />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">失效狀態值（逗號分隔）</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">失效狀態值（逗號分隔）</label>
               <input
                 value={(source.invalidStatusValues ?? []).join(',')}
                 onChange={e => onUpdate({ invalidStatusValues: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
@@ -201,7 +202,7 @@ function SourceEditor({
               />
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-500 mb-0.5">預設優先程度</label>
+              <label className="block text-caption-2 text-text-quaternary mb-0.5">預設優先程度</label>
               <input
                 type="number"
                 value={source.defaultPriority ?? 0}
@@ -211,7 +212,7 @@ function SourceEditor({
             </div>
           </div>
           <div>
-            <label className="block text-[9px] text-zinc-500 mb-0.5">欄位別名（來源欄位=樣板欄位，逗號分隔多組）</label>
+            <label className="block text-caption-2 text-text-quaternary mb-0.5">欄位別名（來源欄位=樣板欄位，逗號分隔多組）</label>
             <input
               value={Object.entries(source.fieldAliases ?? {}).map(([k, v]) => `${k}=${v}`).join(',')}
               onChange={e => {
@@ -245,9 +246,9 @@ function PriorityRuleRow({
 }) {
   const conditions = rule.conditions ?? [];
   return (
-    <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-2 space-y-1.5">
+    <div className="rounded-lg border border-border-quaternary bg-zinc-800/40 p-2 space-y-1.5">
       <div className="flex items-center gap-1.5">
-        <GripVertical size={11} className="text-zinc-600" />
+        <GripVertical size={11} className="text-text-disabled" />
         <input
           value={rule.label ?? ''}
           onChange={e => onUpdate({ label: e.target.value })}
@@ -262,16 +263,16 @@ function PriorityRuleRow({
           <option value="">全部來源</option>
           {sourceIds.map(id => <option key={id} value={id}>{id}</option>)}
         </SiteSelect>
-        <label className="text-[9px] text-zinc-500">優先值</label>
+        <label className="text-caption-2 text-text-quaternary">優先值</label>
         <input
           type="number"
           value={rule.priority}
           onChange={e => onUpdate({ priority: Number(e.target.value) || 0 })}
           className={`${inputCls} w-16`}
         />
-        <button type="button" onClick={() => onMove(-1)} className="p-0.5 text-zinc-600 hover:text-zinc-300"><ChevronUp size={12} /></button>
-        <button type="button" onClick={() => onMove(1)} className="p-0.5 text-zinc-600 hover:text-zinc-300"><ChevronDown size={12} /></button>
-        <button type="button" onClick={onRemove} className="p-1 text-zinc-600 hover:text-red-400"><Trash2 size={12} /></button>
+        <button type="button" onClick={() => onMove(-1)} className="p-0.5 text-text-disabled hover:text-text-secondary"><ChevronUp size={12} /></button>
+        <button type="button" onClick={() => onMove(1)} className="p-0.5 text-text-disabled hover:text-text-secondary"><ChevronDown size={12} /></button>
+        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis"><Trash2 size={12} /></button>
       </div>
       <div className="space-y-1 pl-4">
         {conditions.map((c, i) => (
@@ -307,20 +308,20 @@ function TemplateRow({
 }) {
   const conditions = tpl.conditions ?? [];
   return (
-    <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-2 space-y-1.5">
+    <div className="rounded-lg border border-border-quaternary bg-zinc-800/40 p-2 space-y-1.5">
       <div className="flex items-center gap-1.5">
         <input value={tpl.name} onChange={e => onUpdate({ name: e.target.value })} className={`${inputCls} flex-1 font-bold`} />
-        <label className="flex items-center gap-1 text-[9px] text-zinc-500 whitespace-nowrap">
-          <input type="radio" checked={!!tpl.isDefault} onChange={onSetDefault} className="accent-purple-500" />
+        <label className="flex items-center gap-1 text-caption-2 text-text-quaternary whitespace-nowrap">
+          <Radio checked={!!tpl.isDefault} onChange={onSetDefault} />
           預設
         </label>
-        <button type="button" onClick={onDuplicate} className="p-1 text-zinc-500 hover:text-zinc-300" title="複製">
+        <button type="button" onClick={onDuplicate} className="p-1 text-text-quaternary hover:text-text-secondary" title="複製">
           <Plus size={12} />
         </button>
-        <button type="button" onClick={onRemove} className="p-1 text-zinc-600 hover:text-red-400"><Trash2 size={12} /></button>
+        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis"><Trash2 size={12} /></button>
       </div>
       <div className="space-y-1 pl-4">
-        <div className="text-[9px] text-zinc-500">符合以下條件時使用（都沒設定就當預設）：</div>
+        <div className="text-caption-2 text-text-quaternary">符合以下條件時使用（都沒設定就當預設）：</div>
         {conditions.map((c, i) => (
           <ConditionRow
             key={i}
@@ -364,16 +365,11 @@ export function GenericGroupSettings({
 
   return (
     <div className="pt-3 border-t border-purple-500/20 space-y-2">
-      <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={e => patch({ enabled: e.target.checked })}
-          className="accent-purple-500 w-3.5 h-3.5"
-        />
+      <label className="flex items-center gap-2 text-body-xs text-text-secondary cursor-pointer">
+        <Checkbox checked={enabled} onCheckedChange={e => patch({ enabled: e })} />
         <span className="font-bold">啟用泛用群組（多來源／優先程度／多樣板）</span>
       </label>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
+      <p className="text-caption-2 text-text-quaternary">
         關閉時群組維持原本行為（單一資料來源＋單一樣板）。開啟後下面的資料來源清單取代上方的單一資料綁定，樣板清單取代單一子畫布範本。
       </p>
 
@@ -391,7 +387,7 @@ export function GenericGroupSettings({
             <button
               type="button"
               onClick={() => patch({ sources: [...sources, { id: `source-${Date.now()}`, label: '新來源' }] })}
-              className={`${smallBtn} w-full justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1.5`}
+              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
             >
               <Plus size={12} /> 新增資料來源
             </button>
@@ -400,11 +396,11 @@ export function GenericGroupSettings({
           <Section title="項目識別" hint="不同來源預設不互相覆蓋（唯一鍵＝來源＋項目 ID）。只有明確設定合併欄位才會跨來源合併成同一筆。">
             <div className="grid grid-cols-2 gap-1.5">
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">群組預設識別欄位</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">群組預設識別欄位</label>
                 <input value={config.itemIdField ?? ''} onChange={e => patch({ itemIdField: e.target.value })} placeholder="id" className={inputCls} />
               </div>
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">跨來源合併欄位（選填）</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">跨來源合併欄位（選填）</label>
                 <input value={config.mergeIdField ?? ''} onChange={e => patch({ mergeIdField: e.target.value || undefined })} placeholder="vehicle_code" className={inputCls} />
               </div>
             </div>
@@ -412,7 +408,7 @@ export function GenericGroupSettings({
 
           <Section title={`有效性規則（${validityRules.length}）`} hint="命中即視為失效（可切換成「視為有效」白名單規則）。計畫結束時間到了不會自動失效，除非在這裡設規則。">
             {validityRules.map((r, i) => (
-              <div key={r.id} className="flex items-center gap-1.5 rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-1.5">
+              <div key={r.id} className="flex items-center gap-1.5 rounded-lg border border-border-quaternary bg-zinc-800/40 p-1.5">
                 <SiteSelect
                   value={r.effect ?? 'invalid'}
                   onChange={e => patch({ validityRules: validityRules.map((rr, ii) => ii === i ? { ...rr, effect: e.target.value as 'invalid' | 'valid' } : rr) })}
@@ -431,7 +427,7 @@ export function GenericGroupSettings({
             <button
               type="button"
               onClick={() => patch({ validityRules: [...validityRules, { id: `vr-${Date.now()}`, field: '', operator: 'eq', value: '', effect: 'invalid' }] })}
-              className={`${smallBtn} w-full justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1.5`}
+              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
             >
               <Plus size={12} /> 新增有效性規則
             </button>
@@ -458,22 +454,17 @@ export function GenericGroupSettings({
               <button
                 type="button"
                 onClick={() => patch({ priorityRules: [...priorityRules, { id: `pr-${Date.now()}`, priority: 0, conditions: [] }] })}
-                className={`${smallBtn} justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1.5`}
+                className={`${smallBtn} justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
               >
                 <Plus size={12} /> 新增優先程度規則
               </button>
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">沒有規則命中時的預設優先程度</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">沒有規則命中時的預設優先程度</label>
                 <input type="number" value={config.defaultPriority ?? 0} onChange={e => patch({ defaultPriority: Number(e.target.value) || 0 })} className={inputCls} />
               </div>
             </div>
-            <label className="flex items-center gap-2 text-[10px] text-zinc-400 cursor-pointer pt-1">
-              <input
-                type="checkbox"
-                checked={!!config.preemptEqualPriority}
-                onChange={e => patch({ preemptEqualPriority: e.target.checked })}
-                className="accent-purple-500 w-3 h-3"
-              />
+            <label className="flex items-center gap-2 text-caption-2 text-text-tertiary cursor-pointer pt-1">
+              <Checkbox checked={!!config.preemptEqualPriority} onCheckedChange={e => patch({ preemptEqualPriority: e })} />
               同優先程度時，較新的項目可以搶占（預設關閉，避免畫面抖動）
             </label>
           </Section>
@@ -535,7 +526,7 @@ export function GenericGroupSettings({
                 const created = createGroupTemplate(`樣板 ${templates.length + 1}`);
                 patch({ templates: [...templates, { ...created, isDefault: templates.length === 0 }] });
               }}
-              className={`${smallBtn} w-full justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1.5`}
+              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
             >
               <Plus size={12} /> 新增樣板
             </button>
@@ -544,7 +535,7 @@ export function GenericGroupSettings({
           <Section title="容量與溢出">
             <div className="grid grid-cols-2 gap-1.5">
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">可見容量（格數）</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">可見容量（格數）</label>
                 <input
                   type="number"
                   min={1}
@@ -554,7 +545,7 @@ export function GenericGroupSettings({
                 />
               </div>
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">資料不足時</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">資料不足時</label>
                 <SiteSelect
                   value={capacity.overflowFill ?? 'blank'}
                   onChange={e => patch({ capacityConfig: { ...capacity, overflowFill: e.target.value as 'stretch' | 'blank' } })}
@@ -565,13 +556,8 @@ export function GenericGroupSettings({
                 </SiteSelect>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-[10px] text-zinc-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!capacity.showPendingCount}
-                onChange={e => patch({ capacityConfig: { ...capacity, showPendingCount: e.target.checked } })}
-                className="accent-purple-500 w-3 h-3"
-              />
+            <label className="flex items-center gap-2 text-caption-2 text-text-tertiary cursor-pointer">
+              <Checkbox checked={!!capacity.showPendingCount} onCheckedChange={e => patch({ capacityConfig: { ...capacity, showPendingCount: e } })} />
               顯示「還有 N 筆未顯示」提示
             </label>
           </Section>
@@ -588,7 +574,7 @@ export function GenericGroupSettings({
                 <option value="none">無動畫</option>
               </SiteSelect>
               <div>
-                <label className="block text-[9px] text-zinc-500 mb-0.5">時間（毫秒，選填）</label>
+                <label className="block text-caption-2 text-text-quaternary mb-0.5">時間（毫秒，選填）</label>
                 <input
                   type="number"
                   value={transition.durationMs ?? ''}

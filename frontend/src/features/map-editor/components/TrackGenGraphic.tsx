@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { LaneCenterlinePlan, RoadInfo } from '../opendrive/laneCenterlines'
 import type { TrackGenSummary } from '../utils/trackGenFacility'
 import type { Vec2 } from '../utils/trackGenLayout'
+import { Button } from '../../../components/ui';
 
 /**
  * 軌道生成元件的內容：只畫<strong>道路中心線</strong>。
@@ -98,19 +99,12 @@ export function TrackGenGraphic({
   if (parseFailed) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-rose-500/50 bg-rose-950/20 px-3 text-center">
-        <span className="text-xs text-rose-300">{t('mapEditor.trackGen.graphic.parseFailed')}</span>
+        <span className="text-body-xs text-status-error-emphasis">{t('mapEditor.trackGen.graphic.parseFailed')}</span>
         {!readOnly ? (
-          <button
-            type="button"
-            data-trackgen-pick
-            onClick={(e) => {
+          <Button variant="text" data-trackgen-pick onPress={(e) => {
               e.stopPropagation()
               onPickClick()
-            }}
-            className="text-[11px] text-cyan-300 underline"
-          >
-            {t('mapEditor.trackGen.graphic.reselectFile')}
-          </button>
+            }}>{t('mapEditor.trackGen.graphic.reselectFile')}</Button>
         ) : null}
       </div>
     )
@@ -133,7 +127,7 @@ export function TrackGenGraphic({
               e.stopPropagation()
               onPickClick()
             }}
-            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-zinc-200 shadow-md transition hover:border-cyan-500/70 hover:bg-zinc-700 hover:text-cyan-100"
+            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-text-primary shadow-md transition hover:border-border-theme-light hover:bg-link-standard-hover hover:text-cyan-100"
             style={{ width: buttonSize, height: buttonSize }}
           >
             <Plus className="size-[55%]" strokeWidth={2.25} aria-hidden />
@@ -141,13 +135,13 @@ export function TrackGenGraphic({
           </button>
         ) : (
           <Route
-            className="text-zinc-600"
+            className="text-text-disabled"
             style={{ width: buttonSize * 0.55, height: buttonSize * 0.55 }}
             aria-hidden
           />
         )}
         <span
-          className="pointer-events-none select-none px-3 text-center leading-snug text-zinc-400"
+          className="pointer-events-none select-none px-3 text-center leading-snug text-text-tertiary"
           style={{ fontSize: hintFontPx }}
         >
           {readOnly
@@ -252,7 +246,7 @@ export function TrackGenGraphic({
               setCardSize({ w: wLocal, h: hLocal })
             }
           }}
-          className="pointer-events-none absolute z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-300 shadow-lg"
+          className="pointer-events-none absolute z-[3] max-w-[250px] rounded-md border border-emerald-500/60 bg-zinc-900/95 px-2.5 py-2 text-body-xs text-text-secondary shadow-lg"
           style={{
             // 預設放在滑鼠右下，靠近邊界就翻到另一邊，卡片才不會被切掉
             left: Math.max(
@@ -265,7 +259,7 @@ export function TrackGenGraphic({
             ),
           }}
         >
-          <div className="mb-1 font-medium text-emerald-300">
+          <div className="mb-1 font-medium text-status-success">
             road {hoveredRoad.id}
             {hoveredRoad.name && hoveredRoad.name !== hoveredRoad.id
               ? ` · ${hoveredRoad.name}`
@@ -273,39 +267,39 @@ export function TrackGenGraphic({
           </div>
           <div>
             {t('mapEditor.trackGen.graphic.length')}{' '}
-            <b className="font-mono tabular-nums text-zinc-100">
+            <b className="font-mono tabular-nums text-text-primary">
               {hoveredRoad.lengthM.toFixed(1)} m
             </b>
             {hoveredRoad.junctionId !== '-1' ? (
-              <span className="text-amber-300">{` · junction ${hoveredRoad.junctionId}`}</span>
+              <span className="text-status-warning">{` · junction ${hoveredRoad.junctionId}`}</span>
             ) : null}
           </div>
           <div>
             {t('mapEditor.trackGen.graphic.heading')}{' '}
-            <b className="font-mono tabular-nums text-zinc-100">
+            <b className="font-mono tabular-nums text-text-primary">
               {hoveredRoad.headingFromDeg.toFixed(0)}° → {hoveredRoad.headingToDeg.toFixed(0)}°
             </b>
           </div>
           <div>
             {t('mapEditor.trackGen.graphic.predecessor')}{' '}
-            <b className="font-mono text-zinc-100">
+            <b className="font-mono text-text-primary">
               {hoveredRoad.predecessor
                 ? `${hoveredRoad.predecessor.type} ${hoveredRoad.predecessor.id}`
                 : '—'}
             </b>
             {` · ${t('mapEditor.trackGen.graphic.successor')} `}
-            <b className="font-mono text-zinc-100">
+            <b className="font-mono text-text-primary">
               {hoveredRoad.successor
                 ? `${hoveredRoad.successor.type} ${hoveredRoad.successor.id}`
                 : '—'}
             </b>
           </div>
-          <div className="mt-1 border-t border-zinc-700/70 pt-1">
+          <div className="mt-1 border-t border-border-quaternary pt-1">
             {t('mapEditor.trackGen.graphic.lanes')}
             {hoveredRoad.lanes.map((l) => (
               <div key={l.id} className="font-mono tabular-nums">
                 {l.id > 0 ? `+${l.id}` : l.id}{' '}
-                <span className={l.type === 'driving' ? 'text-emerald-300' : 'text-zinc-500'}>
+                <span className={l.type === 'driving' ? 'text-status-success' : 'text-text-quaternary'}>
                   {l.type}
                 </span>
                 {l.widthM > 0 ? ` ${l.widthM.toFixed(2)} m` : ''}
@@ -317,7 +311,7 @@ export function TrackGenGraphic({
       ) : null}
 
       {selected ? (
-        <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
+        <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-caption-2 text-text-tertiary">
           {`${t('mapEditor.trackGen.graphic.summary', {
             roads: centerlines.roads.length,
             lanes: centerlines.laneCount,
@@ -339,7 +333,7 @@ export function TrackGenGraphic({
             e.stopPropagation()
             onPickClick()
           }}
-          className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-zinc-900/90 px-2 py-1 text-[11px] text-zinc-200 shadow-md transition hover:border-cyan-500/70 hover:text-cyan-100"
+          className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-surface-primary px-2 py-1 text-body-xs text-text-primary shadow-md transition hover:border-border-theme-light hover:text-cyan-100"
         >
           {t('mapEditor.trackGen.graphic.replace')}
         </button>

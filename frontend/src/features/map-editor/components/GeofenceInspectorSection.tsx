@@ -18,6 +18,7 @@ import {
   type GeofenceStrokeStyle,
   type GeofenceTextLabel,
 } from '../utils/geofence'
+import { Button, Checkbox } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -53,16 +54,16 @@ export function GeofenceInspectorSection({
   return (
     <>
       <section className="space-y-2.5 rounded-lg border border-violet-900/40 bg-violet-950/15 p-3">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-violet-400/90">
+        <h3 className="text-caption-2 uppercase text-violet-400/90">
           {t('mapEditor.inspector.geofence.borderStyle')}
         </h3>
-        <p className="text-[10px] leading-relaxed text-zinc-500">
+        <p className="text-caption-2 text-text-quaternary">
           {t('mapEditor.inspector.geofence.vertexHint', {
             count: params.verticesMeters.length,
           })}
         </p>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.lineStyle')}</label>
+          <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.lineStyle')}</label>
           <SiteSelect
             disabled={readOnly}
             value={params.strokeStyle}
@@ -71,7 +72,7 @@ export function GeofenceInspectorSection({
                 strokeStyle: e.target.value as GeofenceStrokeStyle,
               })
             }
-            className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-70"
+            size="md" className="w-full"
           >
             <option value="solid">{t('mapEditor.inspector.stroke.solid')}</option>
             <option value="dashed">{t('mapEditor.inspector.stroke.dashed')}</option>
@@ -79,7 +80,7 @@ export function GeofenceInspectorSection({
           </SiteSelect>
         </div>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">
+          <label className="mb-1 block text-caption-2 text-text-quaternary">
             {t('mapEditor.inspector.geofence.strokeWidth')}
           </label>
           <NumberInput
@@ -88,34 +89,27 @@ export function GeofenceInspectorSection({
             disabled={readOnly}
             value={params.strokeWidthPx}
             onChange={(n) => onPatchParameters({ strokeWidthPx: n })}
-            className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-70"
+            className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme disabled:opacity-70"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.strokeColor')}</label>
+          <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.strokeColor')}</label>
           <SiteColorInput
             disabled={readOnly}
             value={params.strokeColor}
             onChange={(e) => onPatchParameters({ strokeColor: e.target.value })}
-            className="h-8 w-full cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
+            className="h-8 w-full cursor-pointer rounded border border-border-tertiary disabled:opacity-50"
            />
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
-          <input
-            type="checkbox"
-            disabled={readOnly}
-            checked={params.fillEnabled}
-            onChange={(e) =>
-              onPatchParameters({ fillEnabled: e.target.checked })
-            }
-            className="rounded border-zinc-600 accent-cyan-500"
-          />
+        <label className="flex cursor-pointer items-center gap-2 text-body-xs text-text-secondary">
+          <Checkbox disabled={readOnly} checked={params.fillEnabled} onCheckedChange={(checked) => onPatchParameters({ fillEnabled: checked })
+            } />
           {t('mapEditor.inspector.geofence.fillInside')}
         </label>
         {params.fillEnabled && (
           <>
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.fillColor')}</label>
+              <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.fillColor')}</label>
               <SiteColorInput
                 disabled={readOnly}
                 value={params.fillBaseColor}
@@ -125,13 +119,13 @@ export function GeofenceInspectorSection({
                     fillOpacity: params.fillOpacity,
                   })
                 }
-                className="h-8 w-full cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
+                className="h-8 w-full cursor-pointer rounded border border-border-tertiary disabled:opacity-50"
                />
             </div>
             <div>
               <label
                 htmlFor="geofence-fill-opacity"
-                className="mb-1 flex items-center justify-between text-[10px] text-zinc-500"
+                className="mb-1 flex items-center justify-between text-caption-2 text-text-quaternary"
               >
                 <span>{t('mapEditor.inspector.geofence.opacity')}</span>
                 <span className="font-mono text-cyan-400/90">
@@ -154,14 +148,14 @@ export function GeofenceInspectorSection({
                 }
                 className="h-2 w-full cursor-pointer accent-cyan-500 disabled:opacity-40"
               />
-              <div className="mt-1 flex justify-between text-[9px] text-zinc-600">
+              <div className="mt-1 flex justify-between text-caption-2 text-text-disabled">
                 <span>{t('mapEditor.inspector.fullyTransparent')}</span>
                 <span>{t('mapEditor.inspector.opaque')}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+            <div className="flex items-center gap-2 text-caption-2 text-text-quaternary">
               <span
-                className="size-6 shrink-0 rounded border border-zinc-600"
+                className="size-6 shrink-0 rounded border border-border-tertiary"
                 style={{ backgroundColor: params.resolvedFillColor }}
                 aria-hidden
               />
@@ -171,15 +165,13 @@ export function GeofenceInspectorSection({
         )}
       </section>
 
-      <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
+      <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             {t('mapEditor.inspector.geofence.textChildren')}
           </h3>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Plus />} onPress={() => {
                 const box = params.verticesMeters
                 const cx =
                   box.reduce((s, v) => s + v.x, 0) / Math.max(1, box.length)
@@ -199,15 +191,11 @@ export function GeofenceInspectorSection({
                   },
                 ])
                 onSelectLabel(id)
-              }}
-              className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
-            >
-              <Plus className="size-3" /> {t('mapEditor.inspector.geofence.addText')}
-            </button>
+              }}>{t('mapEditor.inspector.geofence.addText')}</Button>
           )}
         </div>
         {labels.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             {t('mapEditor.inspector.geofence.noText')}
           </p>
         ) : (
@@ -217,15 +205,15 @@ export function GeofenceInspectorSection({
                 <button
                   type="button"
                   onClick={() => onSelectLabel(lb.id)}
-                  className={`w-full rounded border px-2 py-1 text-left text-[11px] ${
+                  className={`w-full rounded border px-2 py-1 text-left text-body-xs ${
                     selectedLabelId === lb.id
                       ? 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200'
-                      : 'border-zinc-700/80 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600'
+                      : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-tertiary'
                   }`}
                 >
                   {lb.text || t('mapEditor.inspector.geofence.emptyText')}
                   {!isLabelInsideGeofence(gf, lb) && (
-                    <span className="ml-1 text-red-400">{t('mapEditor.inspector.geofence.outOfBounds')}</span>
+                    <span className="ml-1 text-status-error-emphasis">{t('mapEditor.inspector.geofence.outOfBounds')}</span>
                   )}
                 </button>
               </li>
@@ -233,9 +221,9 @@ export function GeofenceInspectorSection({
           </ul>
         )}
         {selectedLabel && (
-          <div className="mt-2 space-y-2 border-t border-zinc-800 pt-2">
+          <div className="mt-2 space-y-2 border-t border-border-quaternary pt-2">
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.textContent')}</label>
+              <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.textContent')}</label>
               <input
                 readOnly={readOnly}
                 value={selectedLabel.text}
@@ -250,12 +238,12 @@ export function GeofenceInspectorSection({
                 }
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
-                className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
               />
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.fontPx')}</label>
+                <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.fontPx')}</label>
                 <NumberInput
                   min={8}
                   max={72}
@@ -268,35 +256,28 @@ export function GeofenceInspectorSection({
                       ),
                     )
                   }
-                  className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                  className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
                 />
               </div>
               <div className="flex items-end">
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-300">
-                  <input
-                    type="checkbox"
-                    disabled={readOnly}
-                    checked={selectedLabel.fontWeight === 'bold'}
-                    onChange={(e) =>
-                      patchLabels(
+                <label className="flex cursor-pointer items-center gap-1.5 text-body-xs text-text-secondary">
+                  <Checkbox disabled={readOnly} checked={selectedLabel.fontWeight === 'bold'} onCheckedChange={(checked) => patchLabels(
                         labels.map((l) =>
                           l.id === selectedLabel.id
                             ? {
                                 ...l,
-                                fontWeight: e.target.checked ? 'bold' : 'normal',
+                                fontWeight: checked ? 'bold' : 'normal',
                               }
                             : l,
                         ),
                       )
-                    }
-                    className="rounded border-zinc-600 accent-cyan-500"
-                  />
+                    } />
                   {t('common.bold')}
                 </label>
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">{t('mapEditor.inspector.geofence.rotationDeg')}</label>
+              <label className="mb-1 block text-caption-2 text-text-quaternary">{t('mapEditor.inspector.geofence.rotationDeg')}</label>
               <NumberInput
                 readOnly={readOnly}
                 value={selectedLabel.rotationDeg}
@@ -307,7 +288,7 @@ export function GeofenceInspectorSection({
                     ),
                   )
                 }
-                className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
               />
             </div>
             <TextAlignmentControls
@@ -357,16 +338,10 @@ export function GeofenceInspectorSection({
               disabled={readOnly}
             />
             {!readOnly && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button hierarchy="danger" variant="text" leadingIcon={<Trash2 />} onPress={() => {
                   patchLabels(labels.filter((l) => l.id !== selectedLabel.id))
                   onSelectLabel(null)
-                }}
-                className="inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300"
-              >
-                <Trash2 className="size-3" /> {t('mapEditor.inspector.geofence.deleteText')}
-              </button>
+                }}>{t('mapEditor.inspector.geofence.deleteText')}</Button>
             )}
           </div>
         )}

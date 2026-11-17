@@ -27,6 +27,7 @@ import {
   patchTrackGenPartStyle,
   type TrackGenPartStyle,
 } from '../utils/trackGenParts'
+import { Checkbox } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -69,8 +70,8 @@ export function TrackPartInspectorSection({
       : DEFAULT_ORDINARY_TRACK_FILL_COLOR
 
   return (
-    <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
-      <div className="text-[10px] font-medium text-zinc-200">
+    <div className="space-y-2 rounded border border-border-quaternary bg-surface-primary p-2">
+      <div className="text-caption-2 text-text-primary">
         {t('mapEditor.inspector.trackParts.title')}
       </div>
       {parts.map((part) => {
@@ -92,11 +93,11 @@ export function TrackPartInspectorSection({
             : patchTrackGenPartColor(facility, part, value)
         return (
           <div key={part} className="space-y-1">
-            <div className="text-[10px] text-zinc-400">
+            <div className="text-caption-2 text-text-tertiary">
               {t(`mapEditor.inspector.trackParts.${part}`)}
             </div>
             {isSwitch ? (
-              <label className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+              <label className="flex items-center gap-1.5 text-caption-2 text-text-quaternary">
                 <span className="shrink-0">{t('mapEditor.inspector.trackParts.style')}</span>
                 <SiteSelect
                   disabled={readOnly}
@@ -109,7 +110,7 @@ export function TrackPartInspectorSection({
                       onPatchParameters(patchTrackGenPartStyle(facility, part, next))
                     }
                   }}
-                  className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  size="sm" className="min-w-0 flex-1"
                 >
                   <option value="fill">
                     {t('mapEditor.inspector.trackParts.styleFill')}
@@ -137,7 +138,7 @@ export function TrackPartInspectorSection({
                   if (e.key === 'Enter') e.currentTarget.blur()
                 }}
                 placeholder={t('mapEditor.inspector.trackParts.placeholder')}
-                className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
+                className="min-w-0 flex-1 rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none placeholder:text-text-disabled focus:border-border-theme"
               />
               <SiteColorInput
                 aria-label={
@@ -153,7 +154,7 @@ export function TrackPartInspectorSection({
                 disabled={readOnly}
                 value={swatchValue}
                 onChange={(e) => onPatchParameters(swatchPatch(e.target.value))}
-                className="h-[26px] w-9 shrink-0 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-[26px] w-9 shrink-0 cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:cursor-not-allowed disabled:opacity-50"
                />
               <NumberInput
                 aria-label={t('mapEditor.inspector.trackParts.fontSize')}
@@ -168,27 +169,20 @@ export function TrackPartInspectorSection({
                 onChange={(n) =>
                   onPatchParameters(patchTrackGenPartFont(facility, part, n))
                 }
-                className="w-12 shrink-0 rounded border border-zinc-600 bg-zinc-950 px-1.5 py-1 text-center font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-12 shrink-0 rounded border border-border-tertiary bg-surface-sub-background px-1.5 py-1 text-center font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {partLabelCanHide(part) ? (
-              <label className="flex items-center gap-1.5 text-[10px] text-zinc-400">
-                <input
-                  type="checkbox"
-                  disabled={readOnly}
-                  checked={!hidden[part]}
-                  onChange={(e) =>
-                    onPatchParameters(patchTrackGenPartLabelHidden(facility, part, !e.target.checked))
-                  }
-                  className="size-3 accent-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                />
+              <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary">
+                <Checkbox disabled={readOnly} checked={!hidden[part]} onCheckedChange={(checked) => onPatchParameters(patchTrackGenPartLabelHidden(facility, part, !checked))
+                  } />
                 {t('mapEditor.inspector.trackParts.showName')}
               </label>
             ) : null}
           </div>
         )
       })}
-      <p className="text-[9px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         {isSwitch
           ? t('mapEditor.inspector.trackParts.hintSwitch')
           : t('mapEditor.inspector.trackParts.hint')}

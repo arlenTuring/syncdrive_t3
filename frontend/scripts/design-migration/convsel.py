@@ -17,7 +17,7 @@ def conv(path,ui):
         for k,v in attrs:
             if k in ('type','className'): continue
             if k=='onChange' and not radio:
-                m=re.fullmatch(r'\{\s*\((\w+)\)\s*=>\s*(.*)\}',v,re.S)
+                m=re.fullmatch(r'\{\s*\(?(\w+)\)?\s*=>\s*(.*)\}',v,re.S)
                 if m and f'{m.group(1)}.target.checked' in m.group(2) and len(re.findall(r'\b'+m.group(1)+r'\b',m.group(2)))==m.group(2).count(f'{m.group(1)}.target.checked'):
                     v='{(checked) => '+m.group(2).replace(f'{m.group(1)}.target.checked','checked')+'}'
                 elif m and re.search(r'\b'+m.group(1)+r'\b',m.group(2)):

@@ -260,7 +260,7 @@ export function MapCropModeOverlay({
       />
 
       <div
-        className="absolute border-2 border-amber-400 shadow-[0_0_0_1px_rgba(251,191,36,0.4)]"
+        className="absolute border-2 border-status-warning shadow-[0_0_0_1px_rgba(251,191,36,0.4)]"
         style={{
           left: x,
           top: y,
@@ -270,24 +270,24 @@ export function MapCropModeOverlay({
         }}
       >
         <div
-          className="absolute left-2 top-2 rounded-md border border-amber-600/50 bg-amber-950/95 px-3 py-1.5 font-mono text-amber-50 shadow-md"
+          className="absolute left-2 top-2 rounded-md border border-status-warning-light bg-amber-950/95 px-3 py-1.5 font-mono text-amber-50 shadow-md"
           style={{
             transform: `scale(${labelScreenScale})`,
             transformOrigin: 'top left',
           }}
         >
-          <span className="text-xs font-medium text-amber-200/90">{t('mapEditor.cropMode.outputResolution')}</span>
-          <div className="mt-0.5 text-lg font-semibold leading-none tracking-tight tabular-nums">
+          <span className="text-body-xs-bold text-status-warning">{t('mapEditor.cropMode.outputResolution')}</span>
+          <div className="mt-0.5 text-headline-5 tabular-nums">
             {Math.round(cw)}×{Math.round(ch)}
-            <span className="ml-1 text-sm font-medium text-amber-200/80">px</span>
+            <span className="ml-1 text-body-s-bold text-status-warning">px</span>
           </div>
           {isStretched || isShrunk ? (
-            <span className="mt-1 block text-xs text-amber-300/80">
+            <span className="mt-1 block text-body-xs text-amber-300/80">
               {isStretched ? t('mapEditor.cropMode.stretched') : t('mapEditor.cropMode.cropped')}
             </span>
           ) : null}
         </div>
-        <p className="absolute bottom-2 left-2 max-w-[90%] text-[9px] leading-snug text-amber-200/70">
+        <p className="absolute bottom-2 left-2 max-w-[90%] text-caption-2 text-amber-200/70">
           {t('mapEditor.cropMode.dragHint')}
         </p>
       </div>
@@ -306,7 +306,7 @@ export function MapCropModeOverlay({
         <div
           key={edge}
           data-map-crop-corner
-          className="absolute rounded-sm border-2 border-amber-300 bg-amber-500/60 hover:bg-amber-400/70"
+          className="absolute rounded-sm border-2 border-status-warning bg-amber-500/60 hover:bg-amber-400/70"
           style={{
             left,
             top,
@@ -323,7 +323,7 @@ export function MapCropModeOverlay({
       ))}
 
       <div
-        className="absolute bottom-2 right-2 rounded bg-zinc-950/85 px-2 py-1 font-mono text-[10px] text-zinc-400"
+        className="absolute bottom-2 right-2 rounded bg-zinc-950/85 px-2 py-1 font-mono text-caption-2 text-text-tertiary"
         style={{ pointerEvents: 'none' }}
       >
         {t('mapEditor.cropMode.workspaceStats', { wsW, wsH, cW: contentExtent.width, cH: contentExtent.height })}

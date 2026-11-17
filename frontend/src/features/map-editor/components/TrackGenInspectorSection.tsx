@@ -27,7 +27,7 @@ export function TrackGenInspectorSection({ basemap, readOnly, onRename }: Props)
   return (
     <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-[11px] text-zinc-400">
+        <span className="text-body-xs text-text-tertiary">
           {t('mapEditor.inspector.trackGen.name')}
         </span>
         <input
@@ -35,11 +35,11 @@ export function TrackGenInspectorSection({ basemap, readOnly, onRename }: Props)
           value={basemap.customName}
           readOnly={readOnly}
           onChange={(e) => onRename(e.target.value)}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 focus:border-cyan-500 focus:outline-none"
+          className="rounded-md border border-border-quaternary bg-surface-primary px-2 py-1 text-body-s text-text-primary focus:border-border-theme focus:outline-none"
         />
       </label>
 
-      <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60 px-3 py-2 text-[11px] leading-snug text-zinc-400">
+      <div className="rounded-md border border-border-quaternary bg-surface-primary px-3 py-2 text-body-xs text-text-tertiary">
         {summary ? (
           <div className="flex flex-col gap-0.5">
             <span>
@@ -55,7 +55,7 @@ export function TrackGenInspectorSection({ basemap, readOnly, onRename }: Props)
                 components: summary.components,
               })}
             </span>
-            <p className="mt-1 text-[10.5px] text-zinc-500">
+            <p className="mt-1 text-[10.5px] text-text-quaternary">
               {t('mapEditor.inspector.trackGen.coordsHint')}
             </p>
           </div>
@@ -70,7 +70,7 @@ export function TrackGenInspectorSection({ basemap, readOnly, onRename }: Props)
         )}
       </div>
 
-      <p className="text-[10.5px] leading-snug text-zinc-500">
+      <p className="text-[10.5px] leading-snug text-text-quaternary">
         {t('mapEditor.inspector.trackGen.dialogHint')}
       </p>
     </div>

@@ -60,6 +60,7 @@ import {
   addTemplateChild,
   makeTemplateCanvasId,
 } from './utils/groupTemplateEdit';
+import { Button } from '../../components/ui';
 import { createWidget } from './types';
 import { systemAlert } from '../../lib/systemDialog';
 
@@ -600,11 +601,11 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
   // ─── 列表視圖 ───
   if (view === 'list') {
     return (
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface-sub-background text-text-primary">
         {/* 列表上方原本有一整條「儀表板管理」標題＋齒輪，跟外層頁籤重複，已拿掉；
             資料設定改在單張儀表板的編輯器工具列（屬於那一張）。獨立開啟時保留返回首頁。 */}
         {onBackToHome && (
-          <div className="z-20 flex h-12 shrink-0 items-center border-b border-zinc-800 bg-zinc-900 px-6">
+          <div className="z-20 flex h-12 shrink-0 items-center border-b border-border-quaternary bg-surface-primary px-6">
             <BackToHomeButton onClick={onBackToHome} />
           </div>
         )}
@@ -1067,29 +1068,22 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
       enabled={!!activePlane && !editingGroup}
     >
     <FormatPainterProvider value={formatPainterApi}>
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface-sub-background text-text-primary">
 
       {/* ── 頂部工具列 ── */}
-      <header className="flex items-center gap-3 px-4 h-12 bg-zinc-900 border-b border-zinc-800 shrink-0 z-20">
+      <header className="flex items-center gap-3 px-4 h-12 bg-surface-primary border-b border-border-quaternary shrink-0 z-20">
         
         {editingTabListCell && editingTabListCellInfo ? (
           <>
             <button
               type="button"
               onClick={saveAndExitTabListCellEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-text-primary font-bold transition-all"
             >
               <ArrowLeft size={16} /> {t('dashboard.doneAndReturn')}
             </button>
-            <button
-              type="button"
-              onClick={discardAndExitTabListCellEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
-                         text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
-            >
-              {t('dashboard.discardChanges')}
-            </button>
-            <span className="text-xs text-zinc-400">
+            <Button hierarchy="subordinate" variant="outlined" onPress={discardAndExitTabListCellEdit}>{t('dashboard.discardChanges')}</Button>
+            <span className="text-body-xs text-text-tertiary">
               {t('dashboard.cellSubcanvas', {
                 tab: editingTabListCellInfo.tab.label,
                 column:
@@ -1105,19 +1099,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <button
               type="button"
               onClick={saveAndExitTabCanvasEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-text-primary font-bold transition-all"
             >
               <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
             </button>
-            <button
-              type="button"
-              onClick={discardAndExitTabCanvasEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
-                         text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
-            >
-              {t('dashboard.exitWithoutSave')}
-            </button>
-            <span className="text-xs text-zinc-500">
+            <Button hierarchy="subordinate" variant="outlined" onPress={discardAndExitTabCanvasEdit}>{t('dashboard.exitWithoutSave')}</Button>
+            <span className="text-body-xs text-text-quaternary">
               {t('dashboard.tabSubcanvas', {
                 label: editingTabDef?.label ?? '',
               })}
@@ -1128,19 +1115,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <button
               type="button"
               onClick={saveAndExitTemplateEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-text-primary font-bold transition-all"
             >
               <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
             </button>
-            <button
-              type="button"
-              onClick={discardAndExitTemplateEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
-                         text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
-            >
-              {t('dashboard.exitWithoutSave')}
-            </button>
-            <span className="text-xs text-zinc-500">
+            <Button hierarchy="subordinate" variant="outlined" onPress={discardAndExitTemplateEdit}>{t('dashboard.exitWithoutSave')}</Button>
+            <span className="text-body-xs text-text-quaternary">
               {t('dashboard.editorChrome.editGenericGroup', {
                 group: editingTemplateGroup?.label ?? '',
                 defaultValue: `編輯樣板：${editingTemplateGroup?.label ?? ''}`,
@@ -1150,7 +1130,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               <SiteSelect
                 value={editingTemplateId ?? ''}
                 onChange={e => switchEditingTemplate(e.target.value)}
-                className="text-xs bg-zinc-800 border border-purple-500/40 text-purple-300 font-bold rounded-md px-2 py-1"
+                size="sm"
                 title={t('dashboard.editorChrome.switchTemplateHint', { defaultValue: '切換要編輯的樣板' })}
               >
                 {(editingTemplateGroup?.genericGroup?.templates ?? []).map(tpl => (
@@ -1158,7 +1138,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 ))}
               </SiteSelect>
             ) : (
-              <span className="text-xs font-bold text-purple-300">{editingTemplateDef?.name ?? ''}</span>
+              <span className="text-body-xs-bold text-purple-300">{editingTemplateDef?.name ?? ''}</span>
             )}
           </>
         ) : editingGroup ? (
@@ -1166,27 +1146,20 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <button
               type="button"
               onClick={saveAndExitGroupEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-text-primary font-bold transition-all"
             >
               <ArrowLeft size={16} /> {t('dashboard.saveAndExit')}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowGroupExitDialog(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-600 bg-zinc-800/80
-                         text-zinc-300 text-xs font-semibold hover:border-zinc-500 hover:text-zinc-100 transition-all"
-            >
-              {t('dashboard.exitWithoutSave')}
-            </button>
-            <div className="text-sm font-bold text-cyan-400 truncate max-w-[200px]">
+            <Button hierarchy="subordinate" variant="outlined" onPress={() => setShowGroupExitDialog(true)}>{t('dashboard.exitWithoutSave')}</Button>
+            <div className="text-body-s-bold text-text-theme truncate max-w-[200px]">
               {t('dashboard.subcanvas', { label: editingGroup.label })}
             </div>
-            <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-zinc-700 bg-zinc-800/80 p-0.5">
+            <div className="ml-2 flex items-center gap-0.5 rounded-lg border border-border-quaternary bg-surface-secondary p-0.5">
               <button
                 type="button"
                 disabled={!canUndo}
                 onClick={undo}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
                 title={t('dashboard.undoTitle')}
               >
                 <Undo2 size={14} />
@@ -1195,7 +1168,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                 type="button"
                 disabled={!canRedo}
                 onClick={redo}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
                 title={t('dashboard.redoTitle')}
               >
                 <Redo2 size={14} />
@@ -1206,25 +1179,25 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           <>
             <button 
               onClick={() => setView('list')}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-cyan-400 transition-all mr-2"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-text-tertiary hover:bg-link-standard-hover hover:text-text-theme transition-all mr-2"
               title={t('dashboard.backToList')}
             >
               <ArrowLeft size={16} />
-              <span className="text-xs font-bold uppercase">{t('dashboard.list')}</span>
+              <span className="text-body-xs-bold uppercase">{t('dashboard.list')}</span>
             </button>
 
-            <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-sm pr-3 border-r border-zinc-700">
+            <div className="flex items-center gap-1.5 text-text-theme text-body-s-bold pr-3 border-r border-border-quaternary">
               <LayoutGrid size={15} />
               <span>{t('dashboard.editor')}</span>
             </div>
 
             {/* 平面名稱編輯器 */}
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50 focus-within:border-cyan-500/50 transition-all">
-              <Monitor size={14} className="text-zinc-500" />
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-border-quaternary focus-within:border-cyan-500/50 transition-all">
+              <Monitor size={14} className="text-text-quaternary" />
               <input
                 value={activePlane?.name ?? ''}
                 onChange={(e) => activePlane && updatePlane(activePlane.id, { name: e.target.value })}
-                className="bg-transparent border-none outline-none text-sm font-bold text-zinc-100 w-[200px] placeholder:text-zinc-600"
+                className="bg-transparent border-none outline-none text-body-s-bold text-text-primary w-[200px] placeholder:text-text-quaternary"
                 placeholder={t('dashboard.unnamedPlane')}
               />
             </div>
@@ -1232,10 +1205,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             <div className="flex-1" />
 
             <span
-              className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              className={`shrink-0 rounded-full px-2.5 py-0.5 text-caption-2 font-bold uppercase tracking-wide ${
                 isEditMode
-                  ? 'bg-cyan-950/80 text-cyan-300 ring-1 ring-cyan-700/60'
-                  : 'bg-zinc-800 text-zinc-400 ring-1 ring-zinc-600'
+                  ? 'bg-cyan-950/80 text-text-theme ring-1 ring-cyan-700/60'
+                  : 'bg-surface-secondary text-text-tertiary ring-1 ring-zinc-600'
               }`}
             >
               {isEditMode ? t('dashboard.modeEdit') : t('dashboard.modeView')}
@@ -1245,7 +1218,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               <button
                 type="button"
                 onClick={toggleEditMode}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-500 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-sm transition hover:bg-zinc-700"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border-primary bg-surface-secondary px-3 py-1.5 text-body-xs-bold text-text-primary shadow-sm transition hover:bg-link-standard-hover"
                 title={t('dashboard.leaveEditTitle')}
               >
                 <LogOut size={14} />
@@ -1255,7 +1228,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
               <button
                 type="button"
                 onClick={toggleEditMode}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-xs font-medium text-cyan-200 shadow-sm transition hover:bg-cyan-900/50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-body-xs-bold text-cyan-200 shadow-sm transition hover:bg-cyan-900/50"
                 title={t('dashboard.enterEditTitle')}
               >
                 <Pencil size={14} />
@@ -1264,12 +1237,12 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             )}
 
             {isEditMode && (
-              <div className="flex items-center gap-0.5 rounded-lg border border-zinc-700 bg-zinc-800/80 p-0.5">
+              <div className="flex items-center gap-0.5 rounded-lg border border-border-quaternary bg-surface-secondary p-0.5">
                 <button
                   type="button"
                   disabled={!canUndo}
                   onClick={undo}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
                   title={t('dashboard.undoTitle')}
                 >
                   <Undo2 size={14} />
@@ -1279,7 +1252,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
                   type="button"
                   disabled={!canRedo}
                   onClick={redo}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-200 transition enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
                   title={t('dashboard.redoTitle')}
                 >
                   <Redo2 size={14} />
@@ -1314,16 +1287,16 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
         {/* Settings */}
         <button onClick={() => setShowSettings(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700
-                     text-zinc-400 text-xs hover:border-purple-600 hover:text-purple-400 transition-colors">
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-secondary border border-border-quaternary
+                     text-text-tertiary text-body-xs hover:border-purple-600 hover:text-purple-400 transition-colors">
           <Settings size={13} /> {t('dashboard.dataSettings')}
         </button>
 
         {/* 剪貼簿狀態提示 */}
         {clipboard && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-900/20 border border-amber-700/40 text-amber-400 text-xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-900/20 border border-status-warning-light text-status-warning text-body-xs">
             <Copy size={11} />
-            <span className="font-mono text-[10px]">
+            <span className="font-mono text-caption-2">
               {clipboard.kind === 'canvas'
                 ? t('dashboard.copiedCanvas')
                 : t('dashboard.copiedWidget')}
@@ -1331,9 +1304,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           </div>
         )}
         {formatPainter && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-fuchsia-900/30 border border-fuchsia-600/50 text-fuchsia-200 text-xs animate-pulse">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-fuchsia-900/30 border border-fuchsia-600/50 text-fuchsia-200 text-body-xs animate-pulse">
             <Paintbrush size={11} />
-            <span className="font-mono text-[10px]">
+            <span className="font-mono text-caption-2">
               {t('dashboard.formatPainter', { type: formatPainter.sourceType })}
             </span>
           </div>
@@ -1341,7 +1314,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         <button
           id="save-btn"
           onClick={handleSave}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all duration-200"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-body-xs transition-all duration-200"
           style={{
             background: saveStatus === 'ok' ? 'rgba(16,185,129,0.1)' : saveStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(39,39,42,1)',
             borderColor: saveStatus === 'ok' ? '#10b981' : saveStatus === 'error' ? '#ef4444' : '#52525b',
@@ -1357,31 +1330,31 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
         </button>
 
         {(editingGroup && dualSubcanvas ? (
-          <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
+          <div className="text-text-disabled text-caption-2 font-mono pl-2 border-l border-border-quaternary">
             {t('dashboard.editorChrome.dualBoardSize', {
               w: dualSubcanvas.laneW,
               h: dualSubcanvas.laneH,
             })}
-            <span className="text-zinc-700 mx-1">·</span>
+            <span className="text-text-disabled mx-1">·</span>
             {t('dashboard.editorChrome.templateSize', {
               w: dualSubcanvas.designW,
               h: dualSubcanvas.designH,
             })}
           </div>
         ) : editingGroup && subcanvasEdit ? (
-          <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
+          <div className="text-text-disabled text-caption-2 font-mono pl-2 border-l border-border-quaternary">
             {t('dashboard.editorChrome.editAreaSize', {
               w: subcanvasEdit.editW,
               h: subcanvasEdit.editH,
             })}
-            <span className="text-zinc-700 mx-1">·</span>
+            <span className="text-text-disabled mx-1">·</span>
             {t('dashboard.editorChrome.runtimeTemplateSize', {
               w: subcanvasEdit.designW,
               h: subcanvasEdit.designH,
             })}
           </div>
         ) : activePlane ? (
-          <div className="text-zinc-600 text-[10px] font-mono pl-2 border-l border-zinc-700">
+          <div className="text-text-disabled text-caption-2 font-mono pl-2 border-l border-border-quaternary">
             {activePlane.width} × {activePlane.height}
           </div>
         ) : null)}
@@ -1537,10 +1510,10 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
-            <Monitor size={48} className="text-zinc-700" />
-            <p className="text-zinc-500 text-sm">{t('dashboard.emptyPlanes')}</p>
+            <Monitor size={48} className="text-text-disabled" />
+            <p className="text-text-quaternary text-body-s">{t('dashboard.emptyPlanes')}</p>
             <button onClick={() => setShowNewDialog(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 text-white text-sm hover:bg-cyan-500 transition-colors">
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 text-text-primary text-body-s hover:bg-cyan-500 transition-colors">
               <Plus size={16} /> {t('dashboard.addFirstPlane')}
             </button>
           </div>

@@ -14,6 +14,7 @@ import {
   type SignalLamp,
   type SignalMountDirection,
 } from '../utils/signalFacility'
+import { Button, IconButton } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -52,17 +53,17 @@ export function SignalInspectorSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-amber-900/40 bg-amber-950/12 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-amber-500/90">
+      <h3 className="text-caption-2 uppercase text-amber-500/90">
         {t('mapEditor.signal.title')}
       </h3>
 
-      <div className="flex items-center gap-3 rounded border border-zinc-700/80 bg-zinc-950/60 p-2">
+      <div className="flex items-center gap-3 rounded border border-border-quaternary bg-black-30 p-2">
         <img
           src={display.iconUrl}
           alt=""
           className="h-12 w-12 shrink-0 object-contain"
         />
-        <span className="text-[10px] text-zinc-500">
+        <span className="text-caption-2 text-text-quaternary">
           {t('mapEditor.signal.preview', {
             lamp: lampLabel(display.lamp),
             mount: mountLabel(mountDirection),
@@ -73,7 +74,7 @@ export function SignalInspectorSection({
       <div>
         <label
           htmlFor="signal-mount"
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           {t('mapEditor.signal.mount')}
         </label>
@@ -88,7 +89,7 @@ export function SignalInspectorSection({
           }
           onFocus={onFieldFocus}
           onBlur={onFieldBlur}
-          className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60"
+          size="sm" className="w-full"
         >
           {SIGNAL_MOUNT_DIRECTIONS.map((d) => (
             <option key={d} value={d}>
@@ -96,7 +97,7 @@ export function SignalInspectorSection({
             </option>
           ))}
         </SiteSelect>
-        <p className="mt-1 text-[10px] text-zinc-600">
+        <p className="mt-1 text-caption-2 text-text-disabled">
           {t('mapEditor.signal.mountHint')}
         </p>
       </div>
@@ -104,7 +105,7 @@ export function SignalInspectorSection({
       <div>
         <label
           htmlFor="signal-default-lamp"
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           {t('mapEditor.signal.defaultLamp')}
         </label>
@@ -119,7 +120,7 @@ export function SignalInspectorSection({
           }
           onFocus={onFieldFocus}
           onBlur={onFieldBlur}
-          className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60"
+          size="sm" className="w-full"
         >
           {SIGNAL_LAMPS.map((lamp) => (
             <option key={lamp} value={lamp}>
@@ -131,13 +132,11 @@ export function SignalInspectorSection({
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500">
+          <span className="text-caption-2 text-text-quaternary">
             {t('mapEditor.signal.rules')}
           </span>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Plus />} onPress={() =>
                 setRules([
                   ...rules,
                   {
@@ -147,21 +146,17 @@ export function SignalInspectorSection({
                     lamp: 'green',
                   },
                 ])
-              }
-              className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
-            >
-              <Plus className="size-3" /> {t('mapEditor.signal.add')}
-            </button>
+              }>{t('mapEditor.signal.add')}</Button>
           )}
         </div>
         {rules.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">{t('mapEditor.signal.noRules')}</p>
+          <p className="text-caption-2 text-text-disabled">{t('mapEditor.signal.noRules')}</p>
         ) : (
           <ul className="space-y-2">
             {rules.map((rule, idx) => (
               <li
                 key={idx}
-                className="flex flex-wrap items-center gap-2 rounded border border-zinc-700/80 bg-zinc-950/60 p-2"
+                className="flex flex-wrap items-center gap-2 rounded border border-border-quaternary bg-black-30 p-2"
               >
                 <input
                   readOnly={readOnly}
@@ -173,7 +168,7 @@ export function SignalInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="min-w-[7rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
+                  className="min-w-[7rem] flex-1 rounded border border-border-tertiary bg-surface-primary px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-status-warning read-only:opacity-80"
                   placeholder={t('mapEditor.signal.fieldPlaceholder')}
                 />
                 <SiteSelect
@@ -189,7 +184,7 @@ export function SignalInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="rounded border border-zinc-600 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60"
+                  size="sm"
                 >
                   <option value="eq">=</option>
                   <option value="gt">&gt;</option>
@@ -205,7 +200,7 @@ export function SignalInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="min-w-[3.5rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-amber-500 read-only:opacity-80"
+                  className="min-w-[3.5rem] flex-1 rounded border border-border-tertiary bg-surface-primary px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-status-warning read-only:opacity-80"
                   placeholder={t('mapEditor.signal.valuePlaceholder')}
                 />
                 <SiteSelect
@@ -221,7 +216,7 @@ export function SignalInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="rounded border border-zinc-600 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60"
+                  size="sm"
                 >
                   {SIGNAL_LAMPS.map((lamp) => (
                     <option key={lamp} value={lamp}>
@@ -235,14 +230,7 @@ export function SignalInspectorSection({
                   className="h-8 w-8 shrink-0 object-contain"
                 />
                 {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => setRules(rules.filter((_, i) => i !== idx))}
-                    className="rounded p-1 text-zinc-500 hover:bg-red-950/50 hover:text-red-400"
-                    aria-label={t('mapEditor.signal.deleteRule')}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => setRules(rules.filter((_, i) => i !== idx))} label={t('mapEditor.signal.deleteRule')} icon={<Trash2 />} />
                 )}
               </li>
             ))}
@@ -250,7 +238,7 @@ export function SignalInspectorSection({
         )}
       </div>
 
-      <pre className="overflow-x-auto rounded border border-zinc-700/80 bg-zinc-950/80 p-2 font-mono text-[9px] leading-relaxed text-zinc-500">
+      <pre className="overflow-x-auto rounded border border-border-quaternary bg-surface-sub-background p-2 font-mono text-caption-2 text-text-quaternary">
         {t('mapEditor.signal.mqttExample', { id: facility.id })}
       </pre>
     </section>

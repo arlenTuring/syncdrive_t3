@@ -77,23 +77,23 @@ export function ZonePartitionInspectorSection({
     <section className="space-y-3 rounded-xl border border-emerald-900/40 bg-gradient-to-b from-emerald-950/35 to-zinc-950/50 p-3 shadow-[inset_0_1px_0_rgba(52,211,153,0.08)]">
       <header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-emerald-700/50 bg-emerald-950/70 text-emerald-300">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-emerald-700/50 bg-emerald-950/70 text-status-success">
             <SquareDashed className="size-3.5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h3 className="text-[11px] font-semibold tracking-wide text-emerald-100/95">
+            <h3 className="text-body-xs-bold text-emerald-100/95">
               {t('mapEditor.inspector.zonePartition.title')}
             </h3>
-            <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
+            <p className="mt-0.5 text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.zonePartition.hintShort')}
             </p>
           </div>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-caption-2 font-medium ${
             bound
-              ? 'border border-emerald-600/50 bg-emerald-950/80 text-emerald-300'
-              : 'border border-zinc-600/60 bg-zinc-900/80 text-zinc-500'
+              ? 'border border-emerald-600/50 bg-emerald-950/80 text-status-success'
+              : 'border border-zinc-600/60 bg-surface-primary text-text-quaternary'
           }`}
         >
           {bound
@@ -102,85 +102,85 @@ export function ZonePartitionInspectorSection({
         </span>
       </header>
 
-      <div className="rounded-lg border border-zinc-700/60 bg-zinc-950/70 p-2.5">
+      <div className="rounded-lg border border-border-quaternary bg-zinc-950/70 p-2.5">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-[10px] font-medium text-zinc-400">
+          <span className="text-caption-2 text-text-tertiary">
             {t('mapEditor.inspector.zonePartition.fieldBounds')}
           </span>
-          <span className="text-[9px] text-zinc-600">m</span>
+          <span className="text-caption-2 text-text-disabled">m</span>
         </div>
         {hasBounds ? (
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5 rounded-md border border-cyan-800/40 bg-cyan-950/25 px-2 py-2">
-              <div className="text-[9px] font-medium uppercase tracking-wider text-cyan-500/90">
+              <div className="text-caption-2 uppercase text-cyan-500/90">
                 {t('mapEditor.inspector.zonePartition.axisX')}
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[9px] text-cyan-700/90">
+                <span className="text-caption-2 text-cyan-700/90">
                   {t('mapEditor.inspector.zonePartition.min')}
                 </span>
-                <span className="font-mono text-[12px] text-cyan-100">
+                <span className="font-mono text-body-xs text-cyan-100">
                   {formatBound(bounds.xMinM)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[9px] text-cyan-700/90">
+                <span className="text-caption-2 text-cyan-700/90">
                   {t('mapEditor.inspector.zonePartition.max')}
                 </span>
-                <span className="font-mono text-[12px] text-cyan-100">
+                <span className="font-mono text-body-xs text-cyan-100">
                   {formatBound(bounds.xMaxM)}
                 </span>
               </div>
             </div>
             <div className="space-y-1.5 rounded-md border border-amber-800/40 bg-amber-950/20 px-2 py-2">
-              <div className="text-[9px] font-medium uppercase tracking-wider text-amber-500/90">
+              <div className="text-caption-2 uppercase text-amber-500/90">
                 {t('mapEditor.inspector.zonePartition.axisY')}
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[9px] text-amber-700/90">
+                <span className="text-caption-2 text-amber-700/90">
                   {t('mapEditor.inspector.zonePartition.min')}
                 </span>
-                <span className="font-mono text-[12px] text-amber-100">
+                <span className="font-mono text-body-xs text-status-warning">
                   {formatBound(bounds.yMinM)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[9px] text-amber-700/90">
+                <span className="text-caption-2 text-amber-700/90">
                   {t('mapEditor.inspector.zonePartition.max')}
                 </span>
-                <span className="font-mono text-[12px] text-amber-100">
+                <span className="font-mono text-body-xs text-status-warning">
                   {formatBound(bounds.yMaxM)}
                 </span>
               </div>
             </div>
           </div>
         ) : (
-          <p className="text-[11px] text-zinc-500">
+          <p className="text-body-xs text-text-quaternary">
             {t('mapEditor.inspector.zonePartition.fieldBoundsEmpty')}
           </p>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2 rounded-md border border-zinc-800/80 bg-zinc-950/50 px-2 py-1.5">
-          <LogIn className="size-3 shrink-0 text-zinc-500" aria-hidden />
-          <span className="w-14 shrink-0 text-[10px] text-zinc-500">
+        <div className="flex items-center gap-2 rounded-md border border-border-quaternary bg-black-30 px-2 py-1.5">
+          <LogIn className="size-3 shrink-0 text-text-quaternary" aria-hidden />
+          <span className="w-14 shrink-0 text-caption-2 text-text-quaternary">
             {t('mapEditor.inspector.zonePartition.entrance')}
           </span>
           <span
-            className="min-w-0 truncate text-[11px] text-zinc-200"
+            className="min-w-0 truncate text-body-xs text-text-primary"
             title={binding?.entranceId}
           >
             {entranceAlias ?? '—'}
           </span>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-zinc-800/80 bg-zinc-950/50 px-2 py-1.5">
-          <Link2 className="size-3 shrink-0 text-zinc-500" aria-hidden />
-          <span className="w-14 shrink-0 text-[10px] text-zinc-500">
+        <div className="flex items-center gap-2 rounded-md border border-border-quaternary bg-black-30 px-2 py-1.5">
+          <Link2 className="size-3 shrink-0 text-text-quaternary" aria-hidden />
+          <span className="w-14 shrink-0 text-caption-2 text-text-quaternary">
             {t('mapEditor.inspector.zonePartition.linkAlias')}
           </span>
           <span
-            className="min-w-0 truncate text-[11px] font-medium text-emerald-100/90"
+            className="min-w-0 truncate text-body-xs-bold text-emerald-100/90"
             title={binding?.linkId}
           >
             {linkAlias ?? '—'}
@@ -188,9 +188,9 @@ export function ZonePartitionInspectorSection({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-zinc-800/70 pt-2.5">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700/70 bg-zinc-900/80 px-2.5 py-1 text-[10px] text-zinc-300">
-          <Boxes className="size-3 text-zinc-500" aria-hidden />
+      <div className="flex items-center gap-2 border-t border-border-quaternary pt-2.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border-quaternary bg-surface-primary px-2.5 py-1 text-caption-2 text-text-secondary">
+          <Boxes className="size-3 text-text-quaternary" aria-hidden />
           {t('mapEditor.inspector.zonePartition.childCount', {
             count: childCount,
           })}
@@ -227,21 +227,21 @@ export function ParentZoneInspectorSection({
   const local = readZoneLocalField(facility.parameters)
 
   return (
-    <section className="space-y-2.5 rounded-xl border border-zinc-800/70 bg-zinc-950/45 p-3">
+    <section className="space-y-2.5 rounded-xl border border-border-quaternary bg-zinc-950/45 p-3">
       <header className="flex items-center gap-2">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900 text-zinc-400">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border-quaternary bg-surface-primary text-text-tertiary">
           <SquareDashed className="size-3" aria-hidden />
         </span>
         <div>
-          <h3 className="text-[11px] font-semibold text-zinc-300">
+          <h3 className="text-body-xs-bold text-text-secondary">
             {t('mapEditor.inspector.parentZone.title')}
           </h3>
-          <p className="text-[10px] leading-snug text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             {t('mapEditor.inspector.parentZone.hint')}
           </p>
         </div>
       </header>
-      <label className="block text-[10px] text-zinc-500">
+      <label className="block text-caption-2 text-text-quaternary">
         {t('mapEditor.inspector.parentZone.select')}
         <SiteSelect
           disabled={readOnly}
@@ -259,7 +259,7 @@ export function ParentZoneInspectorSection({
           }}
           onFocus={onFieldFocus}
           onBlur={onFieldBlur}
-          className="mt-0.5 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-80"
+          size="sm" className="mt-0.5 w-full"
         >
           <option value="">{t('mapEditor.inspector.parentZone.none')}</option>
           {zones.map((z) => (
@@ -271,7 +271,7 @@ export function ParentZoneInspectorSection({
         </SiteSelect>
       </label>
       {local ? (
-        <p className="font-mono text-[10px] text-zinc-500">
+        <p className="font-mono text-caption-2 text-text-quaternary">
           {t('mapEditor.inspector.parentZone.local', {
             u: local.u.toFixed(3),
             v: local.v.toFixed(3),

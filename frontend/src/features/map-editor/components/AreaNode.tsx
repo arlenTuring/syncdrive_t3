@@ -2259,15 +2259,15 @@ export const AreaNode = memo(function AreaNode({
         {showCenterLabel && (
           <div className="pointer-events-none absolute inset-0 z-[1400] grid place-items-center">
             <div className="max-w-[88%] rounded-xl border border-amber-300/70 bg-amber-950/65 px-4 py-3 text-center shadow-[0_0_20px_rgba(251,191,36,0.35)] backdrop-blur-sm">
-              <div className="text-xl font-extrabold tracking-wide text-amber-100 sm:text-2xl">
+              <div className="text-headline-4 font-extrabold text-status-warning sm:text-headline-3">
                 {area.customName.trim() || area.id}
               </div>
-              <div className="mt-1 text-sm font-medium text-amber-200/95 sm:text-base">
+              <div className="mt-1 text-body-s-bold text-amber-200/95 sm:text-body-m">
                 場域範圍：橫向 {displayDomain.xMinM.toFixed(1)} ~{' '}
                 {displayDomain.xMaxM.toFixed(1)} m，縱向 {displayDomain.yMinM.toFixed(1)} ~{' '}
                 {displayDomain.yMaxM.toFixed(1)} m
               </div>
-              <div className="mt-1 text-sm font-medium text-amber-200/95 sm:text-base">
+              <div className="mt-1 text-body-s-bold text-amber-200/95 sm:text-body-m">
                 像素尺寸：橫向 {Math.round(committedLayout.wPx)} px，縱向{' '}
                 {Math.round(committedLayout.hPx)} px
               </div>

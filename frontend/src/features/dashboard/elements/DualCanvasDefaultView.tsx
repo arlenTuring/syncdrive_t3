@@ -57,7 +57,7 @@ export function DualCanvasDefaultView({
               e.stopPropagation();
               onEnterEditMode();
             }}
-            className="pointer-events-auto flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-sm font-bold text-white shadow-lg hover:bg-purple-500"
+            className="pointer-events-auto flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-body-s-bold text-text-primary shadow-lg hover:bg-purple-500"
           >
             <Edit3 size={16} /> 編輯子畫布範本
           </button>

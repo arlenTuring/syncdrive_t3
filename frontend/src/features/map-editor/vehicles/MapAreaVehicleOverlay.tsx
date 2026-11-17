@@ -166,7 +166,7 @@ function MapVehicleMqttCoordLabel({
   const track = trackCode ? ` · ${trackCode}` : '';
   return (
     <div
-      className="pointer-events-none absolute rounded px-1.5 py-1 font-mono text-[10px] leading-snug text-white shadow-sm"
+      className="pointer-events-none absolute rounded px-1.5 py-1 font-mono text-caption-2 text-text-primary shadow-sm"
       style={{
         left,
         top,
@@ -187,14 +187,14 @@ function MapVehicleMqttCoordLabel({
       </div>
       {networkFix ? (
         /* 路網位置是本端反查出來的，車端沒有送這幾個值 */
-        <div className="whitespace-nowrap text-amber-200">
+        <div className="whitespace-nowrap text-status-warning">
           road {networkFix.roadId} · lane {networkFix.laneId} · 里程{' '}
           {networkFix.sM.toFixed(1)} m · 偏離 {networkFix.offsetM.toFixed(2)} m
         </div>
       ) : null}
       {stationProgress?.next || stationProgress?.from ? (
         /* 站也換算成里程，所以「還有多遠」就是兩個里程相減 */
-        <div className="whitespace-nowrap text-emerald-200">
+        <div className="whitespace-nowrap text-status-success">
           {stationProgress.from
             ? `離 ${stationProgress.from.stationName} ${(stationProgress.distanceFromM ?? 0).toFixed(0)} m`
             : '起點'}
@@ -1086,7 +1086,7 @@ export function MapAreaVehicleOverlay({
         ) : null;
         const selectedBadge = selected ? (
           <div
-            className={`pointer-events-none absolute whitespace-nowrap rounded border border-white/70 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-lg ${investigated ? 'bg-amber-400' : 'bg-sky-500'}`}
+            className={`pointer-events-none absolute whitespace-nowrap rounded border border-white/70 px-1.5 py-0.5 text-caption-2 text-black shadow-lg ${investigated ? 'bg-status-warning' : 'bg-sky-500'}`}
             style={{
               left: badgeCenterX,
               top: badgeTopY - (cellBadge ? 20 : 0),

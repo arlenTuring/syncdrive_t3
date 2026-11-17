@@ -276,13 +276,13 @@ function DispatchCardView({
             </span>
           )}
           <span
-            className="truncate font-bold text-zinc-100"
+            className="truncate font-bold text-text-primary"
             style={{ fontSize: titleFs }}
           >
             {tripPrimary}
           </span>
           {vehicleSub && (
-            <span className="shrink-0 font-normal text-zinc-500" style={{ fontSize: subFs }}>
+            <span className="shrink-0 font-normal text-text-quaternary" style={{ fontSize: subFs }}>
               {vehicleSub}
             </span>
           )}
@@ -321,11 +321,11 @@ function DispatchCardView({
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div className="min-w-0">
-            <div className="text-zinc-500" style={{ fontSize: labelFs }}>
+            <div className="text-text-quaternary" style={{ fontSize: labelFs }}>
               {stationLabel}
             </div>
             <div
-              className="font-bold leading-tight text-zinc-50"
+              className="font-bold leading-tight text-text-primary"
               style={{
                 fontSize: valueFs,
                 overflowWrap: 'anywhere',
@@ -346,7 +346,7 @@ function DispatchCardView({
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div>
-            <div className="text-zinc-500" style={{ fontSize: labelFs }}>
+            <div className="text-text-quaternary" style={{ fontSize: labelFs }}>
               {metricLabel}
             </div>
             <div className="font-bold leading-tight" style={{ fontSize: valueFs, color: '#f8fafc' }}>
@@ -377,7 +377,7 @@ function DispatchCardView({
       />
 
       <div
-        className="mt-auto flex shrink-0 items-center justify-between text-zinc-400"
+        className="mt-auto flex shrink-0 items-center justify-between text-text-tertiary"
         style={{
           marginTop: Math.round(4 * scale),
           padding: `${Math.round(6 * scale)}px ${pad}px`,
@@ -638,11 +638,11 @@ function MaintenanceCardView({
               {maintTypeLabel}
             </span>
           )}
-          <span className="truncate font-bold text-zinc-100" style={{ fontSize: titleFs }}>
+          <span className="truncate font-bold text-text-primary" style={{ fontSize: titleFs }}>
             {titlePrimary}
           </span>
           {titleSub && (
-            <span className="shrink-0 font-normal text-zinc-500" style={{ fontSize: subFs }}>
+            <span className="shrink-0 font-normal text-text-quaternary" style={{ fontSize: subFs }}>
               {titleSub}
             </span>
           )}
@@ -681,11 +681,11 @@ function MaintenanceCardView({
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div className="min-w-0">
-            <div className="text-zinc-500" style={{ fontSize: labelFs }}>
+            <div className="text-text-quaternary" style={{ fontSize: labelFs }}>
               {stationLabel}
             </div>
             <div
-              className="font-bold leading-tight text-zinc-50"
+              className="font-bold leading-tight text-text-primary"
               style={{
                 fontSize: valueFs,
                 overflowWrap: 'anywhere',
@@ -706,7 +706,7 @@ function MaintenanceCardView({
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div>
-            <div className="text-zinc-500" style={{ fontSize: labelFs }}>
+            <div className="text-text-quaternary" style={{ fontSize: labelFs }}>
               {etaLabel}
             </div>
             <div className="font-bold leading-tight" style={{ fontSize: valueFs, color: etaValueColor }}>
@@ -729,7 +729,7 @@ function MaintenanceCardView({
       />
 
       <div
-        className="mt-auto flex shrink-0 items-center justify-between text-zinc-400"
+        className="mt-auto flex shrink-0 items-center justify-between text-text-tertiary"
         style={{
           marginTop: Math.round(4 * scale),
           padding: `${Math.round(6 * scale)}px ${pad}px`,
@@ -1027,7 +1027,7 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
       title={progressState === 'stale' ? '車端回報暫停，顯示最後有效位置' : undefined}
     >
       {progressState === 'stale' ? (
-        <span className="pointer-events-none absolute right-0 top-0 z-30 rounded bg-zinc-900/80 px-1 text-[10px] leading-4 text-amber-300/90">
+        <span className="pointer-events-none absolute right-0 top-0 z-30 rounded bg-surface-primary px-1 text-caption-2 text-amber-300/90">
           資料暫停
         </span>
       ) : null}

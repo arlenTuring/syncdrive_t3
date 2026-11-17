@@ -58,6 +58,7 @@ import {
   type PublishedMapSummary,
 } from '../api/mapLibraryApi'
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog'
+import { Button } from '../../../components/ui';
 
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
@@ -70,8 +71,8 @@ const PAGE_SIZE = 20
 
 /** 不是主要地圖：灰色，不搶眼；要換主要地圖從該列的「…」選單 */
 const NOT_IN_USE_TAG_STYLE: StatusTagStyle = {
-  container: 'bg-zinc-800/80',
-  dot: 'bg-zinc-500',
+  container: 'bg-surface-secondary',
+  dot: 'bg-status-inactive',
 }
 
 const IN_USE_TAG_STYLE: StatusTagStyle = {
@@ -545,7 +546,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         type="button"
         onClick={() => toggleSort(key)}
         className={`inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 transition hover:bg-[rgba(209,213,220,0.08)] ${
-          active ? 'text-[#51A2FF]' : 'text-[#99A1AF]'
+          active ? 'text-text-theme' : 'text-text-tertiary'
         }`}
         title={t('mapLibrary.sortTitle')}
         aria-label={t('mapLibrary.sortTitle')}
@@ -556,25 +557,25 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   }
 
   const menuItemClass =
-    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]'
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-[rgba(209,213,220,0.08)]'
   const headCellClass =
-    'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-sm font-normal leading-[18px] tracking-[0.5px] text-[#99A1AF]'
+    'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary'
   const bodyCellClass =
-    'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6]'
+    'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary'
   /** 固定左欄／右欄：底色蓋住捲過去的內容，陰影標出固定邊 */
   const fixedLeftClass =
-    'sticky left-0 z-10 w-[200px] min-w-[200px] bg-[#18181B] shadow-[12px_6px_16px_rgba(2,9,19,0.2)]'
+    'sticky left-0 z-10 w-[200px] min-w-[200px] bg-surface-primary shadow-[12px_6px_16px_rgba(2,9,19,0.2)]'
   const fixedRightClass =
-    'sticky right-0 z-10 w-[58px] min-w-[58px] bg-[#18181B] shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]'
+    'sticky right-0 z-10 w-[58px] min-w-[58px] bg-surface-primary shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]'
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-[#18181B] p-3 text-[#F3F4F6]">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-surface-primary p-3 text-text-primary">
       {/* 篩選列 */}
       <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-2xl p-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
           <div className="flex h-[34px] w-[180px] items-center rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5">
-            <Search className="mr-1 size-5 shrink-0 text-[#99A1AF]" aria-hidden />
+            <Search className="mr-1 size-5 shrink-0 text-text-tertiary" aria-hidden />
             <input
               type="search"
               value={keywordDraft}
@@ -583,7 +584,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 if (e.key === 'Enter' && canSearch) applySearch()
               }}
               placeholder={t('common.keywordPlaceholder')}
-              className="min-w-0 flex-1 bg-transparent py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] placeholder:text-[#99A1AF] focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary placeholder:text-text-tertiary focus:outline-none"
             />
           </div>
           <button
@@ -592,7 +593,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             disabled={!canSearch}
             className={`inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 transition ${
               canSearch
-                ? 'bg-[rgba(43,127,255,0.2)] text-[#51A2FF] hover:bg-[rgba(43,127,255,0.3)]'
+                ? 'bg-[rgba(43,127,255,0.2)] text-text-theme hover:bg-[rgba(43,127,255,0.3)]'
                 : 'cursor-not-allowed bg-[rgba(98,116,142,0.2)] text-[#4A5565]'
             }`}
             title={t('common.search')}
@@ -604,9 +605,9 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             type="button"
             onClick={resetFilters}
             disabled={!canReset}
-            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] transition ${
+            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-body-s font-medium leading-[18px] tracking-[0.5px] transition ${
               canReset
-                ? 'text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]'
+                ? 'text-text-secondary hover:bg-[rgba(209,213,220,0.08)]'
                 : 'cursor-not-allowed text-[#4A5565]'
             }`}
             title={t('common.resetFiltersTitle')}
@@ -617,7 +618,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           {offline && (
             <span
               title={t('mapLibrary.offlineTitle')}
-              className="rounded-lg border border-amber-800/70 px-2 py-1 text-xs text-amber-300"
+              className="rounded-lg border border-amber-800/70 px-2 py-1 text-body-xs text-status-warning"
             >
               {t('mapLibrary.offline')}
             </span>
@@ -644,7 +645,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               onClick={() => setImportMenuOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={importMenuOpen}
-              className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-[#51A2FF] transition hover:bg-[rgba(81,162,255,0.08)]"
+              className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme transition hover:bg-[rgba(81,162,255,0.08)]"
             >
               <CloudDownload className="size-[18px]" aria-hidden />
               {t('mapLibrary.importFile')}
@@ -655,7 +656,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               onClose={() => setImportMenuOpen(false)}
               role="menu"
               ariaLabel={t('mapLibrary.importFile')}
-              className="min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl"
+              className="min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl"
             >
                 <button
                   type="button"
@@ -666,7 +667,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                   role="menuitem"
                     className={menuItemClass}
                 >
-                  <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
+                  <FolderOpen className="size-4 text-text-tertiary" aria-hidden />
                   {t('mapLibrary.importFromFile')}
                 </button>
                 <button
@@ -678,7 +679,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                   role="menuitem"
                     className={menuItemClass}
                 >
-                  <FileText className="size-4 text-[#99A1AF]" aria-hidden />
+                  <FileText className="size-4 text-text-tertiary" aria-hidden />
                   {t('mapLibrary.pasteFile')}
                 </button>
                 <button
@@ -690,7 +691,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                   role="menuitem"
                     className={menuItemClass}
                 >
-                  <Server className="size-4 text-[#99A1AF]" aria-hidden />
+                  <Server className="size-4 text-text-tertiary" aria-hidden />
                   {t('mapLibrary.loadFromServer')}
                 </button>
             </AnchoredPopover>
@@ -698,7 +699,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           <button
             type="button"
             onClick={() => setNewMapDialogOpen(true)}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
+            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
           >
             <Plus className="size-[18px]" strokeWidth={2} aria-hidden />
             {t('mapLibrary.newBlank')}
@@ -708,35 +709,35 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
       {serverOpen && (
         <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
-          <p className="text-xs text-[#99A1AF]">
+          <p className="text-body-xs text-text-tertiary">
             {t('mapLibrary.serverHintBefore')}
-            <span className="text-[#D1D5DC]">{t('mapLibrary.serverHintEmphasis')}</span>
+            <span className="text-text-secondary">{t('mapLibrary.serverHintEmphasis')}</span>
             {t('mapLibrary.serverHintAfter')}
           </p>
 
           {serverError ? (
-            <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 px-2 py-1.5 text-xs text-red-300">
+            <p className="mt-2 rounded-md border border-border-danger-light bg-red-950/40 px-2 py-1.5 text-body-xs text-status-error-emphasis">
               {t('mapLibrary.serverListFailed', { error: serverError })}
             </p>
           ) : serverMaps === null ? (
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-[#99A1AF]">
+            <p className="mt-2 flex items-center gap-1.5 text-body-xs text-text-tertiary">
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
               {t('mapLibrary.serverLoading')}
             </p>
           ) : serverMaps.length === 0 ? (
-            <p className="mt-2 text-xs text-[#99A1AF]">{t('mapLibrary.serverEmpty')}</p>
+            <p className="mt-2 text-body-xs text-text-tertiary">{t('mapLibrary.serverEmpty')}</p>
           ) : (
             <ul className="mt-2 divide-y divide-[rgba(212,212,212,0.15)]">
               {serverMaps.map((m) => (
                 <li key={m.mapId} className="flex items-center gap-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 truncate text-sm text-[#F3F4F6]">
+                    <p className="flex items-center gap-2 truncate text-body-s text-text-primary">
                       {m.displayName}
                       {m.mapId === serverActiveId ? (
                         <StatusTag label={t('mapLibrary.inUse')} style={IN_USE_TAG_STYLE} />
                       ) : null}
                     </p>
-                    <p className="truncate text-[11px] text-[#99A1AF]">
+                    <p className="truncate text-body-xs text-text-tertiary">
                       {m.mapId} · {m.version ?? t('mapLibrary.noVersion')}
                       {m.updatedAt ? ` · ${formatMapListDate(m.updatedAt)}` : ''}
                       {typeof m.routeCount === 'number'
@@ -748,7 +749,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                     type="button"
                     disabled={serverLoadingId != null}
                     onClick={() => void handleLoadFromServer(m)}
-                    className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 text-sm font-medium text-[#51A2FF] hover:bg-[rgba(81,162,255,0.08)] disabled:opacity-40"
+                    className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 text-body-s-bold text-text-theme hover:bg-[rgba(81,162,255,0.08)] disabled:opacity-40"
                   >
                     {serverLoadingId === m.mapId ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -766,7 +767,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
       {pasteOpen && (
         <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
-          <label htmlFor={pasteAreaId} className="text-xs text-[#99A1AF]">
+          <label htmlFor={pasteAreaId} className="text-body-xs text-text-tertiary">
             {t('mapLibrary.pasteLabel')}
           </label>
           <textarea
@@ -774,27 +775,15 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             rows={6}
-            className="mt-1 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-2 font-mono text-xs text-[#F3F4F6] outline-none focus:ring-1 focus:ring-[#51A2FF]"
+            className="mt-1 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-2 font-mono text-body-xs text-text-primary outline-none focus:ring-1 focus:ring-[#51A2FF]"
             placeholder='{"schemaVersion":2,"mapId":"...", ...}'
           />
           <div className="mt-2 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="tonal" onPress={() => {
                 setPasteOpen(false)
                 setPasteText('')
-              }}
-              className="inline-flex h-[34px] items-center rounded-lg bg-[rgba(209,213,220,0.12)] px-3.5 text-sm font-medium text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.18)]"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              onClick={handlePasteImport}
-              className="inline-flex h-[34px] items-center rounded-lg bg-[#2B7FFF] px-3.5 text-sm font-medium text-white hover:bg-[#2569e6]"
-            >
-              {t('mapLibrary.import')}
-            </button>
+              }}>{t('common.cancel')}</Button>
+            <Button onPress={handlePasteImport}>{t('mapLibrary.import')}</Button>
           </div>
         </div>
       )}
@@ -805,15 +794,15 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         <div className="flex min-h-0 flex-1 flex-col px-3">
           <div className="min-h-0 flex-1 overflow-auto">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-[#99A1AF]">
+              <div className="flex items-center justify-center gap-2 py-16 text-text-tertiary">
                 <Loader2 className="size-5 animate-spin" aria-hidden />
                 {t('mapLibrary.loading')}
               </div>
             ) : error ? (
-              <p className="py-4 text-sm text-red-400">{error}</p>
+              <p className="py-4 text-body-s text-status-error-emphasis">{error}</p>
             ) : (
               <table className="w-full min-w-[1040px] border-separate border-spacing-0">
-                <thead className="sticky top-0 z-20 bg-[#18181B]">
+                <thead className="sticky top-0 z-20 bg-surface-primary">
                   <tr>
                     <th className={`${headCellClass} ${fixedLeftClass} z-30`}>
                       <div className="flex items-center gap-1">
@@ -838,7 +827,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 <tbody>
                   {pageEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={columns.length + 2} className="py-16 text-center text-sm text-[#99A1AF]">
+                      <td colSpan={columns.length + 2} className="py-16 text-center text-body-s text-text-tertiary">
                         {entries.length === 0 ? t('mapLibrary.empty') : t('mapLibrary.noMatch')}
                       </td>
                     </tr>
@@ -861,17 +850,10 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                   }
                                 }}
                                 autoFocus
-                                className="h-[34px] w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-sm text-[#F3F4F6] outline-none focus:ring-1 focus:ring-[#51A2FF]"
+                                className="h-[34px] w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s text-text-primary outline-none focus:ring-1 focus:ring-[#51A2FF]"
                               />
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => onOpenMap(entry.libraryId)}
-                                className="block w-full truncate text-left hover:text-[#51A2FF]"
-                                title={t('mapLibrary.openTitle')}
-                              >
-                                {entry.displayName}
-                              </button>
+                              <Button variant="text" className="w-full" onPress={() => onOpenMap(entry.libraryId)} title={t('mapLibrary.openTitle')}>{entry.displayName}</Button>
                             )}
                           </td>
                           <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
@@ -903,7 +885,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     prev === entry.libraryId ? null : entry.libraryId,
                                   )
                                 }
-                                className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]"
+                                className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-text-secondary hover:bg-[rgba(209,213,220,0.08)]"
                                 title={t('common.moreActions')}
                                 aria-label={t('common.moreActions')}
                               >
@@ -916,7 +898,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                 onClose={() => setOpenMenuId(null)}
                                 role="menu"
                                 ariaLabel={t('common.moreActions')}
-                                className="min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl"
+                                className="min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl"
                               >
                                   <button
                                     type="button"
@@ -927,7 +909,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     role="menuitem"
                     className={menuItemClass}
                                   >
-                                    <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
+                                    <FolderOpen className="size-4 text-text-tertiary" aria-hidden />
                                     {t('mapLibrary.openTitle')}
                                   </button>
                                   {!isActive && (
@@ -941,7 +923,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                     className={menuItemClass}
                                       title={t('mapLibrary.setActiveTitle')}
                                     >
-                                      <MapPin className="size-4 text-[#99A1AF]" aria-hidden />
+                                      <MapPin className="size-4 text-text-tertiary" aria-hidden />
                                       {t('mapLibrary.setActive')}
                                     </button>
                                   )}
@@ -954,7 +936,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     role="menuitem"
                     className={menuItemClass}
                                   >
-                                    <Pencil className="size-4 text-[#99A1AF]" aria-hidden />
+                                    <Pencil className="size-4 text-text-tertiary" aria-hidden />
                                     {t('mapLibrary.renameTitle')}
                                   </button>
                                   <button
@@ -966,7 +948,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     role="menuitem"
                     className={menuItemClass}
                                   >
-                                    <Copy className="size-4 text-[#99A1AF]" aria-hidden />
+                                    <Copy className="size-4 text-text-tertiary" aria-hidden />
                                     {t('mapLibrary.duplicateTitle')}
                                   </button>
                                   <button
@@ -978,7 +960,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     role="menuitem"
                     className={menuItemClass}
                                   >
-                                    <Download className="size-4 text-[#99A1AF]" aria-hidden />
+                                    <Download className="size-4 text-text-tertiary" aria-hidden />
                                     {t('mapLibrary.exportTitle')}
                                   </button>
                                   <button
@@ -988,9 +970,9 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                       void handleDelete(entry)
                                     }}
                                     role="menuitem"
-                                    className={`${menuItemClass} hover:text-red-300`}
+                                    className={`${menuItemClass} hover:text-status-error-emphasis`}
                                   >
-                                    <Trash2 className="size-4 text-[#99A1AF]" aria-hidden />
+                                    <Trash2 className="size-4 text-text-tertiary" aria-hidden />
                                     {t('common.delete')}
                                   </button>
                               </AnchoredPopover>
@@ -1012,7 +994,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               type="button"
               disabled={currentPage <= 1}
               onClick={() => setPage(Math.max(1, currentPage - 1))}
-              className="inline-flex size-6 items-center justify-center rounded-lg text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
+              className="inline-flex size-6 items-center justify-center rounded-lg text-text-secondary hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
               aria-label={t('mapLibrary.prevPage')}
             >
               <ChevronLeft className="size-[18px]" aria-hidden />
@@ -1023,10 +1005,10 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 type="button"
                 onClick={() => setPage(n)}
                 aria-current={n === currentPage ? 'page' : undefined}
-                className={`inline-flex size-6 items-center justify-center rounded-lg text-sm leading-[18px] tracking-[0.5px] ${
+                className={`inline-flex size-6 items-center justify-center rounded-lg text-body-s leading-[18px] tracking-[0.5px] ${
                   n === currentPage
-                    ? 'border border-[#51A2FF] text-[#51A2FF]'
-                    : 'text-[#F3F4F6] hover:bg-[rgba(209,213,220,0.08)]'
+                    ? 'border border-[#51A2FF] text-text-theme'
+                    : 'text-text-primary hover:bg-[rgba(209,213,220,0.08)]'
                 }`}
               >
                 {n}
@@ -1036,7 +1018,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              className="inline-flex size-6 items-center justify-center rounded-lg text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
+              className="inline-flex size-6 items-center justify-center rounded-lg text-text-secondary hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
               aria-label={t('mapLibrary.nextPage')}
             >
               <ChevronRight className="size-[18px]" aria-hidden />

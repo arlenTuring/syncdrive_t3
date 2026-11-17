@@ -12,6 +12,7 @@ import {
   type ZoneEntranceLink,
 } from '../utils/zonePartition'
 import { resolveWaypointDisplayName, getWaypointCode } from '../utils/waypointFacility'
+import { Button } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -79,11 +80,11 @@ export function ZoneEntranceInspectorSection({
   }
 
   return (
-    <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+    <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+      <h3 className="text-caption-2 uppercase text-text-quaternary">
         {t('mapEditor.inspector.zoneEntrance.title')}
       </h3>
-      <p className="text-[10px] leading-relaxed text-zinc-600">
+      <p className="text-caption-2 text-text-disabled">
         {t('mapEditor.inspector.zoneEntrance.hint')}
       </p>
 
@@ -92,18 +93,18 @@ export function ZoneEntranceInspectorSection({
         車要從哪裡進出這個場區，由人指定，不用幾何去猜——入口點常常畫在分區外面
         （它是從正線轉進來的路口），猜不準。
       */}
-      <div className="space-y-1.5 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
-        <span className="text-[10px] font-medium text-zinc-400">
+      <div className="space-y-1.5 rounded-md border border-border-quaternary bg-black-30 p-2">
+        <span className="text-caption-2 text-text-tertiary">
           {t('mapEditor.inspector.zoneEntrance.waypointLabel')}
         </span>
         {readOnly || !onPatchParameters ? (
-          <p className="text-[10px] text-zinc-500">
+          <p className="text-caption-2 text-text-quaternary">
             {boundWaypoint
               ? resolveWaypointDisplayName(boundWaypoint)
               : t('mapEditor.inspector.zoneEntrance.waypointNone')}
           </p>
         ) : waypoints.length === 0 ? (
-          <p className="text-[10px] text-amber-300/80">
+          <p className="text-caption-2 text-amber-300/80">
             {t('mapEditor.inspector.zoneEntrance.waypointEmpty')}
           </p>
         ) : (
@@ -116,7 +117,7 @@ export function ZoneEntranceInspectorSection({
                 [ZONE_ENTRANCE_WAYPOINT_ID_KEY]: e.target.value.trim() || undefined,
               })
             }
-            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-200"
+            size="sm" className="w-full"
           >
             <option value="">{t('mapEditor.inspector.zoneEntrance.waypointNone')}</option>
             {waypoints.map((w) => {
@@ -131,17 +132,17 @@ export function ZoneEntranceInspectorSection({
           </SiteSelect>
         )}
         {boundWaypointId && !boundWaypoint ? (
-          <p className="text-[10px] text-amber-300/80">
+          <p className="text-caption-2 text-amber-300/80">
             {t('mapEditor.inspector.zoneEntrance.waypointMissing', { id: boundWaypointId })}
           </p>
         ) : null}
-        <p className="text-[10px] leading-relaxed text-zinc-600">
+        <p className="text-caption-2 text-text-disabled">
           {t('mapEditor.inspector.zoneEntrance.waypointHint')}
         </p>
       </div>
 
       {links.length === 0 ? (
-        <p className="text-[11px] text-zinc-500">
+        <p className="text-body-xs text-text-quaternary">
           {t('mapEditor.inspector.zoneEntrance.empty')}
         </p>
       ) : (
@@ -153,25 +154,19 @@ export function ZoneEntranceInspectorSection({
             return (
               <li
                 key={link.id}
-                className="space-y-2 rounded-md border border-zinc-700/80 bg-zinc-950/80 p-2"
+                className="space-y-2 rounded-md border border-border-quaternary bg-surface-sub-background p-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-medium text-zinc-400">
+                  <span className="text-caption-2 text-text-tertiary">
                     {t('mapEditor.inspector.zoneEntrance.linkLabel', {
                       index: index + 1,
                     })}
                   </span>
                   {!readOnly ? (
-                    <button
-                      type="button"
-                      className="text-[10px] text-rose-400 hover:text-rose-300"
-                      onClick={() => removeLink(link.id)}
-                    >
-                      {t('common.delete')}
-                    </button>
+                    <Button hierarchy="danger" variant="text" onPress={() => removeLink(link.id)}>{t('common.delete')}</Button>
                   ) : null}
                 </div>
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-caption-2 text-text-quaternary">
                   {bound
                     ? t('mapEditor.inspector.zoneEntrance.boundLabel', {
                         label: zoneDisplayLabel(bound),
@@ -190,11 +185,11 @@ export function ZoneEntranceInspectorSection({
                 */}
                 {!readOnly && !bound ? (
                   available.length === 0 ? (
-                    <p className="text-[10px] text-amber-300/80">
+                    <p className="text-caption-2 text-amber-300/80">
                       {t('mapEditor.inspector.zoneEntrance.noAvailable')}
                     </p>
                   ) : (
-                    <label className="block text-[10px] text-amber-300/80">
+                    <label className="block text-caption-2 text-amber-300/80">
                       {t('mapEditor.inspector.zoneEntrance.rebind')}
                       <SiteSelect
                         value=""
@@ -206,7 +201,7 @@ export function ZoneEntranceInspectorSection({
                         }}
                         onFocus={onFieldFocus}
                         onBlur={onFieldBlur}
-                        className="mt-0.5 w-full rounded border border-amber-700/70 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-cyan-500"
+                        size="sm" className="mt-0.5 w-full"
                       >
                         <option value="">
                           {t('mapEditor.inspector.zoneEntrance.pickZone')}
@@ -217,13 +212,13 @@ export function ZoneEntranceInspectorSection({
                           </option>
                         ))}
                       </SiteSelect>
-                      <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-600">
+                      <span className="mt-0.5 block text-caption-2 text-text-disabled">
                         {t('mapEditor.inspector.zoneEntrance.rebindHint')}
                       </span>
                     </label>
                   )
                 ) : null}
-                <label className="block text-[10px] text-zinc-500">
+                <label className="block text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.zoneEntrance.zoneName')}
                   <input
                     readOnly={readOnly}
@@ -233,7 +228,7 @@ export function ZoneEntranceInspectorSection({
                     }
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                    className="mt-0.5 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -257,7 +252,7 @@ export function ZoneEntranceInspectorSection({
                       ],
                     ] as const
                   ).map(([key, label]) => (
-                    <label key={key} className="block text-[10px] text-zinc-500">
+                    <label key={key} className="block text-caption-2 text-text-quaternary">
                       {label}
                       <NumberInput
                         readOnly={readOnly}
@@ -266,7 +261,7 @@ export function ZoneEntranceInspectorSection({
                         onChange={(v) => updateLink(link.id, { [key]: v })}
                         onFocus={onFieldFocus}
                         onBlur={onFieldBlur}
-                        className="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                        className="mt-0.5 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
                       />
                     </label>
                   ))}
@@ -279,11 +274,11 @@ export function ZoneEntranceInspectorSection({
 
       {!readOnly ? (
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">
+          <label className="mb-1 block text-caption-2 text-text-quaternary">
             {t('mapEditor.inspector.zoneEntrance.linkExisting')}
           </label>
           {available.length === 0 ? (
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-body-xs text-text-quaternary">
               {t('mapEditor.inspector.zoneEntrance.noAvailable')}
             </p>
           ) : (
@@ -297,7 +292,7 @@ export function ZoneEntranceInspectorSection({
               }}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-cyan-500"
+              size="sm" className="w-full"
             >
               <option value="">
                 {t('mapEditor.inspector.zoneEntrance.pickZone')}

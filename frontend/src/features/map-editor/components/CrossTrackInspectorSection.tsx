@@ -25,6 +25,7 @@ import {
   type CrossRouteKey,
 } from '../utils/crossTrackPortals'
 import { normalizeWaypointCodeInput, normalizeWaypointNameInput } from '../utils/waypointCode'
+import { Checkbox } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -89,28 +90,19 @@ export function CrossTrackInspectorSection({
     t(`mapEditor.inspector.crossTrack.portal.${key}`)
 
   return (
-    <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
-      <div className="text-[10px] font-medium text-zinc-200">
+    <div className="space-y-2 rounded border border-border-quaternary bg-surface-primary p-2">
+      <div className="text-caption-2 text-text-primary">
         {t('mapEditor.inspector.crossTrack.title')}
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5 text-[10px] text-zinc-300">
-        <input
-          type="checkbox"
-          disabled={readOnly}
-          checked={showPortalLabels}
-          onChange={(e) =>
-            onPatchParameters({ [CROSS_SHOW_PORTAL_LABELS_KEY]: e.target.checked })
-          }
-          onFocus={onFieldFocus}
-          onBlur={onFieldBlur}
-          className="rounded border-zinc-600 bg-zinc-950 text-sky-500 focus:ring-sky-500 disabled:opacity-50"
-        />
+      <label className="flex cursor-pointer items-center gap-2 rounded border border-border-quaternary bg-surface-primary px-2 py-1.5 text-caption-2 text-text-secondary">
+        <Checkbox disabled={readOnly} checked={showPortalLabels} onCheckedChange={(checked) => onPatchParameters({ [CROSS_SHOW_PORTAL_LABELS_KEY]: checked })
+          } onFocus={onFieldFocus} onBlur={onFieldBlur} />
         {t('mapEditor.inspector.crossTrack.showPortalLabels')}
       </label>
 
-      <div className="grid grid-cols-2 gap-2 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5">
-        <label className="block text-[9px] text-zinc-400">
+      <div className="grid grid-cols-2 gap-2 rounded border border-border-quaternary bg-surface-primary px-2 py-1.5">
+        <label className="block text-caption-2 text-text-tertiary">
           {t('mapEditor.inspector.crossTrack.diagStrokeDown')}
           <SiteColorInput
             disabled={readOnly}
@@ -120,10 +112,10 @@ export function CrossTrackInspectorSection({
             }
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-1 h-8 w-full cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:cursor-not-allowed disabled:opacity-50"
            />
         </label>
-        <label className="block text-[9px] text-zinc-400">
+        <label className="block text-caption-2 text-text-tertiary">
           {t('mapEditor.inspector.crossTrack.diagStrokeUp')}
           <SiteColorInput
             disabled={readOnly}
@@ -133,7 +125,7 @@ export function CrossTrackInspectorSection({
             }
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="mt-1 h-8 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-1 h-8 w-full cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:cursor-not-allowed disabled:opacity-50"
            />
         </label>
       </div>
@@ -144,10 +136,10 @@ export function CrossTrackInspectorSection({
           return (
             <div
               key={key}
-              className="space-y-1.5 rounded border border-zinc-800/80 bg-zinc-900/40 px-2 py-1.5"
+              className="space-y-1.5 rounded border border-border-quaternary bg-surface-primary px-2 py-1.5"
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[9px] uppercase tracking-wide text-zinc-300">
+                <div className="text-caption-2 uppercase text-text-secondary">
                   {portalLabel(key)}
                 </div>
                 <button
@@ -164,7 +156,7 @@ export function CrossTrackInspectorSection({
               <div>
                 <label
                   htmlFor={`xc-code-${facility.id}-${key}`}
-                  className="mb-0.5 block text-[9px] text-zinc-400"
+                  className="mb-0.5 block text-caption-2 text-text-tertiary"
                 >
                   {t('mapEditor.inspector.crossTrack.waypointCode')}
                 </label>
@@ -181,14 +173,14 @@ export function CrossTrackInspectorSection({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                   }}
-                  className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60"
+                  className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-60"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor={`xc-alias-${facility.id}-${key}`}
-                  className="mb-0.5 block text-[9px] text-zinc-400"
+                  className="mb-0.5 block text-caption-2 text-text-tertiary"
                 >
                   {t('mapEditor.inspector.crossTrack.alias')}
                 </label>
@@ -205,7 +197,7 @@ export function CrossTrackInspectorSection({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                   }}
-                  className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60"
+                  className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-60"
                 />
               </div>
 
@@ -214,7 +206,7 @@ export function CrossTrackInspectorSection({
                   <div key={axis}>
                     <label
                       htmlFor={`xc-${axis}-${facility.id}-${key}`}
-                      className="mb-0.5 block text-[9px] text-zinc-400"
+                      className="mb-0.5 block text-caption-2 text-text-tertiary"
                     >
                       {axis === 'xM'
                         ? t('mapEditor.inspector.crossTrack.fieldX')
@@ -240,30 +232,30 @@ export function CrossTrackInspectorSection({
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') e.currentTarget.blur()
                       }}
-                      className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60"
+                      className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-60"
                     />
                   </div>
                 ))}
               </div>
               {resolved[key].auto ? (
-                <p className="text-[9px] text-emerald-400/80">
+                <p className="text-caption-2 text-emerald-400/80">
                   {t('mapEditor.inspector.crossTrack.autoValue')}
                 </p>
               ) : (
-                <p className="text-[9px] text-amber-400/80">
+                <p className="text-caption-2 text-status-warning">
                   {t('mapEditor.inspector.crossTrack.manualValue')}
                 </p>
               )}
             </div>
           )
         })}
-        <p className="text-[9px] leading-relaxed text-zinc-500">
+        <p className="text-caption-2 text-text-quaternary">
           {t('mapEditor.inspector.crossTrack.fieldHint')}
         </p>
       </div>
 
       <div className="space-y-1.5">
-        <div className="text-[10px] font-medium text-zinc-200">
+        <div className="text-caption-2 text-text-primary">
           {t('mapEditor.inspector.crossTrack.routes')}
         </div>
         {CROSS_ROUTE_KEYS.map((key: CrossRouteKey) => {
@@ -272,10 +264,10 @@ export function CrossTrackInspectorSection({
             <div key={key} className="flex items-center gap-2">
               <label
                 htmlFor={`xc-route-${facility.id}-${key}`}
-                className="min-w-0 flex-1 truncate text-[10px] text-zinc-300"
+                className="min-w-0 flex-1 truncate text-caption-2 text-text-secondary"
               >
                 {t(`mapEditor.inspector.crossTrack.route.${key}`)}
-                <span className="ml-1 font-mono text-[9px] text-zinc-500">
+                <span className="ml-1 font-mono text-caption-2 text-text-quaternary">
                   {portalLabel(from)}→{portalLabel(to)}
                 </span>
               </label>
@@ -288,7 +280,7 @@ export function CrossTrackInspectorSection({
                     patchCrossRoute(facility, key, e.target.value as CrossRouteDirection),
                   )
                 }
-                className="shrink-0 rounded border border-zinc-600 bg-zinc-950 px-1.5 py-1 text-[11px] text-zinc-100 outline-none focus:border-sky-500 disabled:opacity-60"
+                size="sm" className="shrink-0"
               >
                 {CROSS_ROUTE_DIRECTIONS.map((d) => (
                   <option key={d} value={d}>

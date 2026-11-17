@@ -58,6 +58,7 @@ import { TrackPartInspectorSection } from './TrackPartInspectorSection'
 import { GeofenceInspectorSection } from './GeofenceInspectorSection'
 import { FacilityInspectorSection } from './FacilityInspectorSection'
 import { FacilityDockingPointInspectorSection } from './FacilityDockingPointInspectorSection'
+import { Button, Checkbox } from '../../../components/ui';
 import { FacilityLayerSection } from './FacilityLayerSection'
 import { FacilityRefFieldPositionSection } from './FacilityRefFieldPositionSection'
 import { FacilityRefFieldBoundsSection } from './FacilityRefFieldBoundsSection'
@@ -111,33 +112,24 @@ function FacilityLabelStyleSection({
   const showLabelDragHint = facilityUsesDraggableMapLabel(facility)
 
   return (
-    <div className="space-y-2 rounded-md border border-zinc-700/80 bg-zinc-950/50 p-2.5">
-      <p className="text-[10px] font-medium text-zinc-500">{t('mapEditor.inspector.labelStyle.title')}</p>
-      <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
-        <input
-          type="checkbox"
-          checked={labelStyle.visible !== false}
-          disabled={readOnly}
-          onChange={(e) =>
-            patchLabelStyle({
-              visible: e.target.checked ? true : false,
+    <div className="space-y-2 rounded-md border border-border-quaternary bg-black-30 p-2.5">
+      <p className="text-caption-2 text-text-quaternary">{t('mapEditor.inspector.labelStyle.title')}</p>
+      <label className="flex cursor-pointer items-center gap-2 text-body-xs text-text-secondary">
+        <Checkbox checked={labelStyle.visible !== false} disabled={readOnly} onCheckedChange={(checked) => patchLabelStyle({
+              visible: checked ? true : false,
             })
-          }
-          onFocus={onFieldFocus}
-          onBlur={onFieldBlur}
-          className="rounded border-zinc-600 accent-cyan-500"
-        />
+          } onFocus={onFieldFocus} onBlur={onFieldBlur} />
         {t('mapEditor.inspector.labelStyle.showName')}
       </label>
       {showLabelDragHint && labelStyle.visible !== false ? (
-        <p className="text-[10px] leading-relaxed text-zinc-600">
+        <p className="text-caption-2 text-text-disabled">
           {t('mapEditor.inspector.labelStyle.dragHint')}
         </p>
       ) : null}
       <div>
         <label
           htmlFor="label-font-size"
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           {t('mapEditor.inspector.labelStyle.fontSize')}
         </label>
@@ -152,21 +144,13 @@ function FacilityLabelStyleSection({
             onChange={(n) => patchLabelStyle({ fontSizePx: n })}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
+            className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 disabled:opacity-50"
           />
-          <button
-            type="button"
-            disabled={readOnly || labelStyle.visible === false}
-            onClick={() => patchLabelStyle({ fontSizePx: undefined })}
-            className="shrink-0 rounded border border-zinc-600 px-2 py-1.5 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
-            title={t('mapEditor.inspector.labelStyle.autoTitle', {
+          <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={readOnly || labelStyle.visible === false} onPress={() => patchLabelStyle({ fontSizePx: undefined })} title={t('mapEditor.inspector.labelStyle.autoTitle', {
               px: DEFAULT_AUTO_LABEL_FONT_PX,
-            })}
-          >
-            {t('common.auto')}
-          </button>
+            })}>{t('common.auto')}</Button>
         </div>
-        <p className="mt-1 text-[10px] text-zinc-600">
+        <p className="mt-1 text-caption-2 text-text-disabled">
           {t('mapEditor.inspector.labelStyle.fontHint', {
             px: EXAMPLE_MAP_DEFAULT_LABEL_FONT_PX,
           })}
@@ -175,7 +159,7 @@ function FacilityLabelStyleSection({
       <div>
         <label
           htmlFor="label-color"
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           {t('mapEditor.inspector.labelStyle.textColor')}
         </label>
@@ -187,45 +171,24 @@ function FacilityLabelStyleSection({
             onChange={(e) => patchLabelStyle({ color: e.target.value })}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-50"
+            className="h-8 w-10 cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:opacity-50"
            />
-          <button
-            type="button"
-            disabled={readOnly || labelStyle.visible === false}
-            onClick={() => patchLabelStyle({ color: '' })}
-            className="rounded border border-zinc-600 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {t('mapEditor.inspector.labelStyle.defaultColor')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" disabled={readOnly || labelStyle.visible === false} onPress={() => patchLabelStyle({ color: '' })}>{t('mapEditor.inspector.labelStyle.defaultColor')}</Button>
         </div>
       </div>
       <div className="flex flex-wrap gap-3">
-        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-300">
-          <input
-            type="checkbox"
-            checked={labelStyle.fontWeight === 'bold'}
-            disabled={readOnly || labelStyle.visible === false}
-            onChange={(e) =>
-              patchLabelStyle({
-                fontWeight: e.target.checked ? 'bold' : 'normal',
+        <label className="flex cursor-pointer items-center gap-1.5 text-body-xs text-text-secondary">
+          <Checkbox checked={labelStyle.fontWeight === 'bold'} disabled={readOnly || labelStyle.visible === false} onCheckedChange={(checked) => patchLabelStyle({
+                fontWeight: checked ? 'bold' : 'normal',
               })
-            }
-            className="rounded border-zinc-600 accent-cyan-500"
-          />
+            } />
           {t('common.bold')}
         </label>
-        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-300">
-          <input
-            type="checkbox"
-            checked={labelStyle.fontStyle === 'italic'}
-            disabled={readOnly || labelStyle.visible === false}
-            onChange={(e) =>
-              patchLabelStyle({
-                fontStyle: e.target.checked ? 'italic' : 'normal',
+        <label className="flex cursor-pointer items-center gap-1.5 text-body-xs text-text-secondary">
+          <Checkbox checked={labelStyle.fontStyle === 'italic'} disabled={readOnly || labelStyle.visible === false} onCheckedChange={(checked) => patchLabelStyle({
+                fontStyle: checked ? 'italic' : 'normal',
               })
-            }
-            className="rounded border-zinc-600 accent-cyan-500"
-          />
+            } />
           {t('common.italic')}
         </label>
       </div>
@@ -255,7 +218,7 @@ function FacilityLabelStyleSection({
         disabled={readOnly || labelStyle.visible === false}
       />
       <p
-        className="truncate rounded border border-zinc-700/60 bg-zinc-900/80 px-2 py-1"
+        className="truncate rounded border border-border-quaternary bg-surface-primary px-2 py-1"
         style={{
           fontSize: Math.min(22, effectiveLabelPx),
           color: labelStyle.color ?? '#e4e4e7',
@@ -292,10 +255,10 @@ function InspectorSection({
   return (
     <section
       className={`space-y-2.5 rounded-lg border p-3 ${
-        className ?? 'border-zinc-800/70 bg-zinc-950/45'
+        className ?? 'border-border-quaternary bg-zinc-950/45'
       }`}
     >
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <h3 className="text-caption-2 uppercase text-text-quaternary">
         {title}
       </h3>
       <div className="space-y-2.5">{children}</div>
@@ -422,28 +385,28 @@ export function Inspector({
   return (
     <aside
       data-inspector
-      className="flex h-full min-h-0 w-72 flex-col border-l border-zinc-700/80 bg-zinc-900"
+      className="flex h-full min-h-0 w-72 flex-col border-l border-border-quaternary bg-surface-primary"
     >
-      <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+      <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-text-quaternary">
         {t('mapEditor.inspector.properties')}
         {readOnly && (
-          <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal normal-case text-zinc-400">
+          <span className="ml-2 rounded bg-surface-secondary px-1.5 py-0.5 text-caption-2 font-normal normal-case text-text-tertiary">
             {t('common.view')}
           </span>
         )}
       </div>
-      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm text-zinc-200">
+      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-body-s text-text-primary">
         <InspectorSection title={t('mapEditor.inspector.identityNaming')}>
           <div>
-            <label className="mb-1 block text-[10px] text-zinc-500">
+            <label className="mb-1 block text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.standardLayerName')}
             </label>
-            <p className="break-all rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5 font-mono text-[11px] leading-snug text-cyan-300/90">
+            <p className="break-all rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-cyan-300/90">
               {layerName}
             </p>
           </div>
           <div>
-            <label htmlFor="facility-id" className="mb-1 block text-[10px] text-zinc-500">
+            <label htmlFor="facility-id" className="mb-1 block text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.facilityId')}
             </label>
             <input
@@ -453,12 +416,12 @@ export function Inspector({
               onChange={(e) => onChangeId(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
               placeholder="001"
             />
           </div>
           <div>
-            <label htmlFor="facility-custom" className="mb-1 block text-[10px] text-zinc-500">
+            <label htmlFor="facility-custom" className="mb-1 block text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.customDisplayName')}
             </label>
             <input
@@ -468,14 +431,14 @@ export function Inspector({
               onChange={(e) => onChangeCustomName(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
               placeholder={t('common.optional')}
             />
           </div>
           {onPatchParameters &&
           isFacilityAreaBlock(facility) ? (
             <div>
-              <label htmlFor="facility-purpose" className="mb-1 block text-[10px] text-zinc-500">
+              <label htmlFor="facility-purpose" className="mb-1 block text-caption-2 text-text-quaternary">
                 {t('mapEditor.inspector.purpose')}
               </label>
               <input
@@ -491,10 +454,10 @@ export function Inspector({
                 }
                 onFocus={onFieldFocus}
                 onBlur={onFieldBlur}
-                className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
+                className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50 read-only:cursor-default read-only:opacity-90"
                 placeholder={t('mapEditor.inspector.purposePlaceholder')}
               />
-              <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+              <p className="mt-1 text-caption-2 text-text-disabled">
                 {t('mapEditor.inspector.purposeHint')}
               </p>
             </div>
@@ -527,41 +490,41 @@ export function Inspector({
 
         <InspectorSection title={t('mapEditor.inspector.positionSize')}>
           <div>
-            <p className="mb-1.5 text-[10px] text-zinc-500">
+            <p className="mb-1.5 text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.areaCoordsHint')}
             </p>
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.positionX')}</div>
-                <div className="font-mono text-[11px] text-zinc-200">
+              <div className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5">
+                <div className="text-caption-2 text-text-quaternary">{t('mapEditor.inspector.positionX')}</div>
+                <div className="font-mono text-body-xs text-text-primary">
                   {areaXp.toFixed(2)}
                 </div>
               </div>
-              <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.positionY')}</div>
-                <div className="font-mono text-[11px] text-zinc-200">
+              <div className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5">
+                <div className="text-caption-2 text-text-quaternary">{t('mapEditor.inspector.positionY')}</div>
+                <div className="font-mono text-body-xs text-text-primary">
                   {areaYp.toFixed(2)}
                 </div>
               </div>
             </div>
-            <p className="mt-1.5 text-[10px] text-zinc-600">
+            <p className="mt-1.5 text-caption-2 text-text-disabled">
               {t('mapEditor.inspector.areaDragHint')}
             </p>
           </div>
 
           <div>
-            <p className="mb-1.5 text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelSizeInArea')}</p>
+            <p className="mb-1.5 text-caption-2 text-text-quaternary">{t('mapEditor.inspector.pixelSizeInArea')}</p>
             {readOnly || !onChangeAreaSizePx ? (
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                  <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelWidth')}</div>
-                  <div className="font-mono text-[11px] text-zinc-200">
+                <div className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5">
+                  <div className="text-caption-2 text-text-quaternary">{t('mapEditor.inspector.pixelWidth')}</div>
+                  <div className="font-mono text-body-xs text-text-primary">
                     {pixelW !== null ? pixelW.toFixed(2) : '—'}
                   </div>
                 </div>
-                <div className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5">
-                  <div className="text-[10px] text-zinc-500">{t('mapEditor.inspector.pixelHeight')}</div>
-                  <div className="font-mono text-[11px] text-zinc-200">
+                <div className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5">
+                  <div className="text-caption-2 text-text-quaternary">{t('mapEditor.inspector.pixelHeight')}</div>
+                  <div className="font-mono text-body-xs text-text-primary">
                     {pixelH !== null ? pixelH.toFixed(2) : '—'}
                   </div>
                 </div>
@@ -571,7 +534,7 @@ export function Inspector({
                 <div className="flex items-center gap-2">
                   <label
                     htmlFor="facility-size-px-w"
-                    className="w-16 shrink-0 text-[10px] text-zinc-500"
+                    className="w-16 shrink-0 text-caption-2 text-text-quaternary"
                   >
                     {t('mapEditor.inspector.pixelWidth')}
                   </label>
@@ -586,14 +549,14 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="min-w-0 flex-1 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50"
                   />
-                  <span className="shrink-0 text-[10px] text-zinc-500">px</span>
+                  <span className="shrink-0 text-caption-2 text-text-quaternary">px</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <label
                     htmlFor="facility-size-px-h"
-                    className="w-16 shrink-0 text-[10px] text-zinc-500"
+                    className="w-16 shrink-0 text-caption-2 text-text-quaternary"
                   >
                     {t('mapEditor.inspector.pixelHeight')}
                   </label>
@@ -608,17 +571,17 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="min-w-0 flex-1 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                    className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/50"
                   />
-                  <span className="shrink-0 text-[10px] text-zinc-500">px</span>
+                  <span className="shrink-0 text-caption-2 text-text-quaternary">px</span>
                 </div>
               </div>
             ) : (
-              <p className="rounded-md border border-zinc-700/90 bg-zinc-950/80 px-2 py-1.5 text-[10px] text-zinc-500">
+              <p className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-1.5 text-caption-2 text-text-quaternary">
                 {t('mapEditor.inspector.noPixelSize')}
               </p>
             )}
-            <p className="mt-1.5 text-[10px] text-zinc-600">
+            <p className="mt-1.5 text-caption-2 text-text-disabled">
               {t('mapEditor.inspector.pixelSizeHint')}
             </p>
           </div>
@@ -665,20 +628,20 @@ export function Inspector({
             title={t('mapEditor.inspector.mqtt.title')}
             className="border-amber-900/35 bg-amber-950/12"
           >
-            <p className="text-[10px] leading-relaxed text-zinc-500">
+            <p className="text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.mqtt.hintBefore')}{' '}
               <strong>{t('mapEditor.inspector.mqtt.hintNameId')}</strong>
               {t('mapEditor.inspector.mqtt.hintAfter')}
             </p>
-            <label className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500">
+            <label className="mb-1 block text-caption-2 uppercase text-text-quaternary">
               {t('mapEditor.inspector.mqtt.componentName')}
             </label>
-            <div className="mb-2 rounded border border-zinc-700/80 bg-zinc-950/50 px-2 py-1.5 font-mono text-[11px] text-zinc-200">
+            <div className="mb-2 rounded border border-border-quaternary bg-black-30 px-2 py-1.5 font-mono text-body-xs text-text-primary">
               {facility.name}
             </div>
             <label
               htmlFor="mqtt-instance"
-              className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
+              className="mb-1 block text-caption-2 uppercase text-text-quaternary"
             >
               {t('mapEditor.inspector.mqtt.tailId')}
             </label>
@@ -695,32 +658,26 @@ export function Inspector({
               }}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mb-2 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-amber-100 outline-none focus:border-amber-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-status-warning outline-none focus:border-amber-500/80 read-only:opacity-80"
               placeholder={mqttTailDefault}
             />
-            <div className="rounded border border-zinc-700/80 bg-zinc-950/80 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-zinc-400">
+            <div className="rounded border border-border-quaternary bg-surface-sub-background px-2 py-1.5 font-mono text-caption-2 text-text-tertiary">
               <div>
-                <span className="text-zinc-500">{t('mapEditor.inspector.mqtt.entityIdLabel')}</span>
+                <span className="text-text-quaternary">{t('mapEditor.inspector.mqtt.entityIdLabel')}</span>
                 <span className="text-cyan-300/90">{resolvedEntityId}</span>
               </div>
               <div className="mt-0.5">
-                <span className="text-zinc-500">{t('mapEditor.inspector.mqtt.topicLabel')}</span>
-                <span className="text-amber-200/80">{resolvedTopic}</span>
+                <span className="text-text-quaternary">{t('mapEditor.inspector.mqtt.topicLabel')}</span>
+                <span className="text-status-warning">{resolvedTopic}</span>
               </div>
             </div>
             {legacyEntityId.length > 0 && (
-              <div className="mt-2 rounded border border-amber-800/40 bg-amber-950/40 px-2 py-1.5 text-[10px] text-amber-100/90">
+              <div className="mt-2 rounded border border-amber-800/40 bg-amber-950/40 px-2 py-1.5 text-caption-2 text-amber-100/90">
                 <p className="mb-1">
                   {t('mapEditor.inspector.mqtt.legacyNote')}
                 </p>
                 {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => onPatchParameters({ mqttEntityId: undefined })}
-                    className="rounded border border-amber-700/60 bg-amber-950/60 px-2 py-0.5 text-[10px] hover:bg-amber-900/50"
-                  >
-                    {t('mapEditor.inspector.mqtt.clearLegacy')}
-                  </button>
+                  <Button hierarchy="subordinate" variant="outlined" onPress={() => onPatchParameters({ mqttEntityId: undefined })}>{t('mapEditor.inspector.mqtt.clearLegacy')}</Button>
                 )}
               </div>
             )}
@@ -731,55 +688,45 @@ export function Inspector({
           readOnly ? (
             <InspectorSection title={t('mapEditor.inspector.slot.title')}>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-xs font-medium text-emerald-200/90">
+                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
                   {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
-                <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.viewOnlyHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_OCCUPANCY.map((k) => (
                     <label
                       key={k}
-                      className="flex cursor-default items-center gap-2 text-xs text-zinc-400"
+                      className="flex cursor-default items-center gap-2 text-body-xs text-text-tertiary"
                     >
-                      <input
-                        type="checkbox"
-                        checked={occEn[k]}
-                        disabled
-                        className="rounded border-zinc-600 opacity-70"
-                      />
+                      <Checkbox checked={occEn[k]} disabled />
                       {k === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-xs font-medium text-emerald-200/90">
+                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
                   {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
-                <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.viewOnlyHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {SLOT_EQUIPMENT_STATES.map((k) => (
                     <label
                       key={k}
-                      className="flex cursor-default items-center gap-2 text-xs text-zinc-400"
+                      className="flex cursor-default items-center gap-2 text-body-xs text-text-tertiary"
                     >
-                      <input
-                        type="checkbox"
-                        checked={eqEn[k]}
-                        disabled
-                        className="rounded border-zinc-600 opacity-70"
-                      />
+                      <Checkbox checked={eqEn[k]} disabled />
                       {k}
                     </label>
                   ))}
                 </div>
               </div>
-              <div className="rounded-md border border-zinc-700 bg-zinc-950/80 px-2 py-2 text-xs text-zinc-300">
-                <div className="mb-2 font-medium text-zinc-400">
+              <div className="rounded-md border border-border-quaternary bg-surface-sub-background px-2 py-2 text-body-xs text-text-secondary">
+                <div className="mb-2 font-medium text-text-tertiary">
                   {t('mapEditor.inspector.slot.mapDefaultSaved')}
                 </div>
                 <p>
@@ -794,10 +741,10 @@ export function Inspector({
           ) : (
             <InspectorSection title={t('mapEditor.inspector.slot.title')}>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-xs font-medium text-emerald-200/90">
+                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
                   {t('mapEditor.inspector.slot.occupancySettings')}
                 </div>
-                <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.occupancyEnableHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
@@ -806,22 +753,17 @@ export function Inspector({
                     return (
                       <label
                         key={k}
-                        className="flex cursor-pointer items-center gap-2 text-xs text-zinc-200"
+                        className="flex cursor-pointer items-center gap-2 text-body-xs text-text-primary"
                       >
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={(e) => {
+                        <Checkbox checked={enabled} onCheckedChange={(checked) => {
                             const next = { ...sf.slotOccupancyEnabled }
-                            if (e.target.checked) delete next[k]
+                            if (checked) delete next[k]
                             else next[k] = false
                             onPatchSlot({
                               slotOccupancyEnabled:
                                 Object.keys(next).length > 0 ? next : undefined,
                             })
-                          }}
-                          className="rounded border-zinc-600"
-                        />
+                          }} />
                         {k === 'Vacant' ? t('mapEditor.inspector.slot.vacantOption') : t('mapEditor.inspector.slot.occupiedOption')}
                       </label>
                     )
@@ -829,10 +771,10 @@ export function Inspector({
                 </div>
               </div>
               <div className="rounded-md border border-emerald-900/40 bg-emerald-950/15 p-2">
-                <div className="mb-2 text-xs font-medium text-emerald-200/90">
+                <div className="mb-2 text-body-xs-bold text-emerald-200/90">
                   {t('mapEditor.inspector.slot.equipmentSettings')}
                 </div>
-                <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.equipmentEnableHint')}
                 </p>
                 <div className="flex flex-col gap-1.5">
@@ -841,22 +783,17 @@ export function Inspector({
                     return (
                       <label
                         key={k}
-                        className="flex cursor-pointer items-center gap-2 text-xs text-zinc-200"
+                        className="flex cursor-pointer items-center gap-2 text-body-xs text-text-primary"
                       >
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={(e) => {
+                        <Checkbox checked={enabled} onCheckedChange={(checked) => {
                             const next = { ...sf.slotEquipmentEnabled }
-                            if (e.target.checked) delete next[k]
+                            if (checked) delete next[k]
                             else next[k] = false
                             onPatchSlot({
                               slotEquipmentEnabled:
                                 Object.keys(next).length > 0 ? next : undefined,
                             })
-                          }}
-                          className="rounded border-zinc-600"
-                        />
+                          }} />
                         {k}
                       </label>
                     )
@@ -864,10 +801,10 @@ export function Inspector({
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-zinc-500">
+                <label className="mb-1 block text-body-xs text-text-quaternary">
                   {t('mapEditor.inspector.slot.mapDefaultSaved')}
                 </label>
-                <p className="mb-2 text-[10px] text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.mapDefaultHint')}
                 </p>
                 <div className="flex flex-col gap-2">
@@ -880,7 +817,7 @@ export function Inspector({
                     }
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                    size="md" className="w-full"
                   >
                     {SLOT_OCCUPANCY.map((s) => (
                       <option key={s} value={s}>
@@ -897,7 +834,7 @@ export function Inspector({
                     }
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+                    size="md" className="w-full"
                   >
                     {SLOT_EQUIPMENT_STATES.map((s) => (
                       <option key={s} value={s}>
@@ -909,14 +846,14 @@ export function Inspector({
               </div>
               <div className="rounded-md border border-cyan-900/40 bg-cyan-950/20 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs font-medium text-cyan-200/90">
+                  <span className="text-body-xs-bold text-cyan-200/90">
                     {t('mapEditor.inspector.slot.previewTest')}
                   </span>
                   {slotPreview && (
-                    <span className="text-[10px] text-amber-400">{t('mapEditor.inspector.slot.previewing')}</span>
+                    <span className="text-caption-2 text-status-warning">{t('mapEditor.inspector.slot.previewing')}</span>
                   )}
                 </div>
-                <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
+                <p className="mb-2 text-caption-2 text-text-quaternary">
                   {t('mapEditor.inspector.slot.previewHint')}
                 </p>
                 <div className="flex flex-col gap-2">
@@ -935,7 +872,7 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-cyan-500"
+                    size="md" className="w-full"
                   >
                     {SLOT_OCCUPANCY.map((s) => (
                       <option key={s} value={s}>
@@ -958,7 +895,7 @@ export function Inspector({
                     }}
                     onFocus={onFieldFocus}
                     onBlur={onFieldBlur}
-                    className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-cyan-500"
+                    size="md" className="w-full"
                   >
                     {SLOT_EQUIPMENT_STATES.map((s) => (
                       <option key={s} value={s}>
@@ -967,27 +904,15 @@ export function Inspector({
                     ))}
                   </SiteSelect>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSlotPreviewChange(null)}
-                      className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                    >
-                      {t('mapEditor.inspector.slot.clearPreview')}
-                    </button>
+                    <Button hierarchy="subordinate" variant="outlined" onPress={() => onSlotPreviewChange(null)}>{t('mapEditor.inspector.slot.clearPreview')}</Button>
                     {slotPreview && (
-                      <button
-                        type="button"
-                        onClick={() => {
+                      <Button hierarchy="subordinate" variant="outlined" onPress={() => {
                           onPatchSlot({
                             slotOccupancy: slotPreview.occupancy,
                             slotEquipmentState: slotPreview.equipment,
                           })
                           onSlotPreviewChange(null)
-                        }}
-                        className="rounded border border-cyan-700 bg-cyan-950/50 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-900/40"
-                      >
-                        {t('mapEditor.inspector.slot.applyPreviewAsDefault')}
-                      </button>
+                        }}>{t('mapEditor.inspector.slot.applyPreviewAsDefault')}</Button>
                     )}
                   </div>
                 </div>
@@ -1000,10 +925,10 @@ export function Inspector({
             title={t('mapEditor.inspector.psd.title')}
             className="border-sky-900/35 bg-sky-950/12"
           >
-            <p className="text-[10px] leading-relaxed text-zinc-500">
+            <p className="text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.psd.hint')}
             </p>
-            <label className="mb-1 block text-[10px] text-zinc-500">
+            <label className="mb-1 block text-caption-2 text-text-quaternary">
               {t('mapEditor.inspector.psd.mapDefaultOpen', {
                 pct: resolvePsdDisplay(facility).openPercent.toFixed(0),
               })}
@@ -1031,7 +956,7 @@ export function Inspector({
             />
             <label
               htmlFor="psd-mqtt-key"
-              className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
+              className="mb-1 block text-caption-2 uppercase text-text-quaternary"
             >
               {t('mapEditor.inspector.psd.mqttKey')}
             </label>
@@ -1050,11 +975,11 @@ export function Inspector({
               }
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mb-2 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-sky-500/80 read-only:opacity-80"
             />
             <label
               htmlFor="psd-sql-field"
-              className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500"
+              className="mb-1 block text-caption-2 uppercase text-text-quaternary"
             >
               {t('mapEditor.inspector.psd.sqlField')}
             </label>
@@ -1074,9 +999,9 @@ export function Inspector({
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               placeholder="door_open_pct"
-              className="mb-2 w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500/80 read-only:opacity-80"
+              className="mb-2 w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-sky-500/80 read-only:opacity-80"
             />
-            <pre className="overflow-x-auto rounded border border-zinc-700/80 bg-zinc-950/80 p-2 font-mono text-[9px] leading-relaxed text-zinc-400">
+            <pre className="overflow-x-auto rounded border border-border-quaternary bg-surface-sub-background p-2 font-mono text-caption-2 text-text-tertiary">
               {`{\n  "entityId": "${resolvedEntityId}",\n  "openPercent": 72,\n  "alarm": false\n}`}
             </pre>
           </InspectorSection>
@@ -1214,7 +1139,7 @@ export function Inspector({
               }
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-70"
+              size="md" className="w-full"
             >
               {nonSlotStates!.map((s) => (
                 <option key={s} value={s}>
@@ -1223,7 +1148,7 @@ export function Inspector({
               ))}
             </SiteSelect>
             {facility.type === 'PSD' && (
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-caption-2 text-text-disabled">
                 {t('mapEditor.inspector.psd.alarmHint')}
               </p>
             )}
@@ -1235,7 +1160,7 @@ export function Inspector({
             <button
               type="button"
               onClick={onDelete}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/80 bg-red-950/50 py-2 text-sm font-medium text-red-300 transition hover:bg-red-950/80 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/80 bg-red-950/50 py-2 text-body-s-bold text-status-error-emphasis transition hover:bg-red-950/80 focus:outline-none focus:ring-2 focus:ring-red-500/40"
             >
               <Trash2 className="size-4 shrink-0" aria-hidden />
               {t('mapEditor.inspector.deleteObject')}
@@ -1243,7 +1168,7 @@ export function Inspector({
           </div>
         )}
 
-        <p className="rounded-md border border-zinc-800/60 bg-zinc-950/30 px-2.5 py-2 text-[10px] leading-relaxed text-zinc-500">
+        <p className="rounded-md border border-border-quaternary bg-black-30 px-2.5 py-2 text-caption-2 text-text-quaternary">
           {readOnly
             ? t('mapEditor.inspector.footerViewOnly')
             : t('mapEditor.inspector.footerEditHints')}

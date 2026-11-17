@@ -17,6 +17,7 @@ import type { DashboardPlane } from './types';
 import { ExportTemplateButton, ImportTemplateDialog } from './components/TemplateFileActions';
 import type { TemplateImportResult } from './template/types';
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button } from '../../components/ui';
 
 interface Props {
   planes: DashboardPlane[];
@@ -34,15 +35,15 @@ type SortKey = 'name' | 'resolution' | 'viewportMode' | 'createdAt' | 'updatedAt
  * class 常數。欄位都取自實際保存的版面資料（名稱、寬高、顯示模式、建立／修改時間），沒有的不補。
  */
 const menuItemClass =
-  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]';
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-[rgba(209,213,220,0.08)]';
 const headCellClass =
-  'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-sm font-normal leading-[18px] tracking-[0.5px] text-[#99A1AF]';
+  'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary';
 const bodyCellClass =
-  'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6]';
+  'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary';
 const fixedLeftClass =
-  'sticky left-0 z-10 w-[240px] min-w-[240px] bg-[#18181B] shadow-[12px_6px_16px_rgba(2,9,19,0.2)]';
+  'sticky left-0 z-10 w-[240px] min-w-[240px] bg-surface-primary shadow-[12px_6px_16px_rgba(2,9,19,0.2)]';
 const fixedRightClass =
-  'sticky right-0 z-10 w-[58px] min-w-[58px] bg-[#18181B] shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]';
+  'sticky right-0 z-10 w-[58px] min-w-[58px] bg-surface-primary shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]';
 
 export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTemplate, onUpdatePlane }: Props) {
   const { t, i18n } = useTranslation();
@@ -114,7 +115,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
         type="button"
         onClick={() => toggleSort(key)}
         className={`inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 transition hover:bg-[rgba(209,213,220,0.08)] ${
-          active ? 'text-[#51A2FF]' : 'text-[#99A1AF]'
+          active ? 'text-text-theme' : 'text-text-tertiary'
         }`}
         title={t('mapLibrary.sortTitle')}
         aria-label={t('mapLibrary.sortTitle')}
@@ -132,12 +133,12 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-[#18181B] p-3 text-[#F3F4F6]">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 bg-surface-primary p-3 text-text-primary">
       {/* 工具列 */}
       <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-2xl p-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <div className="flex h-[34px] w-[200px] items-center rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5">
-            <Search className="mr-1 size-5 shrink-0 text-[#99A1AF]" aria-hidden />
+            <Search className="mr-1 size-5 shrink-0 text-text-tertiary" aria-hidden />
             <input
               type="search"
               value={keywordDraft}
@@ -147,7 +148,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
               }}
               placeholder="搜尋名稱"
               aria-label="搜尋名稱"
-              className="min-w-0 flex-1 bg-transparent py-0.5 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] placeholder:text-[#99A1AF] focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary placeholder:text-text-tertiary focus:outline-none"
             />
           </div>
           <button
@@ -156,7 +157,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
             disabled={!canSearch}
             className={`inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 transition ${
               canSearch
-                ? 'bg-[rgba(43,127,255,0.2)] text-[#51A2FF] hover:bg-[rgba(43,127,255,0.3)]'
+                ? 'bg-[rgba(43,127,255,0.2)] text-text-theme hover:bg-[rgba(43,127,255,0.3)]'
                 : 'cursor-not-allowed bg-[rgba(98,116,142,0.2)] text-[#4A5565]'
             }`}
             title={t('common.search')}
@@ -172,8 +173,8 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
               setSort(null);
             }}
             disabled={!canReset}
-            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] transition ${
-              canReset ? 'text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]' : 'cursor-not-allowed text-[#4A5565]'
+            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-body-s font-medium leading-[18px] tracking-[0.5px] transition ${
+              canReset ? 'text-text-secondary hover:bg-[rgba(209,213,220,0.08)]' : 'cursor-not-allowed text-[#4A5565]'
             }`}
           >
             <RotateCw className="size-[18px]" aria-hidden />
@@ -184,7 +185,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
           <button
             type="button"
             onClick={() => setImportOpen(true)}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-[#51A2FF] transition hover:bg-[rgba(81,162,255,0.08)]"
+            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme transition hover:bg-[rgba(81,162,255,0.08)]"
           >
             <CloudDownload className="size-[18px]" aria-hidden />
             匯入儀表板
@@ -192,7 +193,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
           <button
             type="button"
             onClick={onCreate}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
+            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
           >
             <Plus className="size-[18px]" strokeWidth={2} aria-hidden />
             建立儀表板
@@ -204,7 +205,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
       <div className="flex min-h-0 flex-1 flex-col px-3">
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[960px] border-separate border-spacing-0">
-            <thead className="sticky top-0 z-20 bg-[#18181B]">
+            <thead className="sticky top-0 z-20 bg-surface-primary">
               <tr>
                 <th className={`${headCellClass} ${fixedLeftClass} z-30`}>
                   <div className="flex items-center gap-1">
@@ -226,7 +227,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 2} className="py-16 text-center text-sm text-[#99A1AF]">
+                  <td colSpan={columns.length + 2} className="py-16 text-center text-body-s text-text-tertiary">
                     {planes.length === 0 ? t('dashboard.listPage.emptyHint') : '沒有符合名稱的儀表板'}
                   </td>
                 </tr>
@@ -236,14 +237,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                   return (
                     <tr key={p.id} className="group">
                       <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-[#1f1f23]`}>
-                        <button
-                          type="button"
-                          onClick={() => onSelect(p.id)}
-                          className="block w-full truncate text-left hover:text-[#51A2FF]"
-                          title="開啟編輯器"
-                        >
-                          {p.name}
-                        </button>
+                        <Button variant="text" className="w-full" onPress={() => onSelect(p.id)} title="開啟編輯器">{p.name}</Button>
                       </td>
                       <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{p.width} x {p.height}</td>
                       <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{viewportLabel(p)}</td>
@@ -258,14 +252,14 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                           <button
                             type="button"
                             onClick={() => setOpenMenuId((prev) => (prev === p.id ? null : p.id))}
-                            className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.08)]"
+                            className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-text-secondary hover:bg-[rgba(209,213,220,0.08)]"
                             title={t('common.moreActions')}
                             aria-label={t('common.moreActions')}
                           >
                             <MoreHorizontal className="size-6" aria-hidden />
                           </button>
                           {openMenuId === p.id && (
-                            <div className="absolute right-0 top-full z-40 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#18181B] py-1 shadow-xl">
+                            <div className="absolute right-0 top-full z-40 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -274,7 +268,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                                 }}
                                 className={menuItemClass}
                               >
-                                <FolderOpen className="size-4 text-[#99A1AF]" aria-hidden />
+                                <FolderOpen className="size-4 text-text-tertiary" aria-hidden />
                                 開啟編輯
                               </button>
                               {onUpdatePlane && (
@@ -287,7 +281,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                                   className={menuItemClass}
                                   title={fitWidth ? t('dashboard.listPage.fixedScaleTitle') : t('dashboard.listPage.fitWidthTitle')}
                                 >
-                                  <Maximize2 className="size-4 text-[#99A1AF]" aria-hidden />
+                                  <Maximize2 className="size-4 text-text-tertiary" aria-hidden />
                                   顯示模式改為{fitWidth ? t('dashboard.listPage.fixedScaleStatus') : t('dashboard.listPage.fitWidthStatus')}
                                 </button>
                               )}
@@ -300,9 +294,9 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                                   setOpenMenuId(null);
                                   if ((await systemConfirm(t('dashboard.listPage.confirmDelete'), { tone: 'danger' }))) onDelete(p.id);
                                 }}
-                                className={`${menuItemClass} hover:text-red-300`}
+                                className={`${menuItemClass} hover:text-status-error-emphasis`}
                               >
-                                <Trash2 className="size-4 text-[#99A1AF]" aria-hidden />
+                                <Trash2 className="size-4 text-text-tertiary" aria-hidden />
                                 {t('common.delete')}
                               </button>
                             </div>

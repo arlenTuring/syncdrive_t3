@@ -26,6 +26,7 @@ import {
   REF_FIELD_CORNERS_M,
   type RefFieldCornerMeters,
 } from '../utils/facilityRefFieldCorners'
+import { Button } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -115,10 +116,10 @@ export function FacilityRefFieldBoundsSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-emerald-900/40 bg-emerald-950/15 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+      <h3 className="text-caption-2 uppercase text-emerald-400/90">
         場域範圍（公尺）
       </h3>
-      <p className="text-[10px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         {isTaper
           ? readOnly
             ? '斜接用 A／B／C／D 四個角點表示（每個點橫向、縱向各一個數）。圖上選取時會標出對應角。座標為場域公尺（原點左下）。'
@@ -135,18 +136,12 @@ export function FacilityRefFieldBoundsSection({
       {isTaper ? (
         <>
           {!hasCorners && !isZero ? (
-            <p className="text-[10px] text-amber-500/90">
+            <p className="text-caption-2 text-amber-500/90">
               請填齊 A／B／C／D 的橫向與縱向（共八個數字）。
             </p>
           ) : null}
           {autoMapped && !readOnly ? (
-            <button
-              type="button"
-              onClick={handleResyncFromCanvas}
-              className="rounded-md border border-emerald-800/60 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-200/90 hover:border-emerald-600 hover:bg-emerald-900/40"
-            >
-              {hasCorners ? '依圖上形狀重算 A–D' : '依圖上形狀推算 A–D'}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={handleResyncFromCanvas}>{hasCorners ? '依圖上形狀重算 A–D' : '依圖上形狀推算 A–D'}</Button>
           ) : null}
           <div className="space-y-2">
             {REF_FIELD_CORNER_LABELS.map((label, index) => {
@@ -156,7 +151,7 @@ export function FacilityRefFieldBoundsSection({
                   key={label}
                   className="rounded-md border border-emerald-900/30 bg-emerald-950/20 p-2"
                 >
-                  <p className="mb-1.5 text-[10px] font-medium text-emerald-300/80">
+                  <p className="mb-1.5 text-caption-2 text-emerald-300/80">
                     角 {label}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
@@ -166,7 +161,7 @@ export function FacilityRefFieldBoundsSection({
                         { axis: 'yM' as const, axisLabel: '縱向 (m)', id: `taper-c${index}-y` },
                       ] as const
                     ).map(({ axis, axisLabel, id }) => (
-                      <label key={axis} htmlFor={id} className="block text-[10px] text-zinc-500">
+                      <label key={axis} htmlFor={id} className="block text-caption-2 text-text-quaternary">
                         {axisLabel}
                         <input
                           id={id}
@@ -187,7 +182,7 @@ export function FacilityRefFieldBoundsSection({
                           onFocus={onFieldFocus}
                           onBlur={handleBlur}
                           placeholder="—"
-                          className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-emerald-500 read-only:opacity-90"
+                          className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success read-only:opacity-90"
                         />
                       </label>
                     ))}
@@ -200,30 +195,24 @@ export function FacilityRefFieldBoundsSection({
       ) : (
         <>
           {span ? (
-            <p className="rounded-md border border-emerald-900/30 bg-emerald-950/25 px-2 py-1.5 font-mono text-[11px] text-emerald-100/90">
+            <p className="rounded-md border border-emerald-900/30 bg-emerald-950/25 px-2 py-1.5 font-mono text-body-xs text-emerald-100/90">
               涵蓋範圍：橫向 {span.w.toFixed(2)} m × 縱向 {span.h.toFixed(2)} m
             </p>
           ) : null}
           {isZero ? (
-            <p className="text-[10px] text-zinc-400">
+            <p className="text-caption-2 text-text-tertiary">
               已設為 0（不參與斷路掃描與車輛定位）。
             </p>
           ) : null}
           {!hasBounds && !isZero && boundsIssue ? (
-            <p className="text-[10px] text-amber-500/90">{boundsIssue}</p>
+            <p className="text-caption-2 text-amber-500/90">{boundsIssue}</p>
           ) : null}
           {autoMapped && !readOnly ? (
-            <button
-              type="button"
-              onClick={handleResyncFromCanvas}
-              className="rounded-md border border-emerald-800/60 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-200/90 hover:border-emerald-600 hover:bg-emerald-900/40"
-            >
-              {hasBounds ? '依圖上形狀重算範圍' : '依圖上形狀推算範圍'}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={handleResyncFromCanvas}>{hasBounds ? '依圖上形狀重算範圍' : '依圖上形狀推算範圍'}</Button>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             {boundFields.map(({ key, label, id }) => (
-              <label key={key} htmlFor={id} className="block text-[10px] text-zinc-500">
+              <label key={key} htmlFor={id} className="block text-caption-2 text-text-quaternary">
                 {label}
                 <input
                   id={id}
@@ -244,7 +233,7 @@ export function FacilityRefFieldBoundsSection({
                   onFocus={onFieldFocus}
                   onBlur={handleBlur}
                   placeholder="—"
-                  className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-emerald-500 read-only:opacity-90"
+                  className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-status-success read-only:opacity-90"
                 />
               </label>
             ))}

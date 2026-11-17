@@ -45,7 +45,7 @@ export function DashboardIconPicker({
   const isPresetSet = activeSet.id === 'presets' && activeSet.categories?.length;
 
   return (
-    <div className={`rounded-lg border border-zinc-700/60 bg-zinc-900/50 ${compact ? 'p-2' : 'p-2.5'}`}>
+    <div className={`rounded-lg border border-border-quaternary bg-surface-primary ${compact ? 'p-2' : 'p-2.5'}`}>
       {sets.length > 1 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {sets.map((set) => (
@@ -53,10 +53,10 @@ export function DashboardIconPicker({
               key={set.id}
               type="button"
               onClick={() => setActiveSetId(set.id)}
-              className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+              className={`px-2 py-0.5 rounded text-caption-2 font-semibold transition-colors ${
                 activeSetId === set.id
-                  ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/40'
-                  : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
+                  ? 'bg-cyan-600/30 text-text-theme border border-cyan-500/40'
+                  : 'bg-surface-secondary text-text-quaternary border border-border-quaternary hover:text-text-secondary'
               }`}
             >
               {set.label}
@@ -67,7 +67,7 @@ export function DashboardIconPicker({
 
       {isPresetSet ? (
         <>
-          <div className="flex items-center gap-1 mb-2 text-[9px] text-zinc-500">
+          <div className="flex items-center gap-1 mb-2 text-caption-2 text-text-quaternary">
             <FolderOpen size={11} />
             <span>選擇分類</span>
           </div>
@@ -80,10 +80,10 @@ export function DashboardIconPicker({
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategoryId(cat.id)}
-                  className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                  className={`px-2 py-0.5 rounded text-caption-2 font-semibold transition-colors ${
                     activeCategoryId === cat.id
                       ? 'bg-violet-600/25 text-violet-300 border border-violet-500/40'
-                      : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'
+                      : 'bg-surface-secondary text-text-quaternary border border-border-quaternary hover:text-text-secondary'
                   }`}
                 >
                   {cat.label}
@@ -92,7 +92,7 @@ export function DashboardIconPicker({
             })}
           </div>
           {activeSet.categories!.find((c) => c.id === activeCategoryId)?.description && (
-            <p className="text-[9px] text-zinc-500 mb-2 leading-relaxed">
+            <p className="text-caption-2 text-text-quaternary mb-2">
               {activeSet.categories!.find((c) => c.id === activeCategoryId)?.description}
             </p>
           )}
@@ -105,10 +105,10 @@ export function DashboardIconPicker({
       ) : (
         <>
           {activeSet.description && (
-            <p className="text-[9px] text-zinc-500 mb-2 leading-relaxed">{activeSet.description}</p>
+            <p className="text-caption-2 text-text-quaternary mb-2">{activeSet.description}</p>
           )}
           {activeSet.icons.length === 0 ? (
-            <div className="flex items-center gap-2 py-4 text-[10px] text-zinc-500 justify-center">
+            <div className="flex items-center gap-2 py-4 text-caption-2 text-text-quaternary justify-center">
               <ImageIcon size={14} />
               尚無圖示
             </div>
@@ -146,7 +146,7 @@ function PresetIconGrid({
 }) {
   if (icons.length === 0) {
     return (
-      <div className="flex items-center gap-2 py-4 text-[10px] text-zinc-500 justify-center">
+      <div className="flex items-center gap-2 py-4 text-caption-2 text-text-quaternary justify-center">
         <ImageIcon size={14} />
         此分類尚無圖示
       </div>
@@ -189,7 +189,7 @@ function IconThumb({
       className={`flex flex-col items-center gap-0.5 p-1.5 rounded border transition-all ${
         selected
           ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/30'
-          : 'border-zinc-700/80 bg-zinc-800/40 hover:border-zinc-500'
+          : 'border-border-quaternary bg-zinc-800/40 hover:border-border-primary'
       }`}
     >
       <img
@@ -200,7 +200,7 @@ function IconThumb({
           (e.target as HTMLImageElement).style.opacity = '0.25';
         }}
       />
-      <span className="text-[8px] text-zinc-400 truncate w-full text-center leading-tight">
+      <span className="text-[8px] text-text-tertiary truncate w-full text-center leading-tight">
         {label}
       </span>
     </button>

@@ -64,10 +64,10 @@ export function FacilityRefFieldPositionSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-sky-900/40 bg-sky-950/15 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+      <h3 className="text-caption-2 uppercase text-sky-400/90">
         場域座標（公尺）
       </h3>
-      <p className="text-[10px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         {readOnly
           ? '此元件在實際場域中的代表點（唯讀）。座標為場域公尺（原點左下，橫向／縱向）。'
           : autoMapped
@@ -75,11 +75,11 @@ export function FacilityRefFieldPositionSection({
             : '此元件在實際場域中的代表點；僅能在此手動設定。圖台拖曳或調整像素尺寸不會改變此位置。座標為場域公尺（原點左下，橫向／縱向）。'}
       </p>
       {hasPosition ? (
-        <p className="rounded-md border border-sky-900/30 bg-sky-950/25 px-2 py-1.5 font-mono text-[11px] text-sky-100/90">
+        <p className="rounded-md border border-sky-900/30 bg-sky-950/25 px-2 py-1.5 font-mono text-body-xs text-sky-100/90">
           代表點：({position.xM!.toFixed(2)}, {position.yM!.toFixed(2)}) m
         </p>
       ) : (
-        <p className="text-[10px] text-amber-500/90">
+        <p className="text-caption-2 text-amber-500/90">
           {autoMapped
             ? '尚未設定場域座標（目前無法由圖台映射帶入）。'
             : '尚未設定場域座標。'}
@@ -87,7 +87,7 @@ export function FacilityRefFieldPositionSection({
       )}
       <div className="grid grid-cols-1 gap-2">
         {fields.map(({ key, label, id }) => (
-          <label key={key} htmlFor={id} className="block text-[10px] text-zinc-500">
+          <label key={key} htmlFor={id} className="block text-caption-2 text-text-quaternary">
             {label}
             <input
               id={id}
@@ -108,7 +108,7 @@ export function FacilityRefFieldPositionSection({
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               placeholder="—"
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-100 outline-none focus:border-sky-500 read-only:opacity-90"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-90"
             />
           </label>
         ))}

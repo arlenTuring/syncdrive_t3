@@ -51,24 +51,25 @@ import { GenericGroupSettings } from './components/GenericGroupSettings';
 import { VehicleRoofIndicatorSettings } from './components/VehicleRoofIndicatorSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 import { systemConfirm } from '../../lib/systemDialog';
+import { Button, Checkbox } from '../../components/ui';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
-const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
-const selectCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer`;
+const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
 
 function SH({ icon, label, color }: { icon: React.ReactNode; label: string; color?: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider pb-1 border-b border-zinc-800"
+    <div className="flex items-center gap-1.5 text-body-xs-bold uppercase pb-1 border-b border-border-quaternary"
          style={{ color: color ?? '#71717a' }}>
       {icon} {label}
     </div>
   );
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1"><label className="block text-zinc-500 text-[10px] uppercase font-bold tracking-tight">{label}</label>{children}</div>;
+  return <div className="space-y-1"><label className="block text-text-quaternary text-caption-2 uppercase">{label}</label>{children}</div>;
 }
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
@@ -87,39 +88,33 @@ function GroupInheritedVariablesSection({
 
   return (
     <div className="mb-4 p-3 rounded-lg bg-purple-950/25 border border-purple-700/40 space-y-2.5">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-purple-300">
+      <div className="text-caption-2 uppercase text-purple-300">
         {t('dashboard.properties.inheritedVars')}
       </div>
       {indexMode ? (
-        <p className="text-[10px] text-zinc-400 leading-relaxed">
+        <p className="text-caption-2 text-text-tertiary">
           {t('dashboard.properties.inheritedIndex', { token })}
-          <code className="block mt-1 text-[9px] text-zinc-500 font-mono leading-relaxed">
+          <code className="block mt-1 text-caption-2 text-text-quaternary font-mono">
             LIMIT 1 OFFSET {'{'}{rowVar}{'}'}
           </code>
         </p>
       ) : (
-        <p className="text-[10px] text-zinc-400 leading-relaxed">
+        <p className="text-caption-2 text-text-tertiary">
           {t('dashboard.properties.inheritedRow', {
             token: t('dashboard.properties.fieldNameToken'),
           })}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <code className="px-2 py-1 rounded bg-purple-500/20 border border-purple-500/35 text-purple-200 text-[11px] font-mono">
+        <code className="px-2 py-1 rounded bg-purple-500/20 border border-purple-500/35 text-purple-200 text-body-xs font-mono">
           {token}
         </code>
         {onInsertToken && (
-          <button
-            type="button"
-            onClick={() => onInsertToken(token)}
-            className="text-[10px] text-cyan-400 hover:text-cyan-300"
-          >
-            {t('dashboard.properties.insertIntoQuery')}
-          </button>
+          <Button variant="text" onPress={() => onInsertToken(token)}>{t('dashboard.properties.insertIntoQuery')}</Button>
         )}
       </div>
       {hasListSql && indexMode && (
-        <p className="text-[10px] text-zinc-500">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.groupSqlHint')}
         </p>
       )}
@@ -154,27 +149,27 @@ function AlertRulesEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-zinc-500 text-[10px] uppercase font-bold tracking-tight">{t('dashboard.properties.alertRules.title')}</label>
+        <label className="text-text-quaternary text-caption-2 uppercase">{t('dashboard.properties.alertRules.title')}</label>
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); add(); }}
-          className="p-1 hover:bg-zinc-800 rounded text-cyan-500 transition-colors"
+          className="p-1 hover:bg-link-standard-hover rounded text-cyan-500 transition-colors"
           title={t('dashboard.properties.alertRules.addTitle')}
         >
           <Plus size={14} />
         </button>
       </div>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
-        {t('dashboard.properties.alertRules.hint')}<strong className="text-zinc-400">{t('dashboard.properties.alertRules.hintMulti')}</strong>
+      <p className="text-caption-2 text-text-quaternary">
+        {t('dashboard.properties.alertRules.hint')}<strong className="text-text-tertiary">{t('dashboard.properties.alertRules.hintMulti')}</strong>
       </p>
       {rules.length === 0 && (
-        <p className="text-[10px] text-amber-500/90">{t('dashboard.properties.alertRules.empty')}</p>
+        <p className="text-caption-2 text-amber-500/90">{t('dashboard.properties.alertRules.empty')}</p>
       )}
       {rules.map((rule, i) => (
-        <div key={rule.id} className="p-2.5 bg-zinc-800/40 rounded-md border border-zinc-700/50 space-y-2">
+        <div key={rule.id} className="p-2.5 bg-zinc-800/40 rounded-md border border-border-quaternary space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-zinc-400">{t('dashboard.properties.alertRules.ruleN', { n: i + 1 })}</span>
-            <button type="button" onClick={() => remove(i)} className="p-0.5 text-zinc-500 hover:text-red-400 transition-colors">
+            <span className="text-caption-2 text-text-tertiary">{t('dashboard.properties.alertRules.ruleN', { n: i + 1 })}</span>
+            <button type="button" onClick={() => remove(i)} className="p-0.5 text-text-quaternary hover:text-status-error-emphasis transition-colors">
               <X size={12} />
             </button>
           </div>
@@ -189,14 +184,14 @@ function AlertRulesEditor({
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label={t('dashboard.properties.textColor')}>
-              <SiteColorInput value={rule.textColor} onChange={e => patch(i, { textColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+              <SiteColorInput value={rule.textColor} onChange={e => patch(i, { textColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
             </Field>
             <Field label={t('dashboard.properties.backgroundColor')}>
-              <SiteColorInput value={hexFromRgba(rule.backgroundColor)} onChange={e => patch(i, { backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+              <SiteColorInput value={hexFromRgba(rule.backgroundColor)} onChange={e => patch(i, { backgroundColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
             </Field>
           </div>
           <Field label={t('dashboard.properties.alertRules.borderColor')}>
-            <SiteColorInput value={hexFromRgba(rule.borderColor)} onChange={e => patch(i, { borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+            <SiteColorInput value={hexFromRgba(rule.borderColor)} onChange={e => patch(i, { borderColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
           </Field>
           <Field label={t('dashboard.properties.alertRules.displayMode')}>
             <SiteSelect value={rule.displayMode} onChange={e => patch(i, { displayMode: e.target.value as AlertDisplayMode })} className={selectCls}>
@@ -205,8 +200,8 @@ function AlertRulesEditor({
             </SiteSelect>
           </Field>
 
-          <div className="pt-1 border-t border-zinc-700/50 space-y-2">
-            <p className="text-[10px] font-bold text-emerald-500/90">{t('dashboard.properties.alertRules.startCondition')}</p>
+          <div className="pt-1 border-t border-border-quaternary space-y-2">
+            <p className="text-caption-2 text-emerald-500/90">{t('dashboard.properties.alertRules.startCondition')}</p>
             <Field label={t('dashboard.properties.alertRules.watchField')}>
               <input value={rule.startField} onChange={e => patch(i, { startField: e.target.value })} className={inputCls} placeholder="alert_message" />
             </Field>
@@ -224,9 +219,9 @@ function AlertRulesEditor({
             )}
           </div>
 
-          <div className="pt-1 border-t border-zinc-700/50 space-y-2">
-            <label className="flex items-center gap-2 text-[10px] text-zinc-400">
-              <input type="checkbox" checked={rule.endEnabled} onChange={e => patch(i, { endEnabled: e.target.checked })} className="accent-cyan-500" />
+          <div className="pt-1 border-t border-border-quaternary space-y-2">
+            <label className="flex items-center gap-2 text-caption-2 text-text-tertiary">
+              <Checkbox checked={rule.endEnabled} onCheckedChange={e => patch(i, { endEnabled: e })} />
               {t('dashboard.properties.alertRules.enableEnd')}
             </label>
             {rule.endEnabled && (
@@ -280,22 +275,22 @@ function ColorRulesEditor({
   const updateRule = (idx: number, patch: Partial<ColorRule>) => onUpdate(rules.map((r, i) => i === idx ? { ...r, ...patch } : r));
 
   return (
-    <div className={`space-y-2 border-t border-zinc-800 pt-3 transition-opacity ${!enabled ? 'opacity-40' : ''}`}>
+    <div className={`space-y-2 border-t border-border-quaternary pt-3 transition-opacity ${!enabled ? 'opacity-40' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <input type="checkbox" checked={enabled} onChange={e => onToggleEnabled(e.target.checked)} className="accent-cyan-500 w-3 h-3 cursor-pointer" />
+          <Checkbox checked={enabled} onCheckedChange={e => onToggleEnabled(e)} />
           <SH icon={<Palette size={12} />} label={t('dashboard.properties.colorRules.title')} color="#ec4899" />
         </div>
         {enabled && (
-          <button onClick={addRule} className="p-1 hover:bg-zinc-800 rounded text-cyan-500 transition-colors">
+          <button onClick={addRule} className="p-1 hover:bg-link-standard-hover rounded text-cyan-500 transition-colors">
             <Plus size={14} />
           </button>
         )}
       </div>
       
       {enabled && rules.map((rule, i) => (
-        <div key={i} className="p-2 bg-zinc-800/40 rounded-md border border-zinc-700/50 space-y-2 relative group">
-          <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-700 rounded-full text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+        <div key={i} className="p-2 bg-zinc-800/40 rounded-md border border-border-quaternary space-y-2 relative group">
+          <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity">
             <X size={10} />
           </button>
           <div className="flex gap-1.5 items-center">
@@ -307,22 +302,22 @@ function ColorRulesEditor({
             <input value={rule.threshold} onChange={e => updateRule(i, { threshold: e.target.value })} className={`${inputCls} flex-1`} placeholder={t('dashboard.properties.colorRules.thresholdPlaceholder')} />
           </div>
           <div className="grid grid-cols-3 gap-1">
-            <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
+            <div className="flex items-center gap-1 bg-surface-primary p-1 rounded border border-zinc-700/30">
               <SiteColorInput value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
-              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrText')}</span>
+              <span className="text-[8px] text-text-quaternary uppercase">{t('dashboard.properties.colorRules.abbrText')}</span>
             </div>
-            <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
+            <div className="flex items-center gap-1 bg-surface-primary p-1 rounded border border-zinc-700/30">
               <SiteColorInput value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
-              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBg')}</span>
+              <span className="text-[8px] text-text-quaternary uppercase">{t('dashboard.properties.colorRules.abbrBg')}</span>
             </div>
-            <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded border border-zinc-700/30">
+            <div className="flex items-center gap-1 bg-surface-primary p-1 rounded border border-zinc-700/30">
               <SiteColorInput value={rule.borderColor || '#ffffff'} onChange={e => updateRule(i, { borderColor: e.target.value })} className="w-3.5 h-3.5 bg-transparent cursor-pointer"  />
-              <span className="text-[8px] text-zinc-500 uppercase">{t('dashboard.properties.colorRules.abbrBorder')}</span>
+              <span className="text-[8px] text-text-quaternary uppercase">{t('dashboard.properties.colorRules.abbrBorder')}</span>
             </div>
           </div>
         </div>
       ))}
-      {rules.length === 0 && <div className="text-[10px] text-zinc-600 text-center py-2 italic">{t('dashboard.properties.colorRules.empty')}</div>}
+      {rules.length === 0 && <div className="text-caption-2 text-text-disabled text-center py-2 italic">{t('dashboard.properties.colorRules.empty')}</div>}
     </div>
   );
 }
@@ -364,7 +359,7 @@ function TextSettings({
             placeholder={t('dashboard.properties.widgets.text.defaultPlaceholder')}
           />
           {(w.dataSourceId || w.mqttDataSourceId) && (
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
+            <p className="text-caption-2 text-text-quaternary">
               {t('dashboard.properties.widgets.text.defaultHint')}
             </p>
           )}
@@ -379,8 +374,8 @@ function TextSettings({
             <div className="flex flex-wrap gap-1 mt-2">
               {commonIcons.slice(0, 8).map(icon => (
                 <button key={icon} onClick={() => onUpdate({ icon })} 
-                  className={`p-1.5 rounded bg-zinc-800 border transition-all ${w.icon === icon ? 'border-cyan-500 bg-cyan-500/10' : 'border-zinc-700 hover:border-zinc-500'}`}>
-                  {React.createElement((LucideIcons as any)[icon] || Type, { size: 14, className: w.icon === icon ? 'text-cyan-400' : 'text-zinc-400' })}
+                  className={`p-1.5 rounded bg-surface-secondary border transition-all ${w.icon === icon ? 'border-cyan-500 bg-cyan-500/10' : 'border-border-quaternary hover:border-border-primary'}`}>
+                  {React.createElement((LucideIcons as any)[icon] || Type, { size: 14, className: w.icon === icon ? 'text-text-theme' : 'text-text-tertiary' })}
                 </button>
               ))}
             </div>
@@ -407,13 +402,13 @@ function TextSettings({
         )}
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-zinc-800">
+      <div className="space-y-4 pt-4 border-t border-border-quaternary">
         <SH icon={<Palette size={13} />} label={t('dashboard.properties.appearanceDefault')} color="#ec4899" />
         
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.textColor')}>
             <div className="flex gap-2">
-              <SiteColorInput value={w.color.startsWith('#') ? w.color : '#ffffff'} onChange={e => onUpdate({ color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+              <SiteColorInput value={w.color.startsWith('#') ? w.color : '#ffffff'} onChange={e => onUpdate({ color: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
               <input value={w.color} onChange={e => onUpdate({ color: e.target.value })} className={`${inputCls} font-mono`} placeholder="#RRGGBB" />
             </div>
           </Field>
@@ -434,8 +429,8 @@ function TextSettings({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.backgroundFill')}>
             <div className="flex gap-2">
-              <SiteColorInput value={w.backgroundColor?.startsWith('#') ? w.backgroundColor : '#000000'} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
-              <button onClick={() => onUpdate({ backgroundColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
+              <SiteColorInput value={w.backgroundColor?.startsWith('#') ? w.backgroundColor : '#000000'} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
+              <Button hierarchy="subordinate" variant="outlined" onPress={() => onUpdate({ backgroundColor: 'transparent' })} type="submit">{t('dashboard.properties.transparent')}</Button>
             </div>
           </Field>
           <Field label={t('dashboard.properties.borderRadius')}>
@@ -446,8 +441,8 @@ function TextSettings({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.borderColor')}>
             <div className="flex gap-2">
-              <SiteColorInput value={w.borderColor?.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
-              <button onClick={() => onUpdate({ borderColor: 'transparent' })} className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] hover:bg-zinc-700 transition-colors">{t('dashboard.properties.transparent')}</button>
+              <SiteColorInput value={w.borderColor?.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
+              <Button hierarchy="subordinate" variant="outlined" onPress={() => onUpdate({ borderColor: 'transparent' })} type="submit">{t('dashboard.properties.transparent')}</Button>
             </div>
           </Field>
           <Field label={t('dashboard.properties.borderWidth')}>
@@ -456,7 +451,7 @@ function TextSettings({
         </div>
       </div>
 
-      <div className="pt-4 border-t border-zinc-800">
+      <div className="pt-4 border-t border-border-quaternary">
         <SH icon={<Database size={13} />} label={t('dashboard.properties.dataBinding')} color="#a78bfa" />
         <div className="mt-3 space-y-3">
           <DataBindingSettings w={w} onUpdate={onUpdate} />
@@ -469,9 +464,8 @@ function TextSettings({
         onToggleEnabled={e => onUpdate({ colorRulesEnabled: e })}
         onUpdate={rules => onUpdate({ colorRules: rules })} 
       />
-      <label className="flex items-center gap-2 text-xs text-zinc-400">
-        <input type="checkbox" checked={!!w.severityTextColor}
-          onChange={e => onUpdate({ severityTextColor: e.target.checked })} />
+      <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+        <Checkbox checked={!!w.severityTextColor} onCheckedChange={e => onUpdate({ severityTextColor: e })} />
         {t('dashboard.properties.widgets.text.severityColor')}
       </label>
       <PositionFields widget={w} onUpdate={onUpdate as any} />
@@ -494,9 +488,9 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       <SH icon={<Database size={13} />} label={t('dashboard.properties.dataSource')} color="#a78bfa" />
       <DataBindingSettings w={w} onUpdate={onUpdate} />
 
-      <div className="pt-2 border-t border-zinc-800 space-y-3">
+      <div className="pt-2 border-t border-border-quaternary space-y-3">
         <SH icon={<AlertTriangle size={13} />} label={t('dashboard.properties.alertRules.title')} color="#f97316" />
-        <div className="p-2.5 rounded-lg bg-amber-950/25 border border-amber-700/40 text-[10px] text-amber-200/90 leading-relaxed">
+        <div className="p-2.5 rounded-lg bg-amber-950/25 border border-status-warning-light text-caption-2 text-status-warning">
           {t('dashboard.properties.alertRules.previewHint')}
           {(w.alertPresentation ?? 'stack') === 'carousel'
             ? <> {t('dashboard.properties.alertRules.multiCarousel')}</>
@@ -505,7 +499,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
         <AlertRulesEditor rules={rules} onChange={setRules} />
       </div>
 
-      <div className="pt-2 border-t border-zinc-800 space-y-3">
+      <div className="pt-2 border-t border-border-quaternary space-y-3">
         <SH icon={<Type size={13} />} label={t('dashboard.properties.displayModeSection')} color="#38bdf8" />
         <Field label={t('dashboard.properties.alertRules.multiHit')}>
           <SiteSelect
@@ -530,7 +524,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
         )}
       </div>
 
-      <div className="pt-2 border-t border-zinc-800 space-y-3">
+      <div className="pt-2 border-t border-border-quaternary space-y-3">
         <SH icon={<Type size={13} />} label={t('dashboard.properties.sharedStyle')} color="#94a3b8" />
         <Field label={t('dashboard.properties.alertRules.fontSize')}>
           <NumberInput min={8} value={w.fontSize ?? 10} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
@@ -640,12 +634,12 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           }}
           className={inputCls}
         />
-        <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary mt-1">
           {t('dashboard.properties.widgets.gauge.strokeHint')}
         </p>
       </Field>
       <div className="space-y-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{t('dashboard.properties.paddingPx')}</div>
+        <div className="text-caption-2 uppercase text-text-quaternary">{t('dashboard.properties.paddingPx')}</div>
         <div className="grid grid-cols-4 gap-1.5">
           {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
             <Field key={side} label={side === 'top' ? t('dashboard.properties.sideTop') : side === 'right' ? t('dashboard.properties.sideRight') : side === 'bottom' ? t('dashboard.properties.sideBottom') : t('dashboard.properties.sideLeft')}>
@@ -669,7 +663,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
             </Field>
           ))}
         </div>
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.gauge.padHint')}
         </p>
       </div>
@@ -681,7 +675,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           onChange={n => onUpdate({ gaugeTextGap: n })}
           className={inputCls}
         />
-        <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary mt-1">
           {t('dashboard.properties.widgets.gauge.textGapHint')}
         </p>
       </Field>
@@ -690,7 +684,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           <SiteColorInput
             value={w.panelBackgroundColor?.startsWith('#') ? w.panelBackgroundColor : '#1a2332'}
             onChange={e => onUpdate({ panelBackgroundColor: e.target.value })}
-            className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
+            className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
            />
         </Field>
         <Field label={t('dashboard.properties.widgets.gauge.panelRadius')}>
@@ -702,13 +696,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
           />
         </Field>
       </div>
-      <button
-        type="button"
-        className="text-xs text-zinc-400 hover:text-zinc-200 underline"
-        onClick={() => onUpdate({ panelBackgroundColor: 'transparent', panelBorderRadius: 0 })}
-      >
-        {t('dashboard.properties.widgets.gauge.panelTransparent')}
-      </button>
+      <Button hierarchy="subordinate" variant="text" onPress={() => onUpdate({ panelBackgroundColor: 'transparent', panelBorderRadius: 0 })}>{t('dashboard.properties.widgets.gauge.panelTransparent')}</Button>
 
       <PositionFields widget={w} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -740,18 +728,18 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
         <Field label={t('dashboard.properties.widgets.segmentBar.countField')}><input value={w.countField} onChange={e => onUpdate({ countField: e.target.value })} className={inputCls} placeholder="vehicle_count" /></Field>
         <Field label={t('dashboard.properties.widgets.segmentBar.countUnit')}><input value={w.countUnit ?? t('dashboard.properties.widgets.segmentBar.countUnitDefault')} onChange={e => onUpdate({ countUnit: e.target.value })} className={inputCls} /></Field>
       </div>
-      <label className="flex items-center gap-2 text-[10px] text-zinc-400">
-        <input type="checkbox" checked={w.showLegend !== false} onChange={e => onUpdate({ showLegend: e.target.checked })} />
+      <label className="flex items-center gap-2 text-caption-2 text-text-tertiary">
+        <Checkbox checked={w.showLegend !== false} onCheckedChange={e => onUpdate({ showLegend: e })} />
         {t('dashboard.properties.showLegend')}
       </label>
-      <p className="text-[10px] text-zinc-500">{t('dashboard.properties.widgets.segmentBar.statusLegend')}</p>
+      <p className="text-caption-2 text-text-quaternary">{t('dashboard.properties.widgets.segmentBar.statusLegend')}</p>
       {rules.map((rule, idx) => (
-        <div key={idx} className="grid grid-cols-2 gap-2 rounded border border-zinc-800 p-2">
+        <div key={idx} className="grid grid-cols-2 gap-2 rounded border border-border-quaternary p-2">
           <Field label={t('dashboard.properties.widgets.segmentBar.statusCode')}><input value={rule.status} onChange={e => patchRule(idx, { status: e.target.value })} className={inputCls} /></Field>
           <Field label={t('dashboard.properties.label')}><input value={rule.label} onChange={e => patchRule(idx, { label: e.target.value })} className={inputCls} /></Field>
           <div className="col-span-2">
             <Field label={t('dashboard.properties.color')}>
-              <SiteColorInput value={rule.color} onChange={e => patchRule(idx, { color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+              <SiteColorInput value={rule.color} onChange={e => patchRule(idx, { color: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
             </Field>
           </div>
         </div>
@@ -782,8 +770,8 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
         </SiteSelect>
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t('dashboard.properties.widgets.slotGrid.activeColor')}><SiteColorInput value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-        <Field label={t('dashboard.properties.widgets.slotGrid.inactiveColor')}><SiteColorInput value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.activeColor')}><SiteColorInput value={w.activeColor} onChange={e => onUpdate({ activeColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.slotGrid.inactiveColor')}><SiteColorInput value={w.inactiveColor} onChange={e => onUpdate({ inactiveColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.widgets.slotGrid.layoutMode')}>
           <SiteSelect value={w.layout} onChange={e => onUpdate({ layout: e.target.value as any })} className={selectCls}>
             <option value="horizontal">{t('dashboard.properties.widgets.slotGrid.layoutHorizontal')}</option><option value="grid">{t('dashboard.properties.widgets.slotGrid.layoutGrid')}</option>
@@ -791,7 +779,7 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
         </Field>
         <Field label={t('dashboard.properties.widgets.slotGrid.slotGap')}><NumberInput min={0} value={w.slotGap ?? 4} onChange={n => onUpdate({ slotGap: n })} className={inputCls} /></Field>
       </div>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
+      <p className="text-caption-2 text-text-quaternary">
         {t('dashboard.properties.widgets.slotGrid.hint')}
       </p>
 
@@ -816,7 +804,7 @@ function MaintenanceDistributionSettings({ w, onUpdate, onDelete }: { w: Mainten
         <Field label={t('dashboard.properties.widgets.maintenanceDistribution.titleFontSize')}><NumberInput min={8} value={w.titleFontSize ?? 16} onChange={n => onUpdate({ titleFontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.maintenanceDistribution.cardTitleFontSize')}><NumberInput min={8} value={w.cardTitleFontSize ?? 16} onChange={n => onUpdate({ cardTitleFontSize: n })} className={inputCls} /></Field>
       </div>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
+      <p className="text-caption-2 text-text-quaternary">
         {t('dashboard.properties.widgets.maintenanceDistribution.hint')}
       </p>
 
@@ -844,7 +832,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
         />
       </Field>
       {w.src?.trim() && (
-        <div className="rounded-lg overflow-hidden border border-zinc-700 bg-zinc-900">
+        <div className="rounded-lg overflow-hidden border border-border-quaternary bg-surface-primary">
           <img
             src={w.src}
             alt={t('dashboard.properties.preview')}
@@ -892,7 +880,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
           <SiteColorInput
             value={w.backgroundColor ?? '#000000'}
             onChange={e => onUpdate({ backgroundColor: e.target.value })}
-            className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+            className="w-8 h-7 rounded border border-border-tertiary cursor-pointer bg-transparent"
            />
           <input
             value={w.backgroundColor ?? ''}
@@ -917,7 +905,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
             <SiteColorInput
               value={w.borderColor ?? '#ffffff'}
               onChange={e => onUpdate({ borderColor: e.target.value })}
-              className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+              className="w-8 h-7 rounded border border-border-tertiary cursor-pointer bg-transparent"
              />
             <input
               value={w.borderColor ?? ''}
@@ -986,7 +974,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
                 <SiteColorInput
                   value={w.overlayTextColor ?? '#ffffff'}
                   onChange={e => onUpdate({ overlayTextColor: e.target.value })}
-                  className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+                  className="w-8 h-7 rounded border border-border-tertiary cursor-pointer bg-transparent"
                  />
                 <input
                   value={w.overlayTextColor ?? '#ffffff'}
@@ -1000,7 +988,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
                 <SiteColorInput
                   value={w.overlayBgColor ?? '#000000'}
                   onChange={e => onUpdate({ overlayBgColor: e.target.value })}
-                  className="w-8 h-7 rounded border border-zinc-600 cursor-pointer bg-transparent"
+                  className="w-8 h-7 rounded border border-border-tertiary cursor-pointer bg-transparent"
                  />
                 <input
                   value={w.overlayBgColor ?? 'rgba(0,0,0,0.45)'}
@@ -1042,8 +1030,8 @@ function ChartAxisFields({
     />
   );
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{label}</p>
+    <div className="space-y-2 rounded-lg border border-border-quaternary p-2.5 bg-surface-primary">
+      <p className="text-caption-2 text-text-tertiary uppercase">{label}</p>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.unit')}>
           <SiteSelect value={unit} onChange={e => patch({ unit: e.target.value as ChartAxisUnit })} className={selectCls}>
@@ -1069,19 +1057,15 @@ function ChartAxisFields({
                 <option value="12h">{t('dashboard.properties.widgets.chart.h12')}</option>
               </SiteSelect>
             </Field>
-            <div className="col-span-2 space-y-2 pt-1 border-t border-zinc-800/80">
-              <label className="flex items-center gap-2 text-xs text-zinc-400">
-                <input
-                  type="checkbox"
-                  checked={axis?.timeWindow?.enabled === true}
-                  onChange={e => {
+            <div className="col-span-2 space-y-2 pt-1 border-t border-border-quaternary">
+              <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+                <Checkbox checked={axis?.timeWindow?.enabled === true} onCheckedChange={e => {
                     const tw = axis?.timeWindow ?? {};
                     patch({
-                      timeWindow: { ...tw, enabled: e.target.checked },
-                      highlightTime: e.target.checked ? undefined : axis?.highlightTime,
+                      timeWindow: { ...tw, enabled: e },
+                      highlightTime: e ? undefined : axis?.highlightTime,
                     });
-                  }}
-                />
+                  }} />
                 {t('dashboard.properties.widgets.chart.syncNow')}
               </label>
               {axis?.timeWindow?.enabled === true && (
@@ -1157,16 +1141,16 @@ function LineChartSeriesFields({
     patch({ eventLabelStyle: { ...series.eventLabelStyle, ...p } });
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30 relative group">
+    <div className="space-y-2 rounded-lg border border-border-quaternary p-2.5 bg-surface-primary relative group">
       <button
         type="button"
         onClick={onRemove}
-        className="absolute top-2 right-2 p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded opacity-0 group-hover:opacity-100"
+        className="absolute top-2 right-2 p-1 text-text-quaternary hover:text-status-error-emphasis hover:bg-link-standard-hover rounded opacity-0 group-hover:opacity-100"
         title={t('dashboard.properties.widgets.chart.removeSeries')}
       >
         <X size={12} />
       </button>
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide pr-6">{t('dashboard.properties.widgets.chart.seriesTitle')}</p>
+      <p className="text-caption-2 text-text-tertiary uppercase pr-6">{t('dashboard.properties.widgets.chart.seriesTitle')}</p>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.chart.yField')}>
           <input value={series.yField} onChange={e => patch({ yField: e.target.value })} className={inputCls} placeholder="actual_util" />
@@ -1175,7 +1159,7 @@ function LineChartSeriesFields({
           <SiteColorInput
             value={series.color?.startsWith('#') ? series.color : '#38bdf8'}
             onChange={e => patch({ color: e.target.value })}
-            className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
+            className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
            />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.legendName')}>
@@ -1196,21 +1180,13 @@ function LineChartSeriesFields({
           />
         </Field>
       </div>
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
-          <input
-            type="checkbox"
-            checked={series.showPoints !== false}
-            onChange={e => patch({ showPoints: e.target.checked })}
-          />
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
+        <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+          <Checkbox checked={series.showPoints !== false} onCheckedChange={e => patch({ showPoints: e })} />
           {t('dashboard.properties.widgets.chart.showPoints')}
         </label>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
-          <input
-            type="checkbox"
-            checked={series.eventLabelsEnabled === true}
-            onChange={e => patch({ eventLabelsEnabled: e.target.checked })}
-          />
+        <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+          <Checkbox checked={series.eventLabelsEnabled === true} onCheckedChange={e => patch({ eventLabelsEnabled: e })} />
           {t('dashboard.properties.widgets.chart.eventLabels')}
         </label>
         {series.eventLabelsEnabled === true && (
@@ -1262,14 +1238,14 @@ function LineChartSeriesFields({
               <SiteColorInput
                 value={series.eventLabelStyle?.fill?.startsWith('#') ? series.eventLabelStyle.fill : '#fca5a5'}
                 onChange={e => patchLabelStyle({ fill: e.target.value })}
-                className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
+                className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
                />
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.borderColorShort')}>
               <SiteColorInput
                 value={series.eventLabelStyle?.stroke?.startsWith('#') ? series.eventLabelStyle.stroke : '#ef4444'}
                 onChange={e => patchLabelStyle({ stroke: e.target.value })}
-                className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"
+                className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
                />
             </Field>
             <Field label={t('dashboard.properties.borderWidth')}>
@@ -1311,9 +1287,9 @@ function AxisBandFields({
     patch({ colorRules: rules.map((r, i) => (i === idx ? { ...r, ...p } : r)) });
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{t('dashboard.properties.widgets.chart.bandTitle', { axis: band.axis.toUpperCase() })}</p>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
+    <div className="space-y-2 rounded-lg border border-border-quaternary p-2.5 bg-surface-primary">
+      <p className="text-caption-2 text-text-tertiary uppercase">{t('dashboard.properties.widgets.chart.bandTitle', { axis: band.axis.toUpperCase() })}</p>
+      <p className="text-caption-2 text-text-quaternary">
         {t('dashboard.properties.widgets.chart.bandHint')}
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -1327,7 +1303,7 @@ function AxisBandFields({
           <input value={band.segmentField} onChange={e => patch({ segmentField: e.target.value })} className={inputCls} placeholder="segment_code" />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.defaultColor')}>
-          <SiteColorInput value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+          <SiteColorInput value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.thickness')}>
           <NumberInput min={1} max={20} value={band.thickness ?? 4} onChange={n => patch({ thickness: n })} className={inputCls} />
@@ -1336,19 +1312,19 @@ function AxisBandFields({
           <NumberInput min={0} max={1} step={0.1} value={band.opacity ?? 1} onChange={n => patch({ opacity: n })} className={inputCls} />
         </Field>
       </div>
-      <div className="space-y-1.5 pt-1 border-t border-zinc-800">
+      <div className="space-y-1.5 pt-1 border-t border-border-quaternary">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('dashboard.properties.widgets.chart.valueColorMap')}</span>
-          <button type="button" onClick={addRule} className="p-1 text-cyan-500 hover:bg-zinc-800 rounded"><Plus size={12} /></button>
+          <span className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.widgets.chart.valueColorMap')}</span>
+          <button type="button" onClick={addRule} className="p-1 text-cyan-500 hover:bg-link-standard-hover rounded"><Plus size={12} /></button>
         </div>
         {rules.map((rule, i) => (
-          <div key={i} className="flex items-center gap-1.5 p-1.5 bg-zinc-800/40 rounded border border-zinc-700/50 relative group">
-            <button type="button" onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-700 rounded-full text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100"><X size={10} /></button>
+          <div key={i} className="flex items-center gap-1.5 p-1.5 bg-zinc-800/40 rounded border border-border-quaternary relative group">
+            <button type="button" onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100"><X size={10} /></button>
             <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} flex-1 font-mono`} placeholder="IN_SERVICE" />
-            <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer shrink-0"  />
+            <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer shrink-0"  />
           </div>
         ))}
-        {rules.length === 0 && <p className="text-[10px] text-zinc-600 italic text-center py-1">{t('dashboard.properties.widgets.chart.noMapping')}</p>}
+        {rules.length === 0 && <p className="text-caption-2 text-text-disabled italic text-center py-1">{t('dashboard.properties.widgets.chart.noMapping')}</p>}
       </div>
     </div>
   );
@@ -1391,9 +1367,9 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
       <SH icon={<TrendingUp size={13} />} label={t('dashboard.properties.widgets.chart.lineChartTitle')} color="#06b6d4" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.paddingTitle')} color="#64748b" />
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.chart.paddingHint')}
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -1404,7 +1380,7 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
         </div>
       </div>
       <Field label={t('dashboard.properties.widgets.chart.xField')}><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <div className="flex items-center justify-between">
           <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.seriesSection')} color="#06b6d4" />
           <button
@@ -1415,7 +1391,7 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
                 { id: newSeriesId(), yField: 'value', color: '#22c55e', strokeWidth: 2 },
               ])
             }
-            className="flex items-center gap-1 px-2 py-1 text-[10px] text-cyan-400 hover:bg-zinc-800 rounded border border-zinc-700"
+            className="flex items-center gap-1 px-2 py-1 text-caption-2 text-text-theme hover:bg-link-standard-hover rounded border border-border-quaternary"
           >
             <Plus size={12} /> {t('dashboard.properties.add')}
           </button>
@@ -1429,7 +1405,7 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
           />
         ))}
       </div>
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.axesSection')} color="#22d3ee" />
         <Field label={t('dashboard.properties.widgets.chart.viewportMode')}>
           <SiteSelect
@@ -1454,22 +1430,22 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
         )}
         <ChartAxisFields label={t('dashboard.properties.widgets.chart.xAxis')} axis={w.xAxis} onChange={xAxis => onUpdate({ xAxis })} />
         <ChartAxisFields label={t('dashboard.properties.widgets.chart.yAxis')} axis={w.yAxis} onChange={yAxis => onUpdate({ yAxis })} />
-        <div className="space-y-2 rounded-lg border border-zinc-800/80 p-2.5 bg-zinc-900/30">
-          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{t('dashboard.properties.widgets.chart.bandsSection')}</p>
+        <div className="space-y-2 rounded-lg border border-border-quaternary p-2.5 bg-surface-primary">
+          <p className="text-caption-2 text-text-tertiary uppercase">{t('dashboard.properties.widgets.chart.bandsSection')}</p>
           <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-2 text-xs text-zinc-400">
-              <input type="checkbox" checked={!!xBand} onChange={e => setBand('x', e.target.checked)} />
+            <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+              <Checkbox checked={!!xBand} onCheckedChange={e => setBand('x', e)} />
               {t('dashboard.properties.widgets.chart.enableXBand')}
             </label>
-            <label className="flex items-center gap-2 text-xs text-zinc-400">
-              <input type="checkbox" checked={!!yBand} onChange={e => setBand('y', e.target.checked)} />
+            <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+              <Checkbox checked={!!yBand} onCheckedChange={e => setBand('y', e)} />
               {t('dashboard.properties.widgets.chart.enableYBand')}
             </label>
           </div>
         </div>
         {xBand && <AxisBandFields band={xBand} onChange={b => updateBand('x', b)} />}
         {yBand && <AxisBandFields band={yBand} onChange={b => updateBand('y', b)} />}
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.chart.axisHint')}
         </p>
       </div>
@@ -1506,8 +1482,8 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   return (
     <div className="space-y-6">
       <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-2">
-        <SH icon={<Settings size={14} className="text-cyan-400" />} label={t('dashboard.properties.plane.title')} color="#22d3ee" />
-        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-tighter">{t('dashboard.properties.plane.subtitle')}</p>
+        <SH icon={<Settings size={14} className="text-text-theme" />} label={t('dashboard.properties.plane.title')} color="#22d3ee" />
+        <p className="text-caption-2 text-text-quaternary mt-1 uppercase">{t('dashboard.properties.plane.subtitle')}</p>
       </div>
 
       <div className="space-y-4 px-1">
@@ -1515,42 +1491,42 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
           <input 
             value={plane.name} 
             onChange={e => onUpdate({ name: e.target.value })} 
-            className={`${inputCls} text-sm font-semibold`} 
+            className={`${inputCls} text-body-s-bold`} 
             placeholder={t('dashboard.properties.plane.namePlaceholder')}
           />
         </Field>
 
         <div className="space-y-1.5">
-          <label className="text-zinc-400 text-xs font-medium block">{t('dashboard.properties.plane.viewportMode')}</label>
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-800/60 rounded-lg border border-zinc-700/50">
+          <label className="text-text-tertiary text-body-xs-bold block">{t('dashboard.properties.plane.viewportMode')}</label>
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-secondary rounded-lg border border-border-quaternary">
             <button
               type="button"
               onClick={() => onUpdate({ viewportMode: 'fixed-scale' })}
-              className={`py-2 px-2 rounded-md text-[11px] font-medium flex flex-col items-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-md text-body-xs font-medium flex flex-col items-center gap-1 transition-all ${
                 currentMode === 'fixed-scale'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                  ? 'bg-blue-600 text-text-primary shadow-sm'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
               }`}
               title={t('dashboard.properties.plane.fixedScaleTitle')}
             >
               <span className="font-bold">{t('dashboard.properties.plane.fixedScale')}</span>
-              <span className="text-[9px] opacity-75">{t('dashboard.properties.plane.fixedScaleSub')}</span>
+              <span className="text-caption-2 opacity-75">{t('dashboard.properties.plane.fixedScaleSub')}</span>
             </button>
             <button
               type="button"
               onClick={() => onUpdate({ viewportMode: 'fit-width' })}
-              className={`py-2 px-2 rounded-md text-[11px] font-medium flex flex-col items-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-md text-body-xs font-medium flex flex-col items-center gap-1 transition-all ${
                 currentMode === 'fit-width'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                  ? 'bg-blue-600 text-text-primary shadow-sm'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
               }`}
               title={t('dashboard.properties.plane.fitWidthTitle')}
             >
               <span className="font-bold">{t('dashboard.properties.plane.fitWidth')}</span>
-              <span className="text-[9px] opacity-75">{t('dashboard.properties.plane.fitWidthSub')}</span>
+              <span className="text-caption-2 opacity-75">{t('dashboard.properties.plane.fitWidthSub')}</span>
             </button>
           </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed px-0.5">
+          <p className="text-caption-2 text-text-quaternary px-0.5">
             {currentMode === 'fixed-scale'
               ? t('dashboard.properties.plane.fixedScaleHint')
               : t('dashboard.properties.plane.fitWidthHint')}
@@ -1561,29 +1537,29 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
           <Field label={t('dashboard.properties.plane.canvasWidth')}>
             <div className="relative">
               <NumberInput min={320} value={plane.width} onChange={n => onUpdate({ width: n })} className={inputCls} />
-              <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
+              <span className="absolute right-2 top-1.5 text-caption-2 text-text-disabled font-mono">PX</span>
             </div>
           </Field>
           <Field label={t('dashboard.properties.plane.canvasHeight')}>
             <div className="relative">
               <NumberInput min={240} value={plane.height} onChange={n => onUpdate({ height: n })} className={inputCls} />
-              <span className="absolute right-2 top-1.5 text-[9px] text-zinc-600 font-mono">PX</span>
+              <span className="absolute right-2 top-1.5 text-caption-2 text-text-disabled font-mono">PX</span>
             </div>
           </Field>
         </div>
 
-        <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{t('dashboard.properties.plane.aspectRatio')}</div>
-          <div className="px-3 py-1 bg-zinc-900 rounded text-cyan-400 font-mono text-xs shadow-inner">
+        <div className="flex items-center justify-between p-3 bg-link-standard rounded-lg border border-border-quaternary">
+          <div className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.plane.aspectRatio')}</div>
+          <div className="px-3 py-1 bg-surface-primary rounded text-text-theme font-mono text-body-xs shadow-inner">
             {plane.width / g} : {plane.height / g}
           </div>
         </div>
 
-        <div className="pt-4 border-t border-zinc-800">
+        <div className="pt-4 border-t border-border-quaternary">
           <button 
             onClick={async () => { if((await systemConfirm(t('dashboard.properties.plane.deleteConfirm'), { tone: 'danger' }))) onDelete(); }} 
-            className="w-full py-2.5 rounded-lg bg-red-950/20 border border-red-900/30 text-red-400 text-xs 
-                       flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all duration-300"
+            className="w-full py-2.5 rounded-lg bg-red-950/20 border border-red-900/30 text-status-error-emphasis text-body-xs 
+                       flex items-center justify-center gap-2 hover:bg-red-600 hover:text-text-primary transition-all duration-300"
           >
             <Trash2 size={13} /> {t('dashboard.properties.plane.delete')}
           </button>
@@ -1616,7 +1592,7 @@ function ObstacleRingSettings({
   return (
     <div className="space-y-4">
       <SH icon={<AlertTriangle size={13} />} label="八方向障礙指示" color="#fb7185" />
-      <p className="text-[10px] leading-relaxed text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         方向以卡片上的車頭（朝上）為準。只有資料明確表示偵測到才變紅；沒填路徑、沒資料、斷線、過期或值看不懂都顯示為半透明（未知），不當成安全。
         字串 "false" 視為沒有偵測到。
       </p>
@@ -1626,19 +1602,19 @@ function ObstacleRingSettings({
           <NumberInput min={2} max={40} value={w.dotSize ?? 8} onChange={n => onUpdate({ dotSize: Math.max(2, n) })} className={inputCls} />
         </Field>
         <Field label="無障礙（灰）">
-          <SiteColorInput value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"  />
+          <SiteColorInput value={w.idleColor} onChange={e => onUpdate({ idleColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-border-quaternary bg-transparent"  />
         </Field>
         <Field label="有障礙（紅）">
-          <SiteColorInput value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"  />
+          <SiteColorInput value={w.alertColor} onChange={e => onUpdate({ alertColor: e.target.value })} className="h-8 w-full cursor-pointer rounded border border-border-quaternary bg-transparent"  />
         </Field>
       </div>
       <div className="space-y-2">
         {OBSTACLE_DIRECTIONS.map((direction) => {
           const binding = w.directions?.[direction] ?? { path: '', mode: 'boolean' as const };
           return (
-            <div key={direction} className="space-y-1 rounded border border-zinc-700/60 bg-zinc-800/30 p-2">
+            <div key={direction} className="space-y-1 rounded border border-border-quaternary bg-link-standard p-2">
               <div className="flex items-center gap-2">
-                <span className="w-8 shrink-0 text-[11px] font-semibold text-zinc-300">{OBSTACLE_DIRECTION_LABELS[direction]}</span>
+                <span className="w-8 shrink-0 text-body-xs-bold text-text-secondary">{OBSTACLE_DIRECTION_LABELS[direction]}</span>
                 <input
                   value={binding.path}
                   onChange={e => patchDirection(direction, { path: e.target.value })}
@@ -1707,7 +1683,7 @@ function BackgroundImagePicker({
               aria-checked={selected}
               title={option.label}
               onClick={() => onChange(option.url)}
-              className={`rounded-md border p-1 text-left ${selected ? 'border-cyan-500 ring-1 ring-cyan-500/40' : 'border-zinc-700 hover:border-zinc-500'}`}
+              className={`rounded-md border p-1 text-left ${selected ? 'border-cyan-500 ring-1 ring-cyan-500/40' : 'border-border-quaternary hover:border-border-primary'}`}
             >
               <div
                 className="w-full rounded"
@@ -1716,13 +1692,13 @@ function BackgroundImagePicker({
                   background: canvasBackgroundCss(backgroundColor, option.url, 'contain'),
                 }}
               />
-              <span className="mt-1 block truncate text-[10px] text-zinc-400">{option.label}</span>
+              <span className="mt-1 block truncate text-caption-2 text-text-tertiary">{option.label}</span>
             </button>
           );
         })}
       </div>
       {isGroup ? (
-        <p className="mt-1 text-[10px] text-zinc-500">群組：背景圖畫在每一張樣板卡片上，背景顏色仍是整個群組的底色。</p>
+        <p className="mt-1 text-caption-2 text-text-quaternary">群組：背景圖畫在每一張樣板卡片上，背景顏色仍是整個群組的底色。</p>
       ) : null}
     </Field>
   );
@@ -1771,15 +1747,15 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
             onChange={n => onUpdate({ headerTitleFontSize: Math.max(10, Math.min(48, n || 14)) })}
             className={inputCls}
           />
-          <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+          <p className="mt-1 text-caption-2 text-text-quaternary">
             {t('dashboard.properties.headerFontHint')}
           </p>
         </Field>
       ) : null}
 
       {isMap && (
-        <div className="space-y-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-sky-400">{t('dashboard.properties.canvas.mapSource')}</div>
+        <div className="space-y-3 rounded-lg border border-sky-500/25 bg-surface-theme-light p-3">
+          <div className="text-caption-2 uppercase text-text-theme">{t('dashboard.properties.canvas.mapSource')}</div>
           <Field label={t('dashboard.properties.canvas.selectMap')}>
             <SiteSelect value={el.mapId ?? ''} onChange={e => onUpdate({ mapId: e.target.value })} className={selectCls}>
               <option value="">{t('dashboard.properties.canvas.selectMapPlaceholder')}</option>
@@ -1788,7 +1764,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               ))}
             </SiteSelect>
           </Field>
-          <p className="text-[9px] leading-relaxed text-zinc-500">
+          <p className="text-caption-2 text-text-quaternary">
             {t('dashboard.properties.canvas.mapHint')}
           </p>
         </div>
@@ -1802,7 +1778,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
         <Field label={t('dashboard.properties.width')}><NumberInput value={el.width} onChange={n => onUpdate({ width: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.height')}><NumberInput value={el.height} onChange={n => onUpdate({ height: n })} className={inputCls} /></Field>
       </div>
-      <Field label={t('dashboard.properties.backgroundColor')}><SiteColorInput value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+      <Field label={t('dashboard.properties.backgroundColor')}><SiteColorInput value={el.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
       {el.canvasKind !== 'map-platform' ? (
         <BackgroundImagePicker
           value={el.backgroundImage ?? ''}
@@ -1814,8 +1790,8 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
       <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-cyan-500" /></Field>
 
       {isShiftCenter && (
-        <div className="space-y-3 rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
-          <div className="text-[11px] font-semibold text-cyan-300">班次中心統計時間</div>
+        <div className="space-y-3 rounded-lg border border-border-theme-light-trn bg-surface-theme-light p-3">
+          <div className="text-body-xs-bold text-text-theme">班次中心統計時間</div>
           <Field label="統計日期">
             <SiteSelect
               value={shiftRange.dateMode}
@@ -1839,18 +1815,18 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <input readOnly value={`隔日 ${shiftRange.startTime}`} className={inputCls} />
             </Field>
           </div>
-          <p className="text-[10px] text-zinc-400">時區：{shiftRange.timezone}；區間包含起點、不包含終點。</p>
+          <p className="text-caption-2 text-text-tertiary">時區：{shiftRange.timezone}；區間包含起點、不包含終點。</p>
         </div>
       )}
 
       {el.label === '事件中心' && !el.isGroup && (
-        <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
+        <p className="text-caption-2 text-text-quaternary rounded-md border border-border-quaternary bg-zinc-800/40 px-2.5 py-2">
           {t('dashboard.properties.canvas.eventCenterHint')}
         </p>
       )}
 
       {el.canvasLayer === 'overlay' && (
-        <p className="text-[10px] leading-relaxed text-zinc-500 rounded-md border border-zinc-700/80 bg-zinc-800/40 px-2.5 py-2">
+        <p className="text-caption-2 text-text-quaternary rounded-md border border-border-quaternary bg-zinc-800/40 px-2.5 py-2">
           {t('dashboard.properties.canvas.overlayHint')}
         </p>
       )}
@@ -1863,32 +1839,20 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
             // 另外每套樣板各放一顆「編輯內容」按鈕，不然使用者搞不清楚點哪顆才是
             // 「正確」入口，也不知道還有其他樣板可以編輯。
             onEnterTemplateEditMode && (el.genericGroup.templates?.length ?? 0) > 0 && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button hierarchy="subordinate" variant="standard" className="w-full" onPress={() => {
                   const templates = el.genericGroup?.templates ?? [];
                   const defaultTpl = templates.find(t => t.isDefault) ?? templates[0];
                   if (defaultTpl) onEnterTemplateEditMode(defaultTpl.id);
-                }}
-                className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
-              >
-                {t('dashboard.properties.canvas.editSubcanvas')}
-              </button>
+                }}>{t('dashboard.properties.canvas.editSubcanvas')}</Button>
             )
           ) : (
             onEnterEditGroupMode && (
-              <button
-                type="button"
-                onClick={onEnterEditGroupMode}
-                className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 shadow-md"
-              >
-                {t('dashboard.properties.canvas.editSubcanvas')}
-              </button>
+              <Button hierarchy="subordinate" variant="standard" className="w-full" onPress={onEnterEditGroupMode}>{t('dashboard.properties.canvas.editSubcanvas')}</Button>
             )
           )}
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
             <Database size={12} className="text-purple-400" />
-            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">{t('dashboard.properties.canvas.groupBadge')}</span>
+            <span className="text-caption-2 text-purple-400 uppercase">{t('dashboard.properties.canvas.groupBadge')}</span>
           </div>
 
           <Field label={t('dashboard.properties.canvas.presentMode')}>
@@ -1913,7 +1877,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
                   className={inputCls}
                 />
               </Field>
-              <p className="text-[10px] text-zinc-500 leading-relaxed">
+              <p className="text-caption-2 text-text-quaternary">
                 {el.dualCanvasEnabled
                   ? t('dashboard.properties.canvas.scrollDualHint')
                   : t('dashboard.properties.canvas.scrollHint')}
@@ -1954,7 +1918,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
                   <option value="none">{t('dashboard.properties.canvas.transitionNone')}</option>
                 </SiteSelect>
               </Field>
-              <p className="text-[10px] text-zinc-500 leading-relaxed">
+              <p className="text-caption-2 text-text-quaternary">
                 {t('dashboard.properties.canvas.slotPoolHint')}
               </p>
             </>
@@ -1971,9 +1935,9 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
             </SiteSelect>
           </Field>
 
-          <div className="p-2.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50 space-y-1.5">
-            <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">{t('dashboard.properties.canvas.varInject')}</div>
-            <div className="text-[10px] text-zinc-400 leading-relaxed">
+          <div className="p-2.5 bg-zinc-800/50 rounded-lg border border-border-quaternary space-y-1.5">
+            <div className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.canvas.varInject')}</div>
+            <div className="text-caption-2 text-text-tertiary">
               {(el.groupVariableMode ?? 'row') === 'index'
                 ? t('dashboard.properties.canvas.varInjectIndex', { token: `{${el.variableName || 'item'}}` })
                 : t('dashboard.properties.canvas.varInjectRow', { token: t('dashboard.properties.canvas.fieldNameToken') })}
@@ -2005,7 +1969,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <option value="fill">{t('dashboard.properties.canvas.tileFill')}</option>
               <option value="fixed">{t('dashboard.properties.canvas.tileFixed')}</option>
             </SiteSelect>
-            <p className="mt-1 text-[10px] text-zinc-500 leading-relaxed">
+            <p className="mt-1 text-caption-2 text-text-quaternary">
               {(el.groupTileFit || 'fill') === 'slot'
                 ? t('dashboard.properties.canvas.tileSlotHint')
                 : (el.groupTileFit || 'fill') === 'fill'
@@ -2020,7 +1984,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
               <NumberInput value={el.templateHeight || 180} onChange={n => onUpdate({ templateHeight: n })} className={inputCls} />
             </div>
             {(el.groupTileFit || 'fill') === 'slot' && (
-              <p className="mt-1 text-[10px] text-amber-500/90">
+              <p className="mt-1 text-caption-2 text-amber-500/90">
                 {t('dashboard.properties.canvas.templateSuggest', {
                   cols: el.gridColumns || 11,
                   size: (() => {
@@ -2082,8 +2046,8 @@ function PositionFields({ widget, onUpdate }: { widget: ChildWidget; onUpdate: (
   const { t } = useTranslation();
   const minSize = 1;
   return (
-    <div className="pt-2 border-t border-zinc-800">
-      <div className="text-zinc-600 text-[10px] uppercase font-bold mb-2 tracking-wider">{t('dashboard.properties.positionSize')}</div>
+    <div className="pt-2 border-t border-border-quaternary">
+      <div className="text-text-disabled text-caption-2 uppercase mb-2">{t('dashboard.properties.positionSize')}</div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="X"><NumberInput value={widget.x} onChange={n => onUpdate({ x: n } as any)} className={inputCls} /></Field>
         <Field label="Y"><NumberInput value={widget.y} onChange={n => onUpdate({ y: n } as any)} className={inputCls} /></Field>
@@ -2110,32 +2074,11 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       
       {/* 快捷線條預設 */}
       <div className="space-y-1.5 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/40">
-        <label className="text-zinc-400 text-[10px] uppercase font-bold tracking-tight block">{t('dashboard.properties.widgets.colorBlock.quickLines')}</label>
+        <label className="text-text-tertiary text-caption-2 uppercase block">{t('dashboard.properties.widgets.colorBlock.quickLines')}</label>
         <div className="grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            onClick={() => onUpdate({ height: 1, borderRadius: 0, borderWidth: 0 })}
-            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title={t('dashboard.properties.widgets.colorBlock.line1pxTitle')}
-          >
-            {t('dashboard.properties.widgets.colorBlock.line1px')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onUpdate({ height: 2, borderRadius: 1, borderWidth: 0 })}
-            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title={t('dashboard.properties.widgets.colorBlock.line2pxTitle')}
-          >
-            {t('dashboard.properties.widgets.colorBlock.line2px')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onUpdate({ width: 3, borderRadius: 1.5, borderWidth: 0 })}
-            className="py-1.5 px-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] rounded border border-zinc-700/60 font-medium transition-colors text-center"
-            title={t('dashboard.properties.widgets.colorBlock.line3pxTitle')}
-          >
-            {t('dashboard.properties.widgets.colorBlock.line3px')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={() => onUpdate({ height: 1, borderRadius: 0, borderWidth: 0 })} title={t('dashboard.properties.widgets.colorBlock.line1pxTitle')}>{t('dashboard.properties.widgets.colorBlock.line1px')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={() => onUpdate({ height: 2, borderRadius: 1, borderWidth: 0 })} title={t('dashboard.properties.widgets.colorBlock.line2pxTitle')}>{t('dashboard.properties.widgets.colorBlock.line2px')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={() => onUpdate({ width: 3, borderRadius: 1.5, borderWidth: 0 })} title={t('dashboard.properties.widgets.colorBlock.line3pxTitle')}>{t('dashboard.properties.widgets.colorBlock.line3px')}</Button>
         </div>
       </div>
 
@@ -2143,7 +2086,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
         <Field label={t('dashboard.properties.backgroundColor')}>
           <div className="flex gap-2">
             <SiteColorInput value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1e293b'}
-              onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  />
+              onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
             <input value={w.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className={`${inputCls} font-mono`} />
           </div>
         </Field>
@@ -2154,24 +2097,22 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <div className="grid grid-cols-3 gap-2">
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.borderWidth')}><NumberInput min={0} value={w.borderWidth} onChange={n => onUpdate({ borderWidth: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.borderColor')}><SiteColorInput value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.borderColor')}><SiteColorInput value={w.borderColor.startsWith('#') ? w.borderColor : '#ffffff'} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
       </div>
-      <label className="flex items-center gap-2 text-xs text-zinc-400">
-        <input type="checkbox" checked={!!w.severityStripColor}
-          onChange={e => onUpdate({ severityStripColor: e.target.checked })} />
+      <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+        <Checkbox checked={!!w.severityStripColor} onCheckedChange={e => onUpdate({ severityStripColor: e })} />
         {t('dashboard.properties.widgets.colorBlock.severityColor')}
       </label>
       {w.severityStripColor && (
-        <div className="pt-2 border-t border-zinc-800">
+        <div className="pt-2 border-t border-border-quaternary">
           <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.colorBlock.mqttData')} color="#a78bfa" />
           <div className="mt-2">
             <DataBindingSettings w={w} onUpdate={onUpdate} />
           </div>
         </div>
       )}
-      <label className="flex items-center gap-2 text-xs text-zinc-400">
-        <input type="checkbox" checked={!!w.bindBorderFromHealthField}
-          onChange={e => onUpdate({ bindBorderFromHealthField: e.target.checked })} />
+      <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+        <Checkbox checked={!!w.bindBorderFromHealthField} onCheckedChange={e => onUpdate({ bindBorderFromHealthField: e })} />
         {t('dashboard.properties.widgets.colorBlock.healthBorder')}
       </label>
       {w.bindBorderFromHealthField && (
@@ -2182,7 +2123,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <Field label={t('dashboard.properties.widgets.colorBlock.borderColorVar')}>
         <input value={w.bindBorderColorVar ?? ''} onChange={e => onUpdate({ bindBorderColorVar: e.target.value })} className={inputCls} placeholder="card_border_color" />
       </Field>
-      <div className="text-[9px] text-zinc-600 bg-zinc-800/50 p-2 rounded border border-zinc-700/50 italic">
+      <div className="text-caption-2 text-text-disabled bg-zinc-800/50 p-2 rounded border border-border-quaternary italic">
         {t('dashboard.properties.widgets.colorBlock.zHint')}
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2204,30 +2145,30 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="status" /></Field>
         <Field label={t('dashboard.properties.widgets.statusBadge.defaultLabel')}><input value={w.defaultLabel} onChange={e => onUpdate({ defaultLabel: e.target.value })} className={inputCls} placeholder="UNKNOWN" /></Field>
-        <Field label={t('dashboard.properties.widgets.statusBadge.defaultBg')}><SiteColorInput value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-        <Field label={t('dashboard.properties.widgets.statusBadge.defaultText')}><SiteColorInput value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultBg')}><SiteColorInput value={w.defaultBgColor} onChange={e => onUpdate({ defaultBgColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statusBadge.defaultText')}><SiteColorInput value={w.defaultTextColor} onChange={e => onUpdate({ defaultTextColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.fontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex items-center gap-2">
-        <input type="checkbox" checked={w.showDot} onChange={e => onUpdate({ showDot: e.target.checked })} className="accent-green-500 w-3 h-3" />
-        <span className="text-zinc-400 text-[10px]">{t('dashboard.properties.widgets.statusBadge.showDot')}</span>
+        <Checkbox checked={w.showDot} onCheckedChange={e => onUpdate({ showDot: e })} />
+        <span className="text-text-tertiary text-caption-2">{t('dashboard.properties.widgets.statusBadge.showDot')}</span>
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('dashboard.properties.widgets.statusBadge.rules')}</span>
-          <button onClick={addRule} className="p-1 text-cyan-500 hover:bg-zinc-800 rounded"><Plus size={12} /></button>
+          <span className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.widgets.statusBadge.rules')}</span>
+          <button onClick={addRule} className="p-1 text-cyan-500 hover:bg-link-standard-hover rounded"><Plus size={12} /></button>
         </div>
         {w.rules.map((rule, i) => (
-          <div key={i} className="p-2 bg-zinc-800/40 rounded border border-zinc-700/50 space-y-1.5 relative group">
-            <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-700 rounded-full text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
+          <div key={i} className="p-2 bg-zinc-800/40 rounded border border-border-quaternary space-y-1.5 relative group">
+            <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
             <div className="grid grid-cols-2 gap-1">
               <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} font-mono`} placeholder={t('dashboard.properties.widgets.statusBadge.valuePlaceholder')} />
               <input value={rule.label} onChange={e => updateRule(i, { label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statusBadge.labelPlaceholder')} />
             </div>
             <div className="flex gap-2">
-              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.bg')}</span></div>
-              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-[9px] text-zinc-500">{t('dashboard.properties.widgets.statusBadge.text')}</span></div>
+              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.bgColor} onChange={e => updateRule(i, { bgColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-caption-2 text-text-quaternary">{t('dashboard.properties.widgets.statusBadge.bg')}</span></div>
+              <div className="flex items-center gap-1 flex-1"><SiteColorInput value={rule.textColor} onChange={e => updateRule(i, { textColor: e.target.value })} className="w-6 h-6 cursor-pointer rounded"  /><span className="text-caption-2 text-text-quaternary">{t('dashboard.properties.widgets.statusBadge.text')}</span></div>
             </div>
           </div>
         ))}
@@ -2264,7 +2205,7 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
             <option value="right">{t('dashboard.properties.sideRight')}</option>
           </SiteSelect>
         </Field>
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.statCard.labelPositionHint')}
         </p>
         <Field label={t('dashboard.properties.widgets.statCard.contentAlign')}>
@@ -2279,20 +2220,19 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
           </SiteSelect>
         </Field>
         <Field label={t('dashboard.properties.widgets.statCard.layoutGap')}><NumberInput min={0} max={24} value={w.layoutGap ?? 4} onChange={n => onUpdate({ layoutGap: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.valueColor')}><SiteColorInput value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.labelColor')}><SiteColorInput value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-        <Field label={t('dashboard.properties.widgets.statCard.unitColor')}><SiteColorInput value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.valueColor')}><SiteColorInput value={w.valueColor} onChange={e => onUpdate({ valueColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.labelColor')}><SiteColorInput value={w.labelColor} onChange={e => onUpdate({ labelColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.statCard.unitColor')}><SiteColorInput value={w.unitColor} onChange={e => onUpdate({ unitColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
-      <label className="flex items-center gap-2 text-xs text-zinc-400">
-        <input type="checkbox" checked={w.labelUppercase !== false}
-          onChange={e => onUpdate({ labelUppercase: e.target.checked })} />
+      <label className="flex items-center gap-2 text-body-xs text-text-tertiary">
+        <Checkbox checked={w.labelUppercase !== false} onCheckedChange={e => onUpdate({ labelUppercase: e })} />
         {t('dashboard.properties.widgets.statCard.labelUppercase')}
       </label>
       <ColorRulesEditor rules={w.colorRules} enabled={w.colorRulesEnabled} onToggleEnabled={e => onUpdate({ colorRulesEnabled: e })} onUpdate={rules => onUpdate({ colorRules: rules })} />
-      <div className="pt-2 border-t border-zinc-800 space-y-2">
+      <div className="pt-2 border-t border-border-quaternary space-y-2">
         <SH icon={<Hash size={12} />} label={t('dashboard.properties.widgets.statCard.compareTitle')} color="#38bdf8" />
-        <p className="text-[10px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.statCard.compareHint')}
         </p>
         <Field label={t('dashboard.properties.widgets.statCard.targetField')}>
@@ -2305,8 +2245,8 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.properties.widgets.statCard.tolerance')}><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><SiteColorInput value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><SiteColorInput value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><SiteColorInput value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><SiteColorInput value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
           <Field label={t('dashboard.properties.widgets.statCard.hintField')}><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
         </div>
         <Field label={t('dashboard.properties.widgets.statCard.hintIcon')}>
@@ -2342,11 +2282,11 @@ function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; 
         <Field label={t('dashboard.properties.borderRadius')}><NumberInput min={0} value={w.borderRadius} onChange={n => onUpdate({ borderRadius: n })} className={inputCls} /></Field>
       </div>
       <div className="flex gap-4">
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showValue} onChange={e => onUpdate({ showValue: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.progressBar.showValue')}
+        <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary cursor-pointer">
+          <Checkbox checked={w.showValue} onCheckedChange={e => onUpdate({ showValue: e })} /> {t('dashboard.properties.widgets.progressBar.showValue')}
         </label>
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showLabel} onChange={e => onUpdate({ showLabel: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.progressBar.showLabel')}
+        <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary cursor-pointer">
+          <Checkbox checked={w.showLabel} onCheckedChange={e => onUpdate({ showLabel: e })} /> {t('dashboard.properties.widgets.progressBar.showLabel')}
         </label>
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2390,8 +2330,8 @@ function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; on
           <option value="minimal-center">{t('dashboard.properties.widgets.emptyState.variantMinimal')}</option>
         </SiteSelect>
       </Field>
-      <p className="text-[10px] text-zinc-500 leading-relaxed">
-        {t('dashboard.properties.widgets.emptyState.dualHintBefore')}<strong className="text-zinc-400">{t('dashboard.properties.widgets.emptyState.dualHintStrong')}</strong>{t('dashboard.properties.widgets.emptyState.dualHintAfter')}
+      <p className="text-caption-2 text-text-quaternary">
+        {t('dashboard.properties.widgets.emptyState.dualHintBefore')}<strong className="text-text-tertiary">{t('dashboard.properties.widgets.emptyState.dualHintStrong')}</strong>{t('dashboard.properties.widgets.emptyState.dualHintAfter')}
       </p>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -2420,15 +2360,15 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
         </Field>
         <Field label={t('dashboard.properties.widgets.clock.timeFontSize')}><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.widgets.clock.dateFontSize')}><NumberInput value={w.dateFontSize} onChange={n => onUpdate({ dateFontSize: n })} className={inputCls} /></Field>
-        <Field label={t('dashboard.properties.widgets.clock.timeColor')}><SiteColorInput value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
-        <Field label={t('dashboard.properties.widgets.clock.dateColor')}><SiteColorInput value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-zinc-700 bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.timeColor')}><SiteColorInput value={w.color} onChange={e => onUpdate({ color: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+        <Field label={t('dashboard.properties.widgets.clock.dateColor')}><SiteColorInput value={w.dateColor} onChange={e => onUpdate({ dateColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
       </div>
       <div className="flex gap-4">
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showDate} onChange={e => onUpdate({ showDate: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.clock.showDate')}
+        <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary cursor-pointer">
+          <Checkbox checked={w.showDate} onCheckedChange={e => onUpdate({ showDate: e })} /> {t('dashboard.properties.widgets.clock.showDate')}
         </label>
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-          <input type="checkbox" checked={w.showSeconds} onChange={e => onUpdate({ showSeconds: e.target.checked })} className="accent-cyan-500 w-3 h-3" /> {t('dashboard.properties.widgets.clock.showSeconds')}
+        <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary cursor-pointer">
+          <Checkbox checked={w.showSeconds} onCheckedChange={e => onUpdate({ showSeconds: e })} /> {t('dashboard.properties.widgets.clock.showSeconds')}
         </label>
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2483,9 +2423,9 @@ function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; on
         <Field label="字級倍率（12＝設計稿；隨卡片寬度÷320 等比）"><NumberInput value={w.fontSize} onChange={n => onUpdate({ fontSize: n })} className={inputCls} /></Field>
       </div>
       <Field label="資料端點（登入端內部 API）"><input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={`${inputCls} font-mono`} /></Field>
-      <div className="rounded border border-zinc-700 bg-zinc-900/60 p-2 text-[10px] leading-relaxed text-zinc-400">
-        <div className="text-zinc-300">實際採用的來源</div>
-        <div className="break-all font-mono text-emerald-300">{effectiveUrl || '（未設定站點）'}</div>
+      <div className="rounded border border-border-quaternary bg-surface-primary p-2 text-caption-2 text-text-tertiary">
+        <div className="text-text-secondary">實際採用的來源</div>
+        <div className="break-all font-mono text-status-success">{effectiveUrl || '（未設定站點）'}</div>
         <div>每日計畫站序＋車端即時回報，時間為營運時間；重查：訂單開始／結束、車換路段、營運時鐘、每日計畫切換（{(w.invalidateTags ?? []).join('、') || '無'}）</div>
       </div>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
@@ -2511,8 +2451,8 @@ function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpda
         </Field>
         <Field label={t('dashboard.properties.widgets.barChart.barPadding')}><NumberInput step={0.05} min={0} max={0.9} value={w.barPadding ?? 0.3} onChange={n => onUpdate({ barPadding: n })} className={inputCls} /></Field>
       </div>
-      <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-        <input type="checkbox" checked={w.showValues} onChange={e => onUpdate({ showValues: e.target.checked })} className="accent-orange-500 w-3 h-3" /> {t('dashboard.properties.widgets.barChart.showValues')}
+      <label className="flex items-center gap-1.5 text-caption-2 text-text-tertiary cursor-pointer">
+        <Checkbox checked={w.showValues} onCheckedChange={e => onUpdate({ showValues: e })} /> {t('dashboard.properties.widgets.barChart.showValues')}
       </label>
       <PositionFields widget={w as any} onUpdate={onUpdate as any} />
       <DeleteBtn onDelete={onDelete} />
@@ -2583,7 +2523,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
           ))}
         </SiteSelect>
         {maps.length === 0 && (
-          <p className="text-[9px] text-zinc-500 mt-1">
+          <p className="text-caption-2 text-text-quaternary mt-1">
             {t('dashboard.properties.widgets.mapCanvas.noMaps')}
           </p>
         )}
@@ -2595,7 +2535,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
           onChange={e => onUpdate({ zoomFactor: +e.target.value })}
           className="w-full accent-sky-400"
         />
-        <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
+        <div className="flex justify-between text-caption-2 text-text-quaternary mt-0.5">
           <span>{t('dashboard.properties.widgets.mapCanvas.zoomIn')}</span><span>{t('dashboard.properties.widgets.mapCanvas.zoomOut')}</span>
         </div>
       </Field>
@@ -2642,7 +2582,7 @@ function VehicleContainerSettings({
       </Field>
 
       {managedByMap ? (
-        <div className="space-y-2 rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-[11px] text-sky-100">
+        <div className="space-y-2 rounded-lg border border-border-theme-light-trn bg-surface-theme p-3 text-body-xs text-text-theme">
           <p>這張地圖的車輛外觀由圖資管理設定（模型、顯示尺寸、行為圖示）。</p>
           <p className="text-sky-200/80">
             目前使用：{mapModel.resolution?.definition?.name ?? mapModel.resolution?.setting?.definitionKey}
@@ -2658,7 +2598,7 @@ function VehicleContainerSettings({
                 mapId,
               })
             }
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-2 text-xs font-semibold text-white hover:bg-sky-500"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-2 text-body-xs-bold text-text-primary hover:bg-sky-500"
           >
             <ExternalLink size={13} />
             前往圖資管理編輯
@@ -2683,16 +2623,16 @@ function VehicleContainerSettings({
               ) : null}
             </SiteSelect>
           </Field>
-          {error ? <p className="text-[10px] text-red-300">模型清單讀取失敗：{error}</p> : null}
+          {error ? <p className="text-caption-2 text-status-error-emphasis">模型清單讀取失敗：{error}</p> : null}
           {mapId ? (
-            <p className="text-[10px] leading-relaxed text-amber-300/90">
+            <p className="text-caption-2 text-amber-300/90">
               這張地圖還沒在圖資管理設定車輛模型，暫用這個容器的模型與尺寸。可到圖資管理 → 車輛模型 → 遷移，把它搬成地圖設定。
             </p>
           ) : null}
           <button
             type="button"
             onClick={() => requestOpenVehicleModels({ definitionKey: w.vehicleDefinitionId ?? null, mapId })}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-600 py-2 text-xs text-zinc-200 hover:border-zinc-400"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-border-tertiary py-2 text-body-xs text-text-primary hover:border-border-secondary"
           >
             <ExternalLink size={13} />
             前往圖資管理編輯
@@ -2942,22 +2882,22 @@ function TabListSettings({
   }, [w.activeTabId]);
 
   return (
-    <div className="space-y-4 text-xs">
+    <div className="space-y-4 text-body-xs">
       <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#38bdf8" />
 
-      <label className="flex items-center justify-between gap-2 text-zinc-300">
+      <label className="flex items-center justify-between gap-2 text-text-secondary">
         <span>顯示欄位名稱</span>
-        <input type="checkbox" checked={w.showHeader !== false} onChange={e => onUpdate({ showHeader: e.target.checked })} />
+        <Checkbox checked={w.showHeader !== false} onCheckedChange={e => onUpdate({ showHeader: e })} />
       </label>
 
       {/* Tab 管理 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-zinc-400 text-[11px] font-medium">{t('dashboard.properties.widgets.tabList.tabList')}</label>
+          <label className="text-text-tertiary text-body-xs-bold">{t('dashboard.properties.widgets.tabList.tabList')}</label>
           <button
             type="button"
             onClick={addTab}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-600/30 text-blue-300 hover:bg-blue-600/50 text-[10px]"
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-600/30 text-text-theme hover:bg-blue-600/50 text-caption-2"
           >
             <Plus size={11} /> {t('dashboard.properties.widgets.tabList.addTab')}
           </button>
@@ -2968,10 +2908,10 @@ function TabListSettings({
               key={tab.id}
               type="button"
               onClick={() => selectTab(tab.id)}
-              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded text-body-xs font-medium transition-colors ${
                 tab.id === (activeTab?.id ?? '')
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-blue-600 text-text-primary'
+                  : 'bg-surface-secondary text-text-tertiary hover:text-text-primary'
               }`}
             >
               {tab.label}
@@ -2983,14 +2923,14 @@ function TabListSettings({
       {activeTab && (
         <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/40 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-zinc-300">
+            <span className="text-body-xs-bold text-text-secondary">
               {t('dashboard.properties.widgets.tabList.configureTab', { label: activeTab.label })}
             </span>
             {tabs.length > 1 && (
               <button
                 type="button"
                 onClick={() => deleteTab(activeTab.id)}
-                className="text-red-400 hover:text-red-300 text-[10px] flex items-center gap-0.5"
+                className="text-status-error-emphasis hover:text-status-error-emphasis text-caption-2 flex items-center gap-0.5"
               >
                 <Trash2 size={11} /> {t('dashboard.properties.widgets.tabList.deleteTab')}
               </button>
@@ -2999,7 +2939,7 @@ function TabListSettings({
 
           {/* {t('dashboard.properties.widgets.tabList.tabName')} */}
           <div>
-            <label className="text-zinc-400 text-[10px] block mb-1">{t('dashboard.properties.widgets.tabList.tabName')}</label>
+            <label className="text-text-tertiary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabName')}</label>
             <input
               type="text"
               value={activeTab.label}
@@ -3017,23 +2957,19 @@ function TabListSettings({
           <Field label="API／MQTT 合併識別路徑">
             <input value={activeTab.mergeKeyField ?? ''} onChange={e => updateTab(activeTab.id, { mergeKeyField: e.target.value })} className={inputCls} placeholder="event_id（同時使用兩來源時必填）" />
           </Field>
-          <div className="pt-2 border-t border-zinc-700/50 space-y-2">
-            <label className="flex items-center justify-between gap-2 text-zinc-300">
+          <div className="pt-2 border-t border-border-quaternary space-y-2">
+            <label className="flex items-center justify-between gap-2 text-text-secondary">
               <span>耦合同一業務事件</span>
-              <input
-                type="checkbox"
-                checked={activeTab.rowCoupling?.enabled === true}
-                onChange={e => updateTab(activeTab.id, {
+              <Checkbox checked={activeTab.rowCoupling?.enabled === true} onCheckedChange={e => updateTab(activeTab.id, {
                   rowCoupling: {
-                    enabled: e.target.checked,
+                    enabled: e,
                     relationKeyField: activeTab.rowCoupling?.relationKeyField ?? 'coupling_key',
                     stableKeyField: activeTab.rowCoupling?.stableKeyField ?? 'row_key',
                     statusField: activeTab.rowCoupling?.statusField ?? 'event',
                     statusOrder: activeTab.rowCoupling?.statusOrder ?? ['arrive', 'depart'],
                     fieldMappings: activeTab.rowCoupling?.fieldMappings,
                   },
-                })}
-              />
+                })} />
             </label>
             {activeTab.rowCoupling?.enabled && <>
               <div className="grid grid-cols-2 gap-2">
@@ -3059,13 +2995,13 @@ function TabListSettings({
           </div>
 
           {/* 欄位清單 */}
-          <div className="pt-2 border-t border-zinc-700/50 space-y-2">
+          <div className="pt-2 border-t border-border-quaternary space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-zinc-300 text-[11px] font-medium">{t('dashboard.properties.widgets.tabList.columns')}</label>
+              <label className="text-text-secondary text-body-xs-bold">{t('dashboard.properties.widgets.tabList.columns')}</label>
               <button
                 type="button"
                 onClick={addColumn}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/50 text-[10px] font-medium transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/30 text-status-success hover:bg-emerald-600/50 text-caption-2 transition-colors"
               >
                 <Plus size={12} /> {t('dashboard.properties.widgets.tabList.addColumn')}
               </button>
@@ -3077,19 +3013,19 @@ function TabListSettings({
                 return (
                 <div
                   key={col.id}
-                  className="p-3 rounded-lg bg-zinc-900/90 border border-zinc-700/50 space-y-2.5"
+                  className="p-3 rounded-lg bg-surface-primary border border-border-quaternary space-y-2.5"
                 >
                   {/* 第 1 行：序號 + 欄位標題 + 刪除 */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="text-zinc-300 text-[10px] font-bold">
+                      <label className="text-text-secondary text-caption-2">
                         {t('dashboard.properties.widgets.tabList.columnTitle', { n: idx + 1 })}
                       </label>
                       {activeTab.columns.length > 1 && (
                         <button
                           type="button"
                           onClick={() => deleteColumn(col.id)}
-                          className="text-zinc-500 hover:text-red-400 p-1 rounded hover:bg-red-950/40"
+                          className="text-text-quaternary hover:text-status-error-emphasis p-1 rounded hover:bg-red-950/40"
                           title={t('dashboard.properties.widgets.tabList.deleteColumn')}
                         >
                           <Trash2 size={13} />
@@ -3100,21 +3036,21 @@ function TabListSettings({
                       type="text"
                       value={col.name}
                       onChange={e => updateColumn(col.id, { name: e.target.value })}
-                      className={`${inputCls} w-full text-xs`}
+                      className={`${inputCls} w-full text-body-xs`}
                       placeholder={t('dashboard.properties.widgets.tabList.columnNamePlaceholder')}
                     />
                   </div>
 
                   {/* 第 2 行：綁定 SQL 欄位別名 (下拉選單) */}
                   <div className="space-y-1">
-                    <label className="text-zinc-400 text-[10px]">
+                    <label className="text-text-tertiary text-caption-2">
                       {t('dashboard.properties.widgets.tabList.bindAlias')}
                     </label>
                     <input
                       list={`tab-list-fields-${activeTab.id}`}
                       value={effectiveFieldKey}
                       onChange={e => updateColumn(col.id, { fieldKey: e.target.value })}
-                      className={`${inputCls} w-full text-xs py-1.5 font-mono`}
+                      className={`${inputCls} w-full text-body-xs py-1.5 font-mono`}
                       placeholder="欄位或 JSON 路徑"
                     />
                     <datalist id={`tab-list-fields-${activeTab.id}`}>{detectedSqlFields.map(f => <option key={f} value={f} />)}</datalist>
@@ -3125,17 +3061,17 @@ function TabListSettings({
 
                   {/* 第 3 行：欄位寬度 */}
                   <div className="space-y-1">
-                    <label className="text-zinc-400 text-[10px]">
+                    <label className="text-text-tertiary text-caption-2">
                       {t('dashboard.properties.widgets.tabList.columnWidth')}
                     </label>
                     <div className="flex items-center gap-1.5">
                       <NumberInput
                         value={col.width}
                         onChange={n => updateColumn(col.id, { width: Math.max(30, n) })}
-                        className={`${inputCls} w-full text-xs font-mono`}
+                        className={`${inputCls} w-full text-body-xs font-mono`}
                         placeholder={t('dashboard.properties.widgets.tabList.widthPlaceholder')}
                       />
-                      <span className="text-zinc-500 text-xs shrink-0">px</span>
+                      <span className="text-text-quaternary text-body-xs shrink-0">px</span>
                     </div>
                   </div>
 
@@ -3145,9 +3081,9 @@ function TabListSettings({
                     const colTextColor = col.textColor ?? firstText?.color ?? w.textColor ?? '#cbd5e1';
                     return (
                       <div className="space-y-1">
-                        <label className="text-zinc-400 text-[10px]">{t('dashboard.properties.widgets.tabList.columnTextColor')}</label>
+                        <label className="text-text-tertiary text-caption-2">{t('dashboard.properties.widgets.tabList.columnTextColor')}</label>
                         <div
-                          className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner"
+                          className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner"
                           style={{ backgroundColor: colTextColor }}
                         >
                           <SiteColorInput
@@ -3165,7 +3101,7 @@ function TabListSettings({
                   <button
                     type="button"
                     onClick={() => onEnterEditColumn?.(activeTab.id, col.id)}
-                    className="w-full mt-1 py-2 px-3 rounded-md bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                    className="w-full mt-1 py-2 px-3 rounded-md bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-text-theme text-body-xs-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
                   >
                     <Edit3 size={13} /> {t('dashboard.properties.widgets.tabList.editCell')}
                   </button>
@@ -3178,27 +3114,27 @@ function TabListSettings({
       )}
 
       {/* ── 全域字體與外觀設定 ────────────────────────────────────── */}
-      <div className="space-y-3 pt-3 border-t border-zinc-800">
-        <label className="text-zinc-300 text-[11px] font-semibold flex items-center gap-1.5">
-          <Palette size={13} className="text-cyan-400" /> {t('dashboard.properties.widgets.tabList.globalStyle')}
+      <div className="space-y-3 pt-3 border-t border-border-quaternary">
+        <label className="text-text-secondary text-body-xs-bold flex items-center gap-1.5">
+          <Palette size={13} className="text-text-theme" /> {t('dashboard.properties.widgets.tabList.globalStyle')}
         </label>
 
         {/* Tab 標籤樣式 */}
-        <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2">
-          <span className="text-[10px] text-zinc-400 font-bold block">{t('dashboard.properties.widgets.tabList.tabStyle')}</span>
+        <div className="p-2.5 rounded-lg bg-surface-primary border border-border-quaternary space-y-2">
+          <span className="text-caption-2 text-text-tertiary block">{t('dashboard.properties.widgets.tabList.tabStyle')}</span>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabFontSize')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabFontSize')}</label>
               <NumberInput
                 value={w.tabFontSize ?? 14}
                 onChange={n => onUpdate({ tabFontSize: n })}
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-body-xs`}
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabActiveColor')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabActiveColor')}</label>
               <div
-                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabActiveColor ?? '#3b82f6' }}
               >
                 <SiteColorInput
@@ -3210,9 +3146,9 @@ function TabListSettings({
               </div>
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tabInactiveColor')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabInactiveColor')}</label>
               <div
-                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.tabInactiveColor ?? '#64748b' }}
               >
                 <SiteColorInput
@@ -3227,20 +3163,20 @@ function TabListSettings({
         </div>
 
         {/* 表頭與表身字體顏色 */}
-        <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2.5">
-          <span className="text-[10px] text-zinc-400 font-bold block">{t('dashboard.properties.widgets.tabList.tableStyle')}</span>
+        <div className="p-2.5 rounded-lg bg-surface-primary border border-border-quaternary space-y-2.5">
+          <span className="text-caption-2 text-text-tertiary block">{t('dashboard.properties.widgets.tabList.tableStyle')}</span>
 
           {/* {t('dashboard.properties.widgets.tabList.tableAlign')} */}
           <div>
-            <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.tableAlign')}</label>
-            <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded p-0.5 gap-0.5">
+            <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tableAlign')}</label>
+            <div className="flex items-center bg-surface-secondary border border-border-quaternary rounded p-0.5 gap-0.5">
               <button
                 type="button"
                 onClick={() => setGlobalAlign('left')}
                 className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
                   (w.align ?? 'left') === 'left'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                    ? 'bg-blue-600 text-text-primary shadow-sm'
+                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
                 }`}
                 title={t('dashboard.properties.widgets.tabList.alignLeftTitle')}
               >
@@ -3251,8 +3187,8 @@ function TabListSettings({
                 onClick={() => setGlobalAlign('center')}
                 className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
                   w.align === 'center'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                    ? 'bg-blue-600 text-text-primary shadow-sm'
+                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
                 }`}
                 title={t('dashboard.properties.widgets.tabList.alignCenterTitle')}
               >
@@ -3263,8 +3199,8 @@ function TabListSettings({
                 onClick={() => setGlobalAlign('right')}
                 className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
                   w.align === 'right'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50'
+                    ? 'bg-blue-600 text-text-primary shadow-sm'
+                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
                 }`}
                 title={t('dashboard.properties.widgets.tabList.alignRightTitle')}
               >
@@ -3275,17 +3211,17 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerFontSize')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.headerFontSize')}</label>
               <NumberInput
                 value={w.headerFontSize ?? 12}
                 onChange={n => onUpdate({ headerFontSize: n })}
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-body-xs`}
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerTextColor')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.headerTextColor')}</label>
               <div
-                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.headerTextColor ?? '#94a3b8' }}
               >
                 <SiteColorInput
@@ -3300,17 +3236,17 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.contentFontSize')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.contentFontSize')}</label>
               <NumberInput
                 value={w.fontSize ?? 13}
                 onChange={n => onUpdate(applyTabListContentFontSize(w, Math.max(8, n || 13)))}
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-body-xs`}
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.contentTextColor')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.contentTextColor')}</label>
               <div
-                className="w-full h-8 rounded border border-zinc-700 relative overflow-hidden cursor-pointer hover:border-zinc-500 transition-colors shadow-inner flex items-center justify-center"
+                className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
                 style={{ backgroundColor: w.textColor ?? '#cbd5e1' }}
               >
                 <SiteColorInput
@@ -3325,19 +3261,19 @@ function TabListSettings({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.rowHeight')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.rowHeight')}</label>
               <NumberInput
                 value={w.rowHeight ?? 48}
                 onChange={n => onUpdate({ rowHeight: n })}
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-body-xs`}
               />
             </div>
             <div>
-              <label className="text-zinc-500 text-[9px] block mb-1">{t('dashboard.properties.widgets.tabList.headerHeight')}</label>
+              <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.headerHeight')}</label>
               <NumberInput
                 value={w.headerHeight ?? 38}
                 onChange={n => onUpdate({ headerHeight: n })}
-                className={`${inputCls} text-xs`}
+                className={`${inputCls} text-body-xs`}
               />
             </div>
           </div>
@@ -3345,7 +3281,7 @@ function TabListSettings({
 
         {/* 輔助標籤 */}
         <div>
-          <label className="text-zinc-400 text-[10px] block mb-1">{t('dashboard.properties.widgets.tabList.auxLabel')}</label>
+          <label className="text-text-tertiary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.auxLabel')}</label>
           <input
             type="text"
             value={w.currentScheduleLabel ?? t('dashboard.properties.widgets.tabList.auxLabelDefault')}
@@ -3364,7 +3300,7 @@ function TabListSettings({
 function DeleteBtn({ onDelete }: { onDelete: () => void }) {
   const { t } = useTranslation();
   return (
-    <button onClick={onDelete} className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2">
+    <button onClick={onDelete} className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-status-error-emphasis text-caption-2 uppercase flex items-center justify-center gap-1.5 hover:bg-status-error-light transition-colors mt-2">
       <Trash2 size={12} /> {t('dashboard.properties.removeWidget')}
     </button>
   );
@@ -3430,40 +3366,40 @@ export function PropertiesPanel({
 
   if (!activePlane) {
     return (
-      <aside className="w-64 bg-zinc-900 border-l border-zinc-800 flex items-center justify-center">
-        <p className="text-zinc-600 text-xs text-center px-4">{t('dashboard.properties.selectPlane')}</p>
+      <aside className="w-64 bg-surface-primary border-l border-border-quaternary flex items-center justify-center">
+        <p className="text-text-disabled text-body-xs text-center px-4">{t('dashboard.properties.selectPlane')}</p>
       </aside>
     );
   }
 
   if (!isEditMode) {
     return (
-      <aside className="w-64 bg-zinc-900 border-l border-zinc-800 flex flex-col items-center justify-center p-6 text-center gap-3">
-        <Monitor size={28} className="text-zinc-600" />
-        <p className="text-zinc-400 text-sm font-medium">{t('dashboard.properties.viewModeTitle')}</p>
-        <p className="text-zinc-500 text-xs leading-relaxed">
+      <aside className="w-64 bg-surface-primary border-l border-border-quaternary flex flex-col items-center justify-center p-6 text-center gap-3">
+        <Monitor size={28} className="text-text-disabled" />
+        <p className="text-text-tertiary text-body-s-bold">{t('dashboard.properties.viewModeTitle')}</p>
+        <p className="text-text-quaternary text-body-xs">
           {t('dashboard.properties.viewModeHintBefore')}{' '}
-          <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-400">E</kbd>{' '}
+          <kbd className="px-1 py-0.5 rounded bg-surface-secondary text-text-tertiary">E</kbd>{' '}
           {t('dashboard.properties.viewModeHintAfter')}
         </p>
-        <p className="text-zinc-600 text-[10px] font-mono">{activePlane.name}</p>
+        <p className="text-text-disabled text-caption-2 font-mono">{activePlane.name}</p>
       </aside>
     );
   }
 
   return (
-    <aside className="w-64 bg-zinc-900 border-l border-zinc-800 overflow-y-auto">
+    <aside className="w-64 bg-surface-primary border-l border-border-quaternary overflow-y-auto">
       <div className="p-4">
         {dualGateSettingsActive && editingGroup ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-[10px] leading-relaxed">
-            <p className="font-semibold text-cyan-400 mb-1">{t('dashboard.properties.dualGateTitle', { label: editingGroupLabel })}</p>
+          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-caption-2">
+            <p className="font-semibold text-text-theme mb-1">{t('dashboard.properties.dualGateTitle', { label: editingGroupLabel })}</p>
             <p>{t('dashboard.properties.dualGateHint')}</p>
           </div>
         ) : editingGroupLabel && editingGroup && !selectedChild ? (
           <GroupInheritedVariablesSection group={editingGroup} />
         ) : editingGroupLabel ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-[10px] leading-relaxed">
-            <p className="font-semibold text-cyan-400 mb-1">{t('dashboard.properties.subcanvasTitle', { label: editingGroupLabel })}</p>
+          <div className="mb-3 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-cyan-200/90 text-caption-2">
+            <p className="font-semibold text-text-theme mb-1">{t('dashboard.properties.subcanvasTitle', { label: editingGroupLabel })}</p>
             <p>
               {editingGroup?.dualCanvasEnabled
                 ? t('dashboard.properties.subcanvasDual')
@@ -3479,8 +3415,8 @@ export function PropertiesPanel({
             </p>
           </div>
         ) : editingTabListColumn ? (
-          <div className="mb-3 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200/90 text-[10px] leading-relaxed">
-            <p className="font-semibold text-blue-400 mb-1">
+          <div className="mb-3 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200/90 text-caption-2">
+            <p className="font-semibold text-text-theme mb-1">
               {t('dashboard.properties.cellTemplateTitle', {
                 tab: editingTabListColumn.tabLabel,
                 column: editingTabListColumn.columnName,
@@ -3489,8 +3425,8 @@ export function PropertiesPanel({
             <p>{t('dashboard.properties.cellTemplateHint')}</p>
           </div>
         ) : selectedIssue ? (
-          <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-amber-950/50 border border-amber-600/40 text-amber-200 text-[10px] leading-relaxed">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" />
+          <div className="mb-3 flex gap-2 p-2.5 rounded-lg bg-amber-950/50 border border-amber-600/40 text-status-warning text-caption-2">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-status-warning" />
             <span>{selectedIssue.detail}</span>
           </div>
         ) : null}
@@ -3498,8 +3434,8 @@ export function PropertiesPanel({
           <DualCanvasSettings el={editingGroup} onUpdate={onUpdateElement} />
         ) : selectedChildCount > 1 ? (
           <div className="space-y-3 text-center py-8">
-            <p className="text-zinc-300 text-sm font-medium">{t('dashboard.properties.multiSelectTitle', { count: selectedChildCount })}</p>
-            <p className="text-zinc-500 text-xs leading-relaxed px-2">
+            <p className="text-text-secondary text-body-s-bold">{t('dashboard.properties.multiSelectTitle', { count: selectedChildCount })}</p>
+            <p className="text-text-quaternary text-body-xs px-2">
               {t('dashboard.properties.multiSelectHint')}
             </p>
           </div>
@@ -3558,9 +3494,9 @@ export function PropertiesPanel({
                 );
               default:
                 return (
-                  <div className="space-y-3 p-2 text-xs text-zinc-500">
+                  <div className="space-y-3 p-2 text-body-xs text-text-quaternary">
                     <p>{t('dashboard.properties.unsupportedType')}</p>
-                    <button type="button" onClick={props.onDelete} className="w-full rounded bg-red-900/40 py-2 text-red-400">{t('dashboard.properties.deleteWidget')}</button>
+                    <Button hierarchy="danger" variant="text" className="w-full" onPress={props.onDelete}>{t('dashboard.properties.deleteWidget')}</Button>
                   </div>
                 );
             }
@@ -3568,7 +3504,7 @@ export function PropertiesPanel({
           </WidgetDataBindingContext.Provider>
           </React.Fragment>
         ) : editingTabListColumn ? (
-          <p className="text-zinc-500 text-xs leading-relaxed px-1 py-6 text-center">
+          <p className="text-text-quaternary text-body-xs px-1 py-6 text-center">
             {t('dashboard.properties.cellTemplateEmpty')}
           </p>
         ) : selectedElement ? (

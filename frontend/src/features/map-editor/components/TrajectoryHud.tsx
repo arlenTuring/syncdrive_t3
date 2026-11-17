@@ -32,25 +32,25 @@ export const TrajectoryHud = memo(function TrajectoryHud({
 
   return (
     <div
-      className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-[min(100%,20rem)] rounded-md border border-cyan-500/35 bg-zinc-950/90 px-3 py-2 font-mono text-[11px] leading-snug text-zinc-200 shadow-lg backdrop-blur-sm"
+      className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-[min(100%,20rem)] rounded-md border border-cyan-500/35 bg-surface-sub-background px-3 py-2 font-mono text-body-xs text-text-primary shadow-lg backdrop-blur-sm"
       aria-live="polite"
     >
-      <div className="text-[10px] font-medium uppercase tracking-wide text-cyan-400/90">
+      <div className="text-caption-2 uppercase text-cyan-400/90">
         目前軌跡點
       </div>
-      <div className="mt-1 text-zinc-400">
-        序號 <span className="text-zinc-100">{index + 1}</span> / {total}
+      <div className="mt-1 text-text-tertiary">
+        序號 <span className="text-text-primary">{index + 1}</span> / {total}
       </div>
-      <div className="mt-0.5 text-zinc-400">
+      <div className="mt-0.5 text-text-tertiary">
         位置 (m){' '}
-        <span className="text-zinc-100">
+        <span className="text-text-primary">
           x={x.toFixed(2)}, y={y.toFixed(2)}
         </span>
       </div>
-      <div className="mt-0.5 text-zinc-400">
-        時間 <span className="text-zinc-100">{formatTrajectoryPointTime(point.tMs)}</span>
+      <div className="mt-0.5 text-text-tertiary">
+        時間 <span className="text-text-primary">{formatTrajectoryPointTime(point.tMs)}</span>
       </div>
-      <div className="mt-0.5 text-zinc-500">tMs={point.tMs}</div>
+      <div className="mt-0.5 text-text-quaternary">tMs={point.tMs}</div>
     </div>
   )
 })

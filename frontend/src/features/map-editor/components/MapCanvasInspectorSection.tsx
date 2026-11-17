@@ -31,16 +31,16 @@ export function MapCanvasInspectorSection({
   }
 
   return (
-    <aside data-inspector className="flex h-full min-h-0 flex-col bg-zinc-900/50">
-      <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-amber-500/90">
+    <aside data-inspector className="flex h-full min-h-0 flex-col bg-surface-primary">
+      <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-amber-500/90">
         {t('mapEditor.inspector.mapCanvas.title')}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-4 text-sm">
-        <p className="text-xs leading-relaxed text-zinc-500">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-4 text-body-s">
+        <p className="text-body-xs text-text-quaternary">
           {t('mapEditor.inspector.mapCanvas.hint')}
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-body-xs text-text-quaternary">
             {t('mapEditor.inspector.mapCanvas.width')}
             <NumberInput
               min={Math.max(MIN_MAP_PIXEL, minPixelSize.width)}
@@ -51,10 +51,10 @@ export function MapCanvasInspectorSection({
               onChange={(n) => patch({ width: Math.round(n) })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-50"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-status-warning disabled:opacity-50"
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-body-xs text-text-quaternary">
             {t('mapEditor.inspector.mapCanvas.height')}
             <NumberInput
               min={Math.max(MIN_MAP_PIXEL, minPixelSize.height)}
@@ -65,11 +65,11 @@ export function MapCanvasInspectorSection({
               onChange={(n) => patch({ height: Math.round(n) })}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-50"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-status-warning disabled:opacity-50"
             />
           </label>
         </div>
-        <p className="text-[10px] text-zinc-600">
+        <p className="text-caption-2 text-text-disabled">
           {t('mapEditor.inspector.mapCanvas.limits', {
             minW: minPixelSize.width,
             minH: minPixelSize.height,

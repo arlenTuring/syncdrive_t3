@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { MapAreaObject } from '../types/area'
 import type { MapAreaPatch } from '../utils/areaCoords'
 import { resolveAreaFillStyle } from '../utils/areaLayoutStyle'
+import { Button, Checkbox } from '../../../components/ui';
 
 type Props = {
   area: MapAreaObject
@@ -87,23 +88,23 @@ export function AreaInspectorSection({
   return (
     <aside
       data-inspector
-      className="flex h-full min-h-0 w-72 flex-col border-l border-zinc-700/80 bg-zinc-900"
+      className="flex h-full min-h-0 w-72 flex-col border-l border-border-quaternary bg-surface-primary"
     >
-      <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+      <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-text-quaternary">
         Area 屬性
         {readOnly && (
-          <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-normal normal-case text-zinc-400">
+          <span className="ml-2 rounded bg-surface-secondary px-1.5 py-0.5 text-caption-2 font-normal normal-case text-text-tertiary">
             檢視
           </span>
         )}
       </div>
-      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-sm text-zinc-200">
-        <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="flex flex-col gap-3 overflow-y-auto p-3 text-body-s text-text-primary">
+        <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             識別
           </h3>
           <div>
-            <label htmlFor="area-id" className="mb-1 block text-[10px] text-zinc-500">
+            <label htmlFor="area-id" className="mb-1 block text-caption-2 text-text-quaternary">
               Area ID
             </label>
             <input
@@ -113,11 +114,11 @@ export function AreaInspectorSection({
               onChange={(e) => onChangeId(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme read-only:cursor-default read-only:opacity-90"
             />
           </div>
           <div>
-            <label htmlFor="area-name" className="mb-1 block text-[10px] text-zinc-500">
+            <label htmlFor="area-name" className="mb-1 block text-caption-2 text-text-quaternary">
               顯示名稱
             </label>
             <input
@@ -127,16 +128,16 @@ export function AreaInspectorSection({
               onChange={(e) => onChangeCustomName(e.target.value)}
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-zinc-100 outline-none focus:border-cyan-500 read-only:cursor-default read-only:opacity-90"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-text-primary outline-none focus:border-border-theme read-only:cursor-default read-only:opacity-90"
             />
           </div>
         </section>
 
-        <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             畫布布局（px）
           </h3>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             選取 Area 後：拖曳頂部／左側刻度帶可移動 Area；邊界約 10px 內可縮放。中央區域用於放置與拖曳元件。
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -148,7 +149,7 @@ export function AreaInspectorSection({
                 ['hPx', '縱向尺寸 (px)', layout.hPx],
               ] as const
             ).map(([key, label, val]) => (
-              <label key={key} className="block text-[10px] text-zinc-500">
+              <label key={key} className="block text-caption-2 text-text-quaternary">
                 {label}
                 <InspectorNumberInput
                   value={val}
@@ -160,28 +161,24 @@ export function AreaInspectorSection({
                   }}
                   onFieldFocus={onFieldFocus}
                   onFieldBlur={onFieldBlur}
-                  className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-90"
+                  className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-90"
                 />
               </label>
             ))}
           </div>
         </section>
 
-        <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             區域底色
           </h3>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             預設透明。勾選後可指定填色；未指定時 Area 不遮擋下層內容。
           </p>
-          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
-            <input
-              type="checkbox"
-              disabled={readOnly}
-              checked={fillEnabled}
-              onChange={(e) => {
+          <label className="flex cursor-pointer items-center gap-2 text-body-xs text-text-secondary">
+            <Checkbox disabled={readOnly} checked={fillEnabled} onCheckedChange={(checked) => {
                 if (readOnly) return
-                if (!e.target.checked) {
+                if (!checked) {
                   onPatchArea({
                     layout: { ...layout, fillColor: undefined },
                   })
@@ -197,16 +194,12 @@ export function AreaInspectorSection({
                         : '#1e293b',
                   },
                 })
-              }}
-              onFocus={onFieldFocus}
-              onBlur={onFieldBlur}
-              className="rounded border-zinc-600 accent-cyan-500"
-            />
+              }} onFocus={onFieldFocus} onBlur={onFieldBlur} />
             顯示底色
           </label>
           {fillEnabled && (
             <div className="grid grid-cols-2 gap-2">
-              <label className="block text-[10px] text-zinc-500">
+              <label className="block text-caption-2 text-text-quaternary">
                 填色
                 <SiteColorInput
                   disabled={readOnly}
@@ -218,10 +211,10 @@ export function AreaInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-60"
+                  className="mt-1 h-9 w-full cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:opacity-60"
                  />
               </label>
-              <label className="block text-[10px] text-zinc-500">
+              <label className="block text-caption-2 text-text-quaternary">
                 色碼 / rgba
                 <input
                   readOnly={readOnly}
@@ -238,22 +231,22 @@ export function AreaInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   placeholder="transparent"
-                  className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-90"
+                  className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-caption-2 text-text-primary outline-none focus:border-border-theme read-only:opacity-90"
                 />
               </label>
             </div>
           )}
         </section>
 
-        <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             外框線條
           </h3>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-caption-2 text-text-disabled">
             預設為透明（不顯示）。設定粗細與顏色後才會在畫布上繪製 Area 外框；選取時仍會顯示青色選取框。
           </p>
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-[10px] text-zinc-500">
+            <label className="block text-caption-2 text-text-quaternary">
               線條粗細 (px)
               <InspectorNumberInput
                 value={layout.borderPx ?? 0}
@@ -265,10 +258,10 @@ export function AreaInspectorSection({
                 }}
                 onFieldFocus={onFieldFocus}
                 onFieldBlur={onFieldBlur}
-                className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-90"
+                className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-90"
               />
             </label>
-            <label className="block text-[10px] text-zinc-500">
+            <label className="block text-caption-2 text-text-quaternary">
               線條顏色
               <div className="mt-1 flex items-center gap-2">
                 <SiteColorInput
@@ -291,7 +284,7 @@ export function AreaInspectorSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-40"
+                  className="h-8 w-10 cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:opacity-40"
                  />
                 <input
                   readOnly={readOnly}
@@ -308,15 +301,13 @@ export function AreaInspectorSection({
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
                   placeholder="transparent"
-                  className="min-w-0 flex-1 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-90"
+                  className="min-w-0 flex-1 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-caption-2 text-text-primary outline-none focus:border-border-theme read-only:opacity-90"
                 />
               </div>
             </label>
           </div>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" onPress={() => {
                 onPatchArea({
                   layout: {
                     ...layout,
@@ -325,45 +316,25 @@ export function AreaInspectorSection({
                     borderColor: 'transparent',
                   },
                 })
-              }}
-              onFocus={onFieldFocus}
-              onBlur={onFieldBlur}
-              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              重設外框為透明
-            </button>
+              }} onFocus={onFieldFocus} onBlur={onFieldBlur}>重設外框為透明</Button>
           )}
         </section>
 
-        <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+          <h3 className="text-caption-2 uppercase text-text-quaternary">
             顯示選項
           </h3>
-          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
-            <input
-              type="checkbox"
-              checked={area.showRuler}
-              disabled={readOnly}
-              onChange={(e) => onPatchArea({ showRuler: e.target.checked })}
-              onFocus={onFieldFocus}
-              onBlur={onFieldBlur}
-              className="rounded border-zinc-600 accent-cyan-500"
-            />
+          <label className="flex cursor-pointer items-center gap-2 text-body-xs text-text-secondary">
+            <Checkbox checked={area.showRuler} disabled={readOnly} onCheckedChange={(checked) => onPatchArea({ showRuler: checked })} onFocus={onFieldFocus} onBlur={onFieldBlur} />
             在畫布顯示刻度／座標尺
           </label>
-          <p className="text-[10px] leading-relaxed text-zinc-500">
+          <p className="text-caption-2 text-text-quaternary">
             刻度／座標數字畫在 Area（正式顯示範圍）外側，不遮擋軌道與設施。工具列可循環：關閉 → 刻度 → 座標。
           </p>
         </section>
 
         {!readOnly && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/80 bg-red-950/50 py-2 text-sm font-medium text-red-300 transition hover:bg-red-950/80"
-          >
-            刪除此 Area
-          </button>
+          <Button hierarchy="danger" variant="outlined" className="w-full" onPress={onDelete}>刪除此 Area</Button>
         )}
       </div>
     </aside>

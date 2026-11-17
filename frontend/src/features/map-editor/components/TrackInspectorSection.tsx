@@ -61,11 +61,11 @@ export function TrackInspectorSection({
         onFieldBlur={onFieldBlur}
       />
 
-      <section className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+      <section className="space-y-2 rounded-lg border border-border-quaternary bg-surface-primary p-3">
+        <h3 className="text-caption-2 uppercase text-sky-400/90">
           軌道透明度
         </h3>
-        <label className="flex items-center gap-2 text-[11px] text-zinc-300">
+        <label className="flex items-center gap-2 text-body-xs text-text-secondary">
           <span className="w-16 shrink-0">填色</span>
           <input
             type="range"
@@ -84,11 +84,11 @@ export function TrackInspectorSection({
             className="min-w-0 flex-1 accent-sky-500 disabled:opacity-50"
             aria-label="軌道填色不透明度"
           />
-          <span className="w-10 shrink-0 text-right font-mono text-zinc-400">
+          <span className="w-10 shrink-0 text-right font-mono text-text-tertiary">
             {Math.round(getTrackFillOpacity(facility) * 100)}%
           </span>
         </label>
-        <p className="text-[10px] leading-relaxed text-zinc-500">
+        <p className="text-caption-2 text-text-quaternary">
           0% 為完全透明，只留框線與名稱；用來讓兩塊軌道重疊時底下那塊仍看得到（例如疊在一起的
           斜接軌道），不影響車輛定位與現場座標。
         </p>

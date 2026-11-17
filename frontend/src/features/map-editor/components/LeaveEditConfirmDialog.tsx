@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Button } from '../../../components/ui';
 
 type LeaveEditConfirmDialogProps = {
   open: boolean
@@ -18,43 +19,25 @@ export function LeaveEditConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="leave-edit-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-zinc-600 bg-zinc-900 p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl">
         <h2
           id="leave-edit-title"
-          className="text-lg font-semibold text-zinc-100"
+          className="text-headline-5 text-text-primary"
         >
           {t('mapEditor.leaveEditConfirm.title')}
         </h2>
-        <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-3 text-body-s text-text-tertiary">
           {t('mapEditor.leaveEditConfirm.body')}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-700"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={onDiscard}
-            className="rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-700"
-          >
-            {t('mapEditor.leaveEditConfirm.discard')}
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            className="rounded-lg border border-cyan-600 bg-cyan-950/80 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-900/80"
-          >
-            {t('mapEditor.leaveEditConfirm.save')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onCancel}>{t('common.cancel')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onDiscard}>{t('mapEditor.leaveEditConfirm.discard')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onSave}>{t('mapEditor.leaveEditConfirm.save')}</Button>
         </div>
       </div>
     </div>

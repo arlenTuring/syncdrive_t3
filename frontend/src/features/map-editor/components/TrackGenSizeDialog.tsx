@@ -46,6 +46,7 @@ import {
   switchTrackPath,
   taperTrackPath,
 } from '../utils/trackShapes'
+import { Button } from '../../../components/ui';
 
 /**
  * 生成前的三個參數。
@@ -172,16 +173,16 @@ function NumberField({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] text-zinc-400">{label}</span>
+      <span className="text-body-xs text-text-tertiary">{label}</span>
       <div className="flex items-center gap-1.5">
         <NumberInput
           value={Math.round(value)}
           min={min}
           max={max}
           onChange={onChange}
-          className="w-24 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[12px] tabular-nums text-zinc-100 focus:border-cyan-500 focus:outline-none"
+          className="w-24 rounded-md border border-border-quaternary bg-surface-primary px-2 py-1 font-mono text-body-xs tabular-nums text-text-primary focus:border-border-theme focus:outline-none"
         />
-        <span className="text-[11px] text-zinc-500">{suffix}</span>
+        <span className="text-body-xs text-text-quaternary">{suffix}</span>
       </div>
     </label>
   )
@@ -817,19 +818,19 @@ function SizeDialogBody({
    */
   return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black-50 p-4"
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}
     >
       <div
-        className="flex max-h-full flex-col gap-3 overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-5 shadow-2xl"
+        className="flex max-h-full flex-col gap-3 overflow-auto rounded-lg border border-border-quaternary bg-surface-sub-background p-5 shadow-2xl"
         style={{ width: Math.max(360, stageW + 42) }}
         data-trackgen-size-dialog
       >
         <div>
-          <div className="text-base font-medium text-zinc-100">{t('mapEditor.trackGen.title')}</div>
-          <p className="mt-1 text-[12px] leading-snug text-zinc-500">
+          <div className="text-body-m-bold text-text-primary">{t('mapEditor.trackGen.title')}</div>
+          <p className="mt-1 text-body-xs text-text-quaternary">
             {scale >= 0.999
               ? t('mapEditor.trackGen.hintFull', { w: canvasW, h: canvasH })
               : t('mapEditor.trackGen.hintScaled', {
@@ -841,7 +842,7 @@ function SizeDialogBody({
         </div>
 
         <div
-          className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-zinc-900"
+          className="relative shrink-0 self-center overflow-hidden rounded-md border border-cyan-500/40 bg-surface-primary"
           style={{ width: stageW, height: stageH }}
         >
           {/*
@@ -1311,40 +1312,40 @@ function SizeDialogBody({
 
           <div className="flex min-w-[15rem] flex-1 flex-col items-start gap-1 sm:items-end">
             <div
-              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-zinc-400"
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-body-xs text-text-tertiary"
               data-trackgen-stats
             >
               <span>
                 {t('mapEditor.trackGen.axisX')}{' '}
-                <b className="font-mono tabular-nums text-sky-200" data-trackgen-count-x>
+                <b className="font-mono tabular-nums text-text-theme" data-trackgen-count-x>
                   {extent?.countX ?? 0}
                 </b>{' '}
                 {t('mapEditor.trackGen.blockUnit')}
-                <span className="ml-1 font-mono tabular-nums text-zinc-600">
+                <span className="ml-1 font-mono tabular-nums text-text-disabled">
                   {Math.round(totalXM)} m
                 </span>
               </span>
-              <span aria-hidden className="text-zinc-700">
+              <span aria-hidden className="text-text-disabled">
                 ·
               </span>
               <span>
                 {t('mapEditor.trackGen.axisY')}{' '}
-                <b className="font-mono tabular-nums text-emerald-200" data-trackgen-count-y>
+                <b className="font-mono tabular-nums text-status-success" data-trackgen-count-y>
                   {extent?.countY ?? 0}
                 </b>{' '}
                 {t('mapEditor.trackGen.blockUnit')}
-                <span className="ml-1 font-mono tabular-nums text-zinc-600">
+                <span className="ml-1 font-mono tabular-nums text-text-disabled">
                   {Math.round(totalYM)} m
                 </span>
               </span>
-              <span aria-hidden className="text-zinc-700">
+              <span aria-hidden className="text-text-disabled">
                 ·
               </span>
               <span>
                 {t('mapEditor.trackGen.occupies')}{' '}
                 <b
                   className={`font-mono tabular-nums ${
-                    over && (over.w > 1 || over.h > 1) ? 'text-amber-300' : 'text-zinc-200'
+                    over && (over.w > 1 || over.h > 1) ? 'text-status-warning' : 'text-text-primary'
                   }`}
                   data-trackgen-extent
                 >
@@ -1352,7 +1353,7 @@ function SizeDialogBody({
                 </b>
               </span>
               {over && (over.w > 1 || over.h > 1) ? (
-                <span className="text-amber-300" data-trackgen-over>
+                <span className="text-status-warning" data-trackgen-over>
                   {t('mapEditor.trackGen.overflowBefore')}
                   <b className="font-mono tabular-nums">
                     {over.w > 1 ? `${over.w}` : '0'} × {over.h > 1 ? `${over.h}` : '0'} px
@@ -1368,7 +1369,7 @@ function SizeDialogBody({
               每次都佔一行。
             */}
             <div
-              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-zinc-500"
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-caption-2 text-text-quaternary"
               title={t('mapEditor.trackGen.legendNote')}
               data-trackgen-legend
             >
@@ -1383,7 +1384,7 @@ function SizeDialogBody({
                       aria-hidden
                     />
                     {t(`mapEditor.trackGen.kinds.${kind}`)}
-                    <b className="font-mono tabular-nums text-zinc-300">{n}</b>
+                    <b className="font-mono tabular-nums text-text-secondary">{n}</b>
                   </span>
                 )
               })}
@@ -1397,10 +1398,10 @@ function SizeDialogBody({
           兩者都是「在預覽上點軌道」的工具，一次只會用一個，所以只留一個展開區：誰在
           用就展開誰。收起來時整條只有一列高。
         */}
-        <div className="rounded-md border border-zinc-700/70 bg-zinc-900/60">
+        <div className="rounded-md border border-border-quaternary bg-surface-primary">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-3 py-1.5">
             <div className="flex flex-wrap items-center gap-1.5" data-trackgen-groups>
-              <span className="text-[11px] font-medium text-zinc-300">
+              <span className="text-body-xs-bold text-text-secondary">
                 {t('mapEditor.trackGen.groups.title')}
               </span>
               {liveGroups.map((g) => (
@@ -1409,47 +1410,38 @@ function SizeDialogBody({
                   type="button"
                   disabled={mergeMode || nudgeMode}
                   onClick={() => (editingId === g.id ? undefined : editGroup(g))}
-                  className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[11px] transition disabled:opacity-40 ${
+                  className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-body-xs transition disabled:opacity-40 ${
                     editingId === g.id
                       ? 'border-cyan-400 text-cyan-100'
-                      : 'border-zinc-600 text-zinc-300 hover:border-zinc-400'
+                      : 'border-border-tertiary text-text-secondary hover:border-border-secondary'
                   }`}
                 >
                   <span
-                    className="inline-block size-2.5 rounded-[2px] border border-zinc-500"
+                    className="inline-block size-2.5 rounded-[2px] border border-border-primary"
                     style={{ background: g.color }}
                     aria-hidden
                   />
                   <span className="font-mono">{g.code || '—'}</span>
-                  <span className="tabular-nums text-zinc-500">{g.members.length}</span>
+                  <span className="tabular-nums text-text-quaternary">{g.members.length}</span>
                 </button>
               ))}
               {editingId ? null : (
-                <button
-                  type="button"
-                  onClick={startGroup}
-                  disabled={mergeMode}
-                  data-trackgen-group-add
-                  className="rounded border border-cyan-500/70 bg-cyan-500/10 px-1.5 py-0.5 text-[12px] leading-none text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
-                  title={t('mapEditor.trackGen.groups.hint')}
-                >
-                  ＋
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" onPress={startGroup} disabled={mergeMode} data-trackgen-group-add title={t('mapEditor.trackGen.groups.hint')}>＋</Button>
               )}
             </div>
 
-            <span className="mx-1 h-4 w-px shrink-0 bg-zinc-700" aria-hidden />
+            <span className="mx-1 h-4 w-px shrink-0 bg-link-standard-hover" aria-hidden />
 
             <div className="flex flex-wrap items-center gap-1.5" data-trackgen-nudge>
-              <span className="text-[11px] font-medium text-zinc-300">
+              <span className="text-body-xs-bold text-text-secondary">
                 {t('mapEditor.trackGen.nudge.title')}
               </span>
               {nudges.length ? (
                 <span
-                  className={`font-mono text-[11px] tabular-nums ${
+                  className={`font-mono text-body-xs tabular-nums ${
                     (extent?.nudgesApplied ?? nudges.length) < nudges.length
-                      ? 'text-amber-300'
-                      : 'text-zinc-500'
+                      ? 'text-status-warning'
+                      : 'text-text-quaternary'
                   }`}
                   data-trackgen-nudge-count
                 >
@@ -1457,58 +1449,34 @@ function SizeDialogBody({
                 </span>
               ) : null}
               {nudgeMode ? (
-                <button
-                  type="button"
-                  data-trackgen-nudge-exit
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-nudge-exit onPress={() => {
                     setNudgeMode(false)
                     setDrag(null)
-                  }}
-                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-                >
-                  {t('mapEditor.trackGen.nudge.exit')}
-                </button>
+                  }}>{t('mapEditor.trackGen.nudge.exit')}</Button>
               ) : (
-                <button
-                  type="button"
-                  data-trackgen-nudge-enter
-                  disabled={!!editingId || mergeMode}
-                  title={t('mapEditor.trackGen.nudge.hint')}
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-nudge-enter disabled={!!editingId || mergeMode} title={t('mapEditor.trackGen.nudge.hint')} onPress={() => {
                     setEditingId(null)
                     setDraftBackup(null)
                     setNudgeMode(true)
-                  }}
-                  className="rounded border border-cyan-500/70 bg-cyan-500/10 px-1.5 py-0.5 text-[11px] text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
-                >
-                  {t('mapEditor.trackGen.nudge.enter')}
-                </button>
+                  }}>{t('mapEditor.trackGen.nudge.enter')}</Button>
               )}
               {nudges.length ? (
-                <button
-                  type="button"
-                  data-trackgen-nudge-undo
-                  title={t('mapEditor.trackGen.undoHint')}
-                  onClick={undoLast}
-                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-                >
-                  {t('mapEditor.trackGen.nudge.undo')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-nudge-undo title={t('mapEditor.trackGen.undoHint')} onPress={undoLast}>{t('mapEditor.trackGen.nudge.undo')}</Button>
               ) : null}
             </div>
 
-            <span className="mx-1 h-4 w-px shrink-0 bg-zinc-700" aria-hidden />
+            <span className="mx-1 h-4 w-px shrink-0 bg-link-standard-hover" aria-hidden />
 
             <div className="flex flex-wrap items-center gap-1.5" data-trackgen-merge>
-              <span className="text-[11px] font-medium text-zinc-300">
+              <span className="text-body-xs-bold text-text-secondary">
                 {t('mapEditor.trackGen.merge.title')}
               </span>
               {merges.length ? (
                 <span
-                  className={`font-mono text-[11px] tabular-nums ${
+                  className={`font-mono text-body-xs tabular-nums ${
                     (extent?.mergesApplied ?? merges.length) < merges.length
-                      ? 'text-amber-300'
-                      : 'text-zinc-500'
+                      ? 'text-status-warning'
+                      : 'text-text-quaternary'
                   }`}
                   data-trackgen-merge-count
                 >
@@ -1516,45 +1484,22 @@ function SizeDialogBody({
                 </span>
               ) : null}
               {mergeMode ? (
-                <button
-                  type="button"
-                  data-trackgen-merge-exit
-                  onClick={exitMerge}
-                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-                >
-                  {t('mapEditor.trackGen.merge.exit')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-exit onPress={exitMerge}>{t('mapEditor.trackGen.merge.exit')}</Button>
               ) : (
-                <button
-                  type="button"
-                  data-trackgen-merge-enter
-                  disabled={!!editingId || nudgeMode}
-                  onClick={enterMerge}
-                  title={t('mapEditor.trackGen.merge.hint')}
-                  className="rounded border border-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-40"
-                >
-                  {t('mapEditor.trackGen.merge.enter')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-enter disabled={!!editingId || nudgeMode} onPress={enterMerge} title={t('mapEditor.trackGen.merge.hint')}>{t('mapEditor.trackGen.merge.enter')}</Button>
               )}
               {merges.length ? (
-                <button
-                  type="button"
-                  data-trackgen-merge-undo
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-undo onPress={() => {
                     setMerges((prev) => prev.slice(0, -1))
                     setPicks([])
-                  }}
-                  className="rounded border border-zinc-600 px-1.5 py-0.5 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-                >
-                  {t('mapEditor.trackGen.merge.undo')}
-                </button>
+                  }}>{t('mapEditor.trackGen.merge.undo')}</Button>
               ) : null}
             </div>
           </div>
 
           {editing ? (
-            <div className="flex flex-wrap items-end gap-3 border-t border-zinc-800 px-3 py-2">
-              <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
+            <div className="flex flex-wrap items-end gap-3 border-t border-border-quaternary px-3 py-2">
+              <label className="flex flex-col gap-1 text-caption-2 text-text-tertiary">
                 {t('mapEditor.trackGen.groups.code')}
                 <input
                   value={editing.code}
@@ -1562,20 +1507,20 @@ function SizeDialogBody({
                   // 提示字要暗得夠明顯：先前跟真的填了一樣，使用者以為頭字已經有了
                   placeholder="AB"
                   maxLength={2}
-                  className="w-16 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-center font-mono text-[13px] uppercase text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-sky-500"
+                  className="w-16 rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 text-center font-mono text-body-s uppercase text-text-primary outline-none placeholder:text-text-disabled focus:border-border-theme"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[10px] text-zinc-400">
+              <label className="flex flex-col gap-1 text-caption-2 text-text-tertiary">
                 {t('mapEditor.trackGen.groups.color')}
                 <SiteColorInput
                   value={editing.color}
                   onChange={(e) => patchEditing({ color: e.target.value })}
-                  className="h-[30px] w-14 cursor-pointer rounded border border-zinc-600 bg-zinc-950"
+                  className="h-[30px] w-14 cursor-pointer rounded border border-border-tertiary bg-surface-sub-background"
                  />
               </label>
-              <div className="flex-1 text-[11px] text-zinc-400">
+              <div className="flex-1 text-body-xs text-text-tertiary">
                 {t('mapEditor.trackGen.groups.picked', { n: editing.members.length })}
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-caption-2 text-text-quaternary">
                   {editing.code
                     ? t('mapEditor.trackGen.groups.previewName', {
                         first: trackGenGroupLabel(editing.code, 0),
@@ -1587,36 +1532,16 @@ function SizeDialogBody({
                     : t('mapEditor.trackGen.groups.needCode')}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => deleteGroup(editing.id)}
-                className="rounded border border-red-500/60 px-2 py-1 text-[11px] text-red-300 transition hover:bg-red-500/15"
-              >
-                {t('mapEditor.trackGen.groups.remove')}
-              </button>
-              <button
-                type="button"
-                onClick={cancelGroup}
-                className="rounded border border-zinc-600 px-2 py-1 text-[11px] text-zinc-300 transition hover:border-zinc-400"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                data-trackgen-group-done
-                disabled={!editing.code || !editing.members.length}
-                onClick={() => {
+              <Button hierarchy="danger" variant="outlined" onPress={() => deleteGroup(editing.id)}>{t('mapEditor.trackGen.groups.remove')}</Button>
+              <Button hierarchy="subordinate" variant="outlined" onPress={cancelGroup}>{t('common.cancel')}</Button>
+              <Button hierarchy="subordinate" variant="outlined" data-trackgen-group-done disabled={!editing.code || !editing.members.length} onPress={() => {
                   setDraftBackup(null)
                   setEditingId(null)
-                }}
-                className="rounded border border-cyan-500/70 bg-cyan-500/15 px-2 py-1 text-[11px] text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-40"
-              >
-                {t('mapEditor.trackGen.groups.done')}
-              </button>
+                }}>{t('mapEditor.trackGen.groups.done')}</Button>
             </div>
           ) : nudgeMode ? (
             <div
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800 px-3 py-2 text-[10px] text-zinc-400"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border-quaternary px-3 py-2 text-caption-2 text-text-tertiary"
               data-trackgen-nudge-panel
             >
               {drag ? (
@@ -1624,7 +1549,7 @@ function SizeDialogBody({
                  * 拖曳中把數字寫出來：這一端從哪移到哪、移了多少。
                  * 落點對不對不必用眼睛猜，放開前後對一下這個數字就知道。
                  */
-                <span className="font-mono text-amber-200" data-trackgen-nudge-live>
+                <span className="font-mono text-status-warning" data-trackgen-nudge-live>
                   {drag.axis === 'x' ? '↔' : '↕'} {drag.from.toFixed(1)} → {drag.to.toFixed(1)}
                   {'  '}
                   {drag.to - drag.from >= 0 ? '+' : ''}
@@ -1635,7 +1560,7 @@ function SizeDialogBody({
               )}
               {extent?.nudgeErrors?.length ? (
                 <>
-                  <span className="text-zinc-600">·</span>
+                  <span className="text-text-disabled">·</span>
                   <span data-trackgen-nudge-error>
                     {t('mapEditor.trackGen.nudge.error', {
                       total: extent.nudgeTotalM ?? 0,
@@ -1648,8 +1573,8 @@ function SizeDialogBody({
                         key={x.name}
                         className={`rounded border px-1 py-0.5 font-mono ${
                           x.deltaM > 0
-                            ? 'border-emerald-600/50 text-emerald-300'
-                            : 'border-rose-600/50 text-rose-300'
+                            ? 'border-emerald-600/50 text-status-success'
+                            : 'border-rose-600/50 text-status-error-emphasis'
                         }`}
                       >
                         {x.name} {x.deltaM > 0 ? '+' : ''}
@@ -1661,37 +1586,21 @@ function SizeDialogBody({
               ) : null}
             </div>
           ) : mergeMode ? (
-            <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-t border-border-quaternary px-3 py-2">
               {picks.map((n, i) => (
                 <span
                   key={n}
-                  className="rounded border border-amber-500/50 px-1.5 py-0.5 font-mono text-[11px] text-amber-200"
+                  className="rounded border border-status-warning-light px-1.5 py-0.5 font-mono text-body-xs text-status-warning"
                 >
                   {i + 1}. {n}
                 </span>
               ))}
               {mergeChecks ? (
                 <>
-                  <button
-                    type="button"
-                    data-trackgen-merge-1to2
-                    disabled={!mergeChecks.aToB.ok}
-                    onClick={() => commitMerge(picks[0]!, picks[1]!)}
-                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
-                  >
-                    {t('mapEditor.trackGen.merge.oneIntoTwo')}
-                  </button>
-                  <button
-                    type="button"
-                    data-trackgen-merge-2to1
-                    disabled={!mergeChecks.bToA.ok}
-                    onClick={() => commitMerge(picks[1]!, picks[0]!)}
-                    className="rounded border border-amber-500/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-35"
-                  >
-                    {t('mapEditor.trackGen.merge.twoIntoOne')}
-                  </button>
+                  <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-1to2 disabled={!mergeChecks.aToB.ok} onPress={() => commitMerge(picks[0]!, picks[1]!)}>{t('mapEditor.trackGen.merge.oneIntoTwo')}</Button>
+                  <Button hierarchy="subordinate" variant="outlined" data-trackgen-merge-2to1 disabled={!mergeChecks.bToA.ok} onPress={() => commitMerge(picks[1]!, picks[0]!)}>{t('mapEditor.trackGen.merge.twoIntoOne')}</Button>
                   {!mergeChecks.aToB.ok && !mergeChecks.bToA.ok ? (
-                    <span className="text-[10px] text-amber-300/80" data-trackgen-merge-reason>
+                    <span className="text-caption-2 text-amber-300/80" data-trackgen-merge-reason>
                       {t(
                         `mapEditor.trackGen.merge.reason.${
                           (mergeChecks.aToB as { reason: TrackGenMergeRefusal }).reason
@@ -1701,7 +1610,7 @@ function SizeDialogBody({
                   ) : null}
                 </>
               ) : (
-                <span className="text-[10px] text-zinc-500">
+                <span className="text-caption-2 text-text-quaternary">
                   {t('mapEditor.trackGen.merge.pickTwo')}
                 </span>
               )}
@@ -1710,20 +1619,8 @@ function SizeDialogBody({
         </div>
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md border border-zinc-600 px-3 py-1.5 text-[12px] text-zinc-300 transition hover:border-zinc-400 hover:text-zinc-100"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={confirm}
-            className="rounded-md border border-cyan-500/70 bg-cyan-500/15 px-3 py-1.5 text-[12px] text-cyan-200 transition hover:bg-cyan-500/25"
-          >
-            {t('mapEditor.trackGen.generate')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onCancel}>{t('common.cancel')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={confirm}>{t('mapEditor.trackGen.generate')}</Button>
         </div>
       </div>
     </div>,

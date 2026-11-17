@@ -628,7 +628,7 @@ export const GeofenceNode = memo(function GeofenceNode({
               key={`edge-add-${i}`}
               type="button"
               data-geofence-edge-add
-              className="pointer-events-auto absolute z-[72] flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/90 bg-zinc-950/95 text-cyan-200 shadow-[0_0_6px_rgba(34,211,238,0.45)] ring-1 ring-cyan-400/30 hover:border-cyan-200 hover:bg-cyan-950 hover:text-white"
+              className="pointer-events-auto absolute z-[72] flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-300/90 bg-surface-popup text-cyan-200 shadow-[0_0_6px_rgba(34,211,238,0.45)] ring-1 ring-cyan-400/30 hover:border-cyan-200 hover:bg-cyan-950 hover:text-text-primary"
               style={{
                 left: mid.x - wrapLeft,
                 top: mid.y - wrapTop,
@@ -689,7 +689,7 @@ export const GeofenceNode = memo(function GeofenceNode({
               onPointerCancel={endDrag}
             >
               <div
-                className="size-3.5 rounded-sm border-2 border-white bg-amber-400 shadow-sm"
+                className="size-3.5 rounded-sm border-2 border-white bg-status-warning shadow-sm"
                 aria-hidden
               />
             </div>
@@ -793,7 +793,7 @@ export const GeofenceNode = memo(function GeofenceNode({
             {onDelete && (
               <button
                 type="button"
-                className="rounded border border-red-800/80 bg-red-950/90 p-1 text-red-300 hover:bg-red-900"
+                className="rounded border border-red-800/80 bg-red-950/90 p-1 text-status-error-emphasis hover:bg-status-error-light"
                 title="刪除圍籬"
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -846,10 +846,10 @@ function GeofenceLabelView({
   const labelChrome = readOnly
     ? ''
     : invalid
-      ? 'rounded border-2 border-red-500 bg-red-950/40'
+      ? 'rounded border-2 border-status-error bg-red-950/40'
       : selected
-        ? 'rounded border-2 border-cyan-400 bg-zinc-900/80'
-        : 'rounded border border-transparent bg-zinc-900/50'
+        ? 'rounded border-2 border-cyan-400 bg-surface-primary'
+        : 'rounded border border-transparent bg-surface-primary'
 
   if (readOnly && !label.text.trim()) return null
 
@@ -912,7 +912,7 @@ function GeofenceLabelView({
       {selected && !readOnly && (
         <button
           type="button"
-          className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-cyan-500 bg-zinc-900 text-cyan-300"
+          className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-cyan-500 bg-surface-primary text-text-theme"
           title="旋轉文字"
           onPointerDown={(e) => onBeginRotate(e, label)}
         >

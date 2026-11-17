@@ -1,4 +1,5 @@
 import { ChevronLeft, Save } from 'lucide-react'
+import { Button } from '../../../components/ui';
 
 export type RouteGroupDraft = {
   groupId: string | null
@@ -24,22 +25,15 @@ export function RouteGroupEditorView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-600/80 bg-zinc-950/60 px-2.5 py-2 text-left text-[11px] font-medium text-zinc-300 hover:bg-zinc-800/80"
-      >
-        <ChevronLeft className="size-4 shrink-0" />
-        回到路線清單
-      </button>
+      <Button hierarchy="subordinate" variant="outlined" className="shrink-0" leadingIcon={<ChevronLeft />} onPress={onBack}>回到路線清單</Button>
 
-      <p className="text-[11px] font-semibold text-zinc-200">
+      <p className="text-body-xs-bold text-text-primary">
         {draft.groupId ? '編輯路線群組' : '新增路線群組'}
       </p>
 
       <div>
-        <label className="mb-1 block text-[10px] font-medium text-zinc-400">
-          群組名稱 <span className="text-red-400">*</span>
+        <label className="mb-1 block text-caption-2 text-text-tertiary">
+          群組名稱 <span className="text-status-error-emphasis">*</span>
         </label>
         <input
           type="text"
@@ -47,21 +41,13 @@ export function RouteGroupEditorView({
           onChange={(e) => onNameChange(e.target.value)}
           disabled={!editMode}
           placeholder="例如：T3接駁路線"
-          className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500/60 focus:outline-none disabled:opacity-60"
+          className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary placeholder:text-text-quaternary focus:border-border-theme-light focus:outline-none disabled:opacity-60"
         />
       </div>
 
       {editMode ? (
-        <div className="mt-auto flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-700/80 pt-2">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!canSave}
-            className="flex w-full items-center justify-center gap-1 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-2 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-40"
-          >
-            <Save className="size-3.5" />
-            儲存群組
-          </button>
+        <div className="mt-auto flex shrink-0 flex-wrap gap-1.5 border-t border-border-quaternary pt-2">
+          <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Save />} onPress={onSave} disabled={!canSave}>儲存群組</Button>
         </div>
       ) : null}
     </div>

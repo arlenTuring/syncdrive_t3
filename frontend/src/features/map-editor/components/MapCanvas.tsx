@@ -406,7 +406,7 @@ export function MapCanvas({
   const viewportEl = (
     <div
       ref={viewportRef}
-      className={`relative min-h-0 min-w-0 overflow-auto bg-zinc-950 ${
+      className={`relative min-h-0 min-w-0 overflow-auto bg-surface-sub-background ${
         showRulers ? 'h-full' : 'flex-1'
       } ${isPanning ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
       onPointerDown={onViewportPointerDown}
@@ -587,17 +587,17 @@ export function MapCanvas({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="grid min-h-0 flex-1 grid-cols-[2.25rem_1fr] grid-rows-[1.75rem_1fr] gap-px bg-zinc-700/70">
         <div
-          className="min-h-0 min-w-0 bg-zinc-950"
+          className="min-h-0 min-w-0 bg-surface-sub-background"
           aria-hidden
         />
-        <div className="relative min-h-0 min-w-0 overflow-hidden bg-zinc-950">
+        <div className="relative min-h-0 min-w-0 overflow-hidden bg-surface-sub-background">
           <HorizontalRuler
             viewportRef={viewportRef}
             scaleX={scaleX}
             selectionMeterX={selectionCrosshair?.meterX ?? null}
           />
         </div>
-        <div className="relative min-h-0 min-w-0 overflow-hidden bg-zinc-950">
+        <div className="relative min-h-0 min-w-0 overflow-hidden bg-surface-sub-background">
           <VerticalRuler
             viewportRef={viewportRef}
             scaleY={scaleY}

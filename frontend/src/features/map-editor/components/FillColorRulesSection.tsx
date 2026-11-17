@@ -2,6 +2,7 @@ import { SiteColorInput } from '../../../components/SiteColorInput';
 import { SiteSelect } from '../../../components/SiteSelect';
 import { Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button, IconButton } from '../../../components/ui';
 
 export type FillColorRule = {
   fieldPath: string
@@ -40,12 +41,12 @@ export function FillColorRulesSection({
 
   return (
     <section className="space-y-2.5 rounded-lg border border-cyan-900/40 bg-cyan-950/15 p-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-500/90">
+      <h3 className="text-caption-2 uppercase text-cyan-500/90">
         {title}
       </h3>
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+      <div className="flex flex-wrap items-center gap-2 text-caption-2 text-text-quaternary">
         <span
-          className="inline-block size-4 rounded border border-zinc-600"
+          className="inline-block size-4 rounded border border-border-tertiary"
           style={{ backgroundColor: defaultFill }}
           title={t('mapEditor.fillColorRules.defaultTitle')}
         />
@@ -54,7 +55,7 @@ export function FillColorRulesSection({
       <div>
         <label
           htmlFor={`${title}-default-fill`}
-          className="mb-1 block text-[10px] text-zinc-500"
+          className="mb-1 block text-caption-2 text-text-quaternary"
         >
           {t('mapEditor.fillColorRules.defaultLabel')}
         </label>
@@ -66,7 +67,7 @@ export function FillColorRulesSection({
             onChange={(e) => onDefaultFillChange(e.target.value)}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="h-8 w-10 cursor-pointer rounded border border-zinc-600 bg-zinc-950 disabled:opacity-50"
+            className="h-8 w-10 cursor-pointer rounded border border-border-tertiary bg-surface-sub-background disabled:opacity-50"
            />
           <input
             type="text"
@@ -75,36 +76,30 @@ export function FillColorRulesSection({
             onChange={(e) => onDefaultFillChange(e.target.value)}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="flex-1 rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+            className="flex-1 rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
           />
         </div>
       </div>
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500">{t('mapEditor.fillColorRules.rulesLabel')}</span>
+          <span className="text-caption-2 text-text-quaternary">{t('mapEditor.fillColorRules.rulesLabel')}</span>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() =>
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Plus />} onPress={() =>
                 setRules([
                   ...rules,
                   { fieldPath: '', operator: 'eq', compareValue: '', color: '#22c55e' },
                 ])
-              }
-              className="inline-flex items-center gap-1 rounded border border-zinc-600 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
-            >
-              <Plus className="size-3" /> {t('mapEditor.fillColorRules.add')}
-            </button>
+              }>{t('mapEditor.fillColorRules.add')}</Button>
           )}
         </div>
         {rules.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">{t('mapEditor.fillColorRules.empty')}</p>
+          <p className="text-caption-2 text-text-disabled">{t('mapEditor.fillColorRules.empty')}</p>
         ) : (
           <ul className="space-y-2">
             {rules.map((rule, idx) => (
               <li
                 key={idx}
-                className="flex flex-wrap items-center gap-2 rounded border border-zinc-700/80 bg-zinc-950/60 p-2"
+                className="flex flex-wrap items-center gap-2 rounded border border-border-quaternary bg-black-30 p-2"
               >
                 <input
                   readOnly={readOnly}
@@ -116,7 +111,7 @@ export function FillColorRulesSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="min-w-[8rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                  className="min-w-[8rem] flex-1 rounded border border-border-tertiary bg-surface-primary px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
                   placeholder={t('mapEditor.fillColorRules.fieldPlaceholder')}
                 />
                 <SiteSelect
@@ -132,7 +127,7 @@ export function FillColorRulesSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="rounded border border-zinc-600 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-60"
+                  size="sm"
                 >
                   <option value="eq">=</option>
                   <option value="gt">&gt;</option>
@@ -148,7 +143,7 @@ export function FillColorRulesSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="min-w-[4rem] flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+                  className="min-w-[4rem] flex-1 rounded border border-border-tertiary bg-surface-primary px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
                   placeholder={t('mapEditor.fillColorRules.valuePlaceholder')}
                 />
                 <SiteColorInput
@@ -161,24 +156,17 @@ export function FillColorRulesSection({
                   }}
                   onFocus={onFieldFocus}
                   onBlur={onFieldBlur}
-                  className="h-7 w-8 cursor-pointer rounded border border-zinc-600 disabled:opacity-50"
+                  className="h-7 w-8 cursor-pointer rounded border border-border-tertiary disabled:opacity-50"
                  />
                 {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => setRules(rules.filter((_, i) => i !== idx))}
-                    className="rounded p-1 text-zinc-500 hover:bg-red-950/50 hover:text-red-400"
-                    aria-label={t('mapEditor.fillColorRules.deleteAria')}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => setRules(rules.filter((_, i) => i !== idx))} label={t('mapEditor.fillColorRules.deleteAria')} icon={<Trash2 />} />
                 )}
               </li>
             ))}
           </ul>
         )}
       </div>
-      <pre className="overflow-x-auto rounded border border-zinc-700/80 bg-zinc-950/80 p-2 font-mono text-[9px] leading-relaxed text-zinc-500">
+      <pre className="overflow-x-auto rounded border border-border-quaternary bg-surface-sub-background p-2 font-mono text-caption-2 text-text-quaternary">
         {t('mapEditor.fillColorRules.mqttExample', { entityId })}
       </pre>
     </section>

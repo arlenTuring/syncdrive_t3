@@ -19,16 +19,17 @@ import {
 } from '../vehicle-operation-actions';
 import { DashboardIconPicker } from '../components/DashboardIconPicker';
 import { WidgetDataBindingSettings } from '../elements/WidgetDataBindingSettings';
-const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+import { Button, Checkbox } from '../../../components/ui';
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
-const selectCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer`;
+const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
 
 function SH({ icon, label, color }: { icon: React.ReactNode; label: string; color?: string }) {
   return (
     <div
-      className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider pb-1 border-b border-zinc-800"
+      className="flex items-center gap-1.5 text-body-xs-bold uppercase pb-1 border-b border-border-quaternary"
       style={{ color: color ?? '#71717a' }}
     >
       {icon} {label}
@@ -39,7 +40,7 @@ function SH({ icon, label, color }: { icon: React.ReactNode; label: string; colo
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="block text-zinc-500 text-[10px] uppercase font-bold tracking-tight">{label}</label>
+      <label className="block text-text-quaternary text-caption-2 uppercase">{label}</label>
       {children}
     </div>
   );
@@ -53,7 +54,7 @@ function PositionFields({
   onUpdate: (p: Partial<{ x: number; y: number; width: number; height: number }>) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
+    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-quaternary">
       {(['x', 'y', 'width', 'height'] as const).map((k) => (
         <Field key={k} label={k.toUpperCase()}>
           <NumberInput
@@ -137,7 +138,7 @@ export function RouteProgressSettings({
 
   return (
     <div className="space-y-4">
-      <SH icon={<LucideIcons.Route size={14} className="text-blue-400" />} label={t('dashboard.routeProgress.title')} color="#3b82f6" />
+      <SH icon={<LucideIcons.Route size={14} className="text-text-theme" />} label={t('dashboard.routeProgress.title')} color="#3b82f6" />
 
       <Field label={t('dashboard.routeProgress.variant')}>
         <SiteSelect
@@ -176,13 +177,8 @@ export function RouteProgressSettings({
            />
         </Field>
       </div>
-      <label className="flex items-center gap-2 text-xs text-zinc-300">
-        <input
-          type="checkbox"
-          checked={w.stationLabelWrap ?? true}
-          onChange={(e) => onUpdate({ stationLabelWrap: e.target.checked })}
-          className="accent-cyan-500"
-        />
+      <label className="flex items-center gap-2 text-body-xs text-text-secondary">
+        <Checkbox checked={w.stationLabelWrap ?? true} onCheckedChange={(checked) => onUpdate({ stationLabelWrap: checked })} />
         {t('dashboard.routeProgress.stationLabelWrap')}
       </label>
       {(w.stationLabelWrap ?? true) && (
@@ -213,7 +209,7 @@ export function RouteProgressSettings({
         </div>
       )}
 
-      <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/50 text-[10px] text-zinc-400 leading-relaxed flex gap-2">
+      <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-border-quaternary text-caption-2 text-text-tertiary flex gap-2">
         <FolderOpen size={14} className="shrink-0 text-cyan-500 mt-0.5" />
         <span>
           {t('dashboard.routeProgress.iconHint', { base: VEHICLE_OPERATION_ACTION_ICONS_BASE })}
@@ -240,7 +236,7 @@ export function RouteProgressSettings({
         </Field>
       </div>
 
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.stationSource')} color="#10b981" />
         <Field label={t('dashboard.routeProgress.mode')}>
           <SiteSelect
@@ -261,7 +257,7 @@ export function RouteProgressSettings({
                 onChange={(e) => onUpdate({ stationsJsonVarKey: e.target.value })}
                 className={inputCls}
               />
-              <p className="text-[9px] text-zinc-500 mt-1 font-mono leading-relaxed">
+              <p className="text-caption-2 text-text-quaternary mt-1 font-mono">
                 [{'{'}&quot;name&quot;:&quot;STATION_A&quot;,&quot;remain_pct&quot;:40{'}'}, …]
               </p>
             </Field>
@@ -276,7 +272,7 @@ export function RouteProgressSettings({
                 <option value="stops">{t('dashboard.routeProgress.stationFilterStops')}</option>
                 <option value="all">{t('dashboard.routeProgress.stationFilterAll')}</option>
               </SiteSelect>
-              <p className="text-[9px] text-zinc-500 mt-1 leading-relaxed">
+              <p className="text-caption-2 text-text-quaternary mt-1">
                 {t('dashboard.routeProgress.stationFilterHint')}
               </p>
             </Field>
@@ -316,19 +312,19 @@ export function RouteProgressSettings({
             />
           </Field>
         </div>
-        <p className="text-[9px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.routeProgress.positionHint')}
         </p>
       </div>
 
       {stationSource === 'manual' && (
-        <div className="space-y-2 pt-2 border-t border-zinc-800">
+        <div className="space-y-2 pt-2 border-t border-border-quaternary">
           <div className="flex items-center justify-between">
             <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.manualStations')} color="#10b981" />
             <button
               type="button"
               onClick={addStation}
-              className="p-1 hover:bg-zinc-800 rounded text-green-500 transition-colors"
+              className="p-1 hover:bg-link-standard-hover rounded text-green-500 transition-colors"
             >
               <Plus size={14} />
             </button>
@@ -336,7 +332,7 @@ export function RouteProgressSettings({
           {w.stations.map((s, i) => (
             <div
               key={s.id}
-              className="flex items-center gap-1 bg-zinc-800/40 p-1.5 rounded border border-zinc-700/50"
+              className="flex items-center gap-1 bg-zinc-800/40 p-1.5 rounded border border-border-quaternary"
             >
               <input
                 value={s.name}
@@ -348,7 +344,7 @@ export function RouteProgressSettings({
               <button
                 type="button"
                 onClick={() => removeStation(i)}
-                className="p-1 text-zinc-500 hover:text-red-400"
+                className="p-1 text-text-quaternary hover:text-status-error-emphasis"
               >
                 <Trash2 size={12} />
               </button>
@@ -357,40 +353,26 @@ export function RouteProgressSettings({
         </div>
       )}
 
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <div className="flex items-center justify-between gap-2">
           <SH icon={<Zap size={12} />} label={t('dashboard.routeProgress.actionMapping')} color="#f59e0b" />
           <div className="flex gap-1">
-            <button
-              type="button"
-              title={t('dashboard.routeProgress.loadCatalog')}
-              onClick={() => onUpdate({ actionIconRules: buildCatalogActionRules() })}
-              className="px-2 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
-            >
-              {t('dashboard.routeProgress.catalogBtn')}
-            </button>
-            <button
-              type="button"
-              title={t('dashboard.routeProgress.loadSample')}
-              onClick={() => onUpdate({ actionIconRules: [...DEFAULT_ROUTE_ACTION_ICON_RULES] })}
-              className="px-2 py-0.5 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
-            >
-              {t('dashboard.routeProgress.sampleBtn')}
-            </button>
+            <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadCatalog')} onPress={() => onUpdate({ actionIconRules: buildCatalogActionRules() })}>{t('dashboard.routeProgress.catalogBtn')}</Button>
+            <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadSample')} onPress={() => onUpdate({ actionIconRules: [...DEFAULT_ROUTE_ACTION_ICON_RULES] })}>{t('dashboard.routeProgress.sampleBtn')}</Button>
             <button
               type="button"
               onClick={addRule}
-              className="p-1 hover:bg-zinc-800 rounded text-amber-500"
+              className="p-1 hover:bg-link-standard-hover rounded text-status-warning"
             >
               <Plus size={14} />
             </button>
           </div>
         </div>
         {rules.length === 0 && (
-          <p className="text-[10px] text-zinc-500">{t('dashboard.routeProgress.noRules')}</p>
+          <p className="text-caption-2 text-text-quaternary">{t('dashboard.routeProgress.noRules')}</p>
         )}
         {rules.map((rule, i) => (
-          <div key={rule.id} className="space-y-1.5 p-2 rounded border border-zinc-700/50 bg-zinc-800/30">
+          <div key={rule.id} className="space-y-1.5 p-2 rounded border border-border-quaternary bg-link-standard">
             <div className="flex gap-1">
               <input
                 value={rule.label ?? ''}
@@ -399,7 +381,7 @@ export function RouteProgressSettings({
                 placeholder={t('dashboard.routeProgress.ruleLabel')}
                 style={{ fontSize: 10 }}
               />
-              <button type="button" onClick={() => removeRule(i)} className="p-1 text-zinc-500 hover:text-red-400">
+              <button type="button" onClick={() => removeRule(i)} className="p-1 text-text-quaternary hover:text-status-error-emphasis">
                 <Trash2 size={12} />
               </button>
             </div>
@@ -463,7 +445,7 @@ export function RouteProgressSettings({
         ))}
       </div>
 
-      <div className="space-y-2 pt-2 border-t border-zinc-800">
+      <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <SH icon={<Palette size={12} />} label={t('dashboard.routeProgress.appearance')} color="#ec4899" />
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.routeProgress.activeColor')}>
@@ -507,16 +489,9 @@ export function RouteProgressSettings({
               className={`${inputCls} flex-1`}
               placeholder={t('dashboard.routeProgress.vehicleIconPlaceholder', { file: DEFAULT_VEHICLE_ICON_FILE })}
             />
-            <button
-              type="button"
-              title={t('dashboard.routeProgress.useDefaultIcon')}
-              onClick={() => onUpdate({ vehicleIcon: DEFAULT_VEHICLE_ICON_FILE })}
-              className="shrink-0 px-2 py-1 text-[9px] rounded bg-zinc-800 text-zinc-400 hover:text-cyan-400"
-            >
-              {t('dashboard.routeProgress.defaultBtn')}
-            </button>
+            <Button hierarchy="subordinate" variant="tonal" className="shrink-0" title={t('dashboard.routeProgress.useDefaultIcon')} onPress={() => onUpdate({ vehicleIcon: DEFAULT_VEHICLE_ICON_FILE })}>{t('dashboard.routeProgress.defaultBtn')}</Button>
           </div>
-          <p className="text-[9px] text-zinc-500 mt-1">
+          <p className="text-caption-2 text-text-quaternary mt-1">
             {t('dashboard.routeProgress.vehicleIconHint')}
           </p>
         </Field>
@@ -538,7 +513,7 @@ export function RouteProgressSettings({
             />
           </Field>
         </div>
-        <p className="text-[9px] text-zinc-500 leading-relaxed">
+        <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.routeProgress.healthHint')}
         </p>
       </div>
@@ -547,7 +522,7 @@ export function RouteProgressSettings({
       <button
         type="button"
         onClick={onDelete}
-        className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5 hover:bg-red-900/40 transition-colors mt-2"
+        className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-status-error-emphasis text-caption-2 uppercase flex items-center justify-center gap-1.5 hover:bg-status-error-light transition-colors mt-2"
       >
         <Trash2 size={12} /> {t('dashboard.routeProgress.removeWidget')}
       </button>

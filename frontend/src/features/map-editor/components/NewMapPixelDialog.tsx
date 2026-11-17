@@ -10,6 +10,7 @@ import {
 } from '../constants/mapPixel'
 import type { MapCreationMode } from '../types/mapFile'
 import { systemAlert } from '../../../lib/systemDialog'
+import { Button } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -68,7 +69,7 @@ export function NewMapPixelDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
@@ -78,13 +79,13 @@ export function NewMapPixelDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-xl border border-zinc-600 bg-zinc-900 p-5 shadow-2xl"
+        className="w-full max-w-lg rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} className="text-base font-semibold text-zinc-100">
+        <h2 id={titleId} className="text-body-m-bold text-text-primary">
           {t('mapEditor.newMapPixel.title')}
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-2 text-body-s text-text-tertiary">
           {t('mapEditor.newMapPixel.hint')}
         </p>
 
@@ -103,13 +104,13 @@ export function NewMapPixelDialog({
                     ? mode === 'trackGen'
                       ? 'border-emerald-600/70 bg-emerald-950/40 ring-1 ring-emerald-500/40'
                       : 'border-cyan-600/70 bg-cyan-950/40 ring-1 ring-cyan-500/40'
-                    : 'border-zinc-700 bg-zinc-950/60 hover:border-zinc-500'
+                    : 'border-border-quaternary bg-black-30 hover:border-border-primary'
                 }`}
               >
-                <div className={`text-sm font-medium ${selected ? (mode === 'trackGen' ? 'text-emerald-100' : 'text-cyan-100') : 'text-zinc-200'}`}>
+                <div className={`text-body-s-bold ${selected ? (mode === 'trackGen' ? 'text-emerald-100' : 'text-cyan-100') : 'text-text-primary'}`}>
                   {t(titleKey)}
                 </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                <p className="mt-1 text-body-xs text-text-quaternary">
                   {t(hintKey)}
                 </p>
               </button>
@@ -118,7 +119,7 @@ export function NewMapPixelDialog({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-body-xs text-text-quaternary">
             {t('mapEditor.newMapPixel.width')}
             <input
               type="number"
@@ -127,10 +128,10 @@ export function NewMapPixelDialog({
               step={1}
               value={widthStr}
               onChange={(e) => setWidthStr(e.target.value)}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme"
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-body-xs text-text-quaternary">
             {t('mapEditor.newMapPixel.height')}
             <input
               type="number"
@@ -139,11 +140,11 @@ export function NewMapPixelDialog({
               step={1}
               value={heightStr}
               onChange={(e) => setHeightStr(e.target.value)}
-              className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 font-mono text-zinc-100 outline-none focus:border-cyan-500"
+              className="mt-1 w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 font-mono text-text-primary outline-none focus:border-border-theme"
             />
           </label>
         </div>
-        <p className="mt-2 text-[10px] text-zinc-600">
+        <p className="mt-2 text-caption-2 text-text-disabled">
           {t('mapEditor.newMapPixel.range', {
             min: MIN_MAP_PIXEL,
             max: MAX_MAP_PIXEL,
@@ -152,22 +153,10 @@ export function NewMapPixelDialog({
           })}
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-900/50"
-          >
-            {creationMode === 'trackGen'
+          <Button hierarchy="subordinate" variant="outlined" onPress={onCancel}>{t('common.cancel')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={submit}>{creationMode === 'trackGen'
               ? t('mapEditor.newMapPixel.createTrackGen')
-              : t('mapEditor.newMapPixel.create')}
-          </button>
+              : t('mapEditor.newMapPixel.create')}</Button>
         </div>
       </div>
     </div>

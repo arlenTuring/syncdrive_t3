@@ -54,6 +54,7 @@ import {
   updatePointTopologyEdge,
 } from '../utils/pointTopology'
 import { estimateTopologyEdgeDistanceFromSimRoutes } from '../utils/topologySimRouteDistance'
+import { Button } from '../../../components/ui';
 
 /** 拓撲畫布四周留白，便於平移，並讓任意點位可捲到畫面正中心 */
 const CANVAS_PAN_PAD_PX = 2400
@@ -430,10 +431,10 @@ function EdgeArrow({
             <div className="flex h-full w-full items-center justify-center">
               <div
                 className={[
-                  'rounded-md border px-1.5 py-0.5 shadow-sm whitespace-nowrap text-[9px] font-medium leading-none tabular-nums',
+                  'rounded-md border px-1.5 py-0.5 shadow-sm whitespace-nowrap text-caption-2 tabular-nums',
                   selected
                     ? 'border-cyan-500/60 bg-cyan-950/95 text-cyan-100'
-                    : 'border-zinc-600/80 bg-zinc-950/90 text-zinc-200',
+                    : 'border-zinc-600/80 bg-surface-sub-background text-text-primary',
                 ].join(' ')}
               >
                 {brief}
@@ -1474,24 +1475,24 @@ export function PointTopologyEditorDialog({
       : null
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50">
       <div
-        className="relative flex h-[90%] w-[90%] flex-col overflow-hidden rounded-lg border border-zinc-600 bg-zinc-900 shadow-2xl"
+        className="relative flex h-[90%] w-[90%] flex-col overflow-hidden rounded-lg border border-border-tertiary bg-surface-primary shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="point-topology-title"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-700/80 px-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-quaternary px-3 py-2.5">
           <div className="min-w-0 flex flex-col gap-0.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
               <h2
                 id="point-topology-title"
-                className="shrink-0 text-sm font-semibold text-zinc-50"
+                className="shrink-0 text-body-s-bold text-text-primary"
                 title={t('mapEditor.pointTopology.titleHint')}
               >
                 {t('mapEditor.pointTopology.title')}
               </h2>
-              <p className="truncate text-[12px] font-medium text-zinc-300">
+              <p className="truncate text-body-xs-bold text-text-secondary">
                 {t('mapEditor.pointTopology.summary', {
                   docking: dockingCount,
                   waypoint: waypointCount,
@@ -1510,17 +1511,11 @@ export function PointTopologyEditorDialog({
                 })}
               </p>
             </div>
-            <p className="truncate text-[11px] text-zinc-400">
+            <p className="truncate text-body-xs text-text-tertiary">
               {t('mapEditor.pointTopology.shortcutHint')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md border border-zinc-500 bg-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-100 hover:bg-zinc-700"
-          >
-            {t('mapEditor.pointTopology.close')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={onClose}>{t('mapEditor.pointTopology.close')}</Button>
         </div>
 
         <div className="relative min-h-0 flex-1">
@@ -1529,7 +1524,7 @@ export function PointTopologyEditorDialog({
             type="button"
             onClick={() => setListOpen((v) => !v)}
             className={[
-              'absolute top-1/2 z-40 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border border-zinc-500/80 bg-zinc-900/95 text-zinc-200 shadow-lg backdrop-blur-sm transition hover:bg-zinc-800 hover:text-cyan-200',
+              'absolute top-1/2 z-40 flex h-28 w-7 -translate-y-1/2 flex-col items-center justify-center gap-1 border border-zinc-500/80 bg-zinc-900/95 text-text-primary shadow-lg backdrop-blur-sm transition hover:bg-link-standard-hover hover:text-cyan-200',
               listOpen
                 ? 'left-56 rounded-r-md border-l-0'
                 : 'left-0 rounded-r-xl border-l-0',
@@ -1537,7 +1532,7 @@ export function PointTopologyEditorDialog({
             style={{ writingMode: 'vertical-rl' }}
             title={listOpen ? t('mapEditor.pointTopology.listToggleClose') : t('mapEditor.pointTopology.listToggleOpen')}
           >
-            <span className="text-[11px] font-semibold tracking-wider">
+            <span className="text-body-xs-bold">
               {listOpen ? t('mapEditor.pointTopology.listCollapse') : t('mapEditor.pointTopology.listTitle')}
             </span>
           </button>
@@ -1550,37 +1545,31 @@ export function PointTopologyEditorDialog({
             ].join(' ')}
             aria-hidden={!listOpen}
           >
-            <div className="flex items-center justify-between border-b border-zinc-700/80 px-2.5 py-2">
-              <span className="text-[11px] font-semibold text-zinc-200">{t('mapEditor.pointTopology.listTitle')}</span>
-              <button
-                type="button"
-                onClick={() => setListOpen(false)}
-                className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              >
-                {t('mapEditor.pointTopology.close')}
-              </button>
+            <div className="flex items-center justify-between border-b border-border-quaternary px-2.5 py-2">
+              <span className="text-body-xs-bold text-text-primary">{t('mapEditor.pointTopology.listTitle')}</span>
+              <Button hierarchy="subordinate" variant="standard" onPress={() => setListOpen(false)}>{t('mapEditor.pointTopology.close')}</Button>
             </div>
-            <div className="border-b border-zinc-800 px-2 py-1.5">
+            <div className="border-b border-border-quaternary px-2 py-1.5">
               <input
                 type="search"
                 value={listQuery}
                 onChange={(event) => setListQuery(event.target.value)}
                 placeholder={t('mapEditor.pointTopology.searchPlaceholder')}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-cyan-500"
+                className="w-full rounded-md border border-border-quaternary bg-surface-primary px-2 py-1 text-body-xs text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
               />
-              <p className="mt-1 text-[9px] leading-snug text-zinc-500">
+              <p className="mt-1 text-caption-2 text-text-quaternary">
                 {t('mapEditor.pointTopology.listHint')}
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="sticky top-0 z-10 flex items-center justify-between bg-zinc-950/95 px-2.5 py-1.5 backdrop-blur-sm">
-                <span className="text-[10px] font-semibold tracking-wide text-zinc-400">
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-surface-popup px-2.5 py-1.5 backdrop-blur-sm">
+                <span className="text-caption-2 text-text-tertiary">
                   {t('mapEditor.pointTopology.inNetwork', { count: sortedNodes.length })}
                 </span>
               </div>
               <ul className="space-y-0.5 px-1 pb-2">
                 {sortedNodes.length === 0 ? (
-                  <li className="px-2 py-2 text-[11px] text-zinc-500">{t('mapEditor.pointTopology.noneAdded')}</li>
+                  <li className="px-2 py-2 text-body-xs text-text-quaternary">{t('mapEditor.pointTopology.noneAdded')}</li>
                 ) : (
                   sortedNodes.map((node) => {
                     const field = fieldMetersByNodeId.get(node.id)
@@ -1592,7 +1581,7 @@ export function PointTopologyEditorDialog({
                             'flex items-center gap-1 rounded-md px-1.5 py-1 transition',
                             active
                               ? 'bg-cyan-950/70 ring-1 ring-cyan-500/50'
-                              : 'hover:bg-zinc-800/60',
+                              : 'hover:bg-surface-secondary',
                           ].join(' ')}
                         >
                           <button
@@ -1610,25 +1599,18 @@ export function PointTopologyEditorDialog({
                                 className="h-2 w-2 shrink-0 rounded-full"
                                 style={{ backgroundColor: node.color }}
                               />
-                              <span className="truncate text-[11px] font-medium text-zinc-100">
+                              <span className="truncate text-body-xs-bold text-text-primary">
                                 {nodeDisplayLabel(node.id, node.label)}
                               </span>
                             </span>
-                            <span className="block pl-3.5 text-[9px] text-zinc-500">
+                            <span className="block pl-3.5 text-caption-2 text-text-quaternary">
                               {kindLabel(node.kind)}
                               {field
                                 ? ` · X ${field.xM.toFixed(1)} Y ${field.yM.toFixed(1)}`
                                 : ''}
                             </span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => removeNodesFromDraft([node.id])}
-                            className="shrink-0 rounded border border-zinc-600/80 px-1.5 py-0.5 text-[9px] font-medium text-zinc-300 hover:border-red-700/60 hover:bg-red-950/50 hover:text-red-200"
-                            title={t('mapEditor.pointTopology.removeFromNetwork')}
-                          >
-                            {t('mapEditor.pointTopology.remove')}
-                          </button>
+                          <Button hierarchy="danger" variant="outlined" className="shrink-0" onPress={() => removeNodesFromDraft([node.id])} title={t('mapEditor.pointTopology.removeFromNetwork')}>{t('mapEditor.pointTopology.remove')}</Button>
                         </div>
                       </li>
                     )
@@ -1636,25 +1618,19 @@ export function PointTopologyEditorDialog({
                 )}
               </ul>
 
-              <div className="sticky top-0 z-10 flex items-center justify-between gap-1 border-t border-zinc-800/80 bg-zinc-950/95 px-2.5 py-1.5 backdrop-blur-sm">
-                <span className="text-[10px] font-semibold tracking-wide text-zinc-400">
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-1 border-t border-border-quaternary bg-surface-popup px-2.5 py-1.5 backdrop-blur-sm">
+                <span className="text-caption-2 text-text-tertiary">
                   {t('mapEditor.pointTopology.available', { count: availableToAdd.length })}
                 </span>
                 {availableToAdd.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() =>
+                  <Button hierarchy="subordinate" variant="outlined" onPress={() =>
                       addFacilitiesToDraft(availableToAdd.map((item) => item.nodeId))
-                    }
-                    className="rounded border border-cyan-700/60 px-1.5 py-0.5 text-[9px] font-medium text-cyan-200 hover:bg-cyan-950/80"
-                  >
-                    {t('mapEditor.pointTopology.addAll')}
-                  </button>
+                    }>{t('mapEditor.pointTopology.addAll')}</Button>
                 ) : null}
               </div>
               <ul className="space-y-0.5 px-1 pb-2">
                 {availableToAdd.length === 0 ? (
-                  <li className="px-2 py-2 text-[11px] text-zinc-500">
+                  <li className="px-2 py-2 text-body-xs text-text-quaternary">
                     {loadCandidates.every((item) => item.alreadyInTopology)
                       ? t('mapEditor.pointTopology.allLoaded')
                       : t('mapEditor.pointTopology.noSearchMatch')}
@@ -1662,22 +1638,16 @@ export function PointTopologyEditorDialog({
                 ) : (
                   availableToAdd.map((item) => (
                     <li key={item.nodeId}>
-                      <div className="flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-zinc-800/60">
+                      <div className="flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-surface-secondary">
                         <div className="min-w-0 flex-1 px-0.5">
-                          <p className="truncate text-[11px] font-medium text-zinc-200">
+                          <p className="truncate text-body-xs-bold text-text-primary">
                             {nodeDisplayLabel(item.nodeId, item.label)}
                           </p>
-                          <p className="truncate text-[9px] text-zinc-500">
+                          <p className="truncate text-caption-2 text-text-quaternary">
                             {kindLabel(item.kind)} · {item.areaName}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => addFacilitiesToDraft([item.nodeId])}
-                          className="shrink-0 rounded border border-cyan-700/50 px-1.5 py-0.5 text-[9px] font-medium text-cyan-200 hover:bg-cyan-950/70"
-                        >
-                          {t('mapEditor.pointTopology.add')}
-                        </button>
+                        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => addFacilitiesToDraft([item.nodeId])}>{t('mapEditor.pointTopology.add')}</Button>
                       </div>
                     </li>
                   ))
@@ -1688,7 +1658,7 @@ export function PointTopologyEditorDialog({
 
           <div
             ref={canvasRef}
-            className="absolute inset-0 overflow-auto overscroll-contain bg-[radial-gradient(circle_at_1px_1px,#3f3f46_1px,transparent_0)] [background-size:24px_24px] bg-zinc-950 [scrollbar-gutter:stable]"
+            className="absolute inset-0 overflow-auto overscroll-contain bg-[radial-gradient(circle_at_1px_1px,#3f3f46_1px,transparent_0)] [background-size:24px_24px] bg-surface-sub-background [scrollbar-gutter:stable]"
             onPointerDown={onCanvasBackgroundPointerDown}
             title={t('mapEditor.pointTopology.panHint')}
           >
@@ -1923,7 +1893,7 @@ export function PointTopologyEditorDialog({
                         ? 'z-20 scale-110 border-emerald-300 ring-4 ring-emerald-400/80'
                         : selected
                           ? 'border-cyan-300 ring-2 ring-cyan-400/70'
-                          : 'border-white/25',
+                          : 'border-border-tertiary',
                       linkBlocked ? 'opacity-40' : '',
                       'cursor-grab active:cursor-grabbing',
                       draggingId === node.id ? 'z-20 scale-105' : '',
@@ -1950,7 +1920,7 @@ export function PointTopologyEditorDialog({
                       setInspectorTarget({ kind: 'node', id: node.id })
                     }}
                   >
-                    <span className="line-clamp-2 max-w-full break-words px-0.5 text-[9px] font-semibold leading-tight">
+                    <span className="line-clamp-2 max-w-full break-words px-0.5 text-caption-2">
                       {displayLabel}
                     </span>
                     {field ? (
@@ -2054,18 +2024,12 @@ export function PointTopologyEditorDialog({
             ].join(' ')}
           >
             {legendOpen ? (
-              <div className="max-w-[240px] rounded-lg border border-zinc-600/80 bg-zinc-950/90 px-2.5 py-2 shadow-lg backdrop-blur-sm">
+              <div className="max-w-[240px] rounded-lg border border-zinc-600/80 bg-surface-sub-background px-2.5 py-2 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold text-zinc-200">{t('mapEditor.pointTopology.legendTitle')}</p>
-                  <button
-                    type="button"
-                    className="rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
-                    onClick={() => setLegendOpen(false)}
-                  >
-                    {t('mapEditor.pointTopology.collapse')}
-                  </button>
+                  <p className="text-caption-2 text-text-primary">{t('mapEditor.pointTopology.legendTitle')}</p>
+                  <Button hierarchy="subordinate" variant="standard" onPress={() => setLegendOpen(false)}>{t('mapEditor.pointTopology.collapse')}</Button>
                 </div>
-                <ul className="mt-1.5 space-y-1 text-[10px] leading-snug text-zinc-400">
+                <ul className="mt-1.5 space-y-1 text-caption-2 text-text-tertiary">
                   <li className="flex items-start gap-1.5">
                     <span
                       className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
@@ -2098,21 +2062,14 @@ export function PointTopologyEditorDialog({
                 </ul>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setLegendOpen(true)}
-                className="rounded-md border border-zinc-600/80 bg-zinc-950/85 px-2 py-1 text-[10px] font-medium text-zinc-300 shadow-lg backdrop-blur-sm hover:border-zinc-500 hover:text-zinc-100"
-                title={t('mapEditor.pointTopology.showLegend')}
-              >
-                {t('mapEditor.pointTopology.legend')}
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" onPress={() => setLegendOpen(true)} title={t('mapEditor.pointTopology.showLegend')}>{t('mapEditor.pointTopology.legend')}</Button>
             )}
           </div>
 
           {selectedEdge && inspectorTarget?.kind === 'edge' && inspectorTarget.id === selectedEdge.id ? (
-            <aside className="absolute right-0 top-0 z-30 flex h-full w-56 flex-col border-l border-zinc-700/80 bg-zinc-950/95 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-zinc-700/80 px-2.5 py-1.5">
-                <span className="text-[10px] font-semibold tracking-wider text-zinc-400">
+            <aside className="absolute right-0 top-0 z-30 flex h-full w-56 flex-col border-l border-border-quaternary bg-surface-popup shadow-2xl">
+              <div className="flex items-center justify-between border-b border-border-quaternary px-2.5 py-1.5">
+                <span className="text-caption-2 text-text-tertiary">
                   {isDispatchAfterServiceEdge(
                     nodeById.get(selectedEdge.fromNodeId),
                     nodeById.get(selectedEdge.toNodeId),
@@ -2120,14 +2077,7 @@ export function PointTopologyEditorDialog({
                     ? t('mapEditor.pointTopology.afterYardDispatch')
                     : t('mapEditor.pointTopology.interStation')}
                 </span>
-                <button
-                  type="button"
-                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                  onClick={() => { setSelectedEdgeId(null); setInspectorTarget(null) }}
-                  title={t('mapEditor.pointTopology.collapseSidebar')}
-                >
-                  {t('mapEditor.pointTopology.collapse')}
-                </button>
+                <Button hierarchy="subordinate" variant="text" onPress={() => { setSelectedEdgeId(null); setInspectorTarget(null) }} title={t('mapEditor.pointTopology.collapseSidebar')}>{t('mapEditor.pointTopology.collapse')}</Button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                 <EdgePropertiesForm
@@ -2233,35 +2183,29 @@ export function PointTopologyEditorDialog({
               </div>
             </aside>
           ) : selectedNode?.kind === 'facility' && inspectorTarget?.kind === 'node' && inspectorTarget.id === selectedNode.id ? (
-            <aside className="absolute right-0 top-0 z-30 flex h-full w-56 flex-col border-l border-zinc-700/80 bg-zinc-950/95 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-zinc-700/80 px-2.5 py-1.5">
-                <span className="text-[10px] font-semibold tracking-wider text-zinc-400">
+            <aside className="absolute right-0 top-0 z-30 flex h-full w-56 flex-col border-l border-border-quaternary bg-surface-popup shadow-2xl">
+              <div className="flex items-center justify-between border-b border-border-quaternary px-2.5 py-1.5">
+                <span className="text-caption-2 text-text-tertiary">
                   {t('mapEditor.pointTopology.afterYardDispatch')}
                 </span>
-                <button
-                  type="button"
-                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                  onClick={() => { setSelectedNodeId(null); setInspectorTarget(null) }}
-                >
-                  {t('mapEditor.pointTopology.collapse')}
-                </button>
+                <Button hierarchy="subordinate" variant="text" onPress={() => { setSelectedNodeId(null); setInspectorTarget(null) }}>{t('mapEditor.pointTopology.collapse')}</Button>
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2.5">
                 <div>
-                  <p className="text-[11px] font-medium text-zinc-100">
+                  <p className="text-body-xs-bold text-text-primary">
                     {nodeDisplayLabel(selectedNode.id, selectedNode.label)}
                   </p>
                   {areaNameByNodeId.get(selectedNode.id) ? (
-                    <p className="mt-0.5 text-[10px] text-cyan-400">
+                    <p className="mt-0.5 text-caption-2 text-text-theme">
                       {t('mapEditor.pointTopology.areaPrefix', { name: areaNameByNodeId.get(selectedNode.id) })}
                     </p>
                   ) : null}
-                  <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
+                  <p className="mt-0.5 text-caption-2 text-text-quaternary">
                     {t('mapEditor.pointTopology.dispatchWhere')}
                   </p>
                 </div>
                 <label className="block space-y-1">
-                  <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.dispatchDocking')}</span>
+                  <span className="text-caption-2 text-text-quaternary">{t('mapEditor.pointTopology.dispatchDocking')}</span>
                   <SiteSelect
                     value={selectedFacilityDispatchId ?? ''}
                     onChange={(event) => {
@@ -2270,7 +2214,7 @@ export function PointTopologyEditorDialog({
                         setFacilityDispatchDocking(prev, selectedNode.id, nextId),
                       )
                     }}
-                    className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500"
+                    size="sm" className="w-full"
                   >
                     <option value="">{t('mapEditor.pointTopology.notAssigned')}</option>
                     {dockingNodes.map((node) => (
@@ -2281,17 +2225,17 @@ export function PointTopologyEditorDialog({
                   </SiteSelect>
                 </label>
                 {dockingNodes.length === 0 ? (
-                  <p className="text-[10px] leading-snug text-amber-300/90">
+                  <p className="text-caption-2 text-amber-300/90">
                     {t('mapEditor.pointTopology.needDockingFirst')}
                   </p>
                 ) : selectedFacilityDispatchId ? (
-                  <p className="text-[10px] leading-snug text-lime-200/80">
+                  <p className="text-caption-2 text-lime-200/80">
                     {t('mapEditor.pointTopology.assignedDispatch', {
                       label: labelForTopologyNode(draft, selectedFacilityDispatchId, areas),
                     })}
                   </p>
                 ) : (
-                  <p className="text-[10px] leading-snug text-zinc-500">
+                  <p className="text-caption-2 text-text-quaternary">
                     {t('mapEditor.pointTopology.dragFromGreen')}
                   </p>
                 )}
@@ -2300,51 +2244,22 @@ export function PointTopologyEditorDialog({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-zinc-700/80 px-3 py-2">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border-quaternary px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              disabled={!canUndo}
-              onClick={undoDraft}
-              title={t('mapEditor.pointTopology.undoTitle')}
-              className="rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
-            >
-              {t('mapEditor.pointTopology.undo')}
-            </button>
-            <button
-              type="button"
-              disabled={!canRedo}
-              onClick={redoDraft}
-              title={t('mapEditor.pointTopology.redoTitle')}
-              className="rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
-            >
-              {t('mapEditor.pointTopology.redo')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" disabled={!canUndo} onPress={undoDraft} title={t('mapEditor.pointTopology.undoTitle')}>{t('mapEditor.pointTopology.undo')}</Button>
+            <Button hierarchy="subordinate" variant="outlined" disabled={!canRedo} onPress={redoDraft} title={t('mapEditor.pointTopology.redoTitle')}>{t('mapEditor.pointTopology.redo')}</Button>
             {hasInvalidTravelTimes ? (
-              <p className="min-w-0 text-[10px] leading-snug text-red-300/95">
+              <p className="min-w-0 text-caption-2 text-red-300/95">
                 {t('mapEditor.pointTopology.invalidTravel', { count: invalidTravelEdges.length })}
               </p>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-700"
-            >
-              {t('mapEditor.pointTopology.cancel')}
-            </button>
-            <button
-              type="button"
-              disabled={hasInvalidTravelTimes}
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" onPress={onClose}>{t('mapEditor.pointTopology.cancel')}</Button>
+            <Button hierarchy="subordinate" variant="outlined" disabled={hasInvalidTravelTimes} onPress={() => {
                 if (hasInvalidTravelTimes) return
                 onApply(draft)
-              }}
-              className="rounded-md border border-cyan-600 bg-cyan-950/80 px-3 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-900/80 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-500"
-            >
-              {t('mapEditor.pointTopology.apply')}
-            </button>
+              }}>{t('mapEditor.pointTopology.apply')}</Button>
           </div>
         </div>
       </div>
@@ -2418,21 +2333,21 @@ function EdgePropertiesForm({
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[11px] font-medium text-zinc-200">
+        <p className="text-body-xs-bold text-text-primary">
           {fromLabel}
-          <span className="mx-1 text-cyan-400">→</span>
+          <span className="mx-1 text-text-theme">→</span>
           {toLabel}
         </p>
         {roleHint ? (
-          <p className="mt-1 text-[10px] leading-snug text-zinc-400">{roleHint}</p>
+          <p className="mt-1 text-caption-2 text-text-tertiary">{roleHint}</p>
         ) : null}
-        <p className="mt-0.5 font-mono text-[10px] text-zinc-600">{edge.id}</p>
+        <p className="mt-0.5 font-mono text-caption-2 text-text-disabled">{edge.id}</p>
       </div>
       {!readOnly ? (
         <div className="space-y-1">
           {isBidirectional ? (
             <>
-              <div className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-center text-xs font-medium text-emerald-200">
+              <div className="w-full rounded-lg border border-status-success-light bg-emerald-950/40 px-3 py-2 text-center text-body-xs-bold text-status-success">
                 {t('mapEditor.pointTopology.bidirectional')}
               </div>
               {oppositeEdge ? (
@@ -2442,10 +2357,10 @@ function EdgePropertiesForm({
                   const oppositeHasTime = known(oppositeEdge.avgTravelTimeSeconds) || known(oppositeEdge.minTravelTimeSeconds)
                   return (
                     <div
-                      className={`rounded-lg border px-2.5 py-2 text-[11px] leading-snug ${
+                      className={`rounded-lg border px-2.5 py-2 text-body-xs leading-snug ${
                         oppositeHasTime
-                          ? 'border-zinc-700 bg-zinc-900/60 text-zinc-300'
-                          : 'border-amber-600/60 bg-amber-950/40 text-amber-200'
+                          ? 'border-border-quaternary bg-surface-primary text-text-secondary'
+                          : 'border-status-warning-light bg-amber-950/40 text-status-warning'
                       }`}
                     >
                       <p>
@@ -2456,73 +2371,39 @@ function EdgePropertiesForm({
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {onSelectOpposite ? (
-                          <button type="button" onClick={onSelectOpposite} className="rounded border border-zinc-600 px-2 py-0.5 text-zinc-200 hover:bg-zinc-800">
-                            編輯對向這一條
-                          </button>
+                          <Button hierarchy="subordinate" variant="outlined" onPress={onSelectOpposite}>編輯對向這一條</Button>
                         ) : null}
                         {!oppositeHasTime && onCopyTimesToOpposite ? (
-                          <button type="button" onClick={onCopyTimesToOpposite} className="rounded border border-amber-600/70 px-2 py-0.5 text-amber-100 hover:bg-amber-900/40">
-                            對向沿用這一條的時間與距離
-                          </button>
+                          <Button hierarchy="subordinate" variant="outlined" onPress={onCopyTimesToOpposite}>對向沿用這一條的時間與距離</Button>
                         ) : null}
                       </div>
                     </div>
                   )
                 })()
               ) : null}
-              <button
-                type="button"
-                onClick={onRemoveOpposite}
-                title={t('mapEditor.pointTopology.makeUnidirectionalTitle')}
-                className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
-              >
-                {t('mapEditor.pointTopology.makeUnidirectional')}
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" className="w-full" onPress={onRemoveOpposite} title={t('mapEditor.pointTopology.makeUnidirectionalTitle')}>{t('mapEditor.pointTopology.makeUnidirectional')}</Button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={onMakeBidirectional}
-              title={t('mapEditor.pointTopology.makeBidirectionalTitle')}
-              className="w-full rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-900/50"
-            >
-              {t('mapEditor.pointTopology.makeBidirectional', { to: toLabel, from: fromLabel })}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" onPress={onMakeBidirectional} title={t('mapEditor.pointTopology.makeBidirectionalTitle')}>{t('mapEditor.pointTopology.makeBidirectional', { to: toLabel, from: fromLabel })}</Button>
           )}
-          <button
-            type="button"
-            disabled={!canReverse}
-            onClick={onReverse}
-            title={
+          <Button hierarchy="subordinate" variant="outlined" className="w-full" disabled={!canReverse} onPress={onReverse} title={
               canReverse
                 ? t('mapEditor.pointTopology.reverseTitle')
                 : t('mapEditor.pointTopology.reverseBlocked')
-            }
-            className="w-full rounded-lg border border-cyan-700/60 bg-cyan-950/40 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/40 disabled:text-zinc-500"
-          >
-            {t('mapEditor.pointTopology.reverseDirection', { from: fromLabel, to: toLabel })}
-          </button>
+            }>{t('mapEditor.pointTopology.reverseDirection', { from: fromLabel, to: toLabel })}</Button>
           {!canReverse ? (
-            <p className="text-[10px] leading-snug text-amber-300/80">
+            <p className="text-caption-2 text-amber-300/80">
               {t('mapEditor.pointTopology.reverseBlockedHint')}
             </p>
           ) : null}
-          <button
-            type="button"
-            disabled={!customBend}
-            onClick={onResetBend}
-            title={customBend ? t('mapEditor.pointTopology.clearBendTitle') : t('mapEditor.pointTopology.noBendTitle')}
-            className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
-          >
-            {t('mapEditor.pointTopology.resetBend')}
-          </button>
-          <p className="text-[10px] leading-snug text-zinc-500">
+          <Button hierarchy="subordinate" variant="outlined" className="w-full" disabled={!customBend} onPress={onResetBend} title={customBend ? t('mapEditor.pointTopology.clearBendTitle') : t('mapEditor.pointTopology.noBendTitle')}>{t('mapEditor.pointTopology.resetBend')}</Button>
+          <p className="text-caption-2 text-text-quaternary">
             {t('mapEditor.pointTopology.bendHint')}
           </p>
         </div>
       ) : null}
       <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.minTime')}</span>
+        <span className="text-caption-2 text-text-quaternary">{t('mapEditor.pointTopology.minTime')}</span>
         <input
           type="number"
           min={0}
@@ -2532,11 +2413,11 @@ function EdgePropertiesForm({
           onChange={(event) =>
             onChange({ minTravelTimeSeconds: parseOptionalNumber(event.target.value) })
           }
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+          className="w-full rounded-md border border-border-quaternary bg-surface-primary px-2 py-1.5 text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
         />
       </label>
       <label className="block space-y-1">
-        <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.avgTime')}</span>
+        <span className="text-caption-2 text-text-quaternary">{t('mapEditor.pointTopology.avgTime')}</span>
         <input
           type="number"
           min={0}
@@ -2546,20 +2427,20 @@ function EdgePropertiesForm({
           onChange={(event) =>
             onChange({ avgTravelTimeSeconds: parseOptionalNumber(event.target.value) })
           }
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+          className="w-full rounded-md border border-border-quaternary bg-surface-primary px-2 py-1.5 text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
         />
       </label>
       {edge.minTravelTimeSeconds != null
         && edge.avgTravelTimeSeconds != null
         && edge.minTravelTimeSeconds > edge.avgTravelTimeSeconds ? (
-        <p className="text-[10px] leading-snug text-red-300/95">
+        <p className="text-caption-2 text-red-300/95">
           {t('mapEditor.pointTopology.minGtAvg')}
         </p>
       ) : null}
       <div className="space-y-1">
         <div className="flex items-end justify-between gap-2">
           <label className="min-w-0 flex-1 space-y-1">
-            <span className="text-[10px] text-zinc-500">{t('mapEditor.pointTopology.distance')}</span>
+            <span className="text-caption-2 text-text-quaternary">{t('mapEditor.pointTopology.distance')}</span>
             <input
               type="number"
               min={0}
@@ -2570,14 +2451,11 @@ function EdgePropertiesForm({
                 setSimEstimateHint(null)
                 onChange({ distanceMeters: parseOptionalNumber(event.target.value) })
               }}
-              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+              className="w-full rounded-md border border-border-quaternary bg-surface-primary px-2 py-1.5 text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
             />
           </label>
           {!readOnly && onEstimateSimDistance ? (
-            <button
-              type="button"
-              title={t('mapEditor.pointTopology.simEstimateTitle')}
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" className="shrink-0" title={t('mapEditor.pointTopology.simEstimateTitle')} onPress={() => {
                 const est = onEstimateSimDistance()
                 if (!est) {
                   setSimEstimateHint(t('mapEditor.pointTopology.simEstimateMiss'))
@@ -2590,25 +2468,15 @@ function EdgePropertiesForm({
                     route: est.routeDisplayName,
                   }),
                 )
-              }}
-              className="shrink-0 rounded-md border border-cyan-700/70 bg-cyan-950/50 px-2 py-1.5 text-[10px] font-medium text-cyan-100 transition hover:bg-cyan-900/60"
-            >
-              {t('mapEditor.pointTopology.simEstimate')}
-            </button>
+              }}>{t('mapEditor.pointTopology.simEstimate')}</Button>
           ) : null}
         </div>
         {simEstimateHint ? (
-          <p className="text-[10px] leading-snug text-zinc-500">{simEstimateHint}</p>
+          <p className="text-caption-2 text-text-quaternary">{simEstimateHint}</p>
         ) : null}
       </div>
       {!readOnly ? (
-        <button
-          type="button"
-          onClick={onDelete}
-          className="w-full rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-xs font-medium text-red-200 hover:bg-red-900/60"
-        >
-          {t('mapEditor.pointTopology.deleteEdge')}
-        </button>
+        <Button hierarchy="danger" variant="outlined" className="w-full" onPress={onDelete}>{t('mapEditor.pointTopology.deleteEdge')}</Button>
       ) : null}
     </div>
   )

@@ -20,6 +20,7 @@ import { organizeRoutesByGroups } from '../utils/routeGroupPlanning'
 import { stationDisplayLabel, formatRouteTravelTimeSummary } from '../utils/routePlanning'
 import type { PointTopology } from '../types/pointTopology'
 import { buildTopologyRouteTravelBreakdown } from '../utils/topologyRouteTravel'
+import { Button, IconButton } from '../../../components/ui';
 
 type Props = {
   areas: MapAreaObject[]
@@ -117,60 +118,31 @@ function RowActionsMenu({
 
   return (
     <div ref={rootRef} className="relative shrink-0 self-start">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpenMenu(menuKey)
-        }}
-        title={t('mapEditor.routeGroupList.moreActions')}
-        className="flex items-center justify-center rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-      >
-        <MoreHorizontal className="size-3.5" />
-      </button>
+      <IconButton size="small" hierarchy="subordinate" variant="standard" ref={buttonRef} onPress={(e) => {
+     e.stopPropagation()
+     onOpenMenu(menuKey)
+    }} title={t('mapEditor.routeGroupList.moreActions')} label={t('mapEditor.routeGroupList.moreActions')} icon={<MoreHorizontal />} />
       {open && menuPos
         ? createPortal(
             <div
               ref={portalRef}
-              className="fixed z-[12000] w-max overflow-hidden rounded-md border border-zinc-600 bg-zinc-950 py-0.5 shadow-xl"
+              className="fixed z-[12000] w-max overflow-hidden rounded-md border border-border-tertiary bg-surface-sub-background py-0.5 shadow-xl"
               style={{ top: menuPos.top, right: menuPos.right }}
             >
-              <button
-                type="button"
-                onClick={() => {
+              <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => {
                   onCloseMenu()
                   onEdit()
-                }}
-                className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
-              >
-                <Pencil className="size-3 shrink-0 text-zinc-400" />
-                {t('mapEditor.routeGroupList.edit')}
-              </button>
+                }}>{t('mapEditor.routeGroupList.edit')}</Button>
               {onEditSimRoutePath ? (
-                <button
-                  type="button"
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Route />} onPress={() => {
                     onCloseMenu()
                     onEditSimRoutePath()
-                  }}
-                  className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-zinc-200 hover:bg-zinc-800"
-                >
-                  <Route className="size-3 shrink-0 text-sky-400" />
-                  {t('mapEditor.routeGroupList.editSimRoutePath')}
-                </button>
+                  }}>{t('mapEditor.routeGroupList.editSimRoutePath')}</Button>
               ) : null}
-              <button
-                type="button"
-                onClick={() => {
+              <Button hierarchy="danger" variant="text" className="w-full" leadingIcon={<Trash2 />} onPress={() => {
                   onCloseMenu()
                   onDelete()
-                }}
-                className="flex w-full items-center gap-1.5 whitespace-nowrap px-2 py-1 text-left text-[11px] text-red-300 hover:bg-red-950/40"
-              >
-                <Trash2 className="size-3 shrink-0 text-red-400" />
-                {t('mapEditor.routeGroupList.delete')}
-              </button>
+                }}>{t('mapEditor.routeGroupList.delete')}</Button>
             </div>,
             document.body,
           )
@@ -248,8 +220,8 @@ function RouteRow({
         'ml-3 flex items-stretch gap-1 rounded-md border',
         topologyAvailable
           ? isVisible
-            ? 'border-cyan-500/30 bg-zinc-950/30'
-            : 'border-zinc-800/80 bg-zinc-950/30'
+            ? 'border-cyan-500/30 bg-black-30'
+            : 'border-border-quaternary bg-black-30'
           : 'border-amber-800/40 bg-amber-950/15',
       ].join(' ')}
       title={
@@ -274,10 +246,10 @@ function RouteRow({
         className={[
           'flex shrink-0 items-center justify-center rounded-l-md px-2 transition-colors',
           !topologyAvailable
-            ? 'cursor-not-allowed text-zinc-500'
+            ? 'cursor-not-allowed text-text-quaternary'
             : isVisible
-              ? 'text-cyan-300 hover:bg-cyan-950/40'
-              : 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300',
+              ? 'text-text-theme hover:bg-cyan-950/40'
+              : 'text-text-disabled hover:bg-surface-secondary hover:text-text-secondary',
         ].join(' ')}
       >
         {isVisible && topologyAvailable ? (
@@ -288,18 +260,18 @@ function RouteRow({
       </button>
       <div className="min-w-0 flex-1 py-2 pr-1">
         <div className="flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 truncate text-[11px] font-medium text-zinc-100">
+          <p className="min-w-0 truncate text-body-xs-bold text-text-primary">
             {route.displayName}
           </p>
           {!topologyAvailable ? (
-            <span className="shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-1 py-px text-[8px] font-semibold tracking-wide text-amber-200">
+            <span className="shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-1 py-px text-[8px] font-semibold tracking-wide text-status-warning">
               {t('mapEditor.routeGroupList.unavailableBadge')}
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-[10px] text-zinc-400">{pathLabel}</p>
+        <p className="mt-0.5 truncate text-caption-2 text-text-tertiary">{pathLabel}</p>
         {timeSummary && topologyAvailable ? (
-          <p className="mt-0.5 text-[9px] text-zinc-500">
+          <p className="mt-0.5 text-caption-2 text-text-quaternary">
             {timeSummary}
             {topology?.totalDistanceMeters != null
               ? ` · ${topology.totalDistanceMeters} m`
@@ -307,7 +279,7 @@ function RouteRow({
           </p>
         ) : null}
         {!topologyAvailable && unavailableDetail ? (
-          <p className="mt-0.5 text-[9px] leading-snug text-amber-200/90">
+          <p className="mt-0.5 text-caption-2 text-status-warning">
             {t('mapEditor.routeGroupList.missing', { detail: unavailableDetail })}
           </p>
         ) : null}
@@ -369,12 +341,12 @@ export function RouteGroupListView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <p className="text-[10px] leading-snug text-zinc-500">
+      <p className="text-caption-2 text-text-quaternary">
         {t('mapEditor.routeGroupList.intro')}
       </p>
 
       {isEmpty ? (
-        <p className="rounded-md border border-dashed border-zinc-700/70 px-2 py-6 text-center text-[10px] text-zinc-600">
+        <p className="rounded-md border border-dashed border-border-quaternary px-2 py-6 text-center text-caption-2 text-text-disabled">
           {t('mapEditor.routeGroupList.empty')}
           {editMode ? t('mapEditor.routeGroupList.emptyEdit') : t('mapEditor.routeGroupList.emptyView')}
         </p>
@@ -394,7 +366,7 @@ export function RouteGroupListView({
             return (
               <section
                 key={group.groupId}
-                className="overflow-hidden rounded-lg border border-zinc-700/80 bg-zinc-950/40"
+                className="overflow-hidden rounded-lg border border-border-quaternary bg-black-30"
               >
                 <div className="flex items-stretch gap-0.5">
                   <button
@@ -405,10 +377,10 @@ export function RouteGroupListView({
                     className={[
                       'flex shrink-0 items-center justify-center px-2 transition-colors disabled:cursor-default disabled:opacity-40',
                       groupVisibility === 'all'
-                        ? 'text-cyan-300 hover:bg-cyan-950/40'
+                        ? 'text-text-theme hover:bg-cyan-950/40'
                         : groupVisibility === 'partial'
                           ? 'text-cyan-300/50 hover:bg-cyan-950/30'
-                          : 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300',
+                          : 'text-text-disabled hover:bg-surface-secondary hover:text-text-secondary',
                     ].join(' ')}
                   >
                     {groupVisibility === 'none' ? (
@@ -420,14 +392,14 @@ export function RouteGroupListView({
                   <button
                     type="button"
                     onClick={() => toggleCollapsed(group.groupId)}
-                    className="flex min-w-0 flex-1 items-start gap-2 px-1 py-2.5 text-left hover:bg-zinc-900/50"
+                    className="flex min-w-0 flex-1 items-start gap-2 px-1 py-2.5 text-left hover:bg-surface-primary"
                   >
                     {open ? (
-                      <ChevronDown className="mt-0.5 size-4 shrink-0 text-zinc-500" />
+                      <ChevronDown className="mt-0.5 size-4 shrink-0 text-text-quaternary" />
                     ) : (
-                      <ChevronRight className="mt-0.5 size-4 shrink-0 text-zinc-500" />
+                      <ChevronRight className="mt-0.5 size-4 shrink-0 text-text-quaternary" />
                     )}
-                    <p className="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] font-semibold text-zinc-100">
+                    <p className="flex min-w-0 flex-1 items-center gap-1.5 text-body-xs-bold text-text-primary">
                       <FolderOpen className="size-3.5 shrink-0 text-sky-400/90" />
                       <span className="truncate">{group.displayName}</span>
                     </p>
@@ -447,9 +419,9 @@ export function RouteGroupListView({
                 </div>
 
                 {open ? (
-                  <div className="space-y-1.5 border-t border-zinc-800/80 px-2 pb-2.5 pt-2">
+                  <div className="space-y-1.5 border-t border-border-quaternary px-2 pb-2.5 pt-2">
                     {groupRoutes.length === 0 ? (
-                      <p className="px-1 py-2 text-[10px] text-zinc-600">{t('mapEditor.routeGroupList.groupEmpty')}</p>
+                      <p className="px-1 py-2 text-caption-2 text-text-disabled">{t('mapEditor.routeGroupList.groupEmpty')}</p>
                     ) : (
                       groupRoutes.map((route) => (
                         <RouteRow
@@ -471,14 +443,7 @@ export function RouteGroupListView({
                       ))
                     )}
                     {editMode ? (
-                      <button
-                        type="button"
-                        onClick={() => onStartNewRoute(group.groupId)}
-                        className="ml-3 flex w-[calc(100%-0.75rem)] items-center justify-center gap-1 rounded-md border border-dashed border-amber-600/40 py-1.5 text-[10px] text-amber-200/90 hover:bg-amber-950/30"
-                      >
-                        <Plus className="size-3" />
-                        {t('mapEditor.routeGroupList.createInGroup')}
-                      </button>
+                      <Button hierarchy="subordinate" variant="outlined" className="ml-3 w-[calc(100%-0.75rem)]" leadingIcon={<Plus />} onPress={() => onStartNewRoute(group.groupId)}>{t('mapEditor.routeGroupList.createInGroup')}</Button>
                     ) : null}
                   </div>
                 ) : null}
@@ -487,8 +452,8 @@ export function RouteGroupListView({
           })}
 
           {ungrouped.length > 0 ? (
-            <section className="rounded-lg border border-dashed border-zinc-700/80 bg-zinc-950/20 p-2.5">
-              <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <section className="rounded-lg border border-dashed border-border-quaternary bg-zinc-950/20 p-2.5">
+              <p className="mb-2 flex items-center gap-1.5 text-caption-2 uppercase text-text-quaternary">
                 <GitBranch className="size-3.5" />
                 {t('mapEditor.routeGroupList.ungrouped')}
               </p>
@@ -519,27 +484,13 @@ export function RouteGroupListView({
 
       {editMode ? (
         <div className="flex shrink-0 flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={onStartNewGroup}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-sky-600/50 bg-sky-950/30 px-3 py-2 text-[11px] font-medium text-sky-200 hover:bg-sky-900/40"
-          >
-            <Plus className="size-4" />
-            {t('mapEditor.routeGroupList.addGroup')}
-          </button>
+          <Button variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={onStartNewGroup}>{t('mapEditor.routeGroupList.addGroup')}</Button>
           {routeGroups.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => onStartNewRoute(null)}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-950/40 px-3 py-2 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50"
-            >
-              <Plus className="size-4" />
-              {t('mapEditor.routeGroupList.createUngrouped')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={() => onStartNewRoute(null)}>{t('mapEditor.routeGroupList.createUngrouped')}</Button>
           ) : null}
         </div>
       ) : (
-        <p className="shrink-0 rounded-md border border-zinc-700/70 bg-zinc-950/50 px-2.5 py-2 text-center text-[10px] text-zinc-500">
+        <p className="shrink-0 rounded-md border border-border-quaternary bg-black-30 px-2.5 py-2 text-center text-caption-2 text-text-quaternary">
           {t('mapEditor.routeGroupList.enterEdit')}
         </p>
       )}

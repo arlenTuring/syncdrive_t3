@@ -73,13 +73,13 @@ export const TrajectoryRawDataList = memo(function TrajectoryRawDataList({
               else rowRefs.current.delete(originalIndex)
             }}
             onClick={() => onSeekToIndex(originalIndex)}
-            className={`mb-1 w-full rounded border px-1.5 py-1 text-left font-mono text-[10px] leading-snug break-all transition enabled:cursor-pointer enabled:hover:border-zinc-500 enabled:hover:bg-zinc-800/80 ${
+            className={`mb-1 w-full rounded border px-1.5 py-1 text-left font-mono text-caption-2 leading-snug break-all transition enabled:cursor-pointer enabled:hover:border-border-primary enabled:hover:bg-surface-secondary ${
               active
-                ? 'border-amber-400/70 bg-amber-950/50 text-zinc-100'
-                : 'border-zinc-700/50 bg-zinc-950/80 text-zinc-400'
+                ? 'border-amber-400/70 bg-amber-950/50 text-text-primary'
+                : 'border-border-quaternary bg-surface-sub-background text-text-tertiary'
             }`}
           >
-            <span className="mr-1 text-zinc-500">#{originalIndex}</span>
+            <span className="mr-1 text-text-quaternary">#{originalIndex}</span>
             {line}
           </button>
         )

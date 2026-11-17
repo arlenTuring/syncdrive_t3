@@ -13,6 +13,7 @@ import {
   type MapRevisionReason,
 } from '../utils/mapRevisionHistory'
 import { systemConfirm } from '../../../lib/systemDialog'
+import { Button } from '../../../components/ui';
 
 type MapRevisionHistoryDialogProps = {
   open: boolean
@@ -138,40 +139,34 @@ export function MapRevisionHistoryDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="map-revision-history-title"
     >
-      <div className="flex max-h-[min(90vh,40rem)] w-full max-w-lg flex-col rounded-xl border border-zinc-600 bg-zinc-900 shadow-2xl">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-700 px-5 py-4">
+      <div className="flex max-h-[min(90vh,40rem)] w-full max-w-lg flex-col rounded-xl border border-border-tertiary bg-surface-primary shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border-quaternary px-5 py-4">
           <div>
             <h2
               id="map-revision-history-title"
-              className="flex items-center gap-2 text-lg font-semibold text-zinc-100"
+              className="flex items-center gap-2 text-headline-5 text-text-primary"
             >
-              <History className="size-5 text-cyan-400" aria-hidden />
+              <History className="size-5 text-text-theme" aria-hidden />
               {t('mapEditor.revision.title')}
             </h2>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            <p className="mt-1 text-body-xs text-text-tertiary">
               {t('mapEditor.revision.hint', { max: MAX_REVISIONS_PER_MAP })}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
-          >
-            {t('common.close')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onClose}>{t('common.close')}</Button>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 px-5 py-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-quaternary px-5 py-3">
           <button
             type="button"
             onClick={() => void handleBookmark()}
             disabled={bookmarking}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/70 bg-cyan-950/50 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-900/60 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/70 bg-cyan-950/50 px-3 py-1.5 text-body-xs-bold text-cyan-100 hover:bg-cyan-900/60 disabled:opacity-50"
           >
             {bookmarking ? (
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -180,33 +175,26 @@ export function MapRevisionHistoryDialog({
             )}
             {t('mapEditor.revision.bookmark')}
           </button>
-          <button
-            type="button"
-            onClick={() => void handleClearAll()}
-            disabled={items.length === 0 || loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
-          >
-            {t('mapEditor.revision.clearAll')}
-          </button>
-          <span className="ml-auto text-[11px] text-zinc-500">
+          <Button hierarchy="subordinate" variant="outlined" onPress={() => void handleClearAll()} disabled={items.length === 0 || loading}>{t('mapEditor.revision.clearAll')}</Button>
+          <span className="ml-auto text-body-xs text-text-quaternary">
             {items.length} / {MAX_REVISIONS_PER_MAP}
           </span>
         </div>
 
         {error && (
-          <p className="shrink-0 px-5 pt-3 text-xs text-amber-300" role="alert">
+          <p className="shrink-0 px-5 pt-3 text-body-xs text-status-warning" role="alert">
             {error}
           </p>
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {loading && items.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-zinc-400">
+            <div className="flex items-center justify-center gap-2 py-12 text-body-s text-text-tertiary">
               <Loader2 className="size-4 animate-spin" aria-hidden />
               {t('common.loading')}
             </div>
           ) : items.length === 0 ? (
-            <p className="px-2 py-10 text-center text-sm text-zinc-500">
+            <p className="px-2 py-10 text-center text-body-s text-text-quaternary">
               {t('mapEditor.revision.empty')}
             </p>
           ) : (
@@ -214,14 +202,14 @@ export function MapRevisionHistoryDialog({
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="rounded-lg border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5"
+                  className="rounded-lg border border-border-quaternary bg-black-30 px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-100">
+                      <p className="truncate text-body-s-bold text-text-primary">
                         {item.label}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                      <p className="mt-0.5 text-body-xs text-text-quaternary">
                         {reasonLabel(item.reason)} ·{' '}
                         {formatRevisionByteSize(item.byteSize)} ·{' '}
                         {t('mapEditor.revision.summary', {
@@ -237,7 +225,7 @@ export function MapRevisionHistoryDialog({
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void handleRestore(item.id)}
-                        className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-body-xs text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
                         title={t('mapEditor.revision.restoreTitle')}
                       >
                         {busyId === item.id ? (
@@ -254,7 +242,7 @@ export function MapRevisionHistoryDialog({
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void handleDelete(item.id)}
-                        className="inline-flex items-center rounded-md border border-zinc-600 bg-zinc-800 p-1.5 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 disabled:opacity-50"
+                        className="inline-flex items-center rounded-md border border-border-tertiary bg-surface-secondary p-1.5 text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary disabled:opacity-50"
                         title={t('mapEditor.revision.deleteTitle')}
                       >
                         <Trash2 className="size-3.5" aria-hidden />

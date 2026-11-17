@@ -10,12 +10,12 @@ import { dataSourceSelectionPatch, describeWidgetDataLineage } from '../utils/wi
 import { getRowSourceMetadata } from '../utils/rowRules';
 import { getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
 
-const inputCls = `w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
-const readonlyCls = `${inputCls} bg-zinc-950/60 text-zinc-300 font-mono`;
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+const readonlyCls = `${inputCls} bg-black-30 text-text-secondary font-mono`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1"><label className="block text-zinc-500 text-[10px] uppercase font-bold tracking-tight">{label}</label>{children}</div>;
+  return <div className="space-y-1"><label className="block text-text-quaternary text-caption-2 uppercase">{label}</label>{children}</div>;
 }
 
 export interface WidgetDataBindingContextValue {
@@ -70,9 +70,9 @@ function InheritedSource({ source, mode, fields }: { source: GroupDataSource; mo
   const label = source.label || source.id || '群組來源';
   return (
     <div className="space-y-2 rounded-md border border-purple-700/40 bg-purple-950/20 p-2.5">
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+      <div className="flex flex-wrap items-center gap-1.5 text-caption-2">
         <span className="rounded bg-purple-500/20 px-1.5 py-0.5 font-bold text-purple-200">繼承群組</span>
-        <span className="text-zinc-300">{label}</span><span className="text-zinc-500">基礎資料</span>
+        <span className="text-text-secondary">{label}</span><span className="text-text-quaternary">基礎資料</span>
       </div>
       {mode === 'sql' && <><ReadonlyValue label="SQL 資料來源" value={sourceName(source.dataSourceId)} /><ReadonlyValue label="SQL 查詢" value={source.sqlQuery ?? ''} multiline /></>}
       {mode === 'mqtt' && <><ReadonlyValue label="MQTT 資料來源" value={sourceName(source.mqttDataSourceId)} /><ReadonlyValue label="MQTT Topic" value={source.mqttTopic ?? ''} /><ReadonlyValue label="JSON Path" value={source.mqttValuePath ?? ''} /></>}
@@ -90,9 +90,9 @@ function PostProcessMqtt({ source, fields }: { source: GroupDataSource; fields: 
   if (inputs.length === 0) return null;
   return (
     <div className="space-y-2 rounded-md border border-cyan-700/40 bg-cyan-950/20 p-2.5">
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+      <div className="flex flex-wrap items-center gap-1.5 text-caption-2">
         <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-bold text-cyan-200">即時覆寫</span>
-        <span className="text-zinc-300">後處理：{definition.label}</span>
+        <span className="text-text-secondary">後處理：{definition.label}</span>
       </div>
       <ReadonlyValue label="MQTT 資料來源" value={sourceName(definition.mqtt.dataSourceId)} />
       <ReadonlyValue label="MQTT Topic" value={definition.mqtt.topic} />
@@ -141,36 +141,36 @@ export function WidgetDataBindingSettings({ w, onUpdate }: { w: WidgetDataBindin
     : null;
 
   return (
-    <div className="border border-zinc-800 rounded-lg p-3 space-y-3 bg-zinc-900/50">
-      {!hasOwn && !hasInherited && <div className="rounded border border-zinc-700 bg-zinc-950/50 px-2.5 py-2 text-[10px] text-zinc-400">未綁定／固定內容</div>}
-      {context?.group && <div className={`text-[10px] ${context.error ? (context.stale ? 'text-amber-300' : 'text-red-300') : 'text-zinc-500'}`}>
+    <div className="border border-border-quaternary rounded-lg p-3 space-y-3 bg-surface-primary">
+      {!hasOwn && !hasInherited && <div className="rounded border border-border-quaternary bg-black-30 px-2.5 py-2 text-caption-2 text-text-tertiary">未綁定／固定內容</div>}
+      {context?.group && <div className={`text-caption-2 ${context.error ? (context.stale ? 'text-status-warning' : 'text-status-error-emphasis') : 'text-text-quaternary'}`}>
         {context.error ? `${context.stale ? '本次更新失敗，保留上次資料' : '連線失敗'}：${context.error}` : context.loading ? '正在讀取群組資料…' : !context.previewRow ? '目前無資料（已保留綁定設定）' : '已自動使用目前樣板的真實資料列'}
       </div>}
 
-      <div className="flex gap-1 bg-zinc-800 p-0.5 rounded-md">
+      <div className="flex gap-1 bg-surface-secondary p-0.5 rounded-md">
         {(['sql', 'mqtt', 'rest'] as const).map((item) => {
           const active = item === 'sql' ? ownSql || inheritedByMode.sql.length > 0 : item === 'mqtt' ? ownMqtt || inheritedByMode.mqtt.length > 0 || postProcessSources.length > 0 : ownRest || inheritedByMode.rest.length > 0;
-          return <button key={item} type="button" onClick={() => setModeChoice({ key: bindingKey, mode: item })} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase transition-all ${mode === item ? 'bg-cyan-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>{item}{active ? ' •' : ''}</button>;
+          return <button key={item} type="button" onClick={() => setModeChoice({ key: bindingKey, mode: item })} className={`flex-1 py-1 text-caption-2 rounded uppercase transition-all ${mode === item ? 'bg-cyan-600 text-text-primary' : 'text-text-quaternary hover:text-text-secondary'}`}>{item}{active ? ' •' : ''}</button>;
         })}
       </div>
 
       {mode === 'sql' && <div className="space-y-2.5">
-        {showOwnEditor && <div className="space-y-2">{ownSql && <div className="text-[10px] font-bold text-emerald-300">元件自身綁定</div>}<DataSourcePicker dataSourceId={w.dataSourceId ?? ''} sqlQuery={w.sqlQuery ?? ''} onChangeDataSource={(id) => onUpdate(dataSourceSelectionPatch('sql', id))} onChangeSqlQuery={(sqlQuery) => onUpdate({ sqlQuery })} /></div>}
+        {showOwnEditor && <div className="space-y-2">{ownSql && <div className="text-caption-2 text-status-success">元件自身綁定</div>}<DataSourcePicker dataSourceId={w.dataSourceId ?? ''} sqlQuery={w.sqlQuery ?? ''} onChangeDataSource={(id) => onUpdate(dataSourceSelectionPatch('sql', id))} onChangeSqlQuery={(sqlQuery) => onUpdate({ sqlQuery })} /></div>}
         {inheritedByMode.sql.map((source) => <InheritedSource key={source.id} source={source} mode="sql" fields={fields} />)}
-        {!showOwnEditor && inheritedByMode.sql.length === 0 && <p className="text-[10px] text-zinc-500">未設定 SQL 綁定</p>}
+        {!showOwnEditor && inheritedByMode.sql.length === 0 && <p className="text-caption-2 text-text-quaternary">未設定 SQL 綁定</p>}
       </div>}
 
       {mode === 'mqtt' && <div className="space-y-2.5">
-        {showOwnEditor && <div className="space-y-2">{ownMqtt && <div className="text-[10px] font-bold text-emerald-300">元件自身綁定</div>}<DataSourceIdSelect kind="mqtt" value={w.mqttDataSourceId ?? ''} onChange={(id) => onUpdate(dataSourceSelectionPatch('mqtt', id))} /><Field label={t('dashboard.properties.mqttTopic')}><input value={w.mqttTopic ?? ''} onChange={(event) => onUpdate({ mqttTopic: event.target.value })} className={inputCls} placeholder="未設定" /></Field><Field label={t('dashboard.properties.mqttPath')}><input value={w.mqttValuePath ?? ''} onChange={(event) => onUpdate({ mqttValuePath: event.target.value })} className={inputCls} placeholder="未設定" /></Field>{editableMqttProgressPath !== null && <Field label="MQTT 進度 JSON Path"><input value={editableMqttProgressPath} onChange={(event) => onUpdate({ mqttProgressPath: event.target.value } as Partial<WidgetDataBinding>)} className={inputCls} placeholder="未設定" /></Field>}</div>}
+        {showOwnEditor && <div className="space-y-2">{ownMqtt && <div className="text-caption-2 text-status-success">元件自身綁定</div>}<DataSourceIdSelect kind="mqtt" value={w.mqttDataSourceId ?? ''} onChange={(id) => onUpdate(dataSourceSelectionPatch('mqtt', id))} /><Field label={t('dashboard.properties.mqttTopic')}><input value={w.mqttTopic ?? ''} onChange={(event) => onUpdate({ mqttTopic: event.target.value })} className={inputCls} placeholder="未設定" /></Field><Field label={t('dashboard.properties.mqttPath')}><input value={w.mqttValuePath ?? ''} onChange={(event) => onUpdate({ mqttValuePath: event.target.value })} className={inputCls} placeholder="未設定" /></Field>{editableMqttProgressPath !== null && <Field label="MQTT 進度 JSON Path"><input value={editableMqttProgressPath} onChange={(event) => onUpdate({ mqttProgressPath: event.target.value } as Partial<WidgetDataBinding>)} className={inputCls} placeholder="未設定" /></Field>}</div>}
         {inheritedByMode.mqtt.map((source) => <InheritedSource key={source.id} source={source} mode="mqtt" fields={fields} />)}
         {postProcessSources.map((source) => <PostProcessMqtt key={`post-${source.id}`} source={source} fields={fields} />)}
-        {!showOwnEditor && inheritedByMode.mqtt.length === 0 && postProcessSources.length === 0 && <p className="text-[10px] text-zinc-500">未設定 MQTT 綁定</p>}
+        {!showOwnEditor && inheritedByMode.mqtt.length === 0 && postProcessSources.length === 0 && <p className="text-caption-2 text-text-quaternary">未設定 MQTT 綁定</p>}
       </div>}
 
       {mode === 'rest' && <div className="space-y-2.5">
-        {showOwnEditor && <div className="space-y-2">{ownRest && <div className="text-[10px] font-bold text-emerald-300">元件自身綁定</div>}<Field label={t('dashboard.properties.restUrl')}><input value={w.dataUrl ?? ''} onChange={(event) => onUpdate({ dataUrl: event.target.value })} className={inputCls} placeholder="未設定" /></Field></div>}
+        {showOwnEditor && <div className="space-y-2">{ownRest && <div className="text-caption-2 text-status-success">元件自身綁定</div>}<Field label={t('dashboard.properties.restUrl')}><input value={w.dataUrl ?? ''} onChange={(event) => onUpdate({ dataUrl: event.target.value })} className={inputCls} placeholder="未設定" /></Field></div>}
         {inheritedByMode.rest.map((source) => <InheritedSource key={source.id} source={source} mode="rest" fields={fields} />)}
-        {!showOwnEditor && inheritedByMode.rest.length === 0 && <p className="text-[10px] text-zinc-500">未設定 REST 綁定</p>}
+        {!showOwnEditor && inheritedByMode.rest.length === 0 && <p className="text-caption-2 text-text-quaternary">未設定 REST 綁定</p>}
       </div>}
 
       {fields.length > 0 && <ReadonlyValue label="元件使用欄位" value={fields.join(', ')} />}
@@ -181,9 +181,9 @@ export function WidgetDataBindingSettings({ w, onUpdate }: { w: WidgetDataBindin
           onChange={(event) => onUpdate({ valueField: event.target.value } as Partial<WidgetDataBinding>)}
           className={inputCls}
         />
-        {!editableValueField && hasInherited && <p className="text-[10px] text-zinc-500">未設定獨立欄位；目前使用上方群組列欄位。</p>}
+        {!editableValueField && hasInherited && <p className="text-caption-2 text-text-quaternary">未設定獨立欄位；目前使用上方群組列欄位。</p>}
       </Field>}
-      {hasOwn && <Field label={t('dashboard.properties.freshness')}><SiteSelect value={policy} onChange={(event) => onUpdate({ freshnessPolicy: event.target.value as FreshnessPolicy })} className={inputCls}>{FRESHNESS_POLICY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(`dashboard.properties.freshnessOpt.${option.value}`)}</option>)}</SiteSelect><p className="text-zinc-500 text-[10px] leading-snug mt-1">{t(`dashboard.properties.freshnessHint.${policy}`)}<span className="block text-zinc-600 mt-0.5">{t('dashboard.properties.freshnessCurrent', { reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams) })}</span></p>{policy === 'interval' && <input type="number" min={1} value={w.refreshInterval || 15} onChange={(event) => onUpdate({ refreshInterval: +event.target.value })} className={`${inputCls} mt-1.5`} />}</Field>}
+      {hasOwn && <Field label={t('dashboard.properties.freshness')}><SiteSelect value={policy} onChange={(event) => onUpdate({ freshnessPolicy: event.target.value as FreshnessPolicy })} className={inputCls}>{FRESHNESS_POLICY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(`dashboard.properties.freshnessOpt.${option.value}`)}</option>)}</SiteSelect><p className="text-text-quaternary text-caption-2 mt-1">{t(`dashboard.properties.freshnessHint.${policy}`)}<span className="block text-text-disabled mt-0.5">{t('dashboard.properties.freshnessCurrent', { reason: t(`dashboard.properties.freshnessReason.${fr.reasonKey}`, fr.reasonParams) })}</span></p>{policy === 'interval' && <input type="number" min={1} value={w.refreshInterval || 15} onChange={(event) => onUpdate({ refreshInterval: +event.target.value })} className={`${inputCls} mt-1.5`} />}</Field>}
     </div>
   );
 }

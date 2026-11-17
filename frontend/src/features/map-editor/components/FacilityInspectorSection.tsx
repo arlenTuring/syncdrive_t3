@@ -59,14 +59,14 @@ export function FacilityInspectorSection({
         onFieldBlur={onFieldBlur}
       />
 
-      <section className="space-y-2.5 rounded-lg border border-zinc-800/70 bg-zinc-950/45 p-3">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <section className="space-y-2.5 rounded-lg border border-border-quaternary bg-zinc-950/45 p-3">
+        <h3 className="text-caption-2 uppercase text-text-quaternary">
           設施圖示
         </h3>
         <div>
           <label
             htmlFor="facility-icon-display"
-            className="mb-1 block text-[10px] text-zinc-500"
+            className="mb-1 block text-caption-2 text-text-quaternary"
           >
             圖示顯示
           </label>
@@ -83,7 +83,7 @@ export function FacilityInspectorSection({
             }}
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-60"
+            size="sm" className="w-full"
           >
             <option value="none">不顯示</option>
             <option value="builtin">內建圖示</option>
@@ -94,7 +94,7 @@ export function FacilityInspectorSection({
           <div>
             <label
               htmlFor="facility-custom-icon-url"
-              className="mb-1 block text-[10px] text-zinc-500"
+              className="mb-1 block text-caption-2 text-text-quaternary"
             >
               圖片 URL
             </label>
@@ -110,14 +110,14 @@ export function FacilityInspectorSection({
               onFocus={onFieldFocus}
               onBlur={onFieldBlur}
               placeholder="https://… 或 /assets/…"
-              className="w-full rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+              className="w-full rounded border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
             />
           </div>
         )}
         <div>
           <label
             htmlFor="facility-remarks"
-            className="mb-1 block text-[10px] text-zinc-500"
+            className="mb-1 block text-caption-2 text-text-quaternary"
           >
             備註（滑鼠懸停顯示，選填）
           </label>
@@ -131,7 +131,7 @@ export function FacilityInspectorSection({
             }
             onFocus={onFieldFocus}
             onBlur={onFieldBlur}
-            className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-cyan-500 read-only:opacity-80"
+            className="w-full resize-y rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary outline-none focus:border-border-theme read-only:opacity-80"
           />
         </div>
       </section>

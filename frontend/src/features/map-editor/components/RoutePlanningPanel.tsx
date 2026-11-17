@@ -26,6 +26,7 @@ import {
   partitionStationsForTopologyRouteAppend,
   type TopologyRouteAppendOption,
 } from '../utils/topologyRouteTravel'
+import { Button, IconButton } from '../../../components/ui';
 
 function groupRouteAppendOptionsByKind(options: TopologyRouteAppendOption[]) {
   return {
@@ -54,7 +55,7 @@ function RouteAppendOptionGroup({
   if (options.length === 0) return null
   return (
     <div className="px-1 pb-1">
-      <p className={['px-2 py-1 text-[9px] font-semibold uppercase tracking-wider', titleClassName].join(' ')}>
+      <p className={['px-2 py-1 text-caption-2 uppercase', titleClassName].join(' ')}>
         {title}
       </p>
       {options.map((station) => (
@@ -63,10 +64,10 @@ function RouteAppendOptionGroup({
             key={station.stationId}
             className="cursor-not-allowed rounded px-2 py-1.5 opacity-45"
           >
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-body-xs text-text-quaternary">
               {station.stationName}
             </p>
-            <p className="text-[9px] text-zinc-600">
+            <p className="text-caption-2 text-text-disabled">
               {station.reason}
             </p>
           </div>
@@ -76,14 +77,14 @@ function RouteAppendOptionGroup({
             type="button"
             onClick={() => onPick(station.stationId)}
             className={[
-              'w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-zinc-800',
+              'w-full rounded px-2 py-1.5 text-left text-body-xs hover:bg-link-standard-hover',
               dropdownStationId === station.stationId
-                ? 'bg-amber-950/40 text-amber-100'
-                : 'text-zinc-100',
+                ? 'bg-amber-950/40 text-status-warning'
+                : 'text-text-primary',
             ].join(' ')}
           >
             {station.stationName}{' '}
-            <span className="font-mono text-[10px] text-zinc-500">
+            <span className="font-mono text-caption-2 text-text-quaternary">
               ({station.stationId})
             </span>
           </button>
@@ -296,17 +297,17 @@ export function RoutePlanningPanel({
           <button
             type="button"
             onClick={onCancelDraft}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-600/80 bg-zinc-950/60 px-2.5 py-2 text-left text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-100"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-600/80 bg-black-30 px-2.5 py-2 text-left text-body-xs-bold text-text-secondary transition-colors hover:border-border-primary hover:bg-surface-secondary hover:text-text-primary"
           >
             <ChevronLeft className="size-4 shrink-0" aria-hidden />
             {t('mapEditor.routePlanning.backToList')}
           </button>
 
-          <p className="text-[11px] font-semibold text-zinc-200">
+          <p className="text-body-xs-bold text-text-primary">
             {draft.routeId ? t('mapEditor.routePlanning.editRoute') : t('mapEditor.routePlanning.createRoute')}
           </p>
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-zinc-400">
+            <label className="mb-1 block text-caption-2 text-text-tertiary">
               {t('mapEditor.routePlanning.routeName')}
             </label>
             <input
@@ -315,13 +316,13 @@ export function RoutePlanningPanel({
               onChange={(e) => onDraftNameChange(e.target.value)}
               placeholder={t('mapEditor.routePlanning.namePlaceholder')}
               disabled={!editMode}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-body-xs text-text-primary placeholder:text-text-quaternary focus:border-amber-500/60 focus:outline-none"
             />
           </div>
 
           {editMode ? (
             <div className="space-y-2">
-              <label className="block text-[10px] font-medium text-zinc-400">
+              <label className="block text-caption-2 text-text-tertiary">
                 {t('mapEditor.routePlanning.addStop')}
               </label>
               <div className="flex gap-1">
@@ -329,11 +330,11 @@ export function RoutePlanningPanel({
                   <button
                     type="button"
                     onClick={() => setPickerOpen((v) => !v)}
-                    className="flex w-full items-center justify-between gap-2 rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-left text-[11px] text-zinc-100 hover:border-amber-500/50 focus:border-amber-500/60 focus:outline-none"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1.5 text-left text-body-xs text-text-primary hover:border-status-warning-light focus:border-amber-500/60 focus:outline-none"
                   >
                     <span
                       className={
-                        selectedStationLabel ? 'truncate' : 'truncate text-zinc-500'
+                        selectedStationLabel ? 'truncate' : 'truncate text-text-quaternary'
                       }
                     >
                       {selectedStationLabel ??
@@ -343,13 +344,13 @@ export function RoutePlanningPanel({
                     </span>
                     <ChevronDown
                       className={[
-                        'size-3.5 shrink-0 text-zinc-500 transition',
+                        'size-3.5 shrink-0 text-text-quaternary transition',
                         pickerOpen ? 'rotate-180' : '',
                       ].join(' ')}
                     />
                   </button>
                   {pickerOpen ? (
-                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-zinc-600 bg-zinc-950 py-1 shadow-xl [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
+                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-52 overflow-y-auto rounded-md border border-border-tertiary bg-surface-sub-background py-1 shadow-xl [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
                       {selectableStations.length > 0 ? (
                         <>
                           <RouteAppendOptionGroup
@@ -361,7 +362,7 @@ export function RoutePlanningPanel({
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.facilityDocking')}
-                            titleClassName="text-amber-400/80"
+                            titleClassName="text-status-warning"
                             options={selectableGroups.facilityDocking}
                             dropdownStationId={dropdownStationId}
                             onPick={pickStation}
@@ -383,13 +384,13 @@ export function RoutePlanningPanel({
                         </>
                       ) : null}
                       {disabledStations.length > 0 ? (
-                        <div className="border-t border-zinc-800 pt-1">
-                          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">
+                        <div className="border-t border-border-quaternary pt-1">
+                          <p className="px-2 py-1 text-caption-2 uppercase text-text-disabled">
                             {t('mapEditor.routePlanning.cannotConnect')}
                           </p>
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.docking')}
-                            titleClassName="text-zinc-600"
+                            titleClassName="text-text-disabled"
                             options={disabledGroups.docking}
                             disabled
                             dropdownStationId={dropdownStationId}
@@ -397,7 +398,7 @@ export function RoutePlanningPanel({
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.facilityDocking')}
-                            titleClassName="text-zinc-600"
+                            titleClassName="text-text-disabled"
                             options={disabledGroups.facilityDocking}
                             disabled
                             dropdownStationId={dropdownStationId}
@@ -405,7 +406,7 @@ export function RoutePlanningPanel({
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.waypoint')}
-                            titleClassName="text-zinc-600"
+                            titleClassName="text-text-disabled"
                             options={disabledGroups.waypoint}
                             disabled
                             dropdownStationId={dropdownStationId}
@@ -413,7 +414,7 @@ export function RoutePlanningPanel({
                           />
                           <RouteAppendOptionGroup
                             title={t('mapEditor.routePlanning.crossWaypoint')}
-                            titleClassName="text-zinc-600"
+                            titleClassName="text-text-disabled"
                             options={disabledGroups.crossWaypoint}
                             disabled
                             dropdownStationId={dropdownStationId}
@@ -424,24 +425,17 @@ export function RoutePlanningPanel({
                     </div>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={appendFromDropdown}
-                  disabled={!dropdownStationId}
-                  className="shrink-0 rounded-md border border-amber-500/50 bg-amber-950/40 px-2 py-1.5 text-[10px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40"
-                >
-                  {t('mapEditor.routePlanning.add')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={appendFromDropdown} disabled={!dropdownStationId}>{t('mapEditor.routePlanning.add')}</Button>
               </div>
             </div>
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
-            <p className="mb-1.5 text-[10px] font-medium text-zinc-400">
+            <p className="mb-1.5 text-caption-2 text-text-tertiary">
               {t('mapEditor.routePlanning.stationOrder', { count: draft.stationIds.length })}
             </p>
             {draft.stationIds.length === 0 ? (
-              <p className="rounded border border-dashed border-zinc-700/60 px-2 py-4 text-center text-[10px] text-zinc-600">
+              <p className="rounded border border-dashed border-border-quaternary px-2 py-4 text-center text-caption-2 text-text-disabled">
                 {t('mapEditor.routePlanning.noStations')}
               </p>
             ) : (
@@ -453,63 +447,40 @@ export function RoutePlanningPanel({
                       : null
                   return (
                     <li key={`${stationId}-${index}`} className="space-y-1">
-                      <div className="flex items-center gap-1 rounded border border-zinc-700/80 bg-zinc-950/60 px-1.5 py-1">
-                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[9px] font-bold text-amber-200">
+                      <div className="flex items-center gap-1 rounded border border-border-quaternary bg-black-30 px-1.5 py-1">
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-status-warning-light text-caption-2 text-status-warning">
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[10px] font-medium text-zinc-200">
+                          <p className="truncate text-caption-2 text-text-primary">
                             {stationDisplayLabel(areas, stationId)}
                           </p>
-                          <p className="truncate font-mono text-[9px] text-zinc-500">
+                          <p className="truncate font-mono text-caption-2 text-text-quaternary">
                             {stationId}
                           </p>
                         </div>
                         {editMode ? (
                           <div className="flex shrink-0 flex-col">
-                            <button
-                              type="button"
-                              title={t('mapEditor.routePlanning.moveUp')}
-                              disabled={index === 0}
-                              onClick={() => onMoveStation(index, index - 1)}
-                              className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-                            >
-                              <ArrowUp className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              title={t('mapEditor.routePlanning.moveDown')}
-                              disabled={index === draft.stationIds.length - 1}
-                              onClick={() => onMoveStation(index, index + 1)}
-                              className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
-                            >
-                              <ArrowDown className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              title={t('mapEditor.routePlanning.remove')}
-                              onClick={() => onRemoveStationAt(index)}
-                              className="rounded p-0.5 text-zinc-500 hover:bg-red-950/50 hover:text-red-300"
-                            >
-                              <X className="size-3" />
-                            </button>
+                            <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('mapEditor.routePlanning.moveUp')} disabled={index === 0} onPress={() => onMoveStation(index, index - 1)} label={t('mapEditor.routePlanning.moveUp')} icon={<ArrowUp />} />
+                            <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('mapEditor.routePlanning.moveDown')} disabled={index === draft.stationIds.length - 1} onPress={() => onMoveStation(index, index + 1)} label={t('mapEditor.routePlanning.moveDown')} icon={<ArrowDown />} />
+                            <IconButton size="small" hierarchy="danger" variant="standard" title={t('mapEditor.routePlanning.remove')} onPress={() => onRemoveStationAt(index)} label={t('mapEditor.routePlanning.remove')} icon={<X />} />
                           </div>
                         ) : null}
                       </div>
                       {leg ? (
                         <div
                           className={[
-                            'ml-6 rounded border px-2 py-1 text-[9px] leading-snug',
+                            'ml-6 rounded border px-2 py-1 text-caption-2',
                             leg.pathFound && leg.metricsComplete
-                              ? 'border-zinc-800 bg-zinc-950/40 text-zinc-400'
-                              : 'border-amber-800/50 bg-amber-950/20 text-amber-200/90',
+                              ? 'border-border-quaternary bg-black-30 text-text-tertiary'
+                              : 'border-amber-800/50 bg-amber-950/20 text-status-warning',
                           ].join(' ')}
                         >
                           → {stationDisplayLabel(areas, leg.toStationId)}
                           {' · '}
                           {formatTopologyLegSummary(leg)}
                           {leg.nodePath.length > 2 ? (
-                            <span className="text-zinc-600">
+                            <span className="text-text-disabled">
                               {' '}
                               {t('mapEditor.routePlanning.viaWaypoints', {
                                 count: leg.nodePath.length - 2,
@@ -532,41 +503,41 @@ export function RoutePlanningPanel({
                 'shrink-0 rounded-lg border px-3 py-2.5 transition',
                 topologyBreakdown?.timesComplete
                   ? 'border-cyan-700/50 bg-gradient-to-b from-cyan-950/40 to-zinc-950/80'
-                  : 'border-zinc-700/70 bg-zinc-950/70',
+                  : 'border-border-quaternary bg-zinc-950/70',
               ].join(' ')}
             >
               <div className="mb-2 flex items-center gap-1">
-                <p className="text-[10px] font-semibold text-zinc-200">
+                <p className="text-caption-2 text-text-primary">
                   {t('mapEditor.routePlanning.topologySumTitle')}
                 </p>
                 <span className="group relative inline-flex">
                   <button
                     type="button"
-                    className="rounded p-0.5 text-zinc-400 transition hover:text-zinc-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/60"
+                    className="rounded p-0.5 text-text-tertiary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/60"
                     aria-label={t('mapEditor.routePlanning.travelTimeHelpAria')}
                   >
                     <Info className="size-3.5" strokeWidth={2} aria-hidden />
                   </button>
                   <span
                     role="tooltip"
-                    className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-56 rounded-md border border-zinc-600 bg-zinc-900 px-2.5 py-2 text-[10px] leading-relaxed text-zinc-200 shadow-xl group-hover:block group-focus-within:block"
+                    className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-56 rounded-md border border-border-tertiary bg-surface-primary px-2.5 py-2 text-caption-2 text-text-primary shadow-xl group-hover:block group-focus-within:block"
                   >
                     <span className="block">{t('mapEditor.routePlanning.topologySumHint1')}</span>
-                    <span className="mt-1 block text-zinc-400">
+                    <span className="mt-1 block text-text-tertiary">
                       {t('mapEditor.routePlanning.topologySumHint2')}
                     </span>
                     {topologyBreakdown?.totalDistanceMeters != null ? (
-                      <span className="mt-1.5 block border-t border-zinc-700/80 pt-1.5 tabular-nums text-zinc-100">
+                      <span className="mt-1.5 block border-t border-border-quaternary pt-1.5 tabular-nums text-text-primary">
                         {t('mapEditor.routePlanning.distanceMeters', {
                           meters: topologyBreakdown.totalDistanceMeters,
                         })}
                       </span>
                     ) : (
-                      <span className="mt-1.5 block border-t border-zinc-700/80 pt-1.5 text-zinc-500">
+                      <span className="mt-1.5 block border-t border-border-quaternary pt-1.5 text-text-quaternary">
                         {t('mapEditor.routePlanning.distanceIncomplete')}
                       </span>
                     )}
-                    <span className="mt-1 block text-zinc-500">
+                    <span className="mt-1 block text-text-quaternary">
                       {t('mapEditor.routePlanning.fillTopologyHint')}
                     </span>
                   </span>
@@ -575,27 +546,27 @@ export function RoutePlanningPanel({
 
               {topologyBreakdown?.timesComplete ? (
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md bg-zinc-950/60 px-2.5 py-2">
-                    <p className="text-[9px] text-zinc-400">{t('mapEditor.routePlanning.avgTime')}</p>
-                    <p className="mt-0.5 text-base font-semibold tabular-nums text-zinc-50">
+                  <div className="rounded-md bg-black-30 px-2.5 py-2">
+                    <p className="text-caption-2 text-text-tertiary">{t('mapEditor.routePlanning.avgTime')}</p>
+                    <p className="mt-0.5 text-body-m-bold tabular-nums text-text-primary">
                       {draft.avgTravelTimeSeconds}
-                      <span className="ml-1 text-[10px] font-normal text-zinc-400">
+                      <span className="ml-1 text-caption-2 font-normal text-text-tertiary">
                         {t('mapEditor.routePlanning.seconds')}
                       </span>
                     </p>
                   </div>
-                  <div className="rounded-md bg-zinc-950/60 px-2.5 py-2">
-                    <p className="text-[9px] text-zinc-400">{t('mapEditor.routePlanning.minTime')}</p>
-                    <p className="mt-0.5 text-base font-semibold tabular-nums text-zinc-50">
+                  <div className="rounded-md bg-black-30 px-2.5 py-2">
+                    <p className="text-caption-2 text-text-tertiary">{t('mapEditor.routePlanning.minTime')}</p>
+                    <p className="mt-0.5 text-body-m-bold tabular-nums text-text-primary">
                       {draft.minTravelTimeSeconds}
-                      <span className="ml-1 text-[10px] font-normal text-zinc-400">
+                      <span className="ml-1 text-caption-2 font-normal text-text-tertiary">
                         {t('mapEditor.routePlanning.seconds')}
                       </span>
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-[10px] leading-snug text-zinc-400">
+                <p className="text-caption-2 text-text-tertiary">
                   {!topologyBreakdown?.pathsComplete
                     ? t('mapEditor.routePlanning.noTopologyCombo')
                     : t('mapEditor.routePlanning.topologyIncompleteTimes')}
@@ -604,7 +575,7 @@ export function RoutePlanningPanel({
 
               {topologyBreakdown?.timesComplete
                 && topologyBreakdown.totalDistanceMeters != null ? (
-                <p className="mt-2 text-[10px] tabular-nums text-zinc-400">
+                <p className="mt-2 text-caption-2 tabular-nums text-text-tertiary">
                   {t('mapEditor.routePlanning.distanceShort', {
                     meters: topologyBreakdown.totalDistanceMeters,
                   })}
@@ -612,35 +583,21 @@ export function RoutePlanningPanel({
               ) : null}
 
               {travelTimeInvalid ? (
-                <p className="mt-1.5 text-[9px] text-red-400">
+                <p className="mt-1.5 text-caption-2 text-status-error-emphasis">
                   {t('mapEditor.routePlanning.timeInvalid')}
                 </p>
               ) : null}
             </div>
           ) : (
-            <p className="shrink-0 rounded-lg border border-dashed border-zinc-700/70 px-3 py-2.5 text-center text-[10px] text-zinc-500">
+            <p className="shrink-0 rounded-lg border border-dashed border-border-quaternary px-3 py-2.5 text-center text-caption-2 text-text-quaternary">
               {t('mapEditor.routePlanning.needTwoStops')}
             </p>
           )}
 
           {editMode ? (
-            <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-700/80 pt-2">
-              <button
-                type="button"
-                onClick={onSaveDraft}
-                disabled={!canSave}
-                className="flex flex-1 items-center justify-center gap-1 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-2 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-40"
-              >
-                <Save className="size-3.5" />
-                {t('mapEditor.routePlanning.saveRoute')}
-              </button>
-              <button
-                type="button"
-                onClick={onCancelDraft}
-                className="rounded-md border border-zinc-600 px-2 py-1.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
-              >
-                {t('mapEditor.routePlanning.backToListShort')}
-              </button>
+            <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-border-quaternary pt-2">
+              <Button hierarchy="subordinate" variant="outlined" className="flex-1" leadingIcon={<Save />} onPress={onSaveDraft} disabled={!canSave}>{t('mapEditor.routePlanning.saveRoute')}</Button>
+              <Button hierarchy="subordinate" variant="outlined" onPress={onCancelDraft}>{t('mapEditor.routePlanning.backToListShort')}</Button>
             </div>
           ) : null}
         </div>

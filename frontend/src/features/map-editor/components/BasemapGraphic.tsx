@@ -4,6 +4,7 @@ import type { OpenDrivePlan } from '../opendrive'
 import type { BasemapWorldBounds } from '../utils/basemapGrid'
 import { BasemapContentLayer } from './BasemapContentLayer'
 import { BasemapGridOverlay } from './BasemapGridOverlay'
+import { Button } from '../../../components/ui';
 
 type Props = {
   width: number
@@ -58,19 +59,12 @@ export function BasemapGraphic({
       <div className="relative size-full overflow-hidden rounded-sm">
         {grid}
         <div className="relative z-[1] flex size-full flex-col items-center justify-center gap-2 border border-dashed border-rose-500/50 bg-rose-950/20 px-3 text-center">
-          <span className="text-xs text-rose-300">OpenDRIVE 解析失敗</span>
+          <span className="text-body-xs text-status-error-emphasis">OpenDRIVE 解析失敗</span>
           {!readOnly ? (
-            <button
-              type="button"
-              data-basemap-pick
-              onClick={(e) => {
+            <Button variant="text" data-basemap-pick onPress={(e) => {
                 e.stopPropagation()
                 onPickClick()
-              }}
-              className="text-[11px] text-cyan-300 underline"
-            >
-              重新選擇檔案
-            </button>
+              }}>重新選擇檔案</Button>
           ) : null}
         </div>
       </div>
@@ -104,13 +98,13 @@ export function BasemapGraphic({
               e.stopPropagation()
               onPickClick()
             }}
-            className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-zinc-900/90 px-2 py-1 text-[11px] text-zinc-200 shadow-md transition hover:border-cyan-500/70 hover:text-cyan-100"
+            className="absolute bottom-2 right-2 z-[2] rounded-md border border-zinc-500/80 bg-surface-primary px-2 py-1 text-body-xs text-text-primary shadow-md transition hover:border-border-theme-light hover:text-cyan-100"
           >
             更換底圖
           </button>
         ) : null}
         {xodrPlan && selected ? (
-          <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-[10px] text-zinc-400">
+          <div className="pointer-events-none absolute left-2 top-2 z-[2] rounded-md border border-zinc-600/70 bg-zinc-900/85 px-2 py-1 text-caption-2 text-text-tertiary">
             OpenDRIVE · {xodrPlan.roadCount} 道路 · {xodrPlan.laneCount} 車道
           </div>
         ) : null}
@@ -133,7 +127,7 @@ export function BasemapGraphic({
               e.stopPropagation()
               onPickClick()
             }}
-            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-zinc-200 shadow-md transition hover:border-cyan-500/70 hover:bg-zinc-700 hover:text-cyan-100"
+            className="flex items-center justify-center rounded-full border border-zinc-500/80 bg-zinc-800/90 text-text-primary shadow-md transition hover:border-border-theme-light hover:bg-link-standard-hover hover:text-cyan-100"
             style={{ width: buttonSize, height: buttonSize }}
           >
             <Plus className="size-[55%]" strokeWidth={2.25} aria-hidden />
@@ -141,12 +135,12 @@ export function BasemapGraphic({
           </button>
         ) : (
           <Image
-            className="text-zinc-600"
+            className="text-text-disabled"
             style={{ width: buttonSize * 0.55, height: buttonSize * 0.55 }}
             aria-hidden
           />
         )}
-        <span className="pointer-events-none select-none text-center text-[11px] text-zinc-500">
+        <span className="pointer-events-none select-none text-center text-body-xs text-text-quaternary">
           {readOnly ? '尚未設定底圖' : '點擊載入圖片或 .xodr'}
         </span>
       </div>

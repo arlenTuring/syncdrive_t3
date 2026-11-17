@@ -10,6 +10,7 @@ import {
 import { DataSourceIdSelect } from './DataSourceIdSelect';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
+import { Button } from '../../../components/ui';
 
 interface Props {
   dataSourceId: string;
@@ -20,8 +21,8 @@ interface Props {
   onColumnsDetected?: (cols: string[]) => void;
 }
 
-const inputCls = `w-full bg-zinc-800/80 border border-zinc-700 rounded-md px-2.5 py-1.5 text-zinc-200 text-xs
-  focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
+const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
+  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
 export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChangeDataSource, onChangeSqlQuery, onColumnsDetected }: Props) {
   const { t } = useTranslation();
@@ -110,11 +111,11 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
       {selectedDs?.type === 'internal' && dataSourceId && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-zinc-500 text-xs flex items-center gap-1">
+            <label className="text-text-quaternary text-body-xs flex items-center gap-1">
               <Table size={10} /> {t('dashboard.dataSourcePicker.selectTable')}
             </label>
             <button onClick={() => loadTables(dataSourceId)}
-              className="text-zinc-600 hover:text-zinc-400 transition-colors">
+              className="text-text-disabled hover:text-text-tertiary transition-colors">
               <RefreshCw size={10} className={loadingTables ? 'animate-spin' : ''} />
             </button>
           </div>
@@ -123,19 +124,19 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
           <div className="relative">
             <button
               onClick={() => setShowTableMenu(v => !v)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/80 border border-zinc-700
-                         rounded-md text-xs text-zinc-400 hover:border-zinc-600 transition-colors"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 bg-surface-secondary border border-border-quaternary
+                         rounded-md text-body-xs text-text-tertiary hover:border-border-tertiary transition-colors"
             >
               <span>{selectedTable || (loadingTables ? t('dashboard.dataSourcePicker.loading') : t('dashboard.dataSourcePicker.chooseTable'))}</span>
               <ChevronDown size={10} />
             </button>
             {showTableMenu && tables.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-0.5 bg-zinc-800 border border-zinc-700
+              <div className="absolute top-full left-0 right-0 mt-0.5 bg-surface-secondary border border-border-quaternary
                               rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto py-1">
                 {tables.map(t => (
                   <button key={t} onClick={() => handleSelectTable(t)}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors font-mono
-                      ${selectedTable === t ? 'bg-cyan-600/20 text-cyan-300' : 'text-zinc-300 hover:bg-zinc-700'}`}>
+                    className={`w-full text-left px-3 py-1.5 text-body-xs transition-colors font-mono
+                      ${selectedTable === t ? 'bg-cyan-600/20 text-text-theme' : 'text-text-secondary hover:bg-link-standard-hover'}`}>
                     {t}
                   </button>
                 ))}
@@ -147,21 +148,14 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
           {tableSchema.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {tableSchema.slice(0, 8).map(col => (
-                <button key={col.column_name}
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="tonal" key={col.column_name} onPress={() => {
                     const cursor = (document.getElementById('sql-query-textarea') as HTMLTextAreaElement)?.selectionStart ?? sqlQuery.length;
                     const next = sqlQuery.slice(0, cursor) + col.column_name + sqlQuery.slice(cursor);
                     onChangeSqlQuery(next);
-                  }}
-                  className="px-1.5 py-0.5 rounded text-xs bg-zinc-700 text-zinc-300 font-mono
-                             hover:bg-cyan-700/40 hover:text-cyan-300 transition-colors"
-                  title={col.data_type}
-                >
-                  {col.column_name}
-                </button>
+                  }} title={col.data_type} type="submit">{col.column_name}</Button>
               ))}
               {tableSchema.length > 8 && (
-                <span className="text-zinc-600 text-xs self-center">{t('dashboard.dataSourcePicker.moreColumns', { count: tableSchema.length - 8 })}</span>
+                <span className="text-text-disabled text-body-xs self-center">{t('dashboard.dataSourcePicker.moreColumns', { count: tableSchema.length - 8 })}</span>
               )}
             </div>
           )}
@@ -171,7 +165,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
       {/* SQL 輸入框 */}
       {dataSourceId && (
         <div>
-          <label className="block text-zinc-500 text-xs mb-1">{t('dashboard.dataSourcePicker.sqlLabel')}</label>
+          <label className="block text-text-quaternary text-body-xs mb-1">{t('dashboard.dataSourcePicker.sqlLabel')}</label>
           <textarea
             id="sql-query-textarea"
             value={sqlQuery}
@@ -181,7 +175,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
             placeholder={'SELECT column1, column2\nFROM my_table\nWHERE ...\nORDER BY created_at DESC\nLIMIT 100'}
             spellCheck={false}
           />
-          <p className="text-zinc-600 text-xs mt-0.5 leading-relaxed">
+          <p className="text-text-disabled text-body-xs mt-0.5">
             {t('dashboard.dataSourcePicker.sqlHintBefore')}
             <code className="mx-0.5 text-cyan-600/90">{t('dashboard.dataSourcePicker.sqlHintCode')}</code>
             {t('dashboard.dataSourcePicker.sqlHintAfter')}
@@ -195,7 +189,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
           onClick={handlePreview}
           disabled={previewLoading}
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
-                     bg-cyan-700/25 border border-cyan-700/50 text-cyan-300 text-xs
+                     bg-cyan-700/25 border border-cyan-700/50 text-text-theme text-body-xs
                      hover:bg-cyan-700/40 disabled:opacity-50 transition-colors"
         >
           {previewLoading
@@ -207,21 +201,21 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
 
       {/* 預覽結果 */}
       {showPreview && (
-        <div className="border border-zinc-700/60 rounded-lg overflow-hidden">
+        <div className="border border-border-quaternary rounded-lg overflow-hidden">
           {previewError
             ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-red-900/20 text-red-400 text-xs">
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-900/20 text-status-error-emphasis text-body-xs">
                 <AlertCircle size={12} /> {previewError}
               </div>
             )
             : previewRows.length > 0
               ? (
                 <div className="overflow-x-auto max-h-40">
-                  <table className="w-full text-xs font-mono border-collapse">
+                  <table className="w-full text-body-xs font-mono border-collapse">
                     <thead>
                       <tr>
                         {previewCols.map(c => (
-                          <th key={c} className="px-2 py-1 text-left text-cyan-400 bg-cyan-900/20 border-b border-zinc-700/60 whitespace-nowrap">
+                          <th key={c} className="px-2 py-1 text-left text-text-theme bg-cyan-900/20 border-b border-border-quaternary whitespace-nowrap">
                             {c}
                           </th>
                         ))}
@@ -229,9 +223,9 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
                     </thead>
                     <tbody>
                       {previewRows.map((row, i) => (
-                        <tr key={i} className={i % 2 ? 'bg-zinc-800/30' : ''}>
+                        <tr key={i} className={i % 2 ? 'bg-link-standard' : ''}>
                           {previewCols.map(c => (
-                            <td key={c} className="px-2 py-1 text-zinc-400 whitespace-nowrap max-w-[80px] overflow-hidden text-ellipsis border-b border-zinc-800/60">
+                            <td key={c} className="px-2 py-1 text-text-tertiary whitespace-nowrap max-w-[80px] overflow-hidden text-ellipsis border-b border-border-quaternary">
                               {String(row[c] ?? '')}
                             </td>
                           ))}
@@ -241,7 +235,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
                   </table>
                 </div>
               )
-              : <div className="px-3 py-2 text-zinc-500 text-xs">{t('dashboard.dataSourcePicker.noData')}</div>
+              : <div className="px-3 py-2 text-text-quaternary text-body-xs">{t('dashboard.dataSourcePicker.noData')}</div>
           }
         </div>
       )}

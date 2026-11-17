@@ -12,7 +12,7 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
 
   return (
     <div
-      className="flex shrink-0 gap-1 border-b border-zinc-800 bg-zinc-950 px-4 pt-3"
+      className="flex shrink-0 gap-1 border-b border-border-quaternary bg-surface-sub-background px-4 pt-3"
       role="tablist"
       aria-label={t('mapEditor.workspaceAria')}
     >
@@ -20,10 +20,10 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         type="button"
         role="tab"
         aria-selected={value === 'map'}
-        className={`rounded-t-md border border-b-0 px-4 py-2 text-sm font-medium transition ${
+        className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium transition ${
           value === 'map'
-            ? 'border-zinc-600 bg-zinc-900 text-cyan-200'
-            : 'border-transparent bg-transparent text-zinc-500 hover:text-zinc-300'
+            ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+            : 'border-transparent bg-transparent text-text-quaternary hover:text-text-secondary'
         }`}
         onClick={() => onChange('map')}
       >
@@ -33,10 +33,10 @@ export function WorkspaceTabs({ value, onChange }: WorkspaceTabsProps) {
         type="button"
         role="tab"
         aria-selected={value === 'trajectory'}
-        className={`rounded-t-md border border-b-0 px-4 py-2 text-sm font-medium transition ${
+        className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium transition ${
           value === 'trajectory'
-            ? 'border-zinc-600 bg-zinc-900 text-cyan-200'
-            : 'border-transparent bg-transparent text-zinc-500 hover:text-zinc-300'
+            ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+            : 'border-transparent bg-transparent text-text-quaternary hover:text-text-secondary'
         }`}
         onClick={() => onChange('trajectory')}
       >

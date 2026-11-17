@@ -105,16 +105,16 @@ function ListRow({
           : 'border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.04)] hover:border-[rgba(212,212,212,0.3)] hover:bg-[rgba(142,197,255,0.08)]',
       ].join(' ')}
     >
-      <p className="w-full truncate text-sm font-medium leading-[18px] tracking-[0.5px] text-[#F3F4F6]">
+      <p className="w-full truncate text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary">
         {entry.name}
       </p>
-      <p className="w-full truncate text-xs leading-4 text-[#99A1AF]">
+      <p className="w-full truncate text-body-xs text-text-tertiary">
         {formatListDescription(entry)}
       </p>
-      <p className="w-full truncate text-xs leading-4 text-[#D1D5DC]">
+      <p className="w-full truncate text-body-xs text-text-secondary">
         {t('mapEditor.listDrawer.field', { value: formatRef(entry) })}
       </p>
-      <p className="w-full truncate text-xs leading-4 text-[#D1D5DC]">
+      <p className="w-full truncate text-body-xs text-text-secondary">
         {t('mapEditor.listDrawer.pixels', { value: formatPx(entry) })}
       </p>
     </button>
@@ -139,7 +139,7 @@ function SectionBlock({
   const { t } = useTranslation()
   if (entries.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-[rgba(212,212,212,0.15)] px-2 py-3 text-center text-xs text-[#6A7282]">
+      <p className="rounded-xl border border-dashed border-[rgba(212,212,212,0.15)] px-2 py-3 text-center text-body-xs text-text-quaternary">
         {t('mapEditor.listDrawer.emptySection', { title })}
       </p>
     )
@@ -226,10 +226,10 @@ function TabUnit({
       aria-pressed={active}
       onClick={onClick}
       className={[
-        'pointer-events-auto flex w-7 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-2 text-[14px] leading-[18px] transition-colors',
+        'pointer-events-auto flex w-7 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-2 text-body-s leading-[18px] transition-colors',
         active
-          ? 'bg-[#2B7FFF] font-medium text-white'
-          : 'font-normal text-[#6A7282] hover:bg-white/10 hover:text-zinc-200',
+          ? 'bg-link-theme-filled font-medium text-text-primary'
+          : 'font-normal text-text-quaternary hover:bg-link-standard-hover hover:text-text-primary',
       ].join(' ')}
     >
       <Icon className="size-4 shrink-0" />
@@ -350,7 +350,7 @@ export function MapListDrawer({
               title={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')}
               aria-label={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')}
               onClick={() => onOpenTab(panelOpen ? null : lastTab.current)}
-              className="flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 text-[#D1D5DC] transition-colors hover:bg-white/10"
+              className="flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 text-text-secondary transition-colors hover:bg-link-standard-hover"
             >
               {panelOpen ? <KeyboardArrowLeft className="size-6" /> : <KeyboardArrowRight className="size-6" />}
             </button>
@@ -403,7 +403,7 @@ export function MapListDrawer({
               type="button"
               title={t('mapEditor.listDrawer.palette')}
               onClick={() => onOpenTab('palette')}
-              className="pointer-events-auto flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#151516] px-1.5 py-2 text-[14px] leading-[18px] tracking-[0.5px] text-[#6A7282] transition-colors hover:text-[#D1D5DC]"
+              className="pointer-events-auto flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#151516] px-1.5 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary transition-colors hover:text-text-secondary"
             >
               <KeyboardArrowRight className="size-4 shrink-0" />
               <span style={TAB_TEXT_STYLE}>{t('mapEditor.listDrawer.palette')}</span>
@@ -414,8 +414,8 @@ export function MapListDrawer({
         {panelOpen ? (
           <div className={`pointer-events-auto my-2 mr-2 flex w-60 flex-col ${paletteOpen ? '!mb-[113px]' : ''} gap-3 overflow-hidden rounded-xl border border-[rgba(212,212,212,0.15)] bg-[#151516] px-2 py-3 shadow-2xl`}>
             <div className="flex shrink-0 items-center gap-1 px-2">
-              <PanelIcon className="size-4 shrink-0 text-[#99A1AF]" aria-hidden />
-              <p className="truncate text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6]">
+              <PanelIcon className="size-4 shrink-0 text-text-tertiary" aria-hidden />
+              <p className="truncate text-body-s leading-[18px] tracking-[0.5px] text-text-primary">
                 {panelTitle}
               </p>
             </div>
@@ -454,11 +454,11 @@ export function MapListDrawer({
                 />
               ) : openTab === 'docking' ? (
                 <div className="flex flex-col gap-4">
-                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
+                  <p className="px-1 text-body-xs text-text-quaternary">
                     {t('mapEditor.listDrawer.dockingHint')}
                   </p>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-blue-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-blue-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.docking')}
                     </h4>
@@ -472,7 +472,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-emerald-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.facilityDocking')}
                     </h4>
@@ -486,7 +486,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-sky-400/90">
                       <MapPin className="size-3.5" />
                       {t('mapEditor.listDrawer.waypoint')}
                     </h4>
@@ -502,7 +502,7 @@ export function MapListDrawer({
                 </div>
               ) : openTab === 'geofence' ? (
                 <div className="flex flex-col gap-3">
-                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
+                  <p className="px-1 text-body-xs text-text-quaternary">
                     {t('mapEditor.listDrawer.geofenceHint')}
                   </p>
                   <SectionBlock
@@ -516,7 +516,7 @@ export function MapListDrawer({
                 </div>
               ) : openTab === 'facility' ? (
                 <div className="flex flex-col gap-3">
-                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
+                  <p className="px-1 text-body-xs text-text-quaternary">
                     {t('mapEditor.listDrawer.facilityHint')}
                   </p>
                   <SectionBlock
@@ -530,11 +530,11 @@ export function MapListDrawer({
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <p className="px-1 text-xs leading-4 text-[#6A7282]">
+                  <p className="px-1 text-body-xs text-text-quaternary">
                     {t('mapEditor.listDrawer.equipmentHint')}
                   </p>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-amber-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-status-warning">
                       <Radio className="size-3.5" />
                       {t('mapEditor.listDrawer.trafficLight')}
                     </h4>
@@ -548,7 +548,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-emerald-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-emerald-400/90">
                       <Zap className="size-3.5" />
                       {t('mapEditor.listDrawer.smartPole')}
                     </h4>
@@ -562,7 +562,7 @@ export function MapListDrawer({
                     />
                   </section>
                   <section>
-                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-[0.5px] text-sky-400/90">
+                    <h4 className="mb-2 flex items-center gap-1.5 px-1 text-body-xs-bold tracking-[0.5px] text-sky-400/90">
                       <DoorOpen className="size-3.5" />
                       {t('mapEditor.listDrawer.psd')}
                     </h4>

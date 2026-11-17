@@ -336,7 +336,7 @@ export function AreaRulerOverlay({
       {/* 上緣刻度帶：正式範圍上方 */}
       <div
         data-area-ruler-drag
-        className={`absolute border-b border-cyan-600/50 bg-zinc-950/90 shadow-sm ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
+        className={`absolute border-b border-cyan-600/50 bg-surface-sub-background shadow-sm ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
         style={{
           left: 0,
           right: 0,
@@ -399,13 +399,13 @@ export function AreaRulerOverlay({
               {showEnds ? (
                 <>
                   <span
-                    className="absolute bottom-2.5 left-0 -translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                    className="absolute bottom-2.5 left-0 -translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                     style={{ fontSize: selFontPx }}
                   >
                     {formatMeterRulerLabel(g.labelXMin, 2)}
                   </span>
                   <span
-                    className="absolute bottom-2.5 right-0 translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                    className="absolute bottom-2.5 right-0 translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                     style={{ fontSize: selFontPx }}
                   >
                     {formatMeterRulerLabel(g.labelXMax, 2)}
@@ -413,7 +413,7 @@ export function AreaRulerOverlay({
                 </>
               ) : (
                 <span
-                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                   style={{ fontSize: selFontPx }}
                 >
                   {formatMeterRulerLabel(g.labelXMin, 2)}–
@@ -434,7 +434,7 @@ export function AreaRulerOverlay({
       {/* 左緣刻度帶：正式範圍左側 */}
       <div
         data-area-ruler-drag
-        className={`absolute border-r border-cyan-600/50 bg-zinc-950/90 shadow-sm ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
+        className={`absolute border-r border-cyan-600/50 bg-surface-sub-background shadow-sm ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
         style={{
           left: -bandLeft,
           top: 0,
@@ -497,13 +497,13 @@ export function AreaRulerOverlay({
               {showEnds ? (
                 <>
                   <span
-                    className="absolute right-3 top-0 -translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                    className="absolute right-3 top-0 -translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                     style={{ fontSize: selFontPx }}
                   >
                     {formatMeterRulerLabel(g.labelYMax, 2)}
                   </span>
                   <span
-                    className="absolute bottom-0 right-3 translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                    className="absolute bottom-0 right-3 translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                     style={{ fontSize: selFontPx }}
                   >
                     {formatMeterRulerLabel(g.labelYMin, 2)}
@@ -511,7 +511,7 @@ export function AreaRulerOverlay({
                 </>
               ) : (
                 <span
-                  className="absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-zinc-950 px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded border border-amber-400/70 bg-surface-sub-background px-1 py-0.5 font-mono font-semibold leading-none text-amber-50 shadow-sm"
                   style={{ fontSize: selFontPx }}
                 >
                   {formatMeterRulerLabel(g.labelYMin, 2)}–
@@ -532,7 +532,7 @@ export function AreaRulerOverlay({
       {/* 左上角銜接 */}
       <div
         data-area-ruler-drag
-        className={`absolute border-b border-r border-cyan-600/40 bg-zinc-950/95 ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
+        className={`absolute border-b border-r border-cyan-600/40 bg-surface-popup ${showMoveHint ? 'pointer-events-auto cursor-move' : 'pointer-events-none'}`}
         style={{
           left: -bandLeft,
           top: -bandTop,

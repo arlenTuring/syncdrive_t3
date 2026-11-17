@@ -3,6 +3,7 @@ import { FileCode2, Image, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BasemapFileSelection } from '../utils/basemapFacility'
 import { parseOpenDriveXodr, laneFillColor, lanePolygonToSvgPath, laneStrokeColor } from '../opendrive'
+import { Button } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -129,7 +130,7 @@ export function BasemapFilePickerDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[220] flex items-center justify-center bg-black-50 p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
@@ -139,13 +140,13 @@ export function BasemapFilePickerDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-xl border border-zinc-600 bg-zinc-900 p-5 shadow-2xl"
+        className="w-full max-w-lg rounded-xl border border-border-tertiary bg-surface-primary p-5 shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} className="text-base font-semibold text-zinc-100">
+        <h2 id={titleId} className="text-body-m-bold text-text-primary">
           {t('mapEditor.basemap.title')}
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-2 text-body-s text-text-tertiary">
           {t('mapEditor.basemap.hint')}
         </p>
 
@@ -193,7 +194,7 @@ export function BasemapFilePickerDialog({
             'mt-4 flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-4 py-8 transition',
             dragOver
               ? 'border-cyan-500 bg-cyan-950/40 text-cyan-100'
-              : 'border-zinc-600 bg-zinc-950/60 text-zinc-400 hover:border-cyan-600/60 hover:bg-zinc-950 hover:text-zinc-200',
+              : 'border-border-tertiary bg-black-30 text-text-tertiary hover:border-cyan-600/60 hover:bg-surface-sub-background hover:text-text-primary',
           ].join(' ')}
         >
           {previewUrl ? (
@@ -205,7 +206,7 @@ export function BasemapFilePickerDialog({
           ) : xodrPreview ? (
             <svg
               viewBox={`0 0 320 140`}
-              className="h-40 w-full rounded-md bg-zinc-950 shadow-md"
+              className="h-40 w-full rounded-md bg-surface-sub-background shadow-md"
               aria-hidden
             >
               {xodrPreview.lanes.map((lane) => (
@@ -220,14 +221,14 @@ export function BasemapFilePickerDialog({
             </svg>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              <Upload className="size-8 text-zinc-500" aria-hidden />
-              <div className="flex items-center gap-2 text-zinc-600">
+              <Upload className="size-8 text-text-quaternary" aria-hidden />
+              <div className="flex items-center gap-2 text-text-disabled">
                 <Image className="size-5" aria-hidden />
                 <FileCode2 className="size-5" aria-hidden />
               </div>
             </div>
           )}
-          <span className="text-sm">
+          <span className="text-body-s">
             {selectedFile?.name ??
               (initialFileName
                 ? t('mapEditor.basemap.currentFile', { name: initialFileName })
@@ -236,7 +237,7 @@ export function BasemapFilePickerDialog({
                   : t('mapEditor.basemap.clickOrDrag'))}
           </span>
           {xodrPreview ? (
-            <span className="text-xs text-zinc-500">
+            <span className="text-body-xs text-text-quaternary">
               {t('mapEditor.basemap.roadsLanes', {
                 roads: xodrPreview.roadCount,
                 lanes: xodrPreview.laneCount,
@@ -246,27 +247,14 @@ export function BasemapFilePickerDialog({
         </button>
 
         {error ? (
-          <p className="mt-2 text-sm text-rose-400" role="alert">
+          <p className="mt-2 text-body-s text-status-error-emphasis" role="alert">
             {error}
           </p>
         ) : null}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            className="rounded-md border border-cyan-700 bg-cyan-950/60 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {t('mapEditor.basemap.apply')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={onCancel}>{t('common.cancel')}</Button>
+          <Button hierarchy="subordinate" variant="outlined" onPress={submit} disabled={!canSubmit}>{t('mapEditor.basemap.apply')}</Button>
         </div>
       </div>
     </div>

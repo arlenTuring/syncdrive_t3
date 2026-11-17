@@ -61,6 +61,7 @@ import {
   type MapCropRect,
   type MapCropWorkspace,
 } from './utils/mapCropMode'
+import { Button } from '../../components/ui';
 import {
   getDefaultSlotEquipmentState,
   getDefaultSlotOccupancy,
@@ -4183,13 +4184,13 @@ export default function MapEditorApp({
   return (
     <MapExtentProvider extent={mapExtentMeters}>
     <div
-      className={`flex h-screen min-h-0 flex-col text-zinc-100 ${
-        isMapWorkspace ? 'bg-[#18181B]' : 'bg-zinc-950'
+      className={`flex h-screen min-h-0 flex-col text-text-primary ${
+        isMapWorkspace ? 'bg-surface-primary' : 'bg-surface-sub-background'
       }`}
     >
       {isMapWorkspace && mapScreen === 'library' && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 gap-1 border-b border-zinc-800 bg-zinc-950 px-4 pt-2" role="tablist" aria-label="圖資管理">
+          <div className="flex shrink-0 gap-1 border-b border-border-quaternary bg-surface-sub-background px-4 pt-2" role="tablist" aria-label="圖資管理">
             {(
               [
                 ['maps', '地圖'],
@@ -4202,10 +4203,10 @@ export default function MapEditorApp({
                 role="tab"
                 aria-selected={libraryTab === value}
                 onClick={() => setLibraryTab(value)}
-                className={`rounded-t-md border border-b-0 px-4 py-2 text-sm font-medium ${
+                className={`rounded-t-md border border-b-0 px-4 py-2 text-body-s font-medium ${
                   libraryTab === value
-                    ? 'border-zinc-600 bg-zinc-900 text-cyan-200'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    ? 'border-border-tertiary bg-surface-primary text-cyan-200'
+                    : 'border-transparent text-text-quaternary hover:text-text-secondary'
                 }`}
               >
                 {label}
@@ -4222,9 +4223,9 @@ export default function MapEditorApp({
         </div>
       )}
       {isMapWorkspace && mapScreen === 'editor' && backendSyncFailed && (
-        <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-xs text-amber-300">
+        <div className="shrink-0 border-b border-amber-800/60 bg-amber-950/50 px-4 py-2 text-body-xs text-status-warning">
           {t('mapEditor.unsavedBannerBefore')}
-          <strong className="text-amber-200">{t('mapEditor.unsavedBannerStrong')}</strong>
+          <strong className="text-status-warning">{t('mapEditor.unsavedBannerStrong')}</strong>
           {t('mapEditor.unsavedBannerAfter')}
         </div>
       )}
@@ -4318,16 +4319,16 @@ export default function MapEditorApp({
       )}
       {isTrajectoryWorkspace && (
       <div
-        className="flex shrink-0 items-center gap-3 border-b border-zinc-700/80 bg-zinc-950 px-4 py-2"
+        className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-sub-background px-4 py-2"
         role="toolbar"
         aria-label={t('mapEditor.trajectoryTitle')}
       >
-        <span className="text-sm font-semibold text-zinc-100">{t('mapEditor.trajectoryTitle')}</span>
+        <span className="text-body-s-bold text-text-primary">{t('mapEditor.trajectoryTitle')}</span>
       </div>
       )}
       {isTrajectoryWorkspace && (
       <div
-        className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-1.5 font-mono text-xs text-zinc-400"
+        className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-primary px-4 py-1.5 font-mono text-body-xs text-text-tertiary"
         aria-live="polite"
       >
         <span>
@@ -4339,7 +4340,7 @@ export default function MapEditorApp({
       <div
         className={`relative flex min-h-0 flex-1 ${
           // 設計稿：地圖放在黑底圓角面板裡，左右下留 12
-          isMapWorkspace ? 'mx-3 mb-3 overflow-hidden rounded-xl bg-black' : ''
+          isMapWorkspace ? 'mx-3 mb-3 overflow-hidden rounded-xl bg-surface-sub-background' : ''
         }`}
       >
         <div
@@ -4552,17 +4553,11 @@ export default function MapEditorApp({
           </div>
 
           {isMapWorkspace && mapScreen === 'editor' && simRouteEditRouteId ? (
-            <div className="pointer-events-none absolute bottom-4 left-1/2 z-[9500] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-sky-500/50 bg-zinc-950/95 px-3 py-2 shadow-xl">
-              <p className="max-w-[min(36rem,70vw)] text-[11px] leading-snug text-sky-100">
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-[9500] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-sky-500/50 bg-surface-popup px-3 py-2 shadow-xl">
+              <p className="max-w-[min(36rem,70vw)] text-body-xs text-text-theme">
                 {t('mapEditor.chrome.simRoutePathEditing')}
               </p>
-              <button
-                type="button"
-                className="pointer-events-auto shrink-0 rounded-md border border-sky-400/60 bg-sky-600/90 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-500"
-                onClick={onFinishSimRoutePathEdit}
-              >
-                {t('mapEditor.chrome.simRoutePathDone')}
-              </button>
+              <Button className="shrink-0" onPress={onFinishSimRoutePathEdit}>{t('mapEditor.chrome.simRoutePathDone')}</Button>
             </div>
           ) : null}
 
@@ -4654,13 +4649,13 @@ export default function MapEditorApp({
               <button
                 type="button"
                 onClick={() => setInspectorCollapsed(true)}
-                className="pointer-events-auto absolute left-0 top-3 z-20 flex h-10 w-6 -translate-x-full items-center justify-center rounded-l-md border border-r-0 border-zinc-600 bg-zinc-800 text-zinc-300 shadow-sm hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="pointer-events-auto absolute left-0 top-3 z-20 flex h-10 w-6 -translate-x-full items-center justify-center rounded-l-md border border-r-0 border-border-tertiary bg-surface-secondary text-text-secondary shadow-sm hover:bg-link-standard-hover focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 title={t('mapEditor.chrome.collapseInspector')}
                 aria-label={t('mapEditor.chrome.collapseInspector')}
               >
                 <ChevronRight className="size-4" aria-hidden />
               </button>
-              <div className="pointer-events-auto flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-zinc-700/80 bg-zinc-900/95 shadow-2xl backdrop-blur-sm">
+              <div className="pointer-events-auto flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-border-quaternary bg-zinc-900/95 shadow-2xl backdrop-blur-sm">
                 {mapCropModeActive && cropWorkspace && mapEditorMode === 'edit' ? (
                   <MapCropInspectorSection
                     workspace={cropWorkspace}
@@ -4774,20 +4769,20 @@ export default function MapEditorApp({
                 ) : allAreasSelected && mapEditorMode === 'edit' ? (
                   <aside
                     data-inspector
-                    className="flex h-full min-h-0 flex-col bg-zinc-900/50"
+                    className="flex h-full min-h-0 flex-col bg-surface-primary"
                   >
-                    <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-cyan-400/90">
+                    <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-cyan-400/90">
                       {t('mapEditor.chrome.selectAllAreas', { count: areas.length })}
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm text-zinc-400">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3 text-body-s text-text-tertiary">
                       <p className="leading-relaxed">
                         {t('mapEditor.chrome.allAreasSelectedBefore')}
-                        <strong className="text-zinc-200">{t('mapEditor.chrome.moveTrack')}</strong>
+                        <strong className="text-text-primary">{t('mapEditor.chrome.moveTrack')}</strong>
                         {t('mapEditor.chrome.allAreasSelectedMid')}
-                        <strong className="text-zinc-200">{t('mapEditor.chrome.canvasBlank')}</strong>
+                        <strong className="text-text-primary">{t('mapEditor.chrome.canvasBlank')}</strong>
                         {t('mapEditor.chrome.allAreasSelectedAfter')}
                       </p>
-                      <p className="mt-3 text-xs text-zinc-600">
+                      <p className="mt-3 text-body-xs text-text-disabled">
                         {t('mapEditor.chrome.allAreasSelectedHint')}
                       </p>
                     </div>
@@ -4795,18 +4790,18 @@ export default function MapEditorApp({
                 ) : (
                   <aside
                     data-inspector
-                    className="flex h-full min-h-0 flex-col bg-zinc-900/50"
+                    className="flex h-full min-h-0 flex-col bg-surface-primary"
                   >
-                    <div className="border-b border-zinc-700/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    <div className="border-b border-border-quaternary px-3 py-2 text-body-xs-bold uppercase text-text-quaternary">
                       {t('mapEditor.chrome.properties')}
                     </div>
-                    <div className="p-4 text-sm text-zinc-500">
+                    <div className="p-4 text-body-s text-text-quaternary">
                       <p>
                         {readOnlyCanvas
                           ? t('mapEditor.chrome.propertiesViewHint')
                           : t('mapEditor.chrome.propertiesEditHint')}
                       </p>
-                      <p className="mt-3 text-xs text-zinc-600">
+                      <p className="mt-3 text-body-xs text-text-disabled">
                         {t('mapEditor.chrome.propertiesAreaNote')}
                         {readOnlyCanvas
                           ? t('mapEditor.chrome.propertiesEditExtra')
@@ -4821,12 +4816,12 @@ export default function MapEditorApp({
             <button
               type="button"
               onClick={() => setInspectorCollapsed(false)}
-              className="pointer-events-auto absolute right-2 top-2 z-40 flex h-12 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] px-2 py-3 text-sm leading-[18px] tracking-[0.5px] text-[#F3F4F6] backdrop-blur-md transition hover:bg-[rgba(212,212,216,0.16)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60"
+              className="pointer-events-auto absolute right-2 top-2 z-40 flex h-12 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] px-2 py-3 text-body-s leading-[18px] tracking-[0.5px] text-text-primary backdrop-blur-md transition hover:bg-[rgba(212,212,216,0.16)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60"
               title={t('mapEditor.chrome.expandInspector')}
               aria-label={t('mapEditor.chrome.expandInspector')}
             >
               <span className="flex size-6 items-center justify-center p-0.5">
-                <ChevronLeft className="size-[18px] text-[#D1D5DC]" aria-hidden />
+                <ChevronLeft className="size-[18px] text-text-secondary" aria-hidden />
               </span>
               <span className="pr-2">{t('mapEditor.chrome.properties')}</span>
             </button>

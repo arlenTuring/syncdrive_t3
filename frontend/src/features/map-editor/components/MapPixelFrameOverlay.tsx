@@ -258,7 +258,7 @@ export function MapPixelFrameOverlay({
               title="拖曳調整畫布解析度（寬×高）"
             />
           ))}
-          <div className="pointer-events-none absolute left-2 top-2 z-[6002] rounded bg-amber-950/80 px-2 py-0.5 font-mono text-[10px] text-amber-200/90">
+          <div className="pointer-events-none absolute left-2 top-2 z-[6002] rounded bg-amber-950/80 px-2 py-0.5 font-mono text-caption-2 text-status-warning">
             畫布 {Math.round(dw)}×{Math.round(dh)} px
           </div>
         </>

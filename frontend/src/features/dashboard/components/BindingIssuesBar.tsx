@@ -13,8 +13,8 @@ export function BindingIssuesBar() {
       type="button"
       onClick={refresh}
       title={summary.tooltip}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-600/50
-                 text-amber-300 text-xs font-bold hover:bg-amber-900/50 transition-colors max-w-[280px]"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-status-warning-light
+                 text-status-warning text-body-xs font-bold hover:bg-amber-900/50 transition-colors max-w-[280px]"
     >
       {isChecking ? <RefreshCw size={12} className="animate-spin" /> : <AlertTriangle size={12} />}
       <span className="truncate">

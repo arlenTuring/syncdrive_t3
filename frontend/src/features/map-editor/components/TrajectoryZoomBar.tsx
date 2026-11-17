@@ -5,6 +5,7 @@ import {
   VIEW_BASELINE_WIDTH_M,
   clampMapZoomFactor,
 } from '../constants/map'
+import { Button } from '../../../components/ui';
 
 type TrajectoryZoomBarProps = {
   zoomFactorX: number
@@ -26,21 +27,21 @@ export function TrajectoryZoomBar({
 
   return (
     <div
-      className="pointer-events-auto flex shrink-0 flex-wrap items-end gap-x-6 gap-y-3 border-t border-zinc-700/80 bg-zinc-950/95 px-4 py-2"
+      className="pointer-events-auto flex shrink-0 flex-wrap items-end gap-x-6 gap-y-3 border-t border-border-quaternary bg-surface-popup px-4 py-2"
       role="group"
       aria-label="軌跡圖台縮放"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+        <span className="text-caption-2 uppercase text-text-quaternary">
           軌跡圖台縮放（橫／縱分開）
         </span>
-        <p className="text-[9px] leading-snug text-zinc-600">
+        <p className="text-caption-2 text-text-disabled">
           倍率愈大該軸可視愈大：寬 ≈{' '}
-          <span className="font-mono text-zinc-500">
+          <span className="font-mono text-text-quaternary">
             {VIEW_BASELINE_WIDTH_M}×倍率
           </span>
           m、高 ≈{' '}
-          <span className="font-mono text-zinc-500">
+          <span className="font-mono text-text-quaternary">
             {VIEW_BASELINE_HEIGHT_M}×倍率
           </span>
           m。不寫入檔案。
@@ -48,7 +49,7 @@ export function TrajectoryZoomBar({
       </div>
 
       <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
-        <span className="flex items-center justify-between text-[10px] text-zinc-400">
+        <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>橫向（左右）</span>
           <span className="font-mono text-cyan-400/90">
             {zoomFactorX.toFixed(2)}×
@@ -65,7 +66,7 @@ export function TrajectoryZoomBar({
           }
           className="h-1.5 w-full cursor-pointer accent-cyan-500"
         />
-        <div className="flex justify-between text-[9px] text-zinc-600">
+        <div className="flex justify-between text-caption-2 text-text-disabled">
           <span>{min}×</span>
           <span>1×</span>
           <span>{max}×</span>
@@ -73,7 +74,7 @@ export function TrajectoryZoomBar({
       </label>
 
       <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
-        <span className="flex items-center justify-between text-[10px] text-zinc-400">
+        <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>縱向（上下）</span>
           <span className="font-mono text-cyan-400/90">
             {zoomFactorY.toFixed(2)}×
@@ -90,23 +91,17 @@ export function TrajectoryZoomBar({
           }
           className="h-1.5 w-full cursor-pointer accent-cyan-500"
         />
-        <div className="flex justify-between text-[9px] text-zinc-600">
+        <div className="flex justify-between text-caption-2 text-text-disabled">
           <span>{min}×</span>
           <span>1×</span>
           <span>{max}×</span>
         </div>
       </label>
 
-      <button
-        type="button"
-        onClick={() => {
+      <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => {
           onZoomFactorXChange(1)
           onZoomFactorYChange(1)
-        }}
-        className="shrink-0 rounded border border-zinc-600 px-2 py-1.5 text-[10px] text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-      >
-        橫縱重設 1×
-      </button>
+        }}>橫縱重設 1×</Button>
     </div>
   )
 }

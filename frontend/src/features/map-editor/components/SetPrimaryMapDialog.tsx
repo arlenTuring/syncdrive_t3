@@ -7,6 +7,7 @@ import {
   type MapActivationCheck,
 } from '../api/mapLibraryApi'
 import type { MapLibraryEntry } from '../utils/mapLibraryStorage'
+import { Button } from '../../../components/ui';
 
 type Props = {
   entry: MapLibraryEntry
@@ -63,7 +64,7 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black-50 p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !activating) onClose()
@@ -73,17 +74,17 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-2xl border border-[rgba(212,212,212,0.15)] bg-[#18181B] p-5 text-[#F3F4F6] shadow-2xl"
+        className="w-full max-w-lg rounded-2xl border border-[rgba(212,212,212,0.15)] bg-surface-primary p-5 text-text-primary shadow-2xl"
       >
-        <h2 id={titleId} className="text-lg font-medium leading-6">
+        <h2 id={titleId} className="text-headline-5">
           {t('mapLibrary.primary.title', { name: entry.displayName })}
         </h2>
-        <p className="mt-2 text-sm leading-[20px] tracking-[0.5px] text-[#99A1AF]">
+        <p className="mt-2 text-body-s leading-[20px] tracking-[0.5px] text-text-tertiary">
           {t('mapLibrary.primary.impact')}
         </p>
 
         {loading ? (
-          <p className="mt-5 flex items-center gap-2 text-sm text-[#99A1AF]">
+          <p className="mt-5 flex items-center gap-2 text-body-s text-text-tertiary">
             <Loader2 className="size-4 animate-spin" aria-hidden />
             {t('mapLibrary.primary.checking')}
           </p>
@@ -91,40 +92,40 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
 
         {check ? (
           <div className="mt-4 space-y-3">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-xl bg-[rgba(142,197,255,0.04)] px-4 py-3 text-sm">
-              <dt className="text-[#99A1AF]">{t('mapLibrary.primary.current')}</dt>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-xl bg-[rgba(142,197,255,0.04)] px-4 py-3 text-body-s">
+              <dt className="text-text-tertiary">{t('mapLibrary.primary.current')}</dt>
               <dd>{check.currentActive.displayName ?? check.currentActive.mapId}</dd>
-              <dt className="text-[#99A1AF]">{t('mapLibrary.primary.next')}</dt>
+              <dt className="text-text-tertiary">{t('mapLibrary.primary.next')}</dt>
               <dd>
                 {entry.displayName}
-                <span className="ml-2 text-xs text-[#99A1AF]">
+                <span className="ml-2 text-body-xs text-text-tertiary">
                   {t('mapLibrary.primary.counts', {
                     routes: check.routeCount,
                     stations: check.stationCount,
                   })}
                 </span>
               </dd>
-              <dt className="text-[#99A1AF]">{t('mapLibrary.primary.deployedShift')}</dt>
+              <dt className="text-text-tertiary">{t('mapLibrary.primary.deployedShift')}</dt>
               <dd>{check.deployedShift?.shiftName ?? t('mapLibrary.primary.noDeployedShift')}</dd>
             </dl>
 
             {check.blockers.length > 0 ? (
-              <ul className="space-y-1.5 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+              <ul className="space-y-1.5 rounded-xl border border-red-900/60 bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
                 {check.blockers.map((issue, i) => (
                   <li key={`${issue.code}-${i}`} className="flex gap-2">
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-red-400" aria-hidden />
+                    <XCircle className="mt-0.5 size-4 shrink-0 text-status-error-emphasis" aria-hidden />
                     <span>{issue.message}</span>
                   </li>
                 ))}
-                <li className="pl-6 text-xs text-red-300/80">{t('mapLibrary.primary.blockedHint')}</li>
+                <li className="pl-6 text-body-xs text-red-300/80">{t('mapLibrary.primary.blockedHint')}</li>
               </ul>
             ) : null}
 
             {check.warnings.length > 0 ? (
-              <ul className="space-y-1.5 rounded-xl border border-amber-900/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+              <ul className="space-y-1.5 rounded-xl border border-amber-900/60 bg-status-warning-light px-4 py-3 text-body-s text-status-warning">
                 {check.warnings.map((issue, i) => (
                   <li key={`${issue.code}-${i}`} className="flex gap-2">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden />
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-warning" aria-hidden />
                     <span>{issue.message}</span>
                   </li>
                 ))}
@@ -132,7 +133,7 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
             ) : null}
 
             {check.canActivate && check.blockers.length === 0 && check.warnings.length === 0 ? (
-              <p className="flex items-center gap-2 text-sm text-emerald-300">
+              <p className="flex items-center gap-2 text-body-s text-status-success">
                 <CheckCircle2 className="size-4 shrink-0" aria-hidden />
                 {check.deployedShift
                   ? t('mapLibrary.primary.okWithShift')
@@ -143,25 +144,18 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
         ) : null}
 
         {error ? (
-          <p className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-2 text-sm text-red-300">
+          <p className="mt-4 rounded-xl border border-red-900/60 bg-status-error-light px-4 py-2 text-body-s text-status-error-emphasis">
             {t('mapLibrary.primary.failed', { error })}
           </p>
         ) : null}
 
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={activating}
-            className="inline-flex h-[34px] items-center rounded-lg bg-[rgba(209,213,220,0.12)] px-3.5 text-sm font-medium tracking-[0.5px] text-[#D1D5DC] hover:bg-[rgba(209,213,220,0.18)] disabled:opacity-40"
-          >
-            {t('common.cancel')}
-          </button>
+          <Button hierarchy="subordinate" variant="tonal" onPress={onClose} disabled={activating}>{t('common.cancel')}</Button>
           <button
             type="button"
             onClick={() => void confirm()}
             disabled={!canConfirm}
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-lg bg-[#2B7FFF] px-3.5 text-sm font-medium tracking-[0.5px] text-white enabled:hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-[34px] items-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 text-body-s-bold tracking-[0.5px] text-text-primary enabled:hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {activating && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('mapLibrary.primary.confirm')}

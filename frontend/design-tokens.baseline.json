@@ -51,7 +51,7 @@
     "button": 1
   },
   "features/dashboard/components/BindingIssuesBar.tsx": {
-    "palette": 4,
+    "palette": 2,
     "button": 1
   },
   "features/dashboard/components/BindingWarningIcon.tsx": {
@@ -64,32 +64,27 @@
     "button": 1
   },
   "features/dashboard/components/DashboardIconPicker.tsx": {
-    "arbitrary": 8,
-    "palette": 28,
+    "arbitrary": 1,
+    "palette": 9,
     "button": 3
   },
   "features/dashboard/components/DualCanvasSettings.tsx": {
-    "arbitrary": 5,
-    "palette": 25,
-    "selection": 2
+    "palette": 7
   },
   "features/dashboard/components/EditPreviewChrome.tsx": {
     "hex": 6,
     "rgb": 5
   },
   "features/dashboard/components/GenericGroupSettings.tsx": {
-    "arbitrary": 30,
-    "palette": 84,
-    "button": 14,
-    "selection": 4
+    "palette": 13,
+    "button": 14
   },
   "features/dashboard/components/GroupTemplateExitDialog.tsx": {
-    "palette": 20,
-    "button": 4
+    "palette": 2,
+    "button": 1
   },
   "features/dashboard/components/IconImageField.tsx": {
-    "arbitrary": 4,
-    "palette": 23,
+    "palette": 4,
     "button": 2
   },
   "features/dashboard/components/LayoutValidationIcon.tsx": {
@@ -97,25 +92,20 @@
     "rgb": 2
   },
   "features/dashboard/components/SimulationTransportToolbar.tsx": {
-    "arbitrary": 14,
-    "palette": 75,
-    "button": 10
+    "palette": 18,
+    "button": 8
   },
   "features/dashboard/components/SnapGuideLines.tsx": {
     "hex": 1
   },
   "features/dashboard/components/TemplateFileActions.tsx": {
-    "hex": 11,
-    "arbitrary": 15,
-    "rgb": 4,
-    "palette": 26,
-    "button": 6,
-    "selection": 2
+    "arbitrary": 2,
+    "rgb": 2,
+    "palette": 9,
+    "button": 5
   },
   "features/dashboard/components/VehicleRoofIndicatorSettings.tsx": {
-    "arbitrary": 6,
-    "palette": 12,
-    "selection": 1
+    "palette": 1
   },
   "features/dashboard/constants/alertBannerDemoRules.ts": {
     "hex": 15
@@ -146,11 +136,10 @@
     "rgb": 4
   },
   "features/dashboard/DashboardList.tsx": {
-    "hex": 33,
-    "arbitrary": 60,
+    "hex": 8,
+    "arbitrary": 35,
     "rgb": 14,
-    "palette": 2,
-    "button": 10
+    "button": 9
   },
   "features/dashboard/elements/BarChartWidget.tsx": {
     "hex": 7,
@@ -167,15 +156,14 @@
     "rgb": 9
   },
   "features/dashboard/elements/DataSourceIdSelect.tsx": {
-    "arbitrary": 2,
-    "palette": 8
+    "palette": 2
   },
   "features/dashboard/elements/DataSourcePicker.tsx": {
-    "palette": 40,
-    "button": 5
+    "palette": 8,
+    "button": 4
   },
   "features/dashboard/elements/DualCanvasDefaultView.tsx": {
-    "palette": 3,
+    "palette": 2,
     "button": 1
   },
   "features/dashboard/elements/EmptyStateWidget.tsx": {
@@ -191,9 +179,8 @@
   },
   "features/dashboard/elements/GroupCanvasRenderer.tsx": {
     "hex": 3,
-    "arbitrary": 2,
     "rgb": 12,
-    "palette": 12,
+    "palette": 2,
     "button": 1
   },
   "features/dashboard/elements/ImageWidget.tsx": {
@@ -211,18 +198,14 @@
     "hex": 9,
     "rgb": 9
   },
-  "features/dashboard/elements/MapPlatformLayer.tsx": {
-    "palette": 5
-  },
   "features/dashboard/elements/ProgressBarWidget.tsx": {
     "hex": 2,
     "rgb": 3
   },
   "features/dashboard/elements/RouteProgressWidget.tsx": {
     "hex": 25,
-    "arbitrary": 1,
     "rgb": 14,
-    "palette": 15
+    "palette": 2
   },
   "features/dashboard/elements/SegmentBarWidget.tsx": {
     "hex": 6
@@ -249,26 +232,24 @@
   },
   "features/dashboard/elements/UnitTelemetryCardWidget.tsx": {
     "hex": 42,
-    "arbitrary": 4,
-    "rgb": 9,
-    "palette": 6
+    "arbitrary": 3,
+    "rgb": 9
   },
   "features/dashboard/elements/VehicleAlertBannerWidget.tsx": {
     "hex": 3,
     "rgb": 4
   },
   "features/dashboard/elements/VehicleContainerBehaviorOverlay.tsx": {
-    "arbitrary": 2,
+    "arbitrary": 1,
     "palette": 7
   },
   "features/dashboard/elements/VehicleContainerWidgetView.tsx": {
     "hex": 1,
-    "arbitrary": 3,
-    "palette": 4
+    "arbitrary": 2,
+    "palette": 2
   },
   "features/dashboard/elements/WidgetDataBindingSettings.tsx": {
-    "arbitrary": 14,
-    "palette": 41,
+    "palette": 12,
     "button": 1
   },
   "features/dashboard/elements/WidgetRenderer.tsx": {
@@ -277,35 +258,31 @@
   },
   "features/dashboard/index.tsx": {
     "hex": 7,
-    "arbitrary": 10,
     "rgb": 3,
-    "palette": 109,
-    "button": 18
+    "palette": 26,
+    "button": 14
   },
   "features/dashboard/NewPlaneDialog.tsx": {
-    "palette": 43,
-    "button": 4
+    "palette": 6,
+    "button": 2
   },
   "features/dashboard/PlaneWorkspace.tsx": {
     "hex": 16,
     "rgb": 42,
-    "palette": 3,
+    "palette": 1,
     "button": 7
   },
   "features/dashboard/PropertiesPanel.tsx": {
     "hex": 79,
-    "arbitrary": 123,
+    "arbitrary": 3,
     "rgb": 3,
-    "palette": 440,
-    "button": 37,
-    "selection": 20
+    "palette": 80,
+    "button": 27
   },
   "features/dashboard/route-progress/RouteProgressSettings.tsx": {
     "hex": 6,
-    "arbitrary": 12,
-    "palette": 54,
-    "button": 8,
-    "selection": 1
+    "palette": 7,
+    "button": 5
   },
   "features/dashboard/route-progress/RouteTrackView.tsx": {
     "hex": 16,
@@ -316,14 +293,12 @@
     "rgb": 2
   },
   "features/dashboard/settings/PlaneDataSettingsPanel.tsx": {
-    "arbitrary": 4,
-    "palette": 23,
+    "palette": 6,
     "button": 1
   },
   "features/dashboard/settings/SettingsModal.tsx": {
-    "arbitrary": 2,
-    "palette": 133,
-    "button": 17
+    "palette": 36,
+    "button": 11
   },
   "features/dashboard/types.ts": {
     "hex": 91,
@@ -464,73 +439,59 @@
   },
   "features/map-editor/components/AreaInspectorSection.tsx": {
     "hex": 3,
-    "arbitrary": 24,
-    "palette": 76,
-    "button": 2,
-    "selection": 2
+    "palette": 5
   },
   "features/map-editor/components/AreaNode.tsx": {
     "hex": 7,
     "arbitrary": 1,
-    "palette": 11
+    "palette": 10
   },
   "features/map-editor/components/AreaRulerOverlay.tsx": {
     "hex": 2,
     "rgb": 4,
-    "palette": 38
+    "palette": 29
   },
   "features/map-editor/components/AssetPaletteBar.tsx": {
-    "hex": 6,
-    "arbitrary": 17,
+    "hex": 1,
+    "arbitrary": 12,
     "rgb": 5,
-    "palette": 2,
     "button": 2
   },
   "features/map-editor/components/BasemapCellOverlay.tsx": {
-    "arbitrary": 1,
     "palette": 13
   },
   "features/map-editor/components/BasemapFilePickerDialog.tsx": {
-    "palette": 26,
-    "button": 3
+    "palette": 6,
+    "button": 1
   },
   "features/map-editor/components/BasemapGraphic.tsx": {
-    "arbitrary": 4,
-    "palette": 22,
-    "button": 3
+    "palette": 11,
+    "button": 2
   },
   "features/map-editor/components/BasemapGridOverlay.tsx": {
     "rgb": 4
   },
   "features/map-editor/components/BasemapInspectorSection.tsx": {
-    "arbitrary": 9,
-    "palette": 32,
-    "button": 1
+    "palette": 4
   },
   "features/map-editor/components/BasemapNode.tsx": {
     "hex": 1,
-    "arbitrary": 1,
-    "palette": 33,
+    "palette": 8,
     "button": 8
   },
   "features/map-editor/components/CrossTrackInspectorSection.tsx": {
-    "arbitrary": 18,
-    "palette": 51,
-    "button": 1,
-    "selection": 1
+    "palette": 6,
+    "button": 1
   },
   "features/map-editor/components/DockingPointInspectorSection.tsx": {
-    "arbitrary": 10,
-    "palette": 22
+    "palette": 4
   },
   "features/map-editor/components/FacilityDockingPointInspectorSection.tsx": {
-    "arbitrary": 14,
-    "palette": 38,
-    "button": 3
+    "palette": 4
   },
   "features/map-editor/components/FacilityDraggableLabel.tsx": {
     "rgb": 1,
-    "palette": 6,
+    "palette": 5,
     "button": 1
   },
   "features/map-editor/components/FacilityDragGuidesOverlay.tsx": {
@@ -538,72 +499,56 @@
   },
   "features/map-editor/components/FacilityInspectorSection.tsx": {
     "hex": 1,
-    "arbitrary": 7,
-    "palette": 18
+    "palette": 1
   },
   "features/map-editor/components/FacilityLayerSection.tsx": {
-    "arbitrary": 3,
-    "palette": 8,
-    "button": 1
+    "palette": 1
   },
   "features/map-editor/components/FacilityNode.tsx": {
     "hex": 23,
-    "arbitrary": 7,
+    "arbitrary": 4,
     "rgb": 1,
-    "palette": 102,
+    "palette": 64,
     "button": 6
   },
   "features/map-editor/components/FacilityRefFieldBoundsSection.tsx": {
-    "arbitrary": 13,
-    "palette": 33,
-    "button": 2
+    "palette": 11
   },
   "features/map-editor/components/FacilityRefFieldPositionSection.tsx": {
-    "arbitrary": 6,
-    "palette": 13
+    "palette": 7
   },
   "features/map-editor/components/FacilityTransformOverlay.tsx": {
-    "palette": 2
+    "palette": 1
   },
   "features/map-editor/components/FillColorRulesSection.tsx": {
     "hex": 1,
-    "arbitrary": 11,
-    "palette": 38,
-    "button": 2
+    "palette": 4
   },
   "features/map-editor/components/FrameInspectorSection.tsx": {
     "hex": 2,
-    "arbitrary": 7,
-    "palette": 19,
-    "selection": 1
+    "palette": 1
   },
   "features/map-editor/components/GeofenceInspectorSection.tsx": {
-    "arbitrary": 19,
-    "palette": 63,
-    "button": 3,
-    "selection": 2
+    "palette": 9,
+    "button": 1
   },
   "features/map-editor/components/GeofenceNode.tsx": {
     "hex": 3,
     "arbitrary": 2,
-    "palette": 27,
+    "palette": 17,
     "button": 4
   },
   "features/map-editor/components/Inspector.tsx": {
     "hex": 2,
-    "arbitrary": 61,
-    "palette": 218,
-    "button": 6,
-    "selection": 7
+    "palette": 42,
+    "button": 1
   },
   "features/map-editor/components/LeaveEditConfirmDialog.tsx": {
-    "palette": 17,
-    "button": 3
+    "palette": 1
   },
   "features/map-editor/components/MapAreaCanvas.tsx": {
     "hex": 2,
-    "rgb": 2,
-    "palette": 2
+    "rgb": 2
   },
   "features/map-editor/components/MapAuxiliaryLinesOverlay.tsx": {
     "rgb": 1
@@ -611,60 +556,55 @@
   "features/map-editor/components/MapCanvas.tsx": {
     "hex": 1,
     "rgb": 2,
-    "palette": 7
+    "palette": 3
   },
   "features/map-editor/components/MapCanvasInspectorSection.tsx": {
-    "arbitrary": 1,
-    "palette": 15
+    "palette": 1
   },
   "features/map-editor/components/MapCropInspectorSection.tsx": {
-    "arbitrary": 1,
-    "palette": 16
+    "palette": 4
   },
   "features/map-editor/components/MapCropModeOverlay.tsx": {
-    "arbitrary": 3,
+    "arbitrary": 1,
     "rgb": 1,
-    "palette": 16
+    "palette": 10
   },
   "features/map-editor/components/MapEditorToolbar.tsx": {
-    "hex": 21,
-    "arbitrary": 47,
+    "hex": 3,
+    "arbitrary": 28,
     "rgb": 13,
-    "palette": 17,
+    "palette": 7,
     "button": 9
   },
   "features/map-editor/components/MapLibraryPage.tsx": {
-    "hex": 63,
-    "arbitrary": 107,
-    "rgb": 28,
-    "palette": 11,
-    "button": 22
+    "hex": 13,
+    "arbitrary": 54,
+    "rgb": 26,
+    "palette": 2,
+    "button": 19
   },
   "features/map-editor/components/MapListDrawer.tsx": {
-    "hex": 23,
-    "arbitrary": 44,
+    "hex": 7,
+    "arbitrary": 26,
     "rgb": 12,
-    "palette": 10,
+    "palette": 5,
     "button": 4
   },
   "features/map-editor/components/MapPixelFrameOverlay.tsx": {
-    "arbitrary": 1,
     "rgb": 7,
-    "palette": 3
+    "palette": 2
   },
   "features/map-editor/components/MapRevisionHistoryDialog.tsx": {
-    "arbitrary": 3,
-    "palette": 37,
-    "button": 5
+    "palette": 10,
+    "button": 3
   },
   "features/map-editor/components/MapRulers.tsx": {
-    "arbitrary": 8,
-    "palette": 10
+    "arbitrary": 4,
+    "palette": 4
   },
   "features/map-editor/components/NewMapPixelDialog.tsx": {
-    "arbitrary": 2,
-    "palette": 36,
-    "button": 3
+    "palette": 10,
+    "button": 1
   },
   "features/map-editor/components/PlatformDoorGraphic.tsx": {
     "hex": 2,
@@ -672,46 +612,37 @@
   },
   "features/map-editor/components/PointTopologyEditorDialog.tsx": {
     "hex": 21,
-    "arbitrary": 53,
+    "arbitrary": 3,
     "rgb": 2,
-    "palette": 207,
-    "button": 27
+    "palette": 36,
+    "button": 6
   },
   "features/map-editor/components/RoadLineInspectorSection.tsx": {
-    "arbitrary": 9,
-    "palette": 22
-  },
-  "features/map-editor/components/RouteGroupEditorView.tsx": {
-    "arbitrary": 5,
-    "palette": 17,
-    "button": 2
+    "palette": 3
   },
   "features/map-editor/components/RouteGroupListView.tsx": {
-    "arbitrary": 17,
+    "arbitrary": 1,
     "rgb": 1,
-    "palette": 69,
-    "button": 10
+    "palette": 15,
+    "button": 3
   },
   "features/map-editor/components/RoutePlanningOverlay.tsx": {
     "rgb": 11
   },
   "features/map-editor/components/RoutePlanningPanel.tsx": {
-    "arbitrary": 31,
     "rgb": 2,
-    "palette": 108,
-    "button": 10
+    "palette": 19,
+    "button": 4
   },
   "features/map-editor/components/SetPrimaryMapDialog.tsx": {
-    "hex": 11,
-    "arbitrary": 19,
-    "rgb": 4,
-    "palette": 15,
-    "button": 2
+    "hex": 1,
+    "arbitrary": 6,
+    "rgb": 2,
+    "palette": 5,
+    "button": 1
   },
   "features/map-editor/components/SignalInspectorSection.tsx": {
-    "arbitrary": 15,
-    "palette": 46,
-    "button": 2
+    "palette": 5
   },
   "features/map-editor/components/SignalLightGraphic.tsx": {
     "hex": 8,
@@ -721,84 +652,64 @@
     "hex": 27
   },
   "features/map-editor/components/TrackCornerRadiusSection.tsx": {
-    "arbitrary": 9,
-    "palette": 23,
-    "button": 2
+    "palette": 5
   },
   "features/map-editor/components/TrackDiagnosticsPanel.tsx": {
-    "arbitrary": 2,
-    "palette": 17,
+    "palette": 4,
     "button": 2
   },
   "features/map-editor/components/TrackGenGraphic.tsx": {
     "hex": 3,
-    "arbitrary": 4,
-    "palette": 36,
-    "button": 3
+    "palette": 15,
+    "button": 2
   },
   "features/map-editor/components/TrackGenInspectorSection.tsx": {
-    "arbitrary": 4,
-    "palette": 10
+    "arbitrary": 2
   },
   "features/map-editor/components/TrackGenSizeDialog.tsx": {
     "hex": 25,
-    "arbitrary": 35,
-    "palette": 118,
-    "button": 15
+    "palette": 7,
+    "button": 1
   },
   "features/map-editor/components/TrackInspectorSection.tsx": {
-    "arbitrary": 3,
-    "palette": 7
-  },
-  "features/map-editor/components/TrackPartInspectorSection.tsx": {
-    "arbitrary": 8,
-    "palette": 23,
-    "selection": 1
+    "palette": 2
   },
   "features/map-editor/components/TrajectoryHud.tsx": {
-    "arbitrary": 2,
-    "palette": 11
+    "palette": 2
   },
   "features/map-editor/components/TrajectoryLayer.tsx": {
     "rgb": 11
   },
   "features/map-editor/components/TrajectoryPanel.tsx": {
-    "palette": 37,
+    "palette": 1,
     "button": 4
   },
   "features/map-editor/components/TrajectoryRawDataList.tsx": {
-    "arbitrary": 1,
-    "palette": 9,
+    "palette": 2,
     "button": 1
   },
   "features/map-editor/components/TrajectoryZoomBar.tsx": {
-    "arbitrary": 7,
-    "palette": 18,
-    "button": 1
+    "palette": 4
   },
   "features/map-editor/components/WaypointInspectorSection.tsx": {
-    "arbitrary": 6,
-    "palette": 12
+    "palette": 4
   },
   "features/map-editor/components/WorkspaceTabs.tsx": {
-    "palette": 12,
+    "palette": 2,
     "button": 2
   },
   "features/map-editor/components/ZoneEntranceInspectorSection.tsx": {
-    "arbitrary": 23,
-    "palette": 44,
-    "button": 1
+    "palette": 6
   },
   "features/map-editor/components/ZonePartitionInspectorSection.tsx": {
-    "arbitrary": 26,
-    "palette": 61
+    "palette": 26
   },
   "features/map-editor/index.tsx": {
-    "hex": 7,
-    "arbitrary": 11,
+    "hex": 4,
+    "arbitrary": 6,
     "rgb": 5,
-    "palette": 46,
-    "button": 4
+    "palette": 7,
+    "button": 3
   },
   "features/map-editor/opendrive/lanePolygons.ts": {
     "hex": 8
@@ -844,9 +755,8 @@
   },
   "features/map-editor/vehicles/MapAreaVehicleOverlay.tsx": {
     "hex": 4,
-    "arbitrary": 2,
     "rgb": 2,
-    "palette": 12
+    "palette": 8
   },
   "features/map-editor/vehicles/resolveMapVehicleAppearance.ts": {
     "hex": 1

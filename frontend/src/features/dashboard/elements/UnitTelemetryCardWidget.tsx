@@ -432,8 +432,8 @@ function DefaultTelemetryCardView({
       }}
     >
       <div className="flex items-center justify-between gap-1 px-0.5">
-        <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-100">
-          <span className="text-sky-400">▣</span>
+        <div className="flex items-center gap-1 text-caption-2 text-text-primary">
+          <span className="text-text-theme">▣</span>
           {title}
         </div>
         {badge && (
@@ -463,7 +463,7 @@ function DefaultTelemetryCardView({
           accent="#a78bfa"
         />
       </div>
-      <div className="flex justify-center gap-1 border-t border-zinc-800/80 px-0.5 pt-1">
+      <div className="flex justify-center gap-1 border-t border-border-quaternary px-0.5 pt-1">
         {widget.statusFlags.map((f) => {
           const sys = f.mqttSubsystemKey ?? f.key.toUpperCase();
           const st = getByPath(healthPayload, `subsystems.${sys}.status`) as string | undefined;
@@ -479,9 +479,9 @@ function DefaultTelemetryCardView({
           );
         })}
       </div>
-      <div className="mt-0.5 flex justify-center text-[8px] text-zinc-300">
-        <span className="flex items-center gap-0.5 rounded bg-zinc-800/80 px-1.5 py-px">
-          <MapPin size={9} className="shrink-0 text-zinc-400" />
+      <div className="mt-0.5 flex justify-center text-[8px] text-text-secondary">
+        <span className="flex items-center gap-0.5 rounded bg-surface-secondary px-1.5 py-px">
+          <MapPin size={9} className="shrink-0 text-text-tertiary" />
           {String(segment)}
         </span>
       </div>

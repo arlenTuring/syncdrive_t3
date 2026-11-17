@@ -154,7 +154,7 @@ export function MapPlatformLayer({
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-zinc-500">
+      <div className="flex h-full items-center justify-center text-text-quaternary">
         <MapIcon className="mr-2 size-5 animate-pulse" />
         載入地圖…
       </div>
@@ -163,7 +163,7 @@ export function MapPlatformLayer({
 
   if (error) {
     return (
-      <div className="flex h-full min-h-[120px] items-center justify-center bg-zinc-950 px-4 text-center text-sm text-red-400">
+      <div className="flex h-full min-h-[120px] items-center justify-center bg-surface-sub-background px-4 text-center text-body-s text-status-error-emphasis">
         {error}
       </div>
     );
@@ -171,9 +171,9 @@ export function MapPlatformLayer({
 
   if (areas.length === 0) {
     return (
-      <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 bg-zinc-950 px-4 text-center text-zinc-500">
+      <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 bg-surface-sub-background px-4 text-center text-text-quaternary">
         <MapIcon className="size-6 opacity-40" aria-hidden />
-        <p className="text-xs">圖台尚無 Area 資料（mapId: {mapId || '未設定'}）</p>
+        <p className="text-body-xs">圖台尚無 Area 資料（mapId: {mapId || '未設定'}）</p>
       </div>
     );
   }
