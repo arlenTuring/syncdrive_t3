@@ -294,14 +294,7 @@ export function RoutePlanningPanel({
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <button
-            type="button"
-            onClick={onCancelDraft}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-600/80 bg-black-30 px-2.5 py-2 text-left text-body-xs-bold text-text-secondary transition-colors hover:border-border-primary hover:bg-surface-secondary hover:text-text-primary"
-          >
-            <ChevronLeft className="size-4 shrink-0" aria-hidden />
-            {t('mapEditor.routePlanning.backToList')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="shrink-0" leadingIcon={<ChevronLeft />} onPress={onCancelDraft}>{t('mapEditor.routePlanning.backToList')}</Button>
 
           <p className="text-body-xs-bold text-text-primary">
             {draft.routeId ? t('mapEditor.routePlanning.editRoute') : t('mapEditor.routePlanning.createRoute')}
@@ -511,13 +504,7 @@ export function RoutePlanningPanel({
                   {t('mapEditor.routePlanning.topologySumTitle')}
                 </p>
                 <span className="group relative inline-flex">
-                  <button
-                    type="button"
-                    className="rounded p-0.5 text-text-tertiary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/60"
-                    aria-label={t('mapEditor.routePlanning.travelTimeHelpAria')}
-                  >
-                    <Info className="size-3.5" strokeWidth={2} aria-hidden />
-                  </button>
+                  <IconButton size="small" hierarchy="subordinate" variant="standard" label={t('mapEditor.routePlanning.travelTimeHelpAria')} icon={<Info />} />
                   <span
                     role="tooltip"
                     className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-56 rounded-md border border-border-tertiary bg-surface-primary px-2.5 py-2 text-caption-2 text-text-primary shadow-xl group-hover:block group-focus-within:block"

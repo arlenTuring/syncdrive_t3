@@ -6,6 +6,7 @@ import { VEHICLE_IDS } from '../constants/vehicles'
 import type { VehicleTrajectoryEntry } from '../constants/vehicleTrajectoryCatalog'
 import type { ParsedTrajectory } from '../types/trajectoryFile'
 import { TrajectoryRawDataList } from './TrajectoryRawDataList'
+import { Button, IconButton } from '../../../components/ui';
 
 type TrajectoryPanelProps = {
   selectedVehicleId: string | null
@@ -89,16 +90,7 @@ export function TrajectoryPanel({
                   </option>
                 ))}
               </SiteSelect>
-              <button
-                type="button"
-                disabled={!hasTrajectory}
-                onClick={onLocateVehicle}
-                className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-tertiary bg-surface-secondary px-2.5 py-2 text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-                title={t('mapEditor.trajectory.locateTitle')}
-                aria-label={t('mapEditor.trajectory.locateAria')}
-              >
-                <LocateFixed className="size-4 text-text-theme" aria-hidden />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="tonal" className="shrink-0" disabled={!hasTrajectory} onPress={onLocateVehicle} title={t('mapEditor.trajectory.locateTitle')} label={t('mapEditor.trajectory.locateAria')} icon={<LocateFixed />} />
             </div>
             <p className="mt-1.5 text-body-xs text-text-disabled">
               {t('mapEditor.trajectory.loadHint')}
@@ -148,15 +140,7 @@ export function TrajectoryPanel({
               )}
               {replayPlaying ? t('mapEditor.trajectory.pause') : t('mapEditor.trajectory.play')}
             </button>
-            <button
-              type="button"
-              disabled={!hasTrajectory}
-              onClick={onRewind}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <RotateCcw className="size-4 shrink-0" aria-hidden />
-              {t('mapEditor.trajectory.rewind')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="flex-1" leadingIcon={<RotateCcw />} disabled={!hasTrajectory} onPress={onRewind}>{t('mapEditor.trajectory.rewind')}</Button>
           </div>
 
           <div>
@@ -171,14 +155,7 @@ export function TrajectoryPanel({
                 e.target.value = ''
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition hover:bg-link-standard-hover"
-            >
-              <FolderOpen className="size-4 shrink-0" aria-hidden />
-              {t('mapEditor.trajectory.importJson')}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<FolderOpen />} onPress={() => fileInputRef.current?.click()}>{t('mapEditor.trajectory.importJson')}</Button>
           </div>
 
           {mapMismatch && (

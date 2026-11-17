@@ -33,7 +33,16 @@ def parse_attrs(tag):
         else: val=None
         out.append((name,val))
     return out
-ICON=r'<([A-Z]\w*)(?:\s+[\w-]+=(?:"[^"]*"|\{[^{}]*\}))*\s*/>'
+ICON=r'<([A-Z]\w*)(?:\s+[\w-]+(?:=(?:"[^"]*"|\{[^{}]*\}))?)*\s*/>'
+CICON=r'\{([^{}?]+?)\s*\?\s*('+ICON+r')\s*:\s*('+ICON+r')\s*\}'
+def icon_jsx(src):
+    """<Icon className="size-4 animate-spin" … /> → <Icon className="animate-spin" />：尺寸、顏色交給元件，動畫、旋轉留下"""
+    name=re.match(r'<([A-Z]\w*)',src).group(1)
+    m=re.search(r'className="([^"]*)"',src)
+    keep=[c for c in (m.group(1).split() if m else []) if re.match(r'(?:animate-|rotate-|-rotate-|scale-x-|scale-y-|transition)',c)]
+    return f'<{name} className="{" ".join(keep)}" />' if keep else f'<{name} />'
+def cond_jsx(mc):
+    return f'{mc.group(1).strip()} ? {icon_jsx(mc.group(2))} : {icon_jsx(mc.group(4))}'
 # 只有圖示、沒寫 aria-label / title 時，依圖示補可及名稱
 ICON_LABELS={'Trash2':'刪除','Trash':'刪除','Plus':'新增','X':'移除','Edit2':'編輯','Edit3':'編輯','Pencil':'編輯','ChevronUp':'上移','ChevronDown':'下移','RefreshCw':'重新整理','Copy':'複製','Settings':'設定','Search':'搜尋'}
 def classify(cls,children,is_icon):
@@ -80,7 +89,7 @@ def convert_file(path, ui):
         ch=children.strip()
         mi=re.fullmatch(ICON,ch)
         # {條件 ? <IconA /> : <IconB />}：只有圖示、依狀態換圖示
-        mc=re.fullmatch(r'\{([^{}?]+?)\s*\?\s*('+ICON+r')\s*:\s*('+ICON+r')\s*\}',ch)
+        mc=re.fullmatch(CICON,ch)
         is_icon=bool(mi or mc)
         icon_name=mi.group(1) if mi else None
         auto_label=None
@@ -89,12 +98,18 @@ def convert_file(path, ui):
             else: skipped+=1; continue
         lead=trail=None; label=ch
         if not is_icon:
-            m=re.match(r'^'+ICON+r'\s*(.+)$',ch,re.S)
-            if m and '<' not in m.group(2).replace('{','').split('}')[0][:0]:
-                lead=m.group(1); label=m.group(2).strip()
+            m=re.match(r'^('+ICON+r')\s*(.+)$',ch,re.S)
+            mcl=re.match(r'^'+CICON+r'\s*(.+)$',ch,re.S)
+            if m:
+                lead=icon_jsx(m.group(1)); label=m.group(3).strip()
+            elif mcl:
+                lead=cond_jsx(mcl); label=mcl.group(6).strip()
             else:
-                m2=re.match(r'^(.+?)\s*'+ICON+r'$',ch,re.S)
-                if m2: trail=m2.group(2); label=m2.group(1).strip()
+                m2=re.match(r'^(.+?)\s*('+ICON+r')$',ch,re.S)
+                if m2: trail=icon_jsx(m2.group(2)); label=m2.group(1).strip()
+            # <span>文字</span> 單層包裝：拿掉 span（可能帶 RWD 顯示 class，就跳過）
+            ms=re.fullmatch(r'<span>(.*)</span>',label,re.S)
+            if ms: label=ms.group(1).strip()
             if re.search(r'<(?!/?(?:b|strong|kbd)\b)[a-zA-Z]',label): skipped+=1; continue
         h,v=classify(cls,children,is_icon)
         keep=[c for c in cls.split() if LAYOUT.match(c) and c not in ('flex','inline-flex','block')]
@@ -114,12 +129,12 @@ def convert_file(path, ui):
         if keep: hv.append(f'className="{" ".join(keep)}"')
         if is_icon:
             small=' size="small"' if re.search(r'size-(?:3|3\.5|4)\b|size=\{1[0-6]\}',ch) else ''
-            icon_expr=f'<{mi.group(1)} />' if mi else f'{mc.group(1).strip()} ? <{mc.group(3)} /> : <{mc.group(5)} />'
+            icon_expr=icon_jsx(ch) if mi else cond_jsx(mc)
             new=f'<IconButton{small} {" ".join(hv+parts)} icon={{{icon_expr}}} />'.replace('  ',' ')
             need.add('IconButton')
         else:
-            if lead: hv.append(f'leadingIcon={{<{lead} />}}')
-            if trail: hv.append(f'trailingIcon={{<{trail} />}}')
+            if lead: hv.append(f'leadingIcon={{{lead}}}')
+            if trail: hv.append(f'trailingIcon={{{trail}}}')
             new=f'<Button {" ".join(hv+parts)}>{label}</Button>'
             need.add('Button')
         s=s[:st]+new+s[en:]; done+=1

@@ -1157,14 +1157,7 @@ export function Inspector({
 
         {!readOnly && (
           <div className="pt-1">
-            <button
-              type="button"
-              onClick={onDelete}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/80 bg-red-950/50 py-2 text-body-s-bold text-status-error-emphasis transition hover:bg-red-950/80 focus:outline-none focus:ring-2 focus:ring-red-500/40"
-            >
-              <Trash2 className="size-4 shrink-0" aria-hidden />
-              {t('mapEditor.inspector.deleteObject')}
-            </button>
+            <Button hierarchy="danger" variant="outlined" className="w-full" leadingIcon={<Trash2 />} onPress={onDelete}>{t('mapEditor.inspector.deleteObject')}</Button>
           </div>
         )}
 

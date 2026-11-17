@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import type { TrackDiagnostics, TrackIssue } from '../utils/trackDiagnostics'
+import { IconButton } from '../../../components/ui';
 
 type Props = {
   diagnostics: TrackDiagnostics
@@ -34,14 +35,7 @@ export function TrackDiagnosticsPanel({ diagnostics, onLocate, onClose }: Props)
             {issues.length === 0 ? '全部正常' : `${issues.length} 項需要處理`}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-1 text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary"
-          aria-label="關閉"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onClose} label="關閉" icon={<X />} />
       </div>
       {issues.length === 0 ? (
         <p className="px-3 py-4 text-body-xs text-text-tertiary">

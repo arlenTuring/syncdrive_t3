@@ -13,7 +13,7 @@ import {
   type MapRevisionReason,
 } from '../utils/mapRevisionHistory'
 import { systemConfirm } from '../../../lib/systemDialog'
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 type MapRevisionHistoryDialogProps = {
   open: boolean
@@ -238,15 +238,7 @@ export function MapRevisionHistoryDialog({
                         )}
                         {t('mapEditor.revision.restore')}
                       </button>
-                      <button
-                        type="button"
-                        disabled={busyId === item.id}
-                        onClick={() => void handleDelete(item.id)}
-                        className="inline-flex items-center rounded-md border border-border-tertiary bg-surface-secondary p-1.5 text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary disabled:opacity-50"
-                        title={t('mapEditor.revision.deleteTitle')}
-                      >
-                        <Trash2 className="size-3.5" aria-hidden />
-                      </button>
+                      <IconButton size="small" hierarchy="subordinate" variant="tonal" disabled={busyId === item.id} onPress={() => void handleDelete(item.id)} title={t('mapEditor.revision.deleteTitle')} label={t('mapEditor.revision.deleteTitle')} icon={<Trash2 />} />
                     </div>
                   </div>
                 </li>

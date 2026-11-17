@@ -639,15 +639,7 @@ function CheckGroupCard({
                     </span>
                     <span className="min-w-0 flex-1 text-body-s text-text-primary">{issue.message}</span>
                     {jumpable ? (
-                      <button
-                        type="button"
-                        onClick={() => onIssueClick(issue)}
-                        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-standard-hover hover:text-text-primary"
-                        title={t('shiftList.scheduleAdjust.jump')}
-                        aria-label={`${t('shiftList.scheduleAdjust.jump')} ${tripCode}`}
-                      >
-                        <ArrowRight className="size-4" aria-hidden />
-                      </button>
+                      <IconButton size="small" hierarchy="subordinate" variant="standard" className="mt-0.5 shrink-0" onPress={() => onIssueClick(issue)} title={t('shiftList.scheduleAdjust.jump')} label={`${t('shiftList.scheduleAdjust.jump')} ${tripCode}`} icon={<ArrowRight />} />
                     ) : (
                       <span className="size-7 shrink-0" aria-hidden />
                     )}

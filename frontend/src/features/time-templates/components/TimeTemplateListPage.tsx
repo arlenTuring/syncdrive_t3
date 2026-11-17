@@ -208,15 +208,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
       </header>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-s text-text-primary transition hover:border-border-primary hover:bg-link-standard-hover"
-          title={t('common.resetFiltersTitle')}
-        >
-          <RotateCcw className="size-3.5" aria-hidden />
-          {t('common.resetFilters')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" leadingIcon={<RotateCcw />} onPress={resetFilters} title={t('common.resetFiltersTitle')}>{t('common.resetFilters')}</Button>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
@@ -245,23 +237,8 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           ))}
         </SiteSelect>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
-        <button
-          type="button"
-          onClick={() => void handleDownload()}
-          disabled={exporting || !hasSelection}
-          className="inline-flex items-center gap-2 rounded-lg border border-border-quaternary bg-surface-primary px-4 py-2 text-body-s text-text-primary hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {t('common.download')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
-        >
-          <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          {t('timeTemplates.create')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button>
+        <Button className="ml-auto w-fit shrink-0" leadingIcon={<Plus />} onPress={() => setCreateOpen(true)}>{t('timeTemplates.create')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">

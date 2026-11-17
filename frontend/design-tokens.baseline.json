@@ -81,8 +81,8 @@
     "rgb": 2
   },
   "features/dashboard/components/SimulationTransportToolbar.tsx": {
-    "palette": 18,
-    "button": 7
+    "palette": 13,
+    "button": 4
   },
   "features/dashboard/components/SnapGuideLines.tsx": {
     "hex": 1
@@ -125,9 +125,9 @@
   },
   "features/dashboard/DashboardList.tsx": {
     "hex": 8,
-    "arbitrary": 35,
-    "rgb": 14,
-    "button": 9
+    "arbitrary": 28,
+    "rgb": 11,
+    "button": 6
   },
   "features/dashboard/elements/BarChartWidget.tsx": {
     "hex": 7,
@@ -241,8 +241,8 @@
   "features/dashboard/index.tsx": {
     "hex": 7,
     "rgb": 3,
-    "palette": 14,
-    "button": 6
+    "palette": 10,
+    "button": 4
   },
   "features/dashboard/NewPlaneDialog.tsx": {
     "palette": 6,
@@ -452,8 +452,7 @@
     "button": 8
   },
   "features/map-editor/components/CrossTrackInspectorSection.tsx": {
-    "palette": 6,
-    "button": 1
+    "palette": 1
   },
   "features/map-editor/components/DockingPointInspectorSection.tsx": {
     "palette": 4
@@ -512,8 +511,7 @@
   },
   "features/map-editor/components/Inspector.tsx": {
     "hex": 2,
-    "palette": 42,
-    "button": 1
+    "palette": 38
   },
   "features/map-editor/components/LeaveEditConfirmDialog.tsx": {
     "palette": 1
@@ -550,10 +548,10 @@
   },
   "features/map-editor/components/MapLibraryPage.tsx": {
     "hex": 13,
-    "arbitrary": 54,
-    "rgb": 26,
+    "arbitrary": 46,
+    "rgb": 22,
     "palette": 2,
-    "button": 19
+    "button": 15
   },
   "features/map-editor/components/MapListDrawer.tsx": {
     "hex": 7,
@@ -568,7 +566,7 @@
   },
   "features/map-editor/components/MapRevisionHistoryDialog.tsx": {
     "palette": 10,
-    "button": 3
+    "button": 2
   },
   "features/map-editor/components/MapRulers.tsx": {
     "arbitrary": 4,
@@ -603,8 +601,8 @@
   },
   "features/map-editor/components/RoutePlanningPanel.tsx": {
     "rgb": 2,
-    "palette": 19,
-    "button": 4
+    "palette": 16,
+    "button": 2
   },
   "features/map-editor/components/SetPrimaryMapDialog.tsx": {
     "hex": 1,
@@ -628,7 +626,7 @@
   },
   "features/map-editor/components/TrackDiagnosticsPanel.tsx": {
     "palette": 4,
-    "button": 2
+    "button": 1
   },
   "features/map-editor/components/TrackGenGraphic.tsx": {
     "hex": 3,
@@ -654,7 +652,7 @@
   },
   "features/map-editor/components/TrajectoryPanel.tsx": {
     "palette": 1,
-    "button": 4
+    "button": 1
   },
   "features/map-editor/components/TrajectoryRawDataList.tsx": {
     "palette": 2,
@@ -869,8 +867,7 @@
     "palette": 3
   },
   "features/shift-list/components/ShiftListPage.tsx": {
-    "arbitrary": 2,
-    "button": 4
+    "button": 3
   },
   "features/shift-list/components/ShiftSchedulePlanGrid.tsx": {
     "hex": 14,
@@ -900,7 +897,7 @@
     "hex": 1,
     "arbitrary": 1,
     "palette": 4,
-    "button": 2
+    "button": 1
   },
   "features/shift-list/components/StepShiftSchedulePreview.tsx": {
     "palette": 6
@@ -1046,9 +1043,8 @@
     "button": 3
   },
   "features/time-templates/components/TimeTemplateListPage.tsx": {
-    "arbitrary": 2,
     "palette": 5,
-    "button": 8
+    "button": 5
   },
   "features/time-templates/components/TimeTemplatePanelHeader.tsx": {
     "arbitrary": 6,

@@ -58,7 +58,7 @@ import {
   type PublishedMapSummary,
 } from '../api/mapLibraryApi'
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog'
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
@@ -639,17 +639,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           />
           {/* 匯入：檔案、貼上、從伺服器載入收在同一顆按鈕 */}
           <div className="relative">
-            <button
-              ref={importMenuButtonRef}
-              type="button"
-              onClick={() => setImportMenuOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={importMenuOpen}
-              className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme transition hover:bg-[rgba(81,162,255,0.08)]"
-            >
-              <CloudDownload className="size-[18px]" aria-hidden />
-              {t('mapLibrary.importFile')}
-            </button>
+            <Button variant="outlined" leadingIcon={<CloudDownload />} ref={importMenuButtonRef} onPress={() => setImportMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={importMenuOpen}>{t('mapLibrary.importFile')}</Button>
             <AnchoredPopover
               open={importMenuOpen}
               anchorRef={importMenuButtonRef}
@@ -696,14 +686,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 </button>
             </AnchoredPopover>
           </div>
-          <button
-            type="button"
-            onClick={() => setNewMapDialogOpen(true)}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
-          >
-            <Plus className="size-[18px]" strokeWidth={2} aria-hidden />
-            {t('mapLibrary.newBlank')}
-          </button>
+          <Button leadingIcon={<Plus />} onPress={() => setNewMapDialogOpen(true)}>{t('mapLibrary.newBlank')}</Button>
         </div>
       </div>
 
@@ -990,15 +973,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
 
         {!loading && !error && visibleEntries.length > 0 && (
           <nav className="flex h-6 shrink-0 items-center justify-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              className="inline-flex size-6 items-center justify-center rounded-lg text-text-secondary hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
-              aria-label={t('mapLibrary.prevPage')}
-            >
-              <ChevronLeft className="size-[18px]" aria-hidden />
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" disabled={currentPage <= 1} onPress={() => setPage(Math.max(1, currentPage - 1))} label={t('mapLibrary.prevPage')} icon={<ChevronLeft />} />
             {pageNumbers.map((n) => (
               <button
                 key={n}
@@ -1014,15 +989,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                 {n}
               </button>
             ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              className="inline-flex size-6 items-center justify-center rounded-lg text-text-secondary hover:bg-[rgba(209,213,220,0.08)] disabled:opacity-30"
-              aria-label={t('mapLibrary.nextPage')}
-            >
-              <ChevronRight className="size-[18px]" aria-hidden />
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" disabled={currentPage >= totalPages} onPress={() => setPage(Math.min(totalPages, currentPage + 1))} label={t('mapLibrary.nextPage')} icon={<ChevronRight />} />
           </nav>
         )}
       </div>

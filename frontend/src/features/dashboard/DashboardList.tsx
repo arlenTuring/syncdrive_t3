@@ -17,7 +17,7 @@ import type { DashboardPlane } from './types';
 import { ExportTemplateButton, ImportTemplateDialog } from './components/TemplateFileActions';
 import type { TemplateImportResult } from './template/types';
 import { systemConfirm } from '../../lib/systemDialog';
-import { Button } from '../../components/ui';
+import { Button, IconButton } from '../../components/ui';
 
 interface Props {
   planes: DashboardPlane[];
@@ -182,22 +182,8 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
           </button>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme transition hover:bg-[rgba(81,162,255,0.08)]"
-          >
-            <CloudDownload className="size-[18px]" aria-hidden />
-            匯入儀表板
-          </button>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
-          >
-            <Plus className="size-[18px]" strokeWidth={2} aria-hidden />
-            建立儀表板
-          </button>
+          <Button variant="outlined" leadingIcon={<CloudDownload />} onPress={() => setImportOpen(true)}>匯入儀表板</Button>
+          <Button leadingIcon={<Plus />} onPress={onCreate}>建立儀表板</Button>
         </div>
       </div>
 
@@ -249,15 +235,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                         }`}
                       >
                         <div ref={openMenuId === p.id ? rowMenuRef : undefined} className="relative flex justify-center">
-                          <button
-                            type="button"
-                            onClick={() => setOpenMenuId((prev) => (prev === p.id ? null : p.id))}
-                            className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-text-secondary hover:bg-[rgba(209,213,220,0.08)]"
-                            title={t('common.moreActions')}
-                            aria-label={t('common.moreActions')}
-                          >
-                            <MoreHorizontal className="size-6" aria-hidden />
-                          </button>
+                          <IconButton hierarchy="subordinate" variant="standard" onPress={() => setOpenMenuId((prev) => (prev === p.id ? null : p.id))} title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
                           {openMenuId === p.id && (
                             <div className="absolute right-0 top-full z-40 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl">
                               <button

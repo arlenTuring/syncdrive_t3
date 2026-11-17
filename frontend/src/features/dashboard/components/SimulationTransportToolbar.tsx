@@ -234,31 +234,13 @@ export function SimulationTransportToolbar() {
 
       {!running ? (
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void toggle()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-status-success-light bg-emerald-950/40 px-4 py-2 text-body-xs-bold text-status-success transition hover:bg-emerald-900/40 disabled:opacity-50"
-            title={t('dashboard.simulation.startTitle')}
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-            {t('dashboard.simulation.start')}
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={loading ? <Loader2 className="animate-spin" /> : <Play />} disabled={loading} onPress={() => void toggle()} title={t('dashboard.simulation.startTitle')}>{t('dashboard.simulation.start')}</Button>
           <p className="text-body-xs text-text-quaternary">{t('dashboard.simulation.startHint')}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void toggle()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-xs-bold text-status-error-emphasis transition hover:bg-red-900/30 disabled:opacity-50"
-              title={t('dashboard.simulation.stopTitle')}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
-              {t('dashboard.simulation.stop')}
-            </button>
+            <Button hierarchy="danger" variant="outlined" leadingIcon={loading ? <Loader2 className="animate-spin" /> : <Square />} disabled={loading} onPress={() => void toggle()} title={t('dashboard.simulation.stopTitle')}>{t('dashboard.simulation.stop')}</Button>
 
             {managed && (
               <>
@@ -376,16 +358,7 @@ export function SimulationTransportToolbar() {
                     ))}
                   </SiteSelect>
                 </label>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void triggerVehicleFault(faultVehicleCode)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-700/70 bg-red-950/50 px-3 py-2 text-body-xs-bold text-status-error-emphasis transition hover:bg-status-error-light disabled:opacity-50"
-                  title={t('dashboard.simulation.emergencyStopTitle')}
-                >
-                  {loading ? <Loader2 size={14} className="animate-spin" /> : <TriangleAlert size={14} />}
-                  {t('dashboard.simulation.emergencyStop')}
-                </button>
+                <Button hierarchy="danger" variant="outlined" leadingIcon={loading ? <Loader2 className="animate-spin" /> : <TriangleAlert />} disabled={loading} onPress={() => void triggerVehicleFault(faultVehicleCode)} title={t('dashboard.simulation.emergencyStopTitle')}>{t('dashboard.simulation.emergencyStop')}</Button>
                 <Button hierarchy="subordinate" variant="outlined" disabled={loading} onPress={() => void clearVehicleFault(faultVehicleCode)} title={t('dashboard.simulation.clearFaultTitle')}>{t('dashboard.simulation.clearFault')}</Button>
                 <Button hierarchy="subordinate" variant="outlined" disabled={loading} onPress={() => void simulateVehicleObstacle(faultVehicleCode)} title={t('dashboard.simulation.obstacleTitle')}>{t('dashboard.simulation.obstacle')}</Button>
               </div>

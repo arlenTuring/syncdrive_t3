@@ -195,14 +195,7 @@ export function ShiftListPage({
           />
         </div>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
-        <button
-          type="button"
-          onClick={() => onCreateClick?.()}
-          className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
-        >
-          <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-          {t('shiftList.create')}
-        </button>
+        <Button className="ml-auto w-fit shrink-0" leadingIcon={<Plus />} onPress={() => onCreateClick?.()}>{t('shiftList.create')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">

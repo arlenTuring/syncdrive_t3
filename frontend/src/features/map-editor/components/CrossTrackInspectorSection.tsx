@@ -25,7 +25,7 @@ import {
   type CrossRouteKey,
 } from '../utils/crossTrackPortals'
 import { normalizeWaypointCodeInput, normalizeWaypointNameInput } from '../utils/waypointCode'
-import { Checkbox } from '../../../components/ui';
+import { Checkbox, IconButton } from '../../../components/ui';
 
 type Props = {
   facility: FacilityObject
@@ -142,15 +142,7 @@ export function CrossTrackInspectorSection({
                 <div className="text-caption-2 uppercase text-text-secondary">
                   {portalLabel(key)}
                 </div>
-                <button
-                  type="button"
-                  title={t('mapEditor.inspector.crossTrack.pingPortal')}
-                  aria-label={t('mapEditor.inspector.crossTrack.pingPortal')}
-                  onClick={() => pingCrossPortal(facility.id, key)}
-                  className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-cyan-500/40 bg-cyan-950/50 text-cyan-200 hover:border-cyan-400/70 hover:bg-cyan-900/50"
-                >
-                  <Crosshair className="size-3.5" aria-hidden />
-                </button>
+                <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0" title={t('mapEditor.inspector.crossTrack.pingPortal')} label={t('mapEditor.inspector.crossTrack.pingPortal')} onPress={() => pingCrossPortal(facility.id, key)} icon={<Crosshair />} />
               </div>
 
               <div>

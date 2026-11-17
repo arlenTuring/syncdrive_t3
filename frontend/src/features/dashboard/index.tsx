@@ -1175,25 +1175,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
             </span>
 
             {isEditMode ? (
-              <button
-                type="button"
-                onClick={toggleEditMode}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border-primary bg-surface-secondary px-3 py-1.5 text-body-xs-bold text-text-primary shadow-sm transition hover:bg-link-standard-hover"
-                title={t('dashboard.leaveEditTitle')}
-              >
-                <LogOut size={14} />
-                <span>{t('dashboard.leaveEdit')}</span>
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" leadingIcon={<LogOut />} onPress={toggleEditMode} title={t('dashboard.leaveEditTitle')}>{t('dashboard.leaveEdit')}</Button>
             ) : (
-              <button
-                type="button"
-                onClick={toggleEditMode}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/60 bg-cyan-950/50 px-3 py-1.5 text-body-xs-bold text-cyan-200 shadow-sm transition hover:bg-cyan-900/50"
-                title={t('dashboard.enterEditTitle')}
-              >
-                <Pencil size={14} />
-                <span>{t('dashboard.enterEdit')}</span>
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Pencil />} onPress={toggleEditMode} title={t('dashboard.enterEditTitle')}>{t('dashboard.enterEdit')}</Button>
             )}
 
             {isEditMode && (
