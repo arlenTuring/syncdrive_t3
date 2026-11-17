@@ -29,6 +29,12 @@ export type DialogProps = {
   children?: ReactNode;
   /** 只用來調整內容區排版（例如 gap） */
   bodyClassName?: string;
+  /** false＝內容區不加內距、不捲動，由 children 自己排版（例如內容自帶分欄與底部列） */
+  padded?: boolean;
+  /** 寬度：預設依 size；要特殊寬度時給 max-w-* class（只放寬度） */
+  widthClassName?: string;
+  /** 給了就把內容與底部按鈕包成一個 <form>：底部的 type="submit" 按鈕直接送出 */
+  onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
 /**
@@ -49,6 +55,9 @@ export function Dialog({
   role = 'dialog',
   children,
   bodyClassName,
+  padded = true,
+  widthClassName,
+  onSubmit,
 }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const previous = useRef<HTMLElement | null>(null);
@@ -84,6 +93,22 @@ export function Dialog({
     }
   };
 
+  const content = (
+    <>
+      <div
+        data-dialog-body
+        className={padded
+          ? cn('min-h-0 flex-1 overflow-auto px-6 pb-5 text-body-s text-text-secondary', bodyClassName)
+          : cn('flex min-h-0 flex-1 flex-col', bodyClassName)}
+      >
+        {children}
+      </div>
+      {footer ? (
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-quaternary px-6 py-4">{footer}</footer>
+      ) : null}
+    </>
+  );
+
   return createPortal(
     <div
       className={cn(DIALOG_OVERLAY_CLASS, layer === 'system' ? 'z-[1000]' : 'z-[100]')}
@@ -99,7 +124,7 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         onKeyDown={onKeyDown}
-        className={cn(DIALOG_PANEL_CLASS, DIALOG_WIDTHS[size])}
+        className={cn(DIALOG_PANEL_CLASS, widthClassName ?? DIALOG_WIDTHS[size])}
       >
         <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
           <div className="min-w-0 flex-1">
@@ -108,12 +133,13 @@ export function Dialog({
           </div>
           {hideClose ? null : <IconButton label="關閉" icon={<X />} size="small" hierarchy="subordinate" variant="standard" onClick={onClose} disabled={busy} />}
         </header>
-        <div data-dialog-body className={cn('min-h-0 flex-1 overflow-auto px-6 pb-5 text-body-s text-text-secondary', bodyClassName)}>
-          {children}
-        </div>
-        {footer ? (
-          <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-quaternary px-6 py-4">{footer}</footer>
-        ) : null}
+        {onSubmit ? (
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+            {content}
+          </form>
+        ) : (
+          content
+        )}
       </div>
     </div>,
     document.body,

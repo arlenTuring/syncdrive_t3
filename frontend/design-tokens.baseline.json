@@ -38,7 +38,7 @@
   "features/access-control/AccountDialogs.tsx": {
     "hex": 2,
     "arbitrary": 2,
-    "palette": 40,
+    "palette": 36,
     "button": 4
   },
   "features/access-control/AccountManagementPage.tsx": {
@@ -51,7 +51,7 @@
     "palette": 2
   },
   "features/access-control/LoginDialog.tsx": {
-    "palette": 6,
+    "palette": 5,
     "button": 1
   },
   "features/access-control/LoginPage.tsx": {
@@ -61,7 +61,7 @@
   "features/access-control/RoleManagementPage.tsx": {
     "hex": 10,
     "arbitrary": 10,
-    "palette": 40,
+    "palette": 38,
     "button": 13
   },
   "features/dashboard/CanvasElement.tsx": {

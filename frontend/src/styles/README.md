@@ -18,10 +18,10 @@ components/ui/                        共用元件（頁面一律從 components/
   checkbox/  Checkbox、CheckboxIndicator、headerCheckState ← T3 UI Kit 規格
   radio/     Radio、RadioGroup         ← T3 UI Kit 規格
   switch/    Switch                    ← T3 UI Kit 規格
-  dialog/    Dialog                    ← 專案自訂（設計稿尚未提供），樣式在 variants.ts
+  dialog/    Dialog                    ← 專案自訂（設計稿尚未提供），樣式在 variants.ts；帳號權限的 Modal 也是它
   field/     TextInput、TextArea、Field ← 同上
   panel/     Panel                     ← 同上
-  badge/     Badge                     ← 同上
+  badge/     Badge（StatusTag 也是它）  ← 同上
   variants.ts  專案自訂元件的樣式定義（輸入框、面板層級、狀態色、選單、對話框）
      └─ 各功能頁面                      只組合元件與 utility；className 只用來排版
 ```
@@ -34,10 +34,10 @@ components/ui/                        共用元件（頁面一律從 components/
 | 單選 | `<RadioGroup legend value onValueChange options>`（單一個用 `<Radio>`） |
 | 開關 | `<Switch checked onCheckedChange aria-label>`；軌道裡要文字：`text="通知"` |
 | 輸入框 | `<TextInput>`、`<TextArea>`；包標籤與錯誤訊息：`<Field label error>` |
-| 對話框 | `<Dialog title footer onClose>`；確認／提示用 `systemConfirm`／`systemAlert` |
+| 對話框 | `<Dialog title footer onClose>`（表單：`onSubmit`，底部 `type="submit"` 直接送出；內容自己排版：`padded={false}`）；確認／提示用 `systemConfirm`／`systemAlert`。不要再自己寫 `fixed inset-0` 外框 |
 | 卡片、面板 | `<Panel level="primary">` 或 `surfaceClass(level)` |
-| 狀態標籤 | `<Badge tone="error">`、`<StatusTag tone="success">` |
-| 下拉、選單 | `SiteSelect`、`SiteMultiSelect`；自己做浮層時用 `MENU_PANEL_CLASS`、`menuItemClass()` |
+| 狀態標籤 | `<Badge tone>`；表格狀態欄 `<Badge size="md" dot tone>`；分類色 `colors={{ container, dot }}`（`StatusTag` 只是它的舊名稱） |
+| 下拉、日期 | `<SiteSelect size="md">`、`<SiteDateTimeInput size="md">`、`SiteMultiSelect`：給 `size` 就是系統輸入框外觀，`className` 只放排版；自己做浮層時用 `MENU_PANEL_CLASS`、`menuItemClass()` |
 | canvas、SVG、圖表色 | `readToken('status-error')`、`tokenVar('surface-primary')` |
 
 - 設計稿改了 token 數值：只改 `design-tokens.css`。

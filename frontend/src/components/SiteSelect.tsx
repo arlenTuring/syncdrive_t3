@@ -10,7 +10,7 @@ import {
   type SelectHTMLAttributes,
 } from 'react';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
-import { cn, MENU_BADGE_CLASS, MENU_CHECK_CLASS, MENU_EMPTY_CLASS, MENU_GROUP_LABEL_CLASS, MENU_PANEL_CLASS, menuItemClass, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
+import { cn, fieldClass, type FieldSize, MENU_BADGE_CLASS, MENU_CHECK_CLASS, MENU_EMPTY_CLASS, MENU_GROUP_LABEL_CLASS, MENU_PANEL_CLASS, menuItemClass, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 export type SiteSelectOption = {
   value: string;
@@ -41,6 +41,8 @@ function optionsFromChildren(children: ReactNode): SiteSelectOption[] {
 }
 
 type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'multiple' | 'size'> & {
+  /** 給了就用系統統一的輸入框外觀（components/ui 的 fieldClass），className 只放排版；不給＝沿用呼叫端自己的樣式（舊寫法） */
+  size?: FieldSize;
   options?: SiteSelectOption[];
   groups?: SiteSelectGroup[];
   panelWidth?: number;
@@ -61,6 +63,7 @@ export function SiteSelect({
   onBlur,
   disabled,
   className = '',
+  size,
   style,
   id,
   name,
@@ -98,7 +101,7 @@ export function SiteSelect({
         aria-labelledby={ariaLabelledBy}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex min-h-8 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={cn(size ? fieldClass({ size }) : 'min-h-8 disabled:cursor-not-allowed disabled:opacity-50', 'flex items-center justify-between gap-2 text-left', className)}
         style={style}
         onFocus={(event) => onFocus?.(event as never)}
         onBlur={(event) => onBlur?.(event as never)}

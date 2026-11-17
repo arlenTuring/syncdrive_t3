@@ -3,10 +3,14 @@ import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 're
 import { CustomDateTimePanel } from '../features/shift-records/components/CustomDateTimePanel';
 import { TimePickerPanel } from '../features/time-templates/components/TimeOfDayPicker';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
-import { cn, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
+import { cn, fieldClass, type FieldSize, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 type Kind = 'date' | 'time' | 'datetime-local';
-type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { type: Kind };
+type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> & {
+  type: Kind;
+  /** 給了就用系統統一的輸入框外觀，className 只放排版；不給＝沿用呼叫端自己的樣式（舊寫法） */
+  size?: FieldSize;
+};
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -68,6 +72,7 @@ export function SiteDateTimeInput({
   onChange,
   disabled,
   className = '',
+  size,
   min,
   max,
   step,
@@ -103,7 +108,7 @@ export function SiteDateTimeInput({
         aria-expanded={open}
         data-site-datetime-value={current}
         onClick={() => setOpen((currentOpen) => !currentOpen)}
-        className={`flex min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={cn(size ? fieldClass({ size }) : 'disabled:cursor-not-allowed disabled:opacity-50', 'flex min-w-0 items-center justify-between gap-2 text-left', className)}
       >
         <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
         {timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}

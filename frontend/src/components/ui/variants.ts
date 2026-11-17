@@ -94,12 +94,6 @@ export function badgeToneColors(tone: BadgeTone = 'neutral'): { container: strin
   return BADGE_TONES[tone];
 }
 
-export function badgeClass(tone: BadgeTone = 'neutral'): { container: string; dot: string } {
-  return {
-    container: cn('inline-flex w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-0.5 text-body-xs-bold', BADGE_TONES[tone].container),
-    dot: cn('size-2 shrink-0 rounded-full', BADGE_TONES[tone].dot),
-  };
-}
 
 /* ───────────── 對話框 ───────────── */
 

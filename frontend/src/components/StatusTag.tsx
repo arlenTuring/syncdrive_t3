@@ -1,26 +1,15 @@
-import { badgeToneColors, cn, type BadgeTone } from './ui';
+import { Badge, type BadgeColors, type BadgeTone } from './ui';
 
-/** 自訂配色（分類色，例如任務類型）；狀態意義請改用 tone */
-export type StatusTagStyle = {
-  container: string;
-  dot: string;
-};
+/** 自訂分類色；狀態意義請改用 tone（同 components/ui 的 BadgeColors） */
+export type StatusTagStyle = BadgeColors;
 
-type StatusTagProps = {
-  label: string;
-  /** 狀態語意（故障、警告、正常、資訊、離線…）：顏色由設計系統決定 */
-  tone?: BadgeTone;
-  /** 分類用的自訂配色；有 tone 時忽略 */
-  style?: StatusTagStyle;
-};
-
-/** 帶圓點的狀態標籤（固定高 26px）。新程式優先用 tone；純狀態標記也可以直接用 components/ui 的 Badge。 */
-export function StatusTag({ label, tone, style }: StatusTagProps) {
-  const colors = tone ? badgeToneColors(tone) : style ?? badgeToneColors('neutral');
+/**
+ * 表格狀態欄用的帶圓點標籤＝ Badge size="md" dot。保留這個名稱讓既有畫面不用改；新程式直接用 Badge。
+ */
+export function StatusTag({ label, tone, style }: { label: string; tone?: BadgeTone; style?: StatusTagStyle }) {
   return (
-    <span className={cn('inline-flex h-[26px] w-fit max-w-none flex-none items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1', colors.container)}>
-      <span className={cn('size-2 shrink-0 rounded-full', colors.dot)} />
-      <span className="shrink-0 text-body-s-bold text-text-primary">{label}</span>
-    </span>
+    <Badge size="md" dot tone={tone} colors={tone ? undefined : style}>
+      {label}
+    </Badge>
   );
 }

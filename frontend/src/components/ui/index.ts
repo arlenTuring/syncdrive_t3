@@ -2,7 +2,7 @@
  * 系統共用 UI 元件。頁面一律從這裡取用，不要各自再寫按鈕、輸入框、對話框、狀態標籤的樣式。
  * 規則：.claude/skills/t3-ui-design/SKILL.md；tokens：styles/design-tokens.css、styles/tokens.ts。
  */
-export { Badge } from './badge/Badge';
+export { Badge, type BadgeColors, type BadgeSize } from './badge/Badge';
 export {
   Button,
   IconButton,
@@ -29,7 +29,6 @@ export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } 
 export { headerCheckState } from './checkbox/selection';
 export { Switch, type SwitchConfiguration, type SwitchProps } from './switch/Switch';
 export {
-  badgeClass,
   buttonAttributes,
   badgeToneColors,
   DIALOG_OVERLAY_CLASS,
