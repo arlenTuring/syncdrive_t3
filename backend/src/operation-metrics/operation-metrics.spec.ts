@@ -37,6 +37,28 @@ describe('operation-metrics', () => {
     expect(pphpdAt(leads, 20_000, 70)).toBe(0);
   });
 
+  it('停擺後恢復：長班距只計落在視窗內那一截，不把整個數字拉到 0', () => {
+    // 0～1800 每 180 秒一班，停擺到 9900，之後每 180 秒一班到 11_220
+    const before = Array.from({ length: 11 }, (_, i) => ({ directionKey: 'A', atSecond: i * 180 }));
+    const after = Array.from({ length: 8 }, (_, i) => ({ directionKey: 'A', atSecond: 9900 + i * 180 }));
+    const leads = [...before, ...after];
+    // 視窗 7620～11_220：2280 秒在停擺段（班距 8100）、1320 秒正常（班距 180），再加上最後一班之後 0 秒
+    const expected = (70 * 3600 * (2280 / 8100 + 1320 / 180)) / 3600;
+    expect(pphpdAt(leads, 11_220, 70)).toBeCloseTo(expected, 6);
+    expect(Math.round(pphpdAt(leads, 11_220, 70))).toBe(533);
+  });
+
+  it('只看那個時刻以前的發車；停擺中即時數值跟著往下掉', () => {
+    const leads = Array.from({ length: 11 }, (_, i) => ({ directionKey: 'A', atSecond: i * 180 }));
+    // 正常發車中（最後一班剛發）→ 1400
+    expect(Math.round(pphpdAt(leads, 1800, 70))).toBe(1400);
+    // 最後一班 1800 之後停了 1800 秒：後半個小時頻率 1/1800
+    expect(Math.round(pphpdAt(leads, 3600, 70))).toBe(Math.round((1400 * 1800 + 140 * 1800) / 3600));
+    // 之後才恢復的發車不影響過去那個時刻
+    const later = [...leads, { directionKey: 'A', atSecond: 3700 }];
+    expect(pphpdAt(later, 3600, 70)).toBe(pphpdAt(leads, 3600, 70));
+  });
+
   it('時間模板時段：跨午夜時段、此刻時段、下一個運量不同的時段', () => {
     const segments = templateSegments({
       attributes: [

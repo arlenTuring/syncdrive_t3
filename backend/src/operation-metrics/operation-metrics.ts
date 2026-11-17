@@ -15,8 +15,8 @@
  * </table>
  *
  * 運能換算跟班表編輯器「運能趨勢」同一套：同一服務方向、同一台車連續的不同路線路段
- * （例 NT→TS）只算一趟；過去 60 分鐘內相鄰班距的平均換成 pphpd
- * （載客量 × 3600 ÷ 平均班距），各服務方向取平均。
+ * （例 NT→TS）只算一趟；過去 60 分鐘內的發車頻率（依時間加權）換成 pphpd
+ * （載客量 × 3600 × 頻率），各服務方向取平均。見 pphpdAt。
  */
 
 export const CAPACITY_WINDOW_MINUTES = 60;
@@ -149,32 +149,52 @@ export function mergeDepartureLeads(
   return leads;
 }
 
-/** 過去 60 分鐘內相鄰班距平均 → pphpd；各服務方向取平均（有班距的方向才算） */
+/**
+ * 過去 60 分鐘的實際運能（pphpd）：視窗內每一段時間的發車頻率，依它在視窗內佔的時間加權平均；
+ * 各服務方向取平均（視窗內有發車的方向才算）。
+ *
+ * - 相鄰兩班之間那一段的頻率是 1 ÷ 班距，只計它落在視窗內的那一截。以前整段班距都算進平均，
+ *   一段停擺的長班距只要尾巴碰到視窗就把整個數字拉到接近 0（2026-11-17 本地實測：10:46～13:01
+ *   停擺後恢復正常發車，13:23 的即時數值只剩 180，實際過去一小時約 500）。
+ * - 只看那個時刻以前的發車：最後一班到那個時刻之間還沒有下一班，頻率取 1 ÷ 已經等了多久
+ *   （至少等於上一段班距）。停擺時即時數值會跟著往下掉，趨勢圖的過去點也不會用到之後才發生的發車。
+ * - 視窗內一班都沒發 → 0。
+ */
 export function pphpdAt(leads: DepartureLead[], atSecond: number, vehicleCapacity: number): number {
   if (vehicleCapacity <= 0) return 0;
   const windowStart = atSecond - CAPACITY_WINDOW_MINUTES * 60;
   const byDirection = new Map<string, number[]>();
   for (const lead of leads) {
+    if (lead.atSecond > atSecond) continue;
     const list = byDirection.get(lead.directionKey) ?? [];
     list.push(lead.atSecond);
     byDirection.set(lead.directionKey, list);
   }
   const values: number[] = [];
   for (const seconds of byDirection.values()) {
-    const sorted = [...new Set(seconds)].sort((a, b) => a - b);
-    let gapSum = 0;
-    let gapCount = 0;
-    for (let i = 0; i < sorted.length - 1; i += 1) {
-      const start = sorted[i]!;
-      const end = sorted[i + 1]!;
-      const gap = end - start;
-      if (gap < MIN_CAPACITY_HEADWAY_SECONDS) continue;
-      // 班距跟取樣視窗 [windowStart, atSecond] 有交集才計入
-      if (end <= windowStart || start > atSecond) continue;
-      gapSum += gap;
-      gapCount += 1;
+    // 同向連發不到門檻的視為同一班次的串接偽影，併成一班
+    const departures: number[] = [];
+    for (const at of [...new Set(seconds)].sort((a, b) => a - b)) {
+      const last = departures[departures.length - 1];
+      if (last == null || at - last >= MIN_CAPACITY_HEADWAY_SECONDS) departures.push(at);
     }
-    values.push(gapCount > 0 ? (vehicleCapacity * 3600) / (gapSum / gapCount) : 0);
+    if (!departures.some((at) => at >= windowStart)) continue;
+    let weighted = 0;
+    let covered = 0;
+    const add = (from: number, to: number, headway: number) => {
+      const overlap = Math.min(to, atSecond) - Math.max(from, windowStart);
+      if (overlap <= 0 || headway <= 0) return;
+      weighted += overlap / headway;
+      covered += overlap;
+    };
+    let lastGap = 0;
+    for (let i = 0; i < departures.length - 1; i += 1) {
+      lastGap = departures[i + 1]! - departures[i]!;
+      add(departures[i]!, departures[i + 1]!, lastGap);
+    }
+    const last = departures[departures.length - 1]!;
+    if (lastGap > 0) add(last, atSecond, Math.max(atSecond - last, lastGap));
+    values.push(covered > 0 ? (vehicleCapacity * 3600 * weighted) / covered : 0);
   }
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
