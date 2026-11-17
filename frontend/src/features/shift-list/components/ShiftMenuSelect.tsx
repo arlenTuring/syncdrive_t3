@@ -37,7 +37,7 @@ export function ShiftMenuSelect({
   const { t } = useTranslation();
   return (
     <div className={widthClass}>
-      {hideLabel ? null : <span className="mb-1.5 block text-xs leading-none text-zinc-400">{label}</span>}
+      {hideLabel ? null : <span className="mb-1.5 block text-body-xs text-text-tertiary">{label}</span>}
       <SiteSelect
         value={value}
         options={options}
@@ -47,8 +47,8 @@ export function ShiftMenuSelect({
         panelWidth={panelWidth}
         placeholder={placeholder ?? t('shiftList.menuSelect.placeholder')}
         aria-label={ariaLabel || label || t('shiftList.menuSelect.menuAria')}
-        className={`w-full border border-zinc-700/80 bg-zinc-900/80 text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 ${
-          size === 'sm' ? 'h-8 rounded-md px-2 text-xs' : 'h-10 rounded-lg px-3 text-sm'
+        className={`w-full border border-border-quaternary bg-surface-primary text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn ${
+          size === 'sm' ? 'h-8 rounded-md px-2 text-body-xs' : 'h-10 rounded-lg px-3 text-body-s'
         } ${triggerClassName}`}
       />
     </div>

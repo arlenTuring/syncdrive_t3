@@ -48,6 +48,7 @@ import { StepShiftTimeTemplate } from './StepShiftTimeTemplate';
 import { syncActionSettingsWithSelectedRoutes } from '../utils/actionSettings';
 import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 type CreateShiftSchedulePageProps = {
   onBack: () => void;
@@ -59,7 +60,7 @@ type CreateShiftSchedulePageProps = {
 
 /** 設計稿：無外框、灰藍底的輸入框 */
 const INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 
@@ -86,21 +87,21 @@ function AutoSaveDraftBadge({
   if (status === 'idle' && !savedAt) return null;
 
   return (
-    <div className="absolute right-8 top-[3.25rem] flex items-center gap-2 text-xs text-zinc-400">
+    <div className="absolute right-8 top-[3.25rem] flex items-center gap-2 text-body-xs text-text-tertiary">
       {status === 'saving' ? (
         <>
-          <Loader2 className="size-3 animate-spin text-zinc-500" />
+          <Loader2 className="size-3 animate-spin text-text-quaternary" />
           {t('shiftList.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
-          <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+          <span className="size-2 rounded-full bg-status-success" aria-hidden />
           {t('shiftList.createWizard.draftSaved', {
             time: formatAutoSaveTime(savedAt, i18n.language),
           })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">{t('shiftList.createWizard.autoSaveFailed')}</span>
+        <span className="text-status-error-emphasis">{t('shiftList.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -127,17 +128,10 @@ function CreateStepSidebar({
 }) {
   const { t } = useTranslation();
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col rounded-2xl bg-[#1b1b1f] px-4 py-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-3 px-1 text-base font-medium text-zinc-100 transition hover:text-white"
-      >
-        <ArrowLeft className="size-5" />
-        {t('shiftList.createWizard.backToPlatform')}
-      </button>
-      <div className="mt-4 flex items-center gap-2 border-t border-zinc-700/70 px-1 pt-5 text-base font-medium text-zinc-100">
-        <ClipboardList className="size-5 text-zinc-300" />
+    <aside className="flex w-[260px] shrink-0 flex-col rounded-2xl bg-surface-primary px-4 py-5">
+      <Button hierarchy="subordinate" variant="standard" leadingIcon={<ArrowLeft />} onPress={onBack}>{t('shiftList.createWizard.backToPlatform')}</Button>
+      <div className="mt-4 flex items-center gap-2 border-t border-border-quaternary px-1 pt-5 text-body-m-bold text-text-primary">
+        <ClipboardList className="size-5 text-text-secondary" />
         {t('shiftList.createWizard.title')}
       </div>
 
@@ -184,19 +178,19 @@ function CreateStepSidebar({
                     active
                       ? 'border-[#3d5f8f] bg-[#232a36]'
                       : canClick
-                        ? 'border-transparent hover:bg-white/5'
+                        ? 'border-transparent hover:bg-link-standard'
                         : 'cursor-not-allowed border-transparent'
                   }`}
                 >
                   <span
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-medium ${
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-body-s font-medium ${
                       active
-                        ? 'border-[#2B7FFF] bg-[#2B7FFF] text-white'
+                        ? 'border-border-theme bg-link-theme-filled text-text-primary'
                         : isStepLockedByInvalidation
-                          ? 'border-amber-400 bg-amber-400 text-zinc-950'
+                          ? 'border-status-warning bg-status-warning text-text-invert'
                           : completed
-                            ? 'border-emerald-600 bg-emerald-500/15 text-emerald-400'
-                            : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
+                            ? 'border-emerald-600 bg-status-success-light text-status-success'
+                            : 'border-border-quaternary bg-surface-secondary text-text-secondary'
                     }`}
                   >
                     {isStepLockedByInvalidation ? (
@@ -208,12 +202,12 @@ function CreateStepSidebar({
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xs text-zinc-400">
+                    <span className="block text-body-xs text-text-tertiary">
                       STEP {displayIndex}
                     </span>
                     <span
-                      className={`block truncate text-[15px] ${
-                        canClick || active ? 'text-zinc-100' : 'text-zinc-300'
+                      className={`block truncate text-body-m ${
+                        canClick || active ? 'text-text-primary' : 'text-text-secondary'
                       }`}
                     >
                       {t(`shiftList.createWizard.steps.${item.step}`)}
@@ -245,11 +239,11 @@ function StepBasicInfo({
 
   return (
     <div className="w-full">
-      <h2 className="mb-5 text-lg font-medium text-zinc-100">設定班表名稱與時間基準</h2>
+      <h2 className="mb-5 text-headline-5 text-text-primary">設定班表名稱與時間基準</h2>
       <div className="space-y-5">
         <label className="block">
-          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             班表名稱
           </span>
           <div className="relative">
@@ -258,22 +252,22 @@ function StepBasicInfo({
               value={draft.name}
               onChange={(e) => onChange({ ...draft, name: e.target.value })}
               placeholder="請輸入"
-              className={`${INPUT_CLASS} ${nameInvalid ? 'border-red-500/80 pr-9 focus:border-red-500 focus:ring-red-500/30' : ''}`}
+              className={`${INPUT_CLASS} ${nameInvalid ? 'border-status-error pr-9 focus:border-status-error focus:ring-status-error-light' : ''}`}
             />
             {nameInvalid && (
-              <AlertCircle className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-red-500" />
+              <AlertCircle className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-status-error" />
             )}
             {nameUniqueState === 'checking' && (
-              <Loader2 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-zinc-500" />
+              <Loader2 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-text-quaternary" />
             )}
           </div>
           {nameUniqueState === 'duplicate' && (
-            <p className="mt-1 text-xs text-red-500">此班表名稱已存在，請重新輸入</p>
+            <p className="mt-1 text-body-xs text-status-error">此班表名稱已存在，請重新輸入</p>
           )}
         </label>
         <label className="block">
-          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             版本編號
           </span>
           <input
@@ -285,7 +279,7 @@ function StepBasicInfo({
           />
         </label>
         <label className="block">
-          <span className="mb-2 block px-1 text-sm text-zinc-300">備註說明</span>
+          <span className="mb-2 block px-1 text-body-s text-text-secondary">備註說明</span>
           <input
             type="text"
             value={draft.remarks}
@@ -643,7 +637,7 @@ export function CreateShiftSchedulePage({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col gap-4 bg-black p-5 pb-4 text-zinc-100">
+    <div className="fixed inset-0 z-[60] flex flex-col gap-4 bg-surface-sub-background p-5 pb-4 text-text-primary">
       <div className="flex min-h-0 flex-1 gap-5">
       <CreateStepSidebar
         currentStep={draft.currentStep}
@@ -659,30 +653,30 @@ export function CreateShiftSchedulePage({
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-auto rounded-2xl bg-[#1b1b1f]">
+        <div className="min-h-0 flex-1 overflow-auto rounded-2xl bg-surface-primary">
           <div
             className={`relative flex min-h-full flex-col rounded-2xl px-7 pb-6 pt-4 ${
-              showInvalidationChrome ? 'border-2 border-amber-400' : ''
+              showInvalidationChrome ? 'border-2 border-status-warning' : ''
             }`}
           >
-            <p className="mb-3 flex items-center justify-center gap-1.5 text-sm text-zinc-400">
-              <Lightbulb className="size-4 text-zinc-400" aria-hidden />
+            <p className="mb-3 flex items-center justify-center gap-1.5 text-body-s text-text-tertiary">
+              <Lightbulb className="size-4 text-text-tertiary" aria-hidden />
               {t('shiftList.createWizard.stepHint')}
             </p>
             <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
             {showInvalidationChrome && (
-              <div className="mb-6 flex shrink-0 items-center justify-center gap-2 px-4 py-1 text-sm font-medium text-amber-400">
+              <div className="mb-6 flex shrink-0 items-center justify-center gap-2 px-4 py-1 text-body-s-bold text-status-warning">
                 <AlertTriangle className="size-4 shrink-0" strokeWidth={2.25} aria-hidden />
                 <span>{t('shiftList.createWizard.scheduleInvalidated')}</span>
               </div>
             )}
             {loading ? (
-              <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+              <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
                 <Loader2 className="size-6 animate-spin" />
                 {t('shiftList.createWizard.loadingDraft')}
               </div>
             ) : loadError ? (
-              <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
+              <div className="flex min-h-[240px] items-center justify-center text-body-s text-status-error-emphasis">
                 {loadError}
               </div>
             ) : (
@@ -790,62 +784,40 @@ export function CreateShiftSchedulePage({
       </div>
 
         <footer className="flex shrink-0 flex-col gap-1 px-2">
-          {saveError && <p className="text-right text-xs text-red-400">{saveError}</p>}
+          {saveError && <p className="text-right text-body-xs text-status-error-emphasis">{saveError}</p>}
           <div className="flex items-center gap-6">
-            <button
-              type="button"
-              onClick={() => void handleDiscard()}
-              disabled={!savedShiftId || loading}
-              className="mr-auto inline-flex items-center gap-2 rounded-lg border border-red-500/80 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-500 disabled:hover:bg-transparent"
-            >
-              <Trash2 className="size-4" />
-              {t('shiftList.createWizard.discardDraft')}
-            </button>
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}
-              className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:text-zinc-500"
-            >
-              {t('shiftList.createWizard.previous')}
-            </button>
+            <Button hierarchy="danger" variant="outlined" className="mr-auto" leadingIcon={<Trash2 />} onPress={() => void handleDiscard()} disabled={!savedShiftId || loading}>{t('shiftList.createWizard.discardDraft')}</Button>
+            <Button variant="text" onPress={handlePrevious} disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}>{t('shiftList.createWizard.previous')}</Button>
             {showInvalidationChrome ? (
               <button
                 type="button"
                 onClick={() => void handleRebuildAndGoToAdjust()}
                 disabled={loading || Boolean(loadError)}
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-status-warning px-4 py-2 text-body-s-bold text-text-invert transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className="size-4" aria-hidden />
                 {t('shiftList.createWizard.rebuildSchedule')}
               </button>
             ) : draft.currentStep === 4 && draft.creationMode === 'parametric' && !canGoNext ? (
-              <button
-                type="button"
-                onClick={() => {
+              <Button onPress={() => {
                   setRouteCheckSignal((value) => value + 1);
                   dataCheck.recheck();
                   setRouteChecked(true);
-                }}
-                disabled={
+                }} disabled={
                   loading
                   || Boolean(loadError)
                   || !draft.routeGroups.mapId.trim()
                   || draft.routeGroups.selectedRoutes.length === 0
-                }
-                className="rounded-lg bg-[#2B7FFF] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
-              >
-                檢查
-              </button>
+                }>檢查</Button>
             ) : (
               <button
                 type="button"
                 onClick={draft.currentStep === 7 ? handleFinish : handleNext}
                 disabled={!canGoNext || loading || Boolean(loadError)}
-                className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
+                className={`rounded-lg px-5 py-2 text-body-s font-medium transition ${
                   canGoNext && !loading && !loadError
-                    ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
-                    : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
+                    ? 'bg-link-theme-filled text-text-primary hover:bg-link-theme-filled-hover'
+                    : 'cursor-not-allowed bg-surface-secondary text-text-disabled'
                 }`}
               >
                 {draft.currentStep === 7

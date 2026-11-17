@@ -228,7 +228,7 @@ function BlockIssueHoverCard({
     <div
       className={
         'fixed z-[10050] w-[460px] -translate-x-1/2 overflow-y-auto rounded-lg'
-        + ' border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50'
+        + ' border border-border-quaternary bg-surface-sub-background px-2.5 py-2 shadow-2xl shadow-black-50'
         + (openDownwards ? '' : ' -translate-y-full')
       }
       style={{
@@ -238,15 +238,15 @@ function BlockIssueHoverCard({
       }}
       role="tooltip"
     >
-      <div className="flex items-baseline gap-1.5 text-[11px] leading-4">
+      <div className="flex items-baseline gap-1.5 text-body-xs">
         {blockCode ? (
-          <span className="shrink-0 font-semibold tabular-nums text-sky-300">
+          <span className="shrink-0 font-semibold tabular-nums text-text-theme">
             {blockCode}
           </span>
         ) : null}
-        <span className="font-semibold text-zinc-100">
+        <span className="font-semibold text-text-primary">
           {errors.length > 0 ? i18n.t('shiftList.planGrid.errorsAndWarnings') : i18n.t('shiftList.planGrid.warnings')}
-          <span className="ml-1 text-zinc-500">{i18n.t('shiftList.planGrid.countItems', { count: rows.length })}</span>
+          <span className="ml-1 text-text-quaternary">{i18n.t('shiftList.planGrid.countItems', { count: rows.length })}</span>
         </span>
       </div>
       <ul className="mt-1 space-y-1">
@@ -257,32 +257,32 @@ function BlockIssueHoverCard({
               key={`${issue.code}-${index}`}
               className={
                 severity === 'error'
-                  ? 'rounded border border-red-800/50 bg-red-950/30 px-1.5 py-1'
-                  : 'rounded border border-amber-700/40 bg-amber-950/30 px-1.5 py-1'
+                  ? 'rounded border border-red-800/50 bg-status-error-light px-1.5 py-1'
+                  : 'rounded border border-status-warning-light bg-status-warning-light px-1.5 py-1'
               }
             >
-              <div className="flex items-baseline gap-1 text-[10px] leading-[14px]">
+              <div className="flex items-baseline gap-1 text-caption-2 leading-[14px]">
                 <span
                   className={
                     severity === 'error'
-                      ? 'shrink-0 font-semibold text-red-300'
-                      : 'shrink-0 font-semibold text-amber-300'
+                      ? 'shrink-0 font-semibold text-status-error-emphasis'
+                      : 'shrink-0 font-semibold text-status-warning'
                   }
                 >
                   {meta.groupTitle}
                 </span>
-                <span className="shrink-0 text-zinc-600">·</span>
-                <span className="shrink-0 text-zinc-500">{meta.kindLabel}</span>
-                <span className="shrink-0 text-zinc-600">·</span>
-                <span className="min-w-0 font-mono text-[9px] text-zinc-500">
+                <span className="shrink-0 text-text-disabled">·</span>
+                <span className="shrink-0 text-text-quaternary">{meta.kindLabel}</span>
+                <span className="shrink-0 text-text-disabled">·</span>
+                <span className="min-w-0 font-mono text-caption-2 text-text-quaternary">
                   {issue.code}
                 </span>
               </div>
-              <p className="mt-0.5 text-[10px] leading-[14px] text-zinc-200">
+              <p className="mt-0.5 text-caption-2 leading-[14px] text-text-primary">
                 {issue.message}
               </p>
               {meta.guidance ? (
-                <p className="mt-0.5 text-[10px] leading-[14px] text-zinc-400">
+                <p className="mt-0.5 text-caption-2 leading-[14px] text-text-tertiary">
                   {meta.guidance}
                 </p>
               ) : null}
@@ -336,20 +336,20 @@ function MoveCardHoverCard({
 
   return createPortal(
     <div
-      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-border-quaternary bg-surface-sub-background px-2.5 py-2 shadow-2xl shadow-black-50"
       style={{ top: pos.top, left: clampedLeft }}
       role="tooltip"
     >
       <div className="flex items-baseline gap-1.5">
-        <span className="rounded bg-zinc-800 px-1 py-0.5 text-[10px] font-bold text-zinc-100">
+        <span className="rounded bg-surface-secondary px-1 py-0.5 text-caption-2 text-text-primary">
           {prefix ?? '·'}
         </span>
-        <span className="text-[11px] font-semibold text-zinc-100">
+        <span className="text-body-xs-bold text-text-primary">
           {resolveMoveCardTitle(block)}
         </span>
-        <span className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</span>
+        <span className="text-body-xs-bold tabular-nums text-text-theme">{code}</span>
       </div>
-      <div className="mt-1 text-[11px] leading-4 text-zinc-100">
+      <div className="mt-1 text-body-xs text-text-primary">
         {block.source === 'yard_entry_move'
           ? `${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.currentStation')} → ${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.facility')}`
           : `${block.yardExitFacilityLabel ?? i18n.t('shiftList.planGrid.facility')} → ${block.yardExitStationLabel ?? block.yardExitStationId ?? i18n.t('shiftList.planGrid.transferStation')}`}
@@ -359,24 +359,24 @@ function MoveCardHoverCard({
         不重複顯示——那跟上一行一樣，沒有新資訊。
       */}
       {block.yardMoveViaLabels && block.yardMoveViaLabels.length > 2 ? (
-        <div className="mt-0.5 text-[10px] leading-4 text-zinc-400">
+        <div className="mt-0.5 text-caption-2 text-text-tertiary">
           {t('shiftList.planGrid.viaNodes')} {block.yardMoveViaLabels.join(' › ')}
         </div>
       ) : null}
-      <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
+      <div className="mt-0.5 text-caption-2 tabular-nums text-text-tertiary">
         {formatBlockTimeRange(block)}
         {i18n.t('shiftList.planGrid.secondsParen', { seconds: block.travelSeconds })}
       </div>
       {block.plannedEndMinute - block.plannedStartMinute <= 1e-9 ? (
-        <div className="mt-0.5 text-[10px] leading-4 text-amber-300/90">
+        <div className="mt-0.5 text-caption-2 text-amber-300/90">
           {t('shiftList.planGrid.zeroTransferNote')}
         </div>
       ) : null}
-      <p className="mt-1 text-[10px] leading-[14px] text-zinc-500">
+      <p className="mt-1 text-caption-2 leading-[14px] text-text-quaternary">
         {block.source ? MOVE_CARD_HINT_BY_SOURCE[block.source] ?? '' : ''}
       </p>
       {block.yardExitAteYardTail ? (
-        <p className="mt-0.5 text-[10px] leading-[14px] text-amber-400">
+        <p className="mt-0.5 text-caption-2 leading-[14px] text-status-warning">
           {t('shiftList.planGrid.ateYardTail')}
         </p>
       ) : null}
@@ -423,31 +423,31 @@ function YardTaskHoverCard({
 
   return createPortal(
     <div
-      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      className="fixed z-[10050] w-[260px] -translate-x-1/2 -translate-y-full rounded-lg border border-border-quaternary bg-surface-sub-background px-2.5 py-2 shadow-2xl shadow-black-50"
       style={{ top: pos.top, left: clampedLeft }}
       role="tooltip"
     >
       <div className="flex items-baseline gap-1.5">
-        <span className="text-[11px] font-semibold text-zinc-100">{block.label}</span>
-        <span className="text-[11px] font-semibold tabular-nums text-sky-300">{code}</span>
+        <span className="text-body-xs-bold text-text-primary">{block.label}</span>
+        <span className="text-body-xs-bold tabular-nums text-text-theme">{code}</span>
       </div>
-      <div className="mt-1 text-[11px] leading-4 text-zinc-100">
+      <div className="mt-1 text-body-xs text-text-primary">
         {block.yardFacilityLabel
           ? i18n.t('shiftList.planGrid.facilityAssigned', { label: block.yardFacilityLabel })
           : i18n.t('shiftList.planGrid.facilityUnassigned')}
       </div>
-      <div className="mt-0.5 text-[10px] tabular-nums leading-4 text-zinc-400">
+      <div className="mt-0.5 text-caption-2 tabular-nums text-text-tertiary">
         {formatBlockTimeRange(block)}
         （{hours > 0 ? i18n.t('shiftList.planGrid.hoursPart', { hours }) : ''}
         {minutes} {i18n.t('shiftList.planGrid.minutesUnit')}）
       </div>
       {block.source === 'hold' ? (
-        <p className="mt-1 text-[10px] leading-[14px] text-zinc-400">
+        <p className="mt-1 text-caption-2 leading-[14px] text-text-tertiary">
           {t('shiftList.planGrid.yardHoldHint')}
         </p>
       ) : null}
       {block.yardFacilityUnavailable ? (
-        <p className="mt-1 text-[10px] leading-[14px] text-red-400">
+        <p className="mt-1 text-caption-2 leading-[14px] text-status-error-emphasis">
           {t('shiftList.planGrid.noFacilitySlot')}
         </p>
       ) : null}
@@ -471,7 +471,7 @@ function IntervalAxisHoverCard({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-max max-w-[220px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-3 py-2.5 shadow-2xl shadow-black/50"
+      className="pointer-events-none fixed z-[10050] w-max max-w-[220px] -translate-x-1/2 -translate-y-full rounded-lg border border-border-quaternary bg-surface-sub-background px-3 py-2.5 shadow-2xl shadow-black-50"
       style={{ top: pos.top, left: pos.left }}
       role="tooltip"
     >
@@ -481,17 +481,17 @@ function IntervalAxisHoverCard({
           style={{ backgroundColor: accent }}
           aria-hidden
         />
-        <span className="text-[11px] font-semibold leading-4 text-zinc-100">
+        <span className="text-body-xs-bold text-text-primary">
           {content.title}
         </span>
       </div>
-      <div className="mt-2 space-y-1 text-[10px] leading-[15px] text-zinc-300">
+      <div className="mt-2 space-y-1 text-caption-2 leading-[15px] text-text-secondary">
         {content.lines.map((line) => (
           <div key={line}>{line}</div>
         ))}
       </div>
       <div
-        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
+        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-border-quaternary"
         aria-hidden
       />
     </div>,
@@ -543,29 +543,29 @@ function BlockAlgorithmHoverCard({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-[440px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-2.5 py-2 shadow-2xl shadow-black/50"
+      className="pointer-events-none fixed z-[10050] w-[440px] -translate-x-1/2 -translate-y-full rounded-lg border border-border-quaternary bg-surface-sub-background px-2.5 py-2 shadow-2xl shadow-black-50"
       style={{ top: pos.top, left: pos.left }}
       role="tooltip"
     >
-      <div className="flex min-w-0 items-baseline gap-1.5 text-[11px] leading-4">
+      <div className="flex min-w-0 items-baseline gap-1.5 text-body-xs">
         {blockCode ? (
-          <span className="shrink-0 font-semibold tabular-nums text-sky-300">
+          <span className="shrink-0 font-semibold tabular-nums text-text-theme">
             {blockCode}
           </span>
         ) : null}
-        <span className="min-w-0 truncate font-semibold text-zinc-100">
+        <span className="min-w-0 truncate font-semibold text-text-primary">
           {routeName}
         </span>
       </div>
-      <p className="mt-1 text-[10px] leading-[14px] tabular-nums text-zinc-400">
+      <p className="mt-1 text-caption-2 leading-[14px] tabular-nums text-text-tertiary">
         {t('shiftList.planGrid.travel')} {sec(summary.actualTravelSeconds)}
-        <span className="text-zinc-600">（{t('shiftList.planGrid.avgShort')} {sec(summary.topologyAvgSeconds)} · {t('shiftList.planGrid.minShort')} {sec(summary.topologyMinSeconds)}）</span>
-        <span className="text-zinc-600"> · </span>
+        <span className="text-text-disabled">（{t('shiftList.planGrid.avgShort')} {sec(summary.topologyAvgSeconds)} · {t('shiftList.planGrid.minShort')} {sec(summary.topologyMinSeconds)}）</span>
+        <span className="text-text-disabled"> · </span>
         {t('shiftList.planGrid.dwell')} {sec(summary.dwellBaseSeconds)}
-        <span className="text-zinc-600"> · </span>
+        <span className="text-text-disabled"> · </span>
         {t('shiftList.planGrid.slack')} {sec(summary.dwellSlackSeconds)}
         {summary.addedSlackSeconds > 0 ? (
-          <span className="text-sky-300">
+          <span className="text-text-theme">
             （{t('shiftList.planGrid.slackBreakdown', {
               base: summary.baseSlackSeconds,
               added: summary.addedSlackSeconds,
@@ -574,26 +574,26 @@ function BlockAlgorithmHoverCard({
         ) : null}
         {!hideStrategyBuffers ? (
           <>
-            <span className="text-zinc-600"> · </span>
+            <span className="text-text-disabled"> · </span>
             {t('shiftList.planGrid.switchBuf')} {sec(summary.switchBufferSeconds)}
-            <span className="text-zinc-600"> · </span>
+            <span className="text-text-disabled"> · </span>
             {t('shiftList.planGrid.recovery')} {sec(summary.recoverySeconds)}
           </>
         ) : null}
       </p>
       {entryServiceBerthCheck ? (
-        <p className="mt-1 rounded border border-amber-700/40 bg-amber-950/30 px-1.5 py-1 text-[10px] leading-[14px] tabular-nums text-amber-200">
+        <p className="mt-1 rounded border border-status-warning-light bg-status-warning-light px-1.5 py-1 text-caption-2 leading-[14px] tabular-nums text-status-warning">
           <span className="font-semibold">{t('shiftList.planGrid.insertSlack')}</span>
-          <span className="text-amber-400/80"> · </span>
+          <span className="text-status-warning"> · </span>
           {t('shiftList.planGrid.arrive')} {stops.find((s) => s.stationId === entryServiceBerthCheck.arriveStationId)?.stationName
             ?? entryServiceBerthCheck.arriveStationId}
-          <span className="text-amber-400/80"> · </span>
+          <span className="text-status-warning"> · </span>
           {t('shiftList.planGrid.berthClear')} {formatMinuteToHms(entryServiceBerthCheck.berthClearMinute)}
-          <span className="text-amber-400/80"> · </span>
+          <span className="text-status-warning"> · </span>
           {t('shiftList.planGrid.slackLabel')}{' '}
           <span
             className={
-              entryServiceBerthCheck.slackSeconds < 0 ? 'font-semibold text-red-400' : 'font-semibold'
+              entryServiceBerthCheck.slackSeconds < 0 ? 'font-semibold text-status-error-emphasis' : 'font-semibold'
             }
           >
             {entryServiceBerthCheck.slackSeconds}s
@@ -602,7 +602,7 @@ function BlockAlgorithmHoverCard({
       ) : null}
 
       {summary.slackAdjustment && summary.addedSlackSeconds > 0 ? (
-        <div className="mt-1 rounded border border-sky-700/50 bg-sky-950/40 px-1.5 py-1 text-[10px] leading-[14px] tabular-nums text-sky-100">
+        <div className="mt-1 rounded border border-sky-700/50 bg-sky-950/40 px-1.5 py-1 text-caption-2 leading-[14px] tabular-nums text-text-theme">
           <p className="font-semibold">{t('shiftList.planGrid.slackAdjusted')}</p>
           <p className="text-sky-200/90">{summary.slackAdjustment.reason.message}</p>
           {summary.slackAdjustment.affectedStops.map((stop) => {
@@ -625,21 +625,21 @@ function BlockAlgorithmHoverCard({
       ) : null}
 
       {stops.length === 0 ? (
-        <p className="mt-2 text-[10px] text-zinc-500">{t('shiftList.planGrid.noStationData')}</p>
+        <p className="mt-2 text-caption-2 text-text-quaternary">{t('shiftList.planGrid.noStationData')}</p>
       ) : (
-        <ol className="mt-2 max-h-[260px] space-y-0 overflow-y-auto text-[10px] leading-[14px]">
+        <ol className="mt-2 max-h-[260px] space-y-0 overflow-y-auto text-caption-2 leading-[14px]">
           {stops.map((stop, index) => {
             const leg = legs[index];
             const actualLeg = stop.travelToNextSeconds;
             const showLeg = index < stops.length - 1;
             return (
               <li key={`${stop.order}-${stop.stationId}`} className="min-w-0">
-                <div className="flex min-w-0 items-baseline gap-1.5 text-zinc-300">
-                  <span className="w-3 shrink-0 tabular-nums text-zinc-500">{stop.order}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-zinc-100">
+                <div className="flex min-w-0 items-baseline gap-1.5 text-text-secondary">
+                  <span className="w-3 shrink-0 tabular-nums text-text-quaternary">{stop.order}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-text-primary">
                     {stop.stationName}
                   </span>
-                  <span className="shrink-0 tabular-nums text-zinc-400">
+                  <span className="shrink-0 tabular-nums text-text-tertiary">
                     {(() => {
                       const isFirst = index === 0;
                       const isLast = index === stops.length - 1;
@@ -647,7 +647,7 @@ function BlockAlgorithmHoverCard({
                       if (isFirst && !isLast) {
                         return (
                           <>
-                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
+                            <span className="text-text-disabled">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -656,9 +656,9 @@ function BlockAlgorithmHoverCard({
                       if (isLast && !isFirst) {
                         return (
                           <>
-                            <span className="text-zinc-600">{t('shiftList.planGrid.arrive')} </span>
+                            <span className="text-text-disabled">{t('shiftList.planGrid.arrive')} </span>
                             {formatMinuteToHms(stop.arrivalMinute)}
-                            <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.dwellDone')} </span>
+                            <span className="mx-1 text-text-disabled">{t('shiftList.planGrid.dwellDone')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -670,7 +670,7 @@ function BlockAlgorithmHoverCard({
                       ) {
                         return (
                           <>
-                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
+                            <span className="text-text-disabled">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -678,9 +678,9 @@ function BlockAlgorithmHoverCard({
                       if (isFirst && isLast) {
                         return (
                           <>
-                            <span className="text-zinc-600">{t('shiftList.planGrid.depart')} </span>
+                            <span className="text-text-disabled">{t('shiftList.planGrid.depart')} </span>
                             {formatMinuteToHms(stop.arrivalMinute)}
-                            <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.dwellDone')} </span>
+                            <span className="mx-1 text-text-disabled">{t('shiftList.planGrid.dwellDone')} </span>
                             {formatMinuteToHms(stop.departureMinute)}
                           </>
                         );
@@ -688,30 +688,30 @@ function BlockAlgorithmHoverCard({
                       // 中途站
                       return (
                         <>
-                          <span className="text-zinc-600">{t('shiftList.planGrid.arrive')} </span>
+                          <span className="text-text-disabled">{t('shiftList.planGrid.arrive')} </span>
                           {formatMinuteToHms(stop.arrivalMinute)}
-                          <span className="mx-1 text-zinc-600">{t('shiftList.planGrid.depart')} </span>
+                          <span className="mx-1 text-text-disabled">{t('shiftList.planGrid.depart')} </span>
                           {formatMinuteToHms(stop.departureMinute)}
                         </>
                       );
                     })()}
                   </span>
-                  <span className="shrink-0 text-right tabular-nums text-zinc-500">
+                  <span className="shrink-0 text-right tabular-nums text-text-quaternary">
                     {t('shiftList.planGrid.dwell')} {sec(stop.baseDwellSeconds)}
-                    <span className="text-zinc-600"> · </span>
+                    <span className="text-text-disabled"> · </span>
                     {t('shiftList.planGrid.slack')} {sec(summary.slackAtStop[index] ?? 0)}
                   </span>
                 </div>
                 {showLeg ? (
-                  <div className="ml-3 flex items-center gap-1.5 border-l border-zinc-800 py-1 pl-2.5 text-[10px] tabular-nums text-zinc-500">
-                    <span className="text-zinc-600">↓</span>
+                  <div className="ml-3 flex items-center gap-1.5 border-l border-border-quaternary py-1 pl-2.5 text-caption-2 tabular-nums text-text-quaternary">
+                    <span className="text-text-disabled">↓</span>
                     <span>
                       {t('shiftList.planGrid.minShort')} {sec(leg?.minTravelTimeSeconds)}
-                      <span className="text-zinc-600"> · </span>
+                      <span className="text-text-disabled"> · </span>
                       {t('shiftList.planGrid.avgShort')} {sec(leg?.avgTravelTimeSeconds)}
                       {actualLeg != null ? (
                         <>
-                          <span className="text-zinc-600"> · </span>
+                          <span className="text-text-disabled"> · </span>
                           {t('shiftList.planGrid.thisTrip')} {sec(actualLeg)}
                         </>
                       ) : null}
@@ -724,7 +724,7 @@ function BlockAlgorithmHoverCard({
         </ol>
       )}
       <div
-        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
+        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-border-quaternary"
         aria-hidden
       />
     </div>,
@@ -781,7 +781,7 @@ function TemplateTaskBar({
           <div
             key={`${task.id}-${index}`}
             className={`pointer-events-none absolute z-[2] flex items-center justify-start overflow-clip px-2 ${
-              wizard ? 'rounded-t-md border-r border-[#26262b] bg-[#323238]' : 'rounded-[4px] border border-zinc-700/60 bg-zinc-800/80'
+              wizard ? 'rounded-t-md border-r border-[#26262b] bg-[#323238]' : 'rounded-[4px] border border-border-quaternary bg-surface-secondary'
             }`}
             style={{
               left: leftPx,
@@ -795,17 +795,17 @@ function TemplateTaskBar({
             {index === 0 && wizard ? (
               // 短的條置中（設計稿）；長的條置中會跑到畫面外，改成貼在可見範圍左邊
               <span
-                className={`${widthPx <= WIZARD_CENTER_LABEL_MAX_PX ? 'mx-auto' : 'sticky left-[64px]'} max-w-full truncate text-sm leading-5 text-zinc-100`}
+                className={`${widthPx <= WIZARD_CENTER_LABEL_MAX_PX ? 'mx-auto' : 'sticky left-[64px]'} max-w-full truncate text-body-s text-text-primary`}
               >
                 {task.label}
-                <span className="mx-2 text-zinc-500">｜</span>
+                <span className="mx-2 text-text-quaternary">｜</span>
                 <span className="tabular-nums">{timeLabel}</span>
               </span>
             ) : index === 0 ? (
               <span
                 className={`${
                   isSticky ? 'sticky left-[56px]' : ''
-                } shrink-0 max-w-full truncate text-[10px] font-normal leading-[18px] tracking-[0.5px] text-zinc-300`}
+                } shrink-0 max-w-full truncate text-caption-2 font-normal leading-[18px] tracking-[0.5px] text-text-secondary`}
               >
                 {task.label}
                 <span className="opacity-70"> | {timeLabel}</span>
@@ -889,7 +889,7 @@ function ScheduleIntervalBackground({
         <>
           {/* 暗縫＋每 10 分鐘的刻度線：只在列與列之間露出來 */}
           <div
-            className="pointer-events-none absolute inset-y-0 left-0 bg-[#18181b]"
+            className="pointer-events-none absolute inset-y-0 left-0 bg-surface-popup"
             style={{
               width: totalWidth,
               backgroundImage: `repeating-linear-gradient(to right, rgba(148,148,184,0.18) 0, rgba(148,148,184,0.18) 1px, transparent 1px, transparent ${slotWidthPx}px)`,
@@ -898,7 +898,7 @@ function ScheduleIntervalBackground({
           />
           {/* 軌道底板：把時段條與班次卡框成一列 */}
           <div
-            className="pointer-events-none absolute left-0 border-y border-white/[0.05] bg-[#26262b]"
+            className="pointer-events-none absolute left-0 border-y border-white/[0.05] bg-surface-secondary"
             style={{ width: totalWidth, top: WIZARD_LANE_INSET, height: layout.rowHeight - WIZARD_LANE_INSET * 2 }}
             aria-hidden
           />
@@ -1103,7 +1103,7 @@ function UnservedPulseMarkers({
             <div className="absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-red-500/90" />
             {/* Hover tooltip */}
             <div
-              className="pointer-events-none absolute left-1/2 top-full z-[10060] mt-1 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-red-500/40 bg-zinc-950 px-2.5 py-2 text-[10px] leading-snug text-red-300 shadow-xl shadow-black/50 group-hover:block"
+              className="pointer-events-none absolute left-1/2 top-full z-[10060] mt-1 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-border-danger-light bg-surface-sub-background px-2.5 py-2 text-caption-2 text-status-error-emphasis shadow-xl shadow-black-50 group-hover:block"
               role="tooltip"
             >
               <span className="mb-0.5 block font-semibold">{t('shiftList.planGrid.unservedSpan')}</span>
@@ -1372,11 +1372,11 @@ function ShiftScheduleBlockBar({
   let extraBorderClass = '';
   let extraStyle: CSSProperties = {};
   if (highlighted) {
-    extraBorderClass = 'border-2 border-red-500 ring-4 ring-red-500 shadow-[0_0_24px_rgba(239,68,68,1)] animate-pulse';
+    extraBorderClass = 'border-2 border-status-error ring-4 ring-red-500 shadow-[0_0_24px_rgba(239,68,68,1)] animate-pulse';
   } else if (hasError) {
-    extraBorderClass = 'border border-red-500 shadow-[inset_0_0_4px_rgba(239,68,68,0.4),0_0_8px_rgba(239,68,68,0.5)] animate-pulse';
+    extraBorderClass = 'border border-status-error shadow-[inset_0_0_4px_rgba(239,68,68,0.4),0_0_8px_rgba(239,68,68,0.5)] animate-pulse';
   } else if (hasWarning) {
-    extraBorderClass = 'border border-amber-500 shadow-[inset_0_0_4px_rgba(245,158,11,0.4),0_0_8px_rgba(245,158,11,0.5)]';
+    extraBorderClass = 'border border-status-warning shadow-[inset_0_0_4px_rgba(245,158,11,0.4),0_0_8px_rgba(245,158,11,0.5)]';
   }
 
   const onStationInfoEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1618,7 +1618,7 @@ function ShiftScheduleBlockBar({
               {onDeleteBlock ? (
                 <button
                   type="button"
-                  className="inline-flex size-5 items-center justify-center rounded text-zinc-300/80 transition hover:bg-black/25 hover:text-red-300"
+                  className="inline-flex size-5 items-center justify-center rounded text-text-secondary transition hover:bg-black-16 hover:text-status-error-emphasis"
                   title={t('shiftList.planGrid.deleteTrip')}
                   aria-label={t('shiftList.planGrid.deleteTrip')}
                   onPointerDown={(event) => {
@@ -1637,7 +1637,7 @@ function ShiftScheduleBlockBar({
               {onDuplicateBlock ? (
                 <button
                   type="button"
-                  className="inline-flex size-5 items-center justify-center rounded text-zinc-300/80 transition hover:bg-black/25 hover:text-sky-300"
+                  className="inline-flex size-5 items-center justify-center rounded text-text-secondary transition hover:bg-black-16 hover:text-text-theme"
                   title={t('shiftList.planGrid.duplicateTrip')}
                   aria-label={t('shiftList.planGrid.duplicateTrip')}
                   onPointerDown={(event) => {
@@ -1689,14 +1689,14 @@ function ShiftScheduleBlockBar({
       {isMoveCard ? (
         <button
           type="button"
-          className="pointer-events-auto absolute inset-0 z-[6] flex items-center justify-center text-zinc-100/80 hover:text-zinc-50"
+          className="pointer-events-auto absolute inset-0 z-[6] flex items-center justify-center text-zinc-100/80 hover:text-text-primary"
           aria-label={t('shiftList.planGrid.cardContentAria', { code, title: resolveMoveCardTitle(block) })}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerEnter={onMoveCardInfoEnter}
           onPointerLeave={() => setMoveCardHoverPos(null)}
         >
-          <span className="text-[9px] font-bold leading-none tracking-tight">
+          <span className="text-caption-2">
             {moveCardPrefix ?? '·'}
           </span>
           <Info className="ml-0.5 size-2.5 shrink-0 opacity-70" aria-hidden />
@@ -1711,13 +1711,13 @@ function ShiftScheduleBlockBar({
         className="relative z-[6] w-fit min-w-0 max-w-full self-start px-1 will-change-transform"
       >
         <div
-          className={`flex items-center gap-1 truncate font-semibold ${wizard ? 'text-[13px] leading-[18px]' : 'text-xs leading-tight'}`}
+          className={`flex items-center gap-1 truncate ${wizard ? 'text-body-s-bold leading-[18px]' : 'text-body-xs'}`}
           style={{ color: hasError ? '#FCA5A5' : hasWarning ? '#FDE68A' : colors.text }}
         >
           {hasError || hasWarning ? (
             <button
               type="button"
-              className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 hover:bg-white/10"
+              className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 hover:bg-link-standard-hover"
               aria-label={t('shiftList.planGrid.issueContentAria', { code, kind: hasError ? t('shiftList.planGrid.error') : t('shiftList.planGrid.warning') })}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
@@ -1727,8 +1727,8 @@ function ShiftScheduleBlockBar({
               <AlertTriangle
                 className={
                   hasError
-                    ? 'size-3 shrink-0 text-red-400'
-                    : 'size-3 shrink-0 text-amber-400'
+                    ? 'size-3 shrink-0 text-status-error-emphasis'
+                    : 'size-3 shrink-0 text-status-warning'
                 }
                 aria-hidden
               />
@@ -1737,11 +1737,11 @@ function ShiftScheduleBlockBar({
           <span className="truncate">{code}</span>
         </div>
         {block.routeName ? (
-          <div className={`flex min-w-0 items-center gap-0.5 truncate font-medium text-zinc-200/90 ${wizard ? 'text-xs leading-[17px]' : 'text-[11px] leading-tight'}`}>
+          <div className={`flex min-w-0 items-center gap-0.5 truncate text-zinc-200/90 ${wizard ? 'text-body-xs-bold leading-[17px]' : 'text-body-xs'}`}>
             <span className="truncate">{block.routeName}</span>
             {algorithmSummary.addedSlackSeconds > 0 ? (
               <span
-                className="shrink-0 rounded-sm bg-sky-500/30 px-0.5 text-[9px] leading-3 tabular-nums text-sky-100"
+                className="shrink-0 rounded-sm bg-link-tonal-hover px-0.5 text-caption-2 tabular-nums text-text-theme"
                 title={block.dwellSlackAdjustment?.reason.message}
               >
                 {t('shiftList.planGrid.slackAdjustedBadge', { added: algorithmSummary.addedSlackSeconds })}
@@ -1750,7 +1750,7 @@ function ShiftScheduleBlockBar({
             {showStationInfo ? (
               <button
                 type="button"
-                className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-zinc-300 opacity-80 hover:bg-white/10 hover:opacity-100"
+                className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-text-secondary opacity-80 hover:bg-link-standard-hover hover:opacity-100"
                 aria-label={t('shiftList.planGrid.algoParamsAria', { route: block.routeName })}
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
@@ -1765,7 +1765,7 @@ function ShiftScheduleBlockBar({
           </div>
         ) : (
           <div
-            className={`flex min-w-0 items-center gap-0.5 truncate font-medium opacity-90 ${wizard ? 'text-xs leading-[17px]' : 'text-[11px] leading-tight'}`}
+            className={`flex min-w-0 items-center gap-0.5 truncate opacity-90 ${wizard ? 'text-body-xs-bold leading-[17px]' : 'text-body-xs'}`}
             style={{ color: block.yardFacilityUnavailable ? '#FCA5A5' : colors.text }}
           >
             <span className="truncate">
@@ -1777,7 +1777,7 @@ function ShiftScheduleBlockBar({
             {isYardTask ? (
               <button
                 type="button"
-                className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-zinc-300 opacity-80 hover:bg-white/10 hover:opacity-100"
+                className="pointer-events-auto relative z-[8] inline-flex shrink-0 items-center justify-center rounded-sm p-0.5 text-text-secondary opacity-80 hover:bg-link-standard-hover hover:opacity-100"
                 aria-label={t('shiftList.planGrid.facilityDurationAria', { code, label: block.label })}
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
@@ -1789,7 +1789,7 @@ function ShiftScheduleBlockBar({
             ) : null}
           </div>
         )}
-        <div className={`whitespace-nowrap font-medium tabular-nums text-zinc-300 ${wizard ? 'text-[11px] leading-4' : 'text-[10px] leading-tight'}`}>
+        <div className={`whitespace-nowrap tabular-nums text-text-secondary ${wizard ? 'text-body-xs-bold' : 'text-caption-2'}`}>
           {timeLabel}
         </div>
       </ScrollPinnedCardLabel>
@@ -2010,11 +2010,11 @@ export function ShiftSchedulePlanGrid({
     });
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${wizard ? 'gap-3' : 'rounded-xl border border-zinc-800/80 bg-zinc-950/40'}`}>
+    <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${wizard ? 'gap-3' : 'rounded-xl border border-border-quaternary bg-black-30'}`}>
       {/* 精靈外觀：捲動區是一塊深色、圓角的畫布（設計稿） */}
       <div
         ref={scrollRef}
-        className={`min-h-0 flex-1 overflow-auto ${wizard ? 'rounded-lg bg-[#18181b]' : ''}`}
+        className={`min-h-0 flex-1 overflow-auto ${wizard ? 'rounded-lg bg-surface-popup' : ''}`}
         style={wizard ? { scrollbarColor: '#52525b transparent' } : undefined}
         data-schedule-grid-scroll="true"
       >
@@ -2022,9 +2022,9 @@ export function ShiftSchedulePlanGrid({
           className="min-w-max"
           style={{ width: totalTrackWidthPx + ROW_LABEL_WIDTH }}
         >
-          <div className={`sticky top-0 z-10 ${wizard ? '' : 'bg-[#0c0c0e]/95 backdrop-blur-sm'}`}>
-            <div className={`flex ${wizard ? '' : 'border-b border-zinc-800/80'}`}>
-              <div className={`sticky left-0 z-20 w-12 shrink-0 ${wizard ? 'border-b border-zinc-700/60 bg-[#18181b]' : 'border-r border-zinc-800/60 bg-[#0c0c0e]/95'}`} />
+          <div className={`sticky top-0 z-10 ${wizard ? '' : 'bg-surface-sub-background backdrop-blur-sm'}`}>
+            <div className={`flex ${wizard ? '' : 'border-b border-border-quaternary'}`}>
+              <div className={`sticky left-0 z-20 w-12 shrink-0 ${wizard ? 'border-b border-border-quaternary bg-surface-popup' : 'border-r border-border-quaternary bg-surface-sub-background'}`} />
               {dayCopies.map((copyIndex) => (
                 <div
                   key={copyIndex}
@@ -2047,8 +2047,8 @@ export function ShiftSchedulePlanGrid({
                     key={slot}
                       className={
                         wizard
-                          ? 'pointer-events-none relative z-[6] shrink-0 border-l border-[#9494b8]/20 py-2.5 pl-1 text-left text-sm tabular-nums text-zinc-300'
-                          : `pointer-events-none relative z-[6] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`
+                          ? 'pointer-events-none relative z-[6] shrink-0 border-l border-[#9494b8]/20 py-2.5 pl-1 text-left text-body-s tabular-nums text-text-secondary'
+                          : `pointer-events-none relative z-[6] shrink-0 border-r border-border-quaternary py-2 pl-1 text-left text-body-xs tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`
                       }
                     style={{ width: slotWidthPx }}
                   >
@@ -2088,8 +2088,8 @@ export function ShiftSchedulePlanGrid({
               onDropTaskType(row, startMinute, taskType);
             };
             return (
-              <div key={row} className={`relative flex ${wizard ? '' : 'border-b border-zinc-800/50'}`}>
-                <div className={`sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center ${wizard ? 'bg-[#18181b] text-sm tabular-nums text-zinc-300' : 'border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500'}`}>
+              <div key={row} className={`relative flex ${wizard ? '' : 'border-b border-border-quaternary'}`}>
+                <div className={`sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center ${wizard ? 'bg-surface-popup text-body-s tabular-nums text-text-secondary' : 'border-r border-border-quaternary bg-surface-sub-background text-body-xs text-text-quaternary'}`}>
                   {String(row).padStart(2, '0')}
                 </div>
                 {dayCopies.map((copyIndex) => {
@@ -2171,7 +2171,7 @@ export function ShiftSchedulePlanGrid({
       </div>
 
       {wizard ? (
-        <p className="flex shrink-0 items-center justify-center gap-2 text-sm text-zinc-300">
+        <p className="flex shrink-0 items-center justify-center gap-2 text-body-s text-text-secondary">
           <span
             className="inline-flex cursor-help"
             title={interactiveEdit ? t('shiftList.planGrid.hintManual') : onSelectBlock ? t('shiftList.planGrid.hintWizardDetail') : t('shiftList.planGrid.hintReadonly')}
@@ -2182,8 +2182,8 @@ export function ShiftSchedulePlanGrid({
           <span aria-hidden>← →</span>
         </p>
       ) : (
-      <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
-        <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
+      <div className="flex shrink-0 items-center gap-2 border-t border-border-quaternary px-3 py-2 text-body-xs text-text-quaternary">
+        <Info className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
         <span>
           {interactiveEdit
             ? t('shiftList.planGrid.hintManual')
@@ -2191,7 +2191,7 @@ export function ShiftSchedulePlanGrid({
               ? t('shiftList.planGrid.hintEditable')
               : t('shiftList.planGrid.hintReadonly')}
         </span>
-        <span className="text-zinc-600">← →</span>
+        <span className="text-text-disabled">← →</span>
       </div>
       )}
     </div>

@@ -64,25 +64,25 @@ function AllowanceReport({
   const flagged = rows.filter((row) => row.status !== 'ok');
   const passed = invalid.length === 0 && !message && extraOk;
   return (
-    <section className="rounded-xl border-t-2 border-emerald-500 bg-[#232329] px-5 py-5" aria-label="檢查報告">
-      <h3 className="flex items-center gap-2 text-base font-medium text-zinc-100">
-        <ClipboardCheck className="size-5 text-zinc-300" aria-hidden />
+    <section className="rounded-xl border-t-2 border-status-success bg-surface-secondary px-5 py-5" aria-label="檢查報告">
+      <h3 className="flex items-center gap-2 text-body-m-bold text-text-primary">
+        <ClipboardCheck className="size-5 text-text-secondary" aria-hidden />
         檢查報告
       </h3>
       {message ? (
-        <p className="mt-4 rounded-lg bg-amber-500/10 px-4 py-2.5 text-sm text-amber-300">{message}</p>
+        <p className="mt-4 rounded-lg bg-status-warning-light px-4 py-2.5 text-body-s text-status-warning">{message}</p>
       ) : passed ? (
-        <p className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-500/15 px-4 py-2.5 text-sm text-emerald-300">
+        <p className="mt-4 flex items-center gap-2 rounded-lg bg-status-success-light px-4 py-2.5 text-body-s text-status-success">
           <CheckCircle2 className="size-4 shrink-0" aria-hidden />
           檢查通過！沒有整備會被正線開頭額度吃光
         </p>
       ) : invalid.length === 0 ? (
-        <p className="mt-4 flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+        <p className="mt-4 flex items-center gap-2 rounded-lg bg-status-error-light px-4 py-2.5 text-body-s text-status-error-emphasis">
           <XCircle className="size-4 shrink-0" aria-hidden />
           還有項目沒通過，請依下方說明補齊
         </p>
       ) : (
-        <p className="mt-4 flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+        <p className="mt-4 flex items-center gap-2 rounded-lg bg-status-error-light px-4 py-2.5 text-body-s text-status-error-emphasis">
           <XCircle className="size-4 shrink-0" aria-hidden />
           有 {invalid.length} 段整備會被正線開頭額度吃光，請調小可壓縮時間或回時間模板加長整備
         </p>
@@ -91,18 +91,18 @@ function AllowanceReport({
       {sections.length > 0 ? (
         <ul className="mt-4 space-y-2">
           {sections.map((section) => (
-            <li key={section.label} className={`border-l-2 pl-3 text-sm ${section.filled ? 'border-emerald-500' : 'border-amber-400'}`}>
-              <span className="text-zinc-100">{section.label}</span>
-              <span className={`ml-2 ${section.filled ? 'text-zinc-300' : 'text-amber-300'}`}>{section.filled ? '已填入' : '未填入'}</span>
+            <li key={section.label} className={`border-l-2 pl-3 text-body-s ${section.filled ? 'border-status-success' : 'border-status-warning'}`}>
+              <span className="text-text-primary">{section.label}</span>
+              <span className={`ml-2 ${section.filled ? 'text-text-secondary' : 'text-status-warning'}`}>{section.filled ? '已填入' : '未填入'}</span>
             </li>
           ))}
         </ul>
       ) : null}
       {flagged.length > 0 ? (
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead className="text-zinc-400">
-              <tr className="border-b border-zinc-700/70">
+          <table className="w-full min-w-[48rem] text-left text-body-s">
+            <thead className="text-text-tertiary">
+              <tr className="border-b border-border-quaternary">
                 <th className="px-3 py-2.5 font-normal">時間線</th>
                 <th className="px-3 py-2.5 font-normal">項目</th>
                 <th className="px-3 py-2.5 font-normal">起算時間</th>
@@ -113,20 +113,20 @@ function AllowanceReport({
             </thead>
             <tbody>
               {flagged.map((row) => (
-                <tr key={`${row.section}-${row.taskId}`} className="border-b border-zinc-800/80" title={row.message}>
-                  <td className="whitespace-nowrap px-3 py-3 text-zinc-200">時間線 {row.rowIndex}</td>
-                  <td className="px-3 py-3"><span className="rounded-md bg-zinc-700/70 px-2 py-0.5 text-zinc-100">{row.label || row.sectionLabel}</span></td>
-                  <td className="px-3 py-3 tabular-nums text-zinc-200">{clockText(row.startMinute)}</td>
-                  <td className="px-3 py-3 tabular-nums text-zinc-200">{minutesText(row.durationSeconds)}</td>
-                  <td className="px-3 py-3 tabular-nums text-amber-400">{row.suggestedSeconds != null ? minutesText(row.suggestedSeconds) : '—'}</td>
-                  <td className={`px-3 py-3 ${row.status === 'invalid' ? 'text-red-300' : 'text-zinc-200'}`}>{STATUS_NOTE[row.status]}</td>
+                <tr key={`${row.section}-${row.taskId}`} className="border-b border-border-quaternary" title={row.message}>
+                  <td className="whitespace-nowrap px-3 py-3 text-text-primary">時間線 {row.rowIndex}</td>
+                  <td className="px-3 py-3"><span className="rounded-md bg-zinc-700/70 px-2 py-0.5 text-text-primary">{row.label || row.sectionLabel}</span></td>
+                  <td className="px-3 py-3 tabular-nums text-text-primary">{clockText(row.startMinute)}</td>
+                  <td className="px-3 py-3 tabular-nums text-text-primary">{minutesText(row.durationSeconds)}</td>
+                  <td className="px-3 py-3 tabular-nums text-status-warning">{row.suggestedSeconds != null ? minutesText(row.suggestedSeconds) : '—'}</td>
+                  <td className={`px-3 py-3 ${row.status === 'invalid' ? 'text-status-error-emphasis' : 'text-text-primary'}`}>{STATUS_NOTE[row.status]}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : null}
-      <p className="mt-4 text-xs text-zinc-500">
+      <p className="mt-4 text-body-xs text-text-quaternary">
         ※ 僅供參考，系統不自動修改模板。整備移動所佔用的時間，會在生成報告中逐筆列出
         {lockedRotationSeconds == null ? '。超過 1 小時的整備，選好路線組合後會改用一輪額度重算' : ''}
       </p>
@@ -215,35 +215,35 @@ export function YardEntryAllowancePanel({ templateId, maintenance, lockedRotatio
 
   if (!templateId.trim()) {
     return (
-      <p className="text-xs text-zinc-500">還沒選時間模板，無法對照整備長度（請先完成第 2 步）。</p>
+      <p className="text-body-xs text-text-quaternary">還沒選時間模板，無法對照整備長度（請先完成第 2 步）。</p>
     );
   }
   if (loadError) {
-    return <p className="text-xs text-amber-300">無法載入時間模板或整備任務來對照：{loadError}</p>;
+    return <p className="text-body-xs text-status-warning">無法載入時間模板或整備任務來對照：{loadError}</p>;
   }
   if (rows.length === 0) return null;
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-xs leading-relaxed">
-      <p className="text-zinc-400">
+    <div className="space-y-2 rounded-lg border border-border-quaternary bg-black-30 p-3 text-body-xs">
+      <p className="text-text-tertiary">
         對照時間模板上的整備長度
         {lockedRotationSeconds == null
           ? '（初估：路線組合還沒選，超過 1 小時的整備選好路線組合後會改用一輪額度重算）'
           : `（已依路線組合一輪 ${Math.round(lockedRotationSeconds / 6) / 10} 分重算超過 1 小時的整備）`}
       </p>
       {invalid.length > 0 ? (
-        <ul className="space-y-1 text-red-300">
+        <ul className="space-y-1 text-status-error-emphasis">
           {invalid.map((row) => <li key={`${row.section}-${row.taskId}`}>• {row.message}</li>)}
         </ul>
       ) : (
         <p className="text-emerald-300/90">沒有整備會被正線開頭額度吃光。</p>
       )}
       {notes.length > 0 ? (
-        <ul className="space-y-1 text-amber-200/90">
+        <ul className="space-y-1 text-status-warning">
           {notes.map((row) => <li key={`${row.section}-${row.taskId}-note`}>• {row.message}</li>)}
         </ul>
       ) : null}
-      <p className="text-zinc-500">建議只供參考，不會自動修改時間模板。整備之間的移動會佔用多少，生成後在報告逐筆列出。</p>
+      <p className="text-text-quaternary">建議只供參考，不會自動修改時間模板。整備之間的移動會佔用多少，生成後在報告逐筆列出。</p>
     </div>
   );
 }

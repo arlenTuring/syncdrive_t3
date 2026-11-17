@@ -63,6 +63,7 @@ import {
   type ShiftRouteGroupMapOption,
   type ShiftRouteOption,
 } from '../utils/shiftRouteGroupCatalog';
+import { Button, IconButton } from '../../../components/ui';
 import { RouteRelationGraphEditor } from './RouteRelationGraphEditor';
 import { HelpTip } from './HelpTip';
 import { ShiftMenuSelect } from './ShiftMenuSelect';
@@ -96,13 +97,13 @@ type StepShiftRouteGroupsProps = {
 
 /** 設計稿：無外框、灰藍底 */
 const FIELD_CLASS =
-  'h-9 rounded-lg border border-transparent bg-[#232730] px-3 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s tabular-nums text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const DWELL_INPUT_CLASS =
-  'h-9 w-full min-w-[7rem] rounded-lg border border-transparent bg-[#2a2e37] pl-3 pr-8 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-9 w-full min-w-[7rem] rounded-lg border border-transparent bg-link-standard-hover pl-3 pr-8 text-body-s tabular-nums text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn disabled:cursor-not-allowed disabled:opacity-60';
 
 const DWELL_STATIC_CLASS =
-  'flex h-9 min-w-[6rem] items-center rounded-lg bg-[#2a2e37]/60 px-3 text-sm text-zinc-500';
+  'flex h-9 min-w-[6rem] items-center rounded-lg bg-[#2a2e37]/60 px-3 text-body-s text-text-quaternary';
 
 /** 秒數輸入框：「秒」放在框內右邊 */
 function SecondsInput({ value, onChange, placeholder, ariaLabel }: { value: string; onChange: (value: string) => void; placeholder?: string; ariaLabel: string }) {
@@ -117,7 +118,7 @@ function SecondsInput({ value, onChange, placeholder, ariaLabel }: { value: stri
         className={DWELL_INPUT_CLASS}
         aria-label={ariaLabel}
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-s text-text-tertiary">秒</span>
     </span>
   );
 }
@@ -246,7 +247,7 @@ function StationDwellEditor({
             const roleLabel = formatStationDwellRoleLabel(role);
             return (
               <div key={dwell.stationId} className="block">
-                <span className="mb-1.5 block px-1 text-sm text-zinc-300">{dwell.stationName}</span>
+                <span className="mb-1.5 block px-1 text-body-s text-text-secondary">{dwell.stationName}</span>
                 <div
                   className={DWELL_STATIC_CLASS}
                   aria-label={`${dwell.stationName} ${roleLabel}`}
@@ -259,7 +260,7 @@ function StationDwellEditor({
           const mode = resolveStationDwellMode(dwell);
           return (
             <label key={dwell.stationId} className="block">
-              <span className="mb-1.5 block px-1 text-sm text-zinc-300">
+              <span className="mb-1.5 block px-1 text-body-s text-text-secondary">
                 {t('shiftList.routeGroups.station', { name: dwell.stationName })}
               </span>
               <div className="flex items-center gap-2">
@@ -277,7 +278,7 @@ function StationDwellEditor({
                   }
                   widthClass="w-[9rem] shrink-0"
                   panelWidth={144}
-                  triggerClassName="!border-transparent !bg-[#2a2e37]"
+                  triggerClassName="!border-transparent !bg-link-standard-hover"
                   aria-label={t('shiftList.routeGroups.dwellMode', { name: dwell.stationName })}
                 />
                 {mode === 'seconds' ? (
@@ -297,12 +298,12 @@ function StationDwellEditor({
 
       <div className="space-y-1">
         {showIncompleteWarning && (
-          <p className="px-1 text-xs text-zinc-500">
+          <p className="px-1 text-body-xs text-text-quaternary">
             {t('shiftList.routeGroups.dwellIncomplete')}
           </p>
         )}
         {showTurnaroundWarning && (
-          <p className="px-1 text-xs leading-5 text-red-400">
+          <p className="px-1 text-body-xs text-status-error-emphasis">
             {t('shiftList.routeGroups.overTurnaroundBefore', { min: formatSecondsLabel(totalMinSum) })}
             （{formatSecondsLabel(turnaroundLimitSeconds)}）
             {turnaroundLimitSeconds != null && turnaroundLimitSeconds > 0
@@ -312,17 +313,17 @@ function StationDwellEditor({
           </p>
         )}
 
-        <div className="space-y-1.5 rounded-lg bg-[#1b1b1f] px-4 py-3 text-sm">
+        <div className="space-y-1.5 rounded-lg bg-surface-primary px-4 py-3 text-body-s">
           {[
             [cycleLabel, totalMinSum, breakdownSuffix],
             [avgCycleLabel, totalAvgSum, avgBreakdownSuffix],
           ].map(([label, total, breakdown]) => (
             <p key={String(label)} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
-              <span className="text-zinc-300">{label}</span>
-              <span className="text-zinc-600" aria-hidden>｜</span>
-              <span className="tabular-nums text-zinc-100">{formatSecondsLabel(total as number)}</span>
-              <span className="text-zinc-400">{breakdown}</span>
+              <Lightbulb className="size-3.5 shrink-0 text-text-tertiary" aria-hidden />
+              <span className="text-text-secondary">{label}</span>
+              <span className="text-text-disabled" aria-hidden>｜</span>
+              <span className="tabular-nums text-text-primary">{formatSecondsLabel(total as number)}</span>
+              <span className="text-text-tertiary">{breakdown}</span>
             </p>
           ))}
         </div>
@@ -353,7 +354,7 @@ function RouteDragHandle({
           onKeyMove(event.key === 'ArrowUp' ? 'up' : 'down');
         }
       }}
-      className="flex w-12 shrink-0 cursor-grab items-center justify-center self-stretch border-r border-zinc-700/60 text-zinc-400 hover:text-zinc-200 active:cursor-grabbing"
+      className="flex w-12 shrink-0 cursor-grab items-center justify-center self-stretch border-r border-border-quaternary text-text-tertiary hover:text-text-primary active:cursor-grabbing"
     >
       <GripVertical className="size-5" />
     </button>
@@ -378,7 +379,7 @@ function GlobalSecondsField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">{label}</span>
+      <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">{label}</span>
       <span className="relative block">
         <input
           type="text"
@@ -390,9 +391,9 @@ function GlobalSecondsField({
           className={`${FIELD_CLASS} w-full pr-10 disabled:cursor-not-allowed disabled:opacity-50`}
           aria-label={ariaLabel}
         />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-s text-text-tertiary">秒</span>
       </span>
-      {mixed ? <span className="mt-1.5 block px-1 text-xs text-amber-300">目前各路線不同，修改後全部統一</span> : null}
+      {mixed ? <span className="mt-1.5 block px-1 text-body-xs text-status-warning">目前各路線不同，修改後全部統一</span> : null}
     </label>
   );
 }
@@ -455,22 +456,22 @@ function RecoveryAndServiceDirectionBar({
   );
   if (manual) {
     return (
-      <div className="grid gap-x-4 gap-y-3 rounded-xl bg-[#232329] px-5 py-4 lg:grid-cols-4">
+      <div className="grid gap-x-4 gap-y-3 rounded-xl bg-surface-secondary px-5 py-4 lg:grid-cols-4">
         {dwellSlackField}
       </div>
     );
   }
 
   return (
-    <div className="grid gap-x-4 gap-y-3 rounded-xl bg-[#232329] px-5 py-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.4fr)]">
+    <div className="grid gap-x-4 gap-y-3 rounded-xl bg-surface-secondary px-5 py-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.4fr)]">
       <label className="block">
-        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-          <span className="text-red-500">*</span>
+        <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+          <span className="text-status-error">*</span>
           {t('shiftList.routeGroups.minRecoveryLabel')}
           <span className="ml-auto">
             <HelpTip label={t('shiftList.routeGroups.minRecoveryHelp')}>
               <p>{t('shiftList.routeGroups.minRecoveryHelp1')}</p>
-              <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.minRecoveryHelp2')}</p>
+              <p className="mt-1 text-text-quaternary">{t('shiftList.routeGroups.minRecoveryHelp2')}</p>
             </HelpTip>
           </span>
         </span>
@@ -484,23 +485,23 @@ function RecoveryAndServiceDirectionBar({
             className={`${FIELD_CLASS} w-full pr-10`}
             aria-label={t('shiftList.routeGroups.minRecoveryAria')}
           />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">{t('shiftList.routeGroups.secondsUnit')}</span>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-s text-text-tertiary">{t('shiftList.routeGroups.secondsUnit')}</span>
         </span>
       </label>
 
       <label className="block">
-        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-          <span className="text-red-500">*</span>
+        <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+          <span className="text-status-error">*</span>
           {t('shiftList.routeGroups.collisionLabel')}
           <span className="ml-auto">
           <HelpTip label={t('shiftList.routeGroups.collisionHelp')} widthClass="w-72">
             <p>
               {t('shiftList.routeGroups.collisionHelp1')}
             </p>
-            <p className="mt-1 text-zinc-500">
+            <p className="mt-1 text-text-quaternary">
               {t('shiftList.routeGroups.collisionHelp2')}
             </p>
-            <p className="mt-1 text-zinc-500">
+            <p className="mt-1 text-text-quaternary">
               {t('shiftList.routeGroups.collisionHelp3')}
             </p>
           </HelpTip>
@@ -516,7 +517,7 @@ function RecoveryAndServiceDirectionBar({
             className={`${FIELD_CLASS} w-full pr-10`}
             aria-label={t('shiftList.routeGroups.collisionAria')}
           />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">{t('shiftList.routeGroups.secondsUnit')}</span>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-s text-text-tertiary">{t('shiftList.routeGroups.secondsUnit')}</span>
         </span>
       </label>
 
@@ -531,39 +532,31 @@ function RecoveryAndServiceDirectionBar({
       />
 
       <div className="min-w-0">
-        <span className="mb-2 flex items-center gap-1.5 px-1 text-sm text-zinc-300">
+        <span className="mb-2 flex items-center gap-1.5 px-1 text-body-s text-text-secondary">
           {t('shiftList.routeGroups.serviceDir')}
           <HelpTip label={t('shiftList.routeGroups.serviceDirHelp')} widthClass="w-64">
             <p>
               {t('shiftList.routeGroups.serviceDirHelp1')}
             </p>
-            <p className="mt-1 text-zinc-500">
+            <p className="mt-1 text-text-quaternary">
               {t('shiftList.routeGroups.serviceDirHelp2')}
             </p>
-            <p className="mt-1 text-zinc-500">{t('shiftList.routeGroups.serviceDirHelp3')}</p>
+            <p className="mt-1 text-text-quaternary">{t('shiftList.routeGroups.serviceDirHelp3')}</p>
           </HelpTip>
         </span>
                     <div className="flex flex-wrap items-center gap-2">
           {serviceDirectionTags.map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex h-9 items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 pl-3 pr-1 text-sm text-sky-100"
+              className="inline-flex h-9 items-center gap-1 rounded-lg border border-border-theme-light bg-surface-theme pl-3 pr-1 text-body-s text-text-theme"
             >
               {tag.name}
-              <button
-                type="button"
-                title={t('shiftList.routeGroups.deleteTag', { name: tag.name })}
-                aria-label={t('shiftList.routeGroups.deleteTagAria', { name: tag.name })}
-                onClick={() => onRemoveTag(tag.id)}
-                className="rounded-md p-1 text-sky-200/70 hover:bg-sky-500/20 hover:text-sky-50"
-              >
-                <X className="size-3.5" />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('shiftList.routeGroups.deleteTag', { name: tag.name })} label={t('shiftList.routeGroups.deleteTagAria', { name: tag.name })} onPress={() => onRemoveTag(tag.id)} icon={<X />} />
                       </span>
           ))}
 
           {drafting ? (
-            <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-600 bg-[#1b1b1f] px-1.5">
+            <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-border-tertiary bg-surface-primary px-1.5">
                   <input
                 ref={inputRef}
                     type="text"
@@ -581,7 +574,7 @@ function RecoveryAndServiceDirectionBar({
                 }}
                 placeholder={t('shiftList.routeGroups.directionName')}
                 maxLength={24}
-                className="w-28 bg-transparent px-1.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
+                className="w-28 bg-transparent px-1.5 text-body-s text-text-primary placeholder-zinc-600 focus:outline-none"
                 aria-label={t('shiftList.routeGroups.newDirAria')}
               />
               <button
@@ -590,33 +583,17 @@ function RecoveryAndServiceDirectionBar({
                 aria-label={t('shiftList.routeGroups.confirmAddDirAria')}
                 onClick={commitDraft}
                 disabled={!draftName.trim()}
-                className="rounded-md p-1 text-emerald-400 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md p-1 text-status-success hover:bg-status-success-light disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Check className="size-4" strokeWidth={2.5} />
               </button>
-              <button
-                type="button"
-                title={t('common.cancel')}
-                aria-label={t('shiftList.routeGroups.cancelAddDirAria')}
-                onClick={() => {
-                  setDrafting(false);
-                  setDraftName('');
-                }}
-                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
-              >
-                <X className="size-3.5" />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('common.cancel')} label={t('shiftList.routeGroups.cancelAddDirAria')} onPress={() => {
+         setDrafting(false);
+         setDraftName('');
+        }} icon={<X />} />
                 </div>
           ) : (
-            <button
-              type="button"
-              title={t('shiftList.routeGroups.addServiceDir')}
-              aria-label={t('shiftList.routeGroups.addServiceDir')}
-              onClick={() => setDrafting(true)}
-              className="inline-flex size-10 items-center justify-center rounded-lg border border-zinc-500 text-zinc-200 hover:border-sky-500/60 hover:text-sky-200"
-            >
-              <Plus className="size-5" />
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" title={t('shiftList.routeGroups.addServiceDir')} label={t('shiftList.routeGroups.addServiceDir')} onPress={() => setDrafting(true)} icon={<Plus />} />
           )}
         </div>
       </div>
@@ -666,15 +643,7 @@ function RoutePickerBar({
 
   if (!expanded) {
   return (
-      <button
-        type="button"
-        onClick={onExpand}
-        disabled={availableGroups.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2B7FFF]/70 px-4 py-4 text-base font-medium text-[#5a9aff] transition hover:bg-[rgba(43,127,255,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Plus className="size-4" />
-        {title}
-      </button>
+      <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={onExpand} disabled={availableGroups.length === 0}>{title}</Button>
     );
   }
 
@@ -682,8 +651,8 @@ function RoutePickerBar({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#2B7FFF]/35 bg-[rgba(43,127,255,0.06)] px-4 py-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-zinc-200">
-            <Plus className="size-4 text-[#7CB8FF]" />
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-body-s-bold text-text-primary">
+            <Plus className="size-4 text-text-theme" />
             {title}
           </span>
           <ShiftMenuSelect
@@ -714,19 +683,13 @@ function RoutePickerBar({
           }}
           title={confirmLabel}
           aria-label={confirmLabel}
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-status-success-emphasis text-text-primary transition hover:bg-status-success disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:text-text-disabled"
         >
           <Check className="size-5" strokeWidth={2.5} />
         </button>
       </div>
       {onCancel ? (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-1 text-xs text-zinc-500 hover:text-zinc-300"
-        >
-          {t('common.cancel')}
-        </button>
+        <Button hierarchy="subordinate" variant="tonal" onPress={onCancel}>{t('common.cancel')}</Button>
       ) : null}
     </div>
   );
@@ -1738,13 +1701,13 @@ export function StepShiftRouteGroups({
           event.preventDefault();
           dropRoute(instanceId, dropTarget?.id === instanceId ? dropTarget.after : false);
         }}
-        className={`relative overflow-hidden rounded-xl bg-[#232329] transition ${draggingId === instanceId ? 'opacity-50' : ''} ${
+        className={`relative overflow-hidden rounded-xl bg-surface-secondary transition ${draggingId === instanceId ? 'opacity-50' : ''} ${
           dropTarget?.id === instanceId ? (dropTarget.after ? 'shadow-[0_3px_0_0_#2B7FFF]' : 'shadow-[0_-3px_0_0_#2B7FFF]') : ''
         }`}
       >
         {orderPosition.executionOrder === 1 ? (
           <span
-            className="pointer-events-none absolute left-0 top-0 size-8 bg-amber-400 [clip-path:polygon(0_0,100%_0,0_100%)]"
+            className="pointer-events-none absolute left-0 top-0 size-8 bg-status-warning [clip-path:polygon(0_0,100%_0,0_100%)]"
             title={t('shiftList.routeGroups.startBadge')}
             aria-label={t('shiftList.routeGroups.startBadge')}
           />
@@ -1757,7 +1720,7 @@ export function StepShiftRouteGroups({
               onKeyMove={(direction) => moveRouteOrder(instanceId, direction)}
             />
           ) : (
-            <span className="w-12 shrink-0 self-stretch border-r border-zinc-700/60" aria-hidden />
+            <span className="w-12 shrink-0 self-stretch border-r border-border-quaternary" aria-hidden />
           )}
 
           <div className="min-w-0 flex-1 space-y-3 pl-5">
@@ -1777,35 +1740,21 @@ export function StepShiftRouteGroups({
                   confirmLabel={t('shiftList.routeGroups.confirmReplace')}
                   emptyHint={t('shiftList.routeGroups.reselectRoute')}
                 />
-                <button
-                  type="button"
-                  onClick={() => {
+                <Button hierarchy="subordinate" variant="text" onPress={() => {
                     setEditingRouteId(null);
                     setPendingEditRouteId('');
-                  }}
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
-                >
-                  {t('shiftList.routeGroups.cancelEdit')}
-                </button>
+                  }}>{t('shiftList.routeGroups.cancelEdit')}</Button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-base font-medium text-zinc-100">{route.routeName}</span>
-                <button
-                  type="button"
-                  title={t('shiftList.routeGroups.editRoute')}
-                  aria-label={t('shiftList.routeGroups.editRoute')}
-                  onClick={() => {
-                    setEditingRouteId(instanceId);
-                    setPendingEditRouteId(route.routeId);
-                  }}
-                  className="rounded-lg p-1.5 text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-                >
-                  <Pencil className="size-4" />
-                </button>
-                <label className="flex h-9 w-40 items-center gap-1 rounded-lg bg-[#2a2e37] px-3">
-                  <span className="shrink-0 text-sm text-zinc-400">
-                    <span className="text-rose-400" aria-hidden>
+                <span className="text-body-m-bold text-text-primary">{route.routeName}</span>
+                <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('shiftList.routeGroups.editRoute')} label={t('shiftList.routeGroups.editRoute')} onPress={() => {
+          setEditingRouteId(instanceId);
+          setPendingEditRouteId(route.routeId);
+         }} icon={<Pencil />} />
+                <label className="flex h-9 w-40 items-center gap-1 rounded-lg bg-link-standard-hover px-3">
+                  <span className="shrink-0 text-body-s text-text-tertiary">
+                    <span className="text-status-error-emphasis" aria-hidden>
                       *
                     </span>
                     {t('shiftList.routeGroups.code')}
@@ -1821,14 +1770,14 @@ export function StepShiftRouteGroups({
                         e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
                       )
                     }
-                    className="min-w-0 flex-1 bg-transparent px-1 text-sm font-bold tracking-wider text-[#5a9aff] focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-1 text-body-s-bold text-text-theme focus:outline-none"
                     title={t('shiftList.routeGroups.codeTitle')}
                     aria-label={t('shiftList.routeGroups.codeAria', { name: route.routeName })}
                     aria-required
                   />
                 </label>
-                <span className="text-sm text-zinc-400">{route.groupName}</span>
-                <label className="inline-flex items-center gap-2 text-sm text-zinc-400">
+                <span className="text-body-s text-text-tertiary">{route.groupName}</span>
+                <label className="inline-flex items-center gap-2 text-body-s text-text-tertiary">
                   <span className="shrink-0">班次卡標籤</span>
                   <input
                     type="text"
@@ -1836,18 +1785,18 @@ export function StepShiftRouteGroups({
                     maxLength={12}
                     placeholder="例：環線 A"
                     onChange={(e) => updateCardLabel(instanceId, e.target.value)}
-                    className="h-9 w-32 rounded-lg border border-transparent bg-[#2a2e37] px-3 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none"
+                    className="h-9 w-32 rounded-lg border border-transparent bg-link-standard-hover px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none"
                     aria-label={`${route.routeName} 班次卡標籤`}
                   />
                 </label>
                 {!isManual ? (
-                  <label className="inline-flex items-center gap-2 text-sm text-zinc-400">
+                  <label className="inline-flex items-center gap-2 text-body-s text-text-tertiary">
                     <span className="shrink-0">{t('shiftList.routeGroups.serviceDir')}</span>
                     <SiteSelect
                       value={route.serviceDirectionId ?? ''}
                       onChange={(e) => updateServiceDirectionId(instanceId, e.target.value)}
                       disabled={serviceDirectionTags.length === 0}
-                      className="h-9 max-w-[160px] rounded-lg border border-transparent bg-[#2a2e37] px-3 text-sm text-zinc-200 focus:border-[#2B7FFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      size="md" className="max-w-[160px]"
                       aria-label={`${route.routeName} ${t('shiftList.routeGroups.serviceDir')}`}
                       title={
                         serviceDirectionTags.length === 0
@@ -1868,7 +1817,7 @@ export function StepShiftRouteGroups({
             )}
 
             {!isEditing && !route.routeCode?.trim() ? (
-              <p className="text-xs text-amber-400/90">
+              <p className="text-body-xs text-status-warning">
                 {isManual
                   ? t('shiftList.routeGroups.codeRequiredManual')
                   : t('shiftList.routeGroups.codeRequired')}
@@ -1893,15 +1842,7 @@ export function StepShiftRouteGroups({
 
           {!isEditing ? (
             <div className="flex shrink-0 items-start gap-1 pl-3">
-              <button
-                type="button"
-                title={t('shiftList.routeGroups.delete')}
-                onClick={() => deletePrimary(instanceId)}
-                aria-label={t('shiftList.routeGroups.delete')}
-                className="rounded-lg p-2 text-zinc-300 transition hover:bg-red-500/10 hover:text-red-400"
-              >
-                <Trash2 className="size-5" />
-              </button>
+              <IconButton hierarchy="danger" variant="standard" title={t('shiftList.routeGroups.delete')} onPress={() => deletePrimary(instanceId)} label={t('shiftList.routeGroups.delete')} icon={<Trash2 />} />
             </div>
           ) : null}
         </div>
@@ -1923,16 +1864,16 @@ export function StepShiftRouteGroups({
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="mb-6 shrink-0 space-y-3">
         <div>
-          <h2 className="text-lg font-medium text-zinc-100">{t('shiftList.routeGroups.configureTitle')}</h2>
+          <h2 className="text-headline-5 text-text-primary">{t('shiftList.routeGroups.configureTitle')}</h2>
           {!turnaroundLoading && turnaroundLimitSeconds == null ? (
-            <p className="mt-1 text-xs text-amber-300">
+            <p className="mt-1 text-body-xs text-status-warning">
               {timeTemplateId ? t('shiftList.routeGroups.noTurnaround') : t('shiftList.routeGroups.needTimeTemplate')}
             </p>
           ) : null}
         </div>
         <div>
-          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             {t('shiftList.routeGroups.siteMap')}
           </span>
           <ShiftMenuSelect
@@ -1943,7 +1884,7 @@ export function StepShiftRouteGroups({
             options={mapSelectOptions}
             widthClass="w-full"
             panelWidth={480}
-            triggerClassName="!border-transparent !bg-[#232730]"
+            triggerClassName="!border-transparent !bg-surface-secondary"
             disabled={loading || mapSelectOptions.length === 0}
             onChange={(mapId) => {
               if (!mapId || mapId === selectedMapId) return;
@@ -1952,7 +1893,7 @@ export function StepShiftRouteGroups({
           />
           </div>
         {!loading && !error && routeSyncNotice ? (
-          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+          <div className="rounded-md border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-xs text-status-warning">
             地圖或路線已變動，下列項目已自動重置，請重新指定後再檢查路線組合：
             <span className="ml-1 font-medium">
               {routeSyncNotice.routes > 0 ? `${routeSyncNotice.routes} 條路線改對到不同路徑（代號已清空）` : null}
@@ -1965,23 +1906,23 @@ export function StepShiftRouteGroups({
           </div>
         ) : null}
         {!loading && !error && firstTripOriginsHint ? (
-          <p className="text-xs text-zinc-400">{firstTripOriginsHint}</p>
+          <p className="text-body-xs text-text-tertiary">{firstTripOriginsHint}</p>
         ) : null}
       </div>
 
       {loading ? (
-        <div className="flex min-h-[280px] flex-1 items-center justify-center gap-2 text-sm text-zinc-500">
+        <div className="flex min-h-[280px] flex-1 items-center justify-center gap-2 text-body-s text-text-quaternary">
           <Loader2 className="size-4 animate-spin" />
           {t('shiftList.routeGroups.loadingGroups')}
         </div>
       ) : error ? (
-        <div className="flex min-h-[280px] flex-1 items-center justify-center px-6 text-sm text-red-400">
+        <div className="flex min-h-[280px] flex-1 items-center justify-center px-6 text-body-s text-status-error-emphasis">
           {error}
         </div>
       ) : catalog.length === 0 ? (
-        <div className="flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+        <div className="flex min-h-[280px] flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-black-30">
           <ShiftSelectionEmptyState />
-          <p className="pb-8 text-center text-xs text-zinc-500">
+          <p className="pb-8 text-center text-body-xs text-text-quaternary">
             {t('shiftList.routeGroups.emptyGroups')}
           </p>
         </div>
@@ -2019,7 +1960,7 @@ export function StepShiftRouteGroups({
             routeCodes={draft.selectedRoutes.map((route) => route.routeCode)}
           />
 
-          <div className="space-y-4 border-t border-zinc-700/70 pt-6">
+          <div className="space-y-4 border-t border-border-quaternary pt-6">
             {primaryRoutes.map((route) => renderConfiguredCard(route))}
 
             <RoutePickerBar
@@ -2041,7 +1982,7 @@ export function StepShiftRouteGroups({
           </div>
 
           {primaryRoutes.length > 0 ? (
-            <div className="overflow-hidden rounded-xl bg-[#232329]">
+            <div className="overflow-hidden rounded-xl bg-surface-secondary">
               <RouteRelationGraphEditor
                 framed={false}
                 routes={primaryRoutes}
@@ -2067,33 +2008,33 @@ export function StepShiftRouteGroups({
               />
 
               {!isManual ? (
-                <div className="space-y-3 border-t border-zinc-700/60 px-5 py-4">
+                <div className="space-y-3 border-t border-border-quaternary px-5 py-4">
                   {throughGateStatus === 'missingGraph' ? (
-                    <p className="text-[11px] text-zinc-500">{t('shiftList.routeGroups.needEdgesHint')}</p>
+                    <p className="text-body-xs text-text-quaternary">{t('shiftList.routeGroups.needEdgesHint')}</p>
                   ) : throughGateStatus === 'missingMarks' ? (
-                    <p className="text-[11px] text-zinc-400">
+                    <p className="text-body-xs text-text-tertiary">
                       {t('shiftList.routeGroups.needStartEndHint')}
                     </p>
                   ) : throughGateStatus === 'headNotInStarts' ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
-                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                    <p className="flex items-start gap-1.5 text-body-xs text-status-warning">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning" />
                       <span>{t('shiftList.routeGroups.firstMustStartHint')}</span>
                     </p>
                   ) : throughGateStatus === 'failed' ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-red-300">
-                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                    <p className="flex items-start gap-1.5 text-body-xs text-status-error-emphasis">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-error-emphasis" />
                       <span>{t('shiftList.routeGroups.noPathHint')}</span>
                     </p>
                   ) : throughGateStatus === 'missingPreferred' ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-amber-200">
-                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                    <p className="flex items-start gap-1.5 text-body-xs text-status-warning">
+                      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning" />
                       <span>{t('shiftList.routeGroups.pickPreferredHint')}</span>
                     </p>
                   ) : null}
 
                   {listedThroughCycles.length > 0 ? (
                     <div className="space-y-1">
-                      <p className="pb-1 text-[11px] text-zinc-500">
+                      <p className="pb-1 text-body-xs text-text-quaternary">
                         {t('shiftList.routeGroups.pickPreferredList')}
                         {listedIsStale
                           ? t('shiftList.routeGroups.listStale')
@@ -2110,12 +2051,12 @@ export function StepShiftRouteGroups({
                             onClick={() => selectPreferredThroughCycle(cycle)}
                             aria-pressed={isReference}
                             className={[
-                              'flex w-full items-start justify-between gap-6 rounded-md px-2 py-2.5 text-left text-sm transition-colors',
+                              'flex w-full items-start justify-between gap-6 rounded-md px-2 py-2.5 text-left text-body-s transition-colors',
                               isReference
-                                ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40'
+                                ? 'bg-status-success-light ring-1 ring-emerald-500/40'
                                 : listedIsStale
-                                  ? 'opacity-80 hover:bg-zinc-800/50'
-                                  : 'hover:bg-zinc-800/50',
+                                  ? 'opacity-80 hover:bg-link-standard'
+                                  : 'hover:bg-link-standard',
                             ].join(' ')}
                           >
                             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
@@ -2124,10 +2065,10 @@ export function StepShiftRouteGroups({
                                   {labelIndex > 0 ? (
                                     <span
                                       className={[
-                                        'inline-flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
+                                        'inline-flex size-5 items-center justify-center rounded-full text-caption-2',
                                         cycle.linkKinds[labelIndex - 1] === 'secondary'
                                           ? 'bg-violet-500/30 text-violet-100'
-                                          : 'bg-sky-500/30 text-sky-100',
+                                          : 'bg-link-tonal-hover text-text-theme',
                                       ].join(' ')}
                                     >
                                       {cycle.linkKinds[labelIndex - 1] === 'secondary'
@@ -2135,13 +2076,13 @@ export function StepShiftRouteGroups({
                                         : t('shiftList.routeGroups.primaryShort')}
                                     </span>
                                   ) : null}
-                                  <span className="font-medium text-zinc-100">{label}</span>
+                                  <span className="font-medium text-text-primary">{label}</span>
                                 </span>
                               ))}
-                              <span className="text-zinc-600">·</span>
+                              <span className="text-text-disabled">·</span>
                               <span
                                 className={
-                                  cycle.secondaryCount === 0 ? 'text-sky-300' : 'text-violet-300'
+                                  cycle.secondaryCount === 0 ? 'text-text-theme' : 'text-violet-300'
                                 }
                               >
                                 {cycle.secondaryCount === 0
@@ -2150,28 +2091,28 @@ export function StepShiftRouteGroups({
                               </span>
                               {isReference ? (
                                 <>
-                                  <span className="text-zinc-600">·</span>
-                                  <span className="text-emerald-300">{t('shiftList.routeGroups.preferred')}</span>
+                                  <span className="text-text-disabled">·</span>
+                                  <span className="text-status-success">{t('shiftList.routeGroups.preferred')}</span>
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-zinc-600">·</span>
-                                  <span className="text-zinc-500">{t('shiftList.routeGroups.clickAdopt')}</span>
+                                  <span className="text-text-disabled">·</span>
+                                  <span className="text-text-quaternary">{t('shiftList.routeGroups.clickAdopt')}</span>
                                 </>
                               )}
             </div>
                             <div
                               className={[
                                 'shrink-0 space-y-0.5 text-right tabular-nums',
-                                rowOver ? 'text-red-400' : 'text-zinc-200',
+                                rowOver ? 'text-status-error-emphasis' : 'text-text-primary',
                               ].join(' ')}
                             >
-                              <div className="text-sm">
-                                <span className="text-zinc-500">{t('shiftList.routeGroups.fastShort')} </span>
+                              <div className="text-body-s">
+                                <span className="text-text-quaternary">{t('shiftList.routeGroups.fastShort')} </span>
                                 {formatSecondsLabel(cycle.minCycleSeconds)}
           </div>
-                              <div className="text-sm">
-                                <span className="text-zinc-500">{t('shiftList.routeGroups.avgShort')} </span>
+                              <div className="text-body-s">
+                                <span className="text-text-quaternary">{t('shiftList.routeGroups.avgShort')} </span>
                                 {formatSecondsLabel(cycle.avgCycleSeconds)}
                               </div>
                             </div>
@@ -2191,9 +2132,9 @@ export function StepShiftRouteGroups({
                         .filter((item) => item.minCycleSeconds <= limit)
                         .sort((a, b) => a.minCycleSeconds - b.minCycleSeconds);
                       return (
-                        <div className="space-y-1.5 rounded-lg border border-red-500/30 bg-red-500/5 p-2.5">
-                          <p className="flex items-start gap-1.5 text-[11px] text-red-300">
-                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                        <div className="space-y-1.5 rounded-lg border border-border-danger-light bg-status-error-light p-2.5">
+                          <p className="flex items-start gap-1.5 text-body-xs text-status-error-emphasis">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-error-emphasis" />
                             <span>
                               {t('shiftList.routeGroups.preferredOver', {
                                 path: referenceCycle.labels.join('→'),
@@ -2203,17 +2144,17 @@ export function StepShiftRouteGroups({
                               })}
                             </span>
                           </p>
-                          <p className="pl-5 text-[10px] leading-4 text-zinc-500">
+                          <p className="pl-5 text-caption-2 text-text-quaternary">
                             {t('shiftList.routeGroups.gateUsesFast', {
                               avg: formatSecondsLabel(referenceCycle.avgCycleSeconds),
                             })}
                           </p>
-                          <div className="pl-5 text-[11px] leading-5 text-zinc-300">
-                            <p className="text-zinc-400">{t('shiftList.routeGroups.solutionsTitle')}</p>
+                          <div className="pl-5 text-body-xs text-text-secondary">
+                            <p className="text-text-tertiary">{t('shiftList.routeGroups.solutionsTitle')}</p>
                             <ul className="list-disc space-y-0.5 pl-4">
                               {withinLimit.length > 0 ? (
                                 <li>
-                                  <span className="text-zinc-200">{t('shiftList.routeGroups.adoptWithin')}</span>
+                                  <span className="text-text-primary">{t('shiftList.routeGroups.adoptWithin')}</span>
                                   {t('shiftList.routeGroups.adoptWithinDetail', {
                                     path: withinLimit[0]!.labels.join('→'),
                                     min: formatSecondsLabel(withinLimit[0]!.minCycleSeconds),
@@ -2228,22 +2169,22 @@ export function StepShiftRouteGroups({
                                 <li>{t('shiftList.routeGroups.allOver')}</li>
                               )}
                               <li>
-                                <span className="text-zinc-200">{t('shiftList.routeGroups.shortenOccupy')}</span>
+                                <span className="text-text-primary">{t('shiftList.routeGroups.shortenOccupy')}</span>
                                 {t('shiftList.routeGroups.shortenOccupyDetail', {
                                   value: formatSecondsLabel(shortfall),
                                 })}
                               </li>
                               <li>
-                                <span className="text-zinc-200">{t('shiftList.routeGroups.raiseLimit')}</span>
+                                <span className="text-text-primary">{t('shiftList.routeGroups.raiseLimit')}</span>
                                 {t('shiftList.routeGroups.raiseLimitNotField')}
-                                <span className="text-zinc-200">
+                                <span className="text-text-primary">
                                   {t('shiftList.routeGroups.raiseLimitFormula')}
                                 </span>
                                 {t('shiftList.routeGroups.raiseLimitMinDay')}
                                 {turnaroundBinding ? (
                                   <>
                                     {t('shiftList.routeGroups.stuckInterval')}
-                                    <span className="font-medium text-amber-300">
+                                    <span className="font-medium text-status-warning">
                                       {formatClockRange(
                                         turnaroundBinding.startMinute,
                                         turnaroundBinding.endMinute,
@@ -2267,33 +2208,26 @@ export function StepShiftRouteGroups({
                   ) : null}
 
                   {throughGateStatus === 'passed' && referenceCycle ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
-                      <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                    <p className="flex items-start gap-1.5 text-body-xs text-status-success">
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-status-success" />
                       <span>
                         {t('shiftList.routeGroups.confirmedOk', { path: referenceCycle.labels.join('→'), limitOk: hasLimit ? t('shiftList.routeGroups.withinTurnaround') : '' })}
                       </span>
                     </p>
                   ) : throughGateStatus === 'passed' ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-emerald-300">
-                      <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                    <p className="flex items-start gap-1.5 text-body-xs text-status-success">
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-status-success" />
                       <span>{t('shiftList.routeGroups.stillValid')}</span>
                     </p>
                   ) : null}
 
                   <div className="flex flex-col items-end gap-2">
-                    <button
-                      type="button"
-                      disabled={!cycleMarksReady || !graphHasLinks}
-                      onClick={runThroughVerification}
-                      className="rounded-md border border-[#2B7FFF]/50 bg-[#2B7FFF]/15 px-3 py-1.5 text-xs font-medium text-[#9ec5ff] hover:bg-[#2B7FFF]/25 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {listedThroughCycles.length > 0
+                    <Button hierarchy="subordinate" variant="outlined" disabled={!cycleMarksReady || !graphHasLinks} onPress={runThroughVerification}>{listedThroughCycles.length > 0
                         ? t('shiftList.routeGroups.recheckCycles')
-                        : t('shiftList.routeGroups.generateCycles')}
-                    </button>
+                        : t('shiftList.routeGroups.generateCycles')}</Button>
                     {nextStepBlockers.length > 0 ? (
-                      <div className="w-full rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-left text-[11px] text-amber-100/90">
-                        <p className="font-medium text-amber-200">{t('shiftList.routeGroups.nextBlocked')}</p>
+                      <div className="w-full rounded-md border border-status-warning-light bg-status-warning-light px-3 py-2 text-left text-body-xs text-amber-100/90">
+                        <p className="font-medium text-status-warning">{t('shiftList.routeGroups.nextBlocked')}</p>
                         <ul className="mt-1 list-disc space-y-0.5 pl-4 text-amber-100/80">
                           {nextStepBlockers.map((item) => (
                             <li key={item}>{item}</li>

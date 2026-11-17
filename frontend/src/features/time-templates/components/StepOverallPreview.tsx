@@ -134,14 +134,14 @@ function PreviewTaskBar({
       />
       <div className="pointer-events-none absolute inset-0 z-[6] flex items-center justify-center px-1.5">
         {wizard ? (
-          <span className="max-w-full truncate text-center text-xs leading-5" style={{ color: colors.text }}>
+          <span className="max-w-full truncate text-center text-body-xs" style={{ color: colors.text }}>
             {task.label}
             <span className="mx-1.5 opacity-50">｜</span>
             <span className="tabular-nums opacity-80">{timeLabel}</span>
           </span>
         ) : (
         <span
-          className="max-w-full truncate text-center text-[10px] font-normal leading-[18px] tracking-[0.5px]"
+          className="max-w-full truncate text-center text-caption-2 font-normal leading-[18px] tracking-[0.5px]"
           style={{ color: colors.text }}
         >
           {task.label}
@@ -204,14 +204,14 @@ function WizardTimeline({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border border-[#2B7FFF]/60 bg-[#232329] p-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border border-border-theme-light bg-surface-secondary p-4">
       {legends.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {legends.map((item) => (
             <AttributeLegendBadgeChip
               key={item.attributeId}
               item={item}
-              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm"
+              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-body-s"
             />
           ))}
         </div>
@@ -219,18 +219,18 @@ function WizardTimeline({
       {tasks.length === 0 ? (
         <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-[#25253a] p-6">
           <PanelNoData />
-          <p className="text-xs text-zinc-500">{emptyHint}</p>
+          <p className="text-body-xs text-text-quaternary">{emptyHint}</p>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg bg-[#18181b]" style={{ scrollbarColor: '#52525b transparent' }}>
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg bg-surface-popup" style={{ scrollbarColor: '#52525b transparent' }}>
           <div className="min-w-max" style={{ width: totalWidth + ROW_LABEL_WIDTH }}>
             <div className="sticky top-0 z-10 flex">
-              <div className="sticky left-0 z-20 shrink-0 bg-[#18181b]" style={{ width: ROW_LABEL_WIDTH }} />
+              <div className="sticky left-0 z-20 shrink-0 bg-surface-popup" style={{ width: ROW_LABEL_WIDTH }} />
               <div className="relative flex rounded-t-lg bg-[#2d2d4a]">
                 {ticks.map((tick) => (
                   <div
                     key={tick}
-                    className="shrink-0 border-l border-[#9494b8]/25 py-2 pl-1.5 text-left text-xs tabular-nums text-zinc-300"
+                    className="shrink-0 border-l border-[#9494b8]/25 py-2 pl-1.5 text-left text-body-xs tabular-nums text-text-secondary"
                     style={{ width: tickWidth }}
                   >
                     {formatTickLabel(tick * tickMinutes)}
@@ -239,11 +239,11 @@ function WizardTimeline({
               </div>
             </div>
             <div className="relative flex">
-              <div className="sticky left-0 z-10 shrink-0 bg-[#18181b]" style={{ width: ROW_LABEL_WIDTH }}>
+              <div className="sticky left-0 z-10 shrink-0 bg-surface-popup" style={{ width: ROW_LABEL_WIDTH }}>
                 {rows.map((row) => (
                   <div
                     key={row}
-                    className="flex items-center justify-center text-sm tabular-nums text-zinc-300"
+                    className="flex items-center justify-center text-body-s tabular-nums text-text-secondary"
                     style={{ height: WIZARD_ROW_HEIGHT_PX, marginTop: WIZARD_ROW_GAP_PX }}
                   >
                     {String(row).padStart(2, '0')}
@@ -258,7 +258,7 @@ function WizardTimeline({
                     <div
                       key={row}
                       // 每一列自己的底色，列與列之間露出外框底色，看得出邊界
-                      className="relative border-y border-white/[0.05] bg-[#26262b]"
+                      className="relative border-y border-white/[0.05] bg-surface-secondary"
                       style={{ height: WIZARD_ROW_HEIGHT_PX, marginTop: WIZARD_ROW_GAP_PX }}
                     >
                       {Array.from({ length: SCHEDULE_VISIBLE_SLOTS }, (_, col) => {
@@ -294,7 +294,7 @@ function WizardTimeline({
           </div>
         </div>
       )}
-      <p className="flex shrink-0 items-center justify-center gap-2 text-sm text-zinc-300">
+      <p className="flex shrink-0 items-center justify-center gap-2 text-body-s text-text-secondary">
         <Info className="size-4 shrink-0" aria-hidden />
         <span>{scrollHint}</span>
         <span aria-hidden>← →</span>
@@ -349,12 +349,12 @@ export function StepOverallPreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       {/* 模板名稱 + 營運時段圖例 */}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border-quaternary bg-black-30 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-sm text-zinc-500">
+          <span className="shrink-0 text-body-s text-text-quaternary">
             {t('timeTemplates.overallPreview.templateName')}
           </span>
-          <span className="truncate text-sm font-medium text-zinc-100">
+          <span className="truncate text-body-s-bold text-text-primary">
             {resolveTimeTemplateDraftName(name)}
           </span>
         </div>
@@ -364,7 +364,7 @@ export function StepOverallPreview({
               <AttributeLegendBadgeChip
                 key={item.attributeId}
                 item={item}
-                className="inline-flex min-h-[26px] max-w-full items-center whitespace-nowrap rounded-lg border px-3 py-1 text-xs font-medium"
+                className="inline-flex min-h-[26px] max-w-full items-center whitespace-nowrap rounded-lg border px-3 py-1 text-body-xs-bold"
               />
             ))}
           </div>
@@ -372,11 +372,11 @@ export function StepOverallPreview({
       </div>
 
       {/* 班表預覽格線 */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-black-30">
         {tasks.length === 0 ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6">
             <PanelNoData />
-            <p className="text-xs text-zinc-600">{resolvedEmptyHint}</p>
+            <p className="text-body-xs text-text-disabled">{resolvedEmptyHint}</p>
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto">
@@ -385,8 +385,8 @@ export function StepOverallPreview({
               style={{ width: SCHEDULE_VISIBLE_SLOTS * slotWidthPx + ROW_LABEL_WIDTH }}
             >
               {/* Time header */}
-              <div className="sticky top-0 z-10 flex border-b border-zinc-800/80 bg-[#0c0c0e]/95 backdrop-blur-sm">
-                <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-zinc-800/60 bg-[#0c0c0e]/95" />
+              <div className="sticky top-0 z-10 flex border-b border-border-quaternary bg-surface-sub-background backdrop-blur-sm">
+                <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-border-quaternary bg-surface-sub-background" />
                 <div className="relative flex">
                   <div className="pointer-events-none absolute inset-0 z-0">
                     <ScheduleTimelineBackground
@@ -398,14 +398,14 @@ export function StepOverallPreview({
                   {timeSlots.map((slot) => (
                     <div
                       key={slot}
-                      className={`relative z-[1] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                      className={`relative z-[1] shrink-0 border-r border-border-quaternary py-2 pl-1 text-left text-body-xs tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
                       style={{ width: slotWidthPx }}
                     >
                       {formatSlotLabel(slot)}
                     </div>
                   ))}
                   <span
-                    className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                    className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-body-xs tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
                     style={{ left: SCHEDULE_VISIBLE_SLOTS * slotWidthPx }}
                     aria-hidden
                   >
@@ -418,8 +418,8 @@ export function StepOverallPreview({
               {rows.map((row) => {
                 const rowTasks = tasks.filter((task) => task.rowIndex === row);
                 return (
-                  <div key={row} className="relative flex border-b border-zinc-800/50">
-                    <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
+                  <div key={row} className="relative flex border-b border-border-quaternary">
+                    <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-border-quaternary bg-surface-sub-background text-body-xs text-text-quaternary">
                       {String(row).padStart(2, '0')}
                     </div>
                     <div className="relative flex">
@@ -439,7 +439,7 @@ export function StepOverallPreview({
                         return (
                           <div
                             key={col}
-                            className={`relative z-[1] shrink-0 border-r border-zinc-800/30 ${
+                            className={`relative z-[1] shrink-0 border-r border-border-disabled ${
                               slotActive ? 'bg-transparent' : 'schedule-inactive-cell'
                             }`}
                             style={{ width: slotWidthPx, height: ROW_HEIGHT_PX }}
@@ -462,14 +462,14 @@ export function StepOverallPreview({
           </div>
         )}
 
-        <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
-          <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
+        <div className="flex shrink-0 items-center gap-2 border-t border-border-quaternary px-3 py-2 text-body-xs text-text-quaternary">
+          <Info className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
           <span>
             {readOnly
               ? t('timeTemplates.overallPreview.readOnlyHint')
               : t('timeTemplates.scheduling.hintScroll')}
           </span>
-          <span className="text-zinc-600">← →</span>
+          <span className="text-text-disabled">← →</span>
         </div>
       </div>
     </div>

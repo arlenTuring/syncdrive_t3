@@ -24,7 +24,7 @@ export function AttributeColorPalette({ value, onChange }: AttributeColorPalette
         aria-hidden
       />
       <div className="flex w-[128px] flex-col gap-1">
-        <span className="text-xs leading-4 text-[#F3F4F6]">Color</span>
+        <span className="text-body-xs text-text-primary">Color</span>
         <div className="flex w-[128px] flex-wrap gap-1">
           {ATTRIBUTE_COLOR_PALETTE.map((color) => {
             const selected = value === color;
@@ -41,7 +41,7 @@ export function AttributeColorPalette({ value, onChange }: AttributeColorPalette
                   className="relative flex size-[14px] items-center justify-center rounded-[3px]"
                   style={{ backgroundColor: color }}
                 >
-                  {selected && <Check className="size-2.5 text-white" strokeWidth={3} />}
+                  {selected && <Check className="size-2.5 text-text-primary" strokeWidth={3} />}
                 </span>
               </button>
             );

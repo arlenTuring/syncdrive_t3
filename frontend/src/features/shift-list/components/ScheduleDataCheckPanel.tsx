@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import type { ScheduleDataCheckState } from '../hooks/useScheduleDataCheck';
+import { Button } from '../../../components/ui';
 
 /**
  * 路線群組的必要資料檢查結果（白皮書 MAP-02～04）；狀態由 useScheduleDataCheck 提供。
@@ -17,15 +18,15 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck, embedd
   const mapIssues = record?.issues.filter((issue) => issue.scope === 'map') ?? [];
   const selectionIssues = record?.issues.filter((issue) => issue.scope !== 'map') ?? [];
   const tone = running || (!record && !error)
-    ? 'border-zinc-700/80 bg-zinc-900/40 text-zinc-300'
+    ? 'border-border-quaternary bg-surface-primary text-text-secondary'
     : error || !record?.ok
-      ? 'border-red-500/50 bg-red-500/10 text-red-200'
-      : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+      ? 'border-red-500/50 bg-status-error-light text-status-error-emphasis'
+      : 'border-emerald-500/40 bg-status-success-light text-status-success';
   const stage = (title: string, issues: Array<{ message: string }>, pending?: string) => (
     <div className="mt-1.5">
       <span className="font-medium">{title}：</span>
       {pending ? (
-        <span className="text-zinc-400">{pending}</span>
+        <span className="text-text-tertiary">{pending}</span>
       ) : issues.length === 0 ? (
         <span>通過</span>
       ) : (
@@ -42,38 +43,36 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck, embedd
   );
   if (embedded) {
     const ok = !running && !error && record?.ok;
-    const bar = running || (!record && !error) ? 'border-zinc-500' : ok ? 'border-emerald-500' : 'border-red-500';
+    const bar = running || (!record && !error) ? 'border-border-primary' : ok ? 'border-status-success' : 'border-status-error';
     const stageLine = (title: string, issues: Array<{ message: string }>, pending?: string) => (
-      <li className={`border-l-2 pl-3 ${pending ? 'border-zinc-500' : issues.length === 0 ? 'border-emerald-500' : 'border-red-500'}`}>
-        <span className="text-zinc-100">{title}</span>
-        <span className={`ml-2 ${pending ? 'text-zinc-400' : issues.length === 0 ? 'text-zinc-300' : 'text-red-300'}`}>
+      <li className={`border-l-2 pl-3 ${pending ? 'border-border-primary' : issues.length === 0 ? 'border-status-success' : 'border-status-error'}`}>
+        <span className="text-text-primary">{title}</span>
+        <span className={`ml-2 ${pending ? 'text-text-tertiary' : issues.length === 0 ? 'text-text-secondary' : 'text-status-error-emphasis'}`}>
           {pending ?? (issues.length === 0 ? '通過' : `${issues.length} 項要補齊`)}
         </span>
         {!pending && issues.length > 0 ? (
-          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-red-200">
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-body-xs text-status-error-emphasis">
             {issues.map((issue, index) => <li key={index}>{issue.message}</li>)}
           </ul>
         ) : null}
       </li>
     );
     return (
-      <div className="text-sm">
+      <div className="text-body-s">
         <div className={`flex flex-wrap items-center gap-2 border-l-2 pl-3 ${bar}`}>
-          <span className="text-zinc-100">地圖與必要資料</span>
+          <span className="text-text-primary">地圖與必要資料</span>
           {running ? (
-            <span className="inline-flex items-center gap-1 text-zinc-400"><Loader2 className="size-3 animate-spin" />檢查中…</span>
+            <span className="inline-flex items-center gap-1 text-text-tertiary"><Loader2 className="size-3 animate-spin" />檢查中…</span>
           ) : error ? (
-            <span className="text-red-300">檢查沒有完成：{error}</span>
+            <span className="text-status-error-emphasis">檢查沒有完成：{error}</span>
           ) : !record ? (
-            <span className="text-zinc-400">尚未檢查</span>
+            <span className="text-text-tertiary">尚未檢查</span>
           ) : record.ok ? (
-            <span className="text-zinc-300">通過（地圖「{record.mapId}」，{new Date(record.checkedAt).toLocaleString()} 檢查）</span>
+            <span className="text-text-secondary">通過（地圖「{record.mapId}」，{new Date(record.checkedAt).toLocaleString()} 檢查）</span>
           ) : (
-            <span className="text-red-300">未通過，補好之前不能往下一步</span>
+            <span className="text-status-error-emphasis">未通過，補好之前不能往下一步</span>
           )}
-          <button type="button" className="ml-auto rounded-md border border-zinc-600 px-2.5 py-1 text-xs text-zinc-300 hover:border-zinc-400 disabled:opacity-50" disabled={running} onClick={recheck}>
-            重新檢查
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="ml-auto" disabled={running} onPress={recheck}>重新檢查</Button>
         </div>
         {!running && record ? (
           <ul className="mt-2 space-y-2 pl-4">
@@ -86,31 +85,24 @@ export function ScheduleDataCheckPanel({ running, error, record, recheck, embedd
   }
 
   return (
-    <div className={`rounded-md border px-3 py-2 text-xs leading-relaxed ${tone}`}>
+    <div className={`rounded-md border px-3 py-2 text-body-xs ${tone}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">地圖與必要資料檢查</span>
         {running ? (
-          <span className="inline-flex items-center gap-1 text-zinc-400">
+          <span className="inline-flex items-center gap-1 text-text-tertiary">
             <Loader2 className="size-3 animate-spin" />
             檢查中…
           </span>
         ) : error ? (
           <span>檢查沒有完成：{error}</span>
         ) : !record ? (
-          <span className="text-zinc-400">尚未檢查</span>
+          <span className="text-text-tertiary">尚未檢查</span>
         ) : record.ok ? (
           <span>通過（地圖「{record.mapId}」，{new Date(record.checkedAt).toLocaleString()} 檢查）</span>
         ) : (
           <span>未通過，補好之前不能往下一步</span>
         )}
-        <button
-          type="button"
-          className="ml-auto rounded border border-zinc-600/70 px-2 py-0.5 text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
-          disabled={running}
-          onClick={recheck}
-        >
-          重新檢查
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" className="ml-auto" disabled={running} onPress={recheck}>重新檢查</Button>
       </div>
       {!running && record ? (
         <>

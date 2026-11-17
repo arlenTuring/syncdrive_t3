@@ -39,7 +39,7 @@ def convert(path, ui, close_expr=None):
         # close handler: outer onMouseDown/onClick 裡呼叫的函式，或指定
         ce=close_expr
         if not ce:
-            cm=re.search(r'on(?:MouseDown|Click)=\{[^}]*?(\w+(?:\?\.)?\(\))',outer)
+            cm=re.search(r'on(?:MouseDown|Click)=\{[^}]*?(\w+(?:\?\.)?\([^()]*\))',outer)
             ce='() => '+cm.group(1) if cm else None
         if not ce:
             cm=re.search(r'\b(onClose|onCancel)\b',s)

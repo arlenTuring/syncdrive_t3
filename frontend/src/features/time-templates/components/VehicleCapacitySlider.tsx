@@ -90,11 +90,11 @@ export function VehicleCapacitySlider({
       >
         <div className="relative h-1 w-full rounded-full bg-[#3F3F46]">
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-[#2B7FFF]"
+            className="absolute inset-y-0 left-0 rounded-full bg-link-theme-filled"
             style={{ width: `${fillPercent}%` }}
           />
           <div
-            className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-[#2B7FFF] shadow-[0_0_0_1px_rgba(43,127,255,0.45)]"
+            className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-link-theme-filled shadow-[0_0_0_1px_rgba(43,127,255,0.45)]"
             style={{ left: `${fillPercent}%` }}
           />
         </div>
@@ -104,11 +104,11 @@ export function VehicleCapacitySlider({
         className="flex shrink-0 flex-col items-center justify-center"
         style={{ width: VALUE_COLUMN_WIDTH_PX, height: TRACK_ROW_HEIGHT_PX }}
       >
-        <span className="text-sm font-medium leading-5 tabular-nums text-[#F3F4F6]">
+        <span className="text-body-s-bold tabular-nums text-text-primary">
           {value}
         </span>
         {!hideValueSublabel && (
-          <span className="whitespace-nowrap text-[10px] leading-4 text-[#99A1AF]">車體載運量</span>
+          <span className="whitespace-nowrap text-caption-2 text-text-tertiary">車體載運量</span>
         )}
       </div>
     </div>

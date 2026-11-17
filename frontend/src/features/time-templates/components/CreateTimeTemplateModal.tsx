@@ -28,6 +28,7 @@ import {
   updateTimeTemplateDraft,
 } from '../api/timeTemplatesApi';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 type CreateTimeTemplateModalProps = {
   onClose: () => void;
@@ -37,7 +38,7 @@ type CreateTimeTemplateModalProps = {
 
 
 const BASIC_INFO_FIELD_CLASS =
-  'h-9 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC] placeholder:text-[#99A1AF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/40';
+  'h-9 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 
@@ -63,21 +64,21 @@ function AutoSaveDraftBadge({
   if (status === 'idle' && !savedAt) return null;
 
   return (
-    <div className="absolute right-4 top-4 flex items-center gap-2 text-xs text-zinc-400">
+    <div className="absolute right-4 top-4 flex items-center gap-2 text-body-xs text-text-tertiary">
       {status === 'saving' ? (
         <>
-          <Loader2 className="size-3 animate-spin text-zinc-500" />
+          <Loader2 className="size-3 animate-spin text-text-quaternary" />
           {t('timeTemplates.createWizard.savingDraft')}
         </>
       ) : status === 'saved' && savedAt ? (
         <>
-          <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+          <span className="size-2 rounded-full bg-status-success" aria-hidden />
           {t('timeTemplates.createWizard.draftSaved', {
             time: formatAutoSaveTime(savedAt, i18n.language),
           })}
         </>
       ) : status === 'error' ? (
-        <span className="text-red-400">{t('timeTemplates.createWizard.autoSaveFailed')}</span>
+        <span className="text-status-error-emphasis">{t('timeTemplates.createWizard.autoSaveFailed')}</span>
       ) : null}
     </div>
   );
@@ -105,7 +106,7 @@ function CreateStepSidebar({
 
   if (collapsed) {
     return (
-      <aside className="flex w-14 shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
+      <aside className="flex w-14 shrink-0 flex-col border-r border-border-quaternary bg-[#08080a]">
         <nav className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-auto py-4">
           {CREATE_TEMPLATE_STEPS.map((item) => {
             const active = item.step === currentStep;
@@ -121,14 +122,14 @@ function CreateStepSidebar({
                 disabled={!unlocked}
                 title={stepLabel(item.step)}
                 onClick={() => unlocked && onStepClick(item.step)}
-                className={`relative flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-medium transition ${
+                className={`relative flex size-9 shrink-0 items-center justify-center rounded-full text-body-xs font-medium transition ${
                   active
-                    ? 'bg-[#2B7FFF] text-white ring-2 ring-[#2B7FFF]/30'
+                    ? 'bg-link-theme-filled text-text-primary ring-2 ring-[#2B7FFF]/30'
                     : completed
-                      ? 'bg-emerald-500/20 text-emerald-400'
+                      ? 'bg-status-success-light text-status-success'
                       : unlocked
-                        ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        : 'cursor-not-allowed bg-zinc-900 text-zinc-600 opacity-50'
+                        ? 'bg-surface-secondary text-text-tertiary hover:bg-link-standard-hover'
+                        : 'cursor-not-allowed bg-surface-primary text-text-disabled opacity-50'
                 }`}
               >
                 {completed ? <Check className="size-3.5" strokeWidth={2.5} /> : item.step}
@@ -141,18 +142,11 @@ function CreateStepSidebar({
   }
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-zinc-800/80 bg-[#08080a]">
-      <div className="border-b border-zinc-800/80 px-4 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-4 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-zinc-200"
-        >
-          <ArrowLeft className="size-4" />
-          {t('timeTemplates.createWizard.backToPlatform')}
-        </button>
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
-          <FileText className="size-4 text-[#2B7FFF]" />
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-border-quaternary bg-[#08080a]">
+      <div className="border-b border-border-quaternary px-4 py-4">
+        <Button hierarchy="subordinate" variant="text" className="mb-4" leadingIcon={<ArrowLeft />} onPress={onBack}>{t('timeTemplates.createWizard.backToPlatform')}</Button>
+        <div className="flex items-center gap-2 text-body-s-bold text-text-primary">
+          <FileText className="size-4 text-text-theme-light" />
           {t('timeTemplates.createWizard.title')}
         </div>
       </div>
@@ -176,34 +170,34 @@ function CreateStepSidebar({
                     active
                       ? 'bg-[rgba(43,127,255,0.12)]'
                       : unlocked
-                        ? 'hover:bg-zinc-900/80'
+                        ? 'hover:bg-surface-primary'
                         : 'cursor-not-allowed opacity-50'
                   }`}
                 >
                   {active && (
                     <span
-                      className="absolute inset-y-2 left-0 w-1 rounded-r bg-[#2B7FFF]"
+                      className="absolute inset-y-2 left-0 w-1 rounded-r bg-link-theme-filled"
                       aria-hidden
                     />
                   )}
                   <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${
+                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-body-xs font-medium ${
                       active
-                        ? 'bg-[#2B7FFF] text-white'
+                        ? 'bg-link-theme-filled text-text-primary'
                         : completed
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-zinc-800 text-zinc-500'
+                          ? 'bg-status-success-light text-status-success'
+                          : 'bg-surface-secondary text-text-quaternary'
                     }`}
                   >
                     {completed ? <Check className="size-3.5" strokeWidth={2.5} /> : item.step}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] uppercase tracking-wider text-zinc-600">
+                    <span className="block text-caption-2 uppercase text-text-disabled">
                       STEP {item.step}
                     </span>
                     <span
-                      className={`block truncate text-sm ${
-                        active ? 'font-medium text-zinc-100' : 'text-zinc-400'
+                      className={`block truncate text-body-s ${
+                        active ? 'font-medium text-text-primary' : 'text-text-tertiary'
                       }`}
                     >
                       {stepLabel(item.step)}
@@ -216,15 +210,8 @@ function CreateStepSidebar({
         </ol>
       </nav>
 
-      <div className="border-t border-zinc-800/80 p-4">
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200"
-        >
-          <Trash2 className="size-4" />
-          {t('timeTemplates.createWizard.discardDraft')}
-        </button>
+      <div className="border-t border-border-quaternary p-4">
+        <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Trash2 />} onPress={onDiscard}>{t('timeTemplates.createWizard.discardDraft')}</Button>
       </div>
     </aside>
   );
@@ -245,13 +232,13 @@ function StepBasicInfoCard({
   return (
     <section className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-[rgba(142,197,255,0.08)]">
       <div className="flex items-center gap-2 border-b border-[rgba(212,212,212,0.1)] px-4 py-2">
-        <Info className="size-5 text-[#99A1AF]" strokeWidth={1.75} />
-        <h3 className="text-base font-medium text-[#F3F4F6]">{t('timeTemplates.createWizard.basicInfo')}</h3>
+        <Info className="size-5 text-text-tertiary" strokeWidth={1.75} />
+        <h3 className="text-body-m-bold text-text-primary">{t('timeTemplates.createWizard.basicInfo')}</h3>
       </div>
       <div className="grid grid-cols-2 gap-4 px-4 py-3">
         <label className="block min-w-0">
-          <span className="mb-1.5 flex items-center gap-1 text-sm text-[#D1D5DC]">
-            <span className="text-red-500">*</span>
+          <span className="mb-1.5 flex items-center gap-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             {t('timeTemplates.createWizard.templateName')}
           </span>
           <input
@@ -263,7 +250,7 @@ function StepBasicInfoCard({
           />
         </label>
         <div className="block min-w-0">
-          <span className="mb-1.5 block text-sm text-[#D1D5DC]">{t('timeTemplates.createWizard.vehicleCapacity')}</span>
+          <span className="mb-1.5 block text-body-s text-text-secondary">{t('timeTemplates.createWizard.vehicleCapacity')}</span>
           <VehicleCapacitySlider
             value={vehicleCapacity}
             onChange={onVehicleCapacityChange}
@@ -309,7 +296,7 @@ function StepOperatingSlots({
 
   return (
     <div className="flex w-full flex-col gap-2">
-      <h2 className="text-base font-medium text-zinc-100">{t('timeTemplates.createWizard.stepTitle1')}</h2>
+      <h2 className="text-body-m-bold text-text-primary">{t('timeTemplates.createWizard.stepTitle1')}</h2>
       <StepBasicInfoCard
         name={draft.name}
         vehicleCapacity={draft.vehicleCapacity}
@@ -544,7 +531,7 @@ export function CreateTimeTemplateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex bg-[#0a0a0b] text-zinc-100">
+    <div className="fixed inset-0 z-[60] flex bg-surface-sub-background text-text-primary">
       <CreateStepSidebar
         currentStep={step}
         maxReachedStep={maxReachedStep}
@@ -572,8 +559,8 @@ export function CreateTimeTemplateModal({
           <div
             className={`relative flex flex-col ${
               step === 2 && scheduleFullscreen
-                ? 'min-h-0 flex-1 overflow-hidden bg-[#111113]'
-                : `rounded-2xl border border-zinc-800/80 bg-[#111113] px-6 pb-6 pt-4 ${
+                ? 'min-h-0 flex-1 overflow-hidden bg-surface-sub-background'
+                : `rounded-2xl border border-border-quaternary bg-surface-sub-background px-6 pb-6 pt-4 ${
                     step === 2 ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-full'
                   }`
             }`}
@@ -582,26 +569,26 @@ export function CreateTimeTemplateModal({
               <AutoSaveDraftBadge status={autoSaveStatus} savedAt={lastSavedAt} />
             )}
             {loading ? (
-              <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+              <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
                 <Loader2 className="size-6 animate-spin" />
                 {t('timeTemplates.createWizard.loadingTemplate')}
               </div>
             ) : loadError ? (
-              <div className="flex min-h-[240px] items-center justify-center text-sm text-red-400">
+              <div className="flex min-h-[240px] items-center justify-center text-body-s text-status-error-emphasis">
                 {loadError}
               </div>
             ) : (
               <>
                 {!(step === 2 && scheduleFullscreen) && (
                   <div className="mb-3 shrink-0 pr-28">
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-body-xs text-text-quaternary">
                       {t('timeTemplates.createWizard.stepHint')}
                     </p>
                     {step !== 1 && (
-                      <h2 className="mt-2 text-base font-medium text-zinc-100">
+                      <h2 className="mt-2 text-body-m-bold text-text-primary">
                         {stepContentTitle(step, t)}
                         {step === 2 && draft.name.trim() && (
-                          <span className="ml-2 font-normal text-zinc-500">
+                          <span className="ml-2 font-normal text-text-quaternary">
                             · {resolveTimeTemplateDraftName(draft.name)}
                           </span>
                         )}
@@ -646,27 +633,20 @@ export function CreateTimeTemplateModal({
         </div>
 
         {!(step === 2 && scheduleFullscreen) && (
-        <footer className="flex shrink-0 flex-col gap-1 border-t border-zinc-800/80 px-8 py-4">
+        <footer className="flex shrink-0 flex-col gap-1 border-t border-border-quaternary px-8 py-4">
           {(saveError || autoSaveStatus === 'error') && (
-            <p className="text-xs text-red-400">{saveError ?? t('timeTemplates.createWizard.autoSaveFailed')}</p>
+            <p className="text-body-xs text-status-error-emphasis">{saveError ?? t('timeTemplates.createWizard.autoSaveFailed')}</p>
           )}
           <div className="flex items-center justify-end gap-4">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={step <= 1 || loading || Boolean(loadError)}
-              className="text-sm text-[#2B7FFF] transition hover:text-[#5a9aff] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t('timeTemplates.createWizard.previous')}
-            </button>
+            <Button variant="text" onPress={handlePrevious} disabled={step <= 1 || loading || Boolean(loadError)}>{t('timeTemplates.createWizard.previous')}</Button>
             <button
               type="button"
               onClick={handleNext}
               disabled={!canGoNext || saving || loading || Boolean(loadError)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              className={`rounded-lg px-4 py-2 text-body-s font-medium transition ${
                 canGoNext && !saving && !loading && !loadError
-                  ? 'bg-[#2B7FFF] text-white hover:bg-[#2569e6]'
-                  : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
+                  ? 'bg-link-theme-filled text-text-primary hover:bg-link-theme-filled-hover'
+                  : 'cursor-not-allowed bg-surface-secondary text-text-disabled'
               }`}
             >
               {saving

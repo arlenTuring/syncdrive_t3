@@ -958,122 +958,90 @@
   },
   "features/shift-list/components/CapacityTrendChart.tsx": {
     "hex": 7,
-    "arbitrary": 5,
+    "arbitrary": 3,
     "rgb": 3,
-    "palette": 26,
+    "palette": 1,
     "button": 1
   },
   "features/shift-list/components/CreateShiftSchedulePage.tsx": {
-    "hex": 15,
-    "arbitrary": 16,
-    "palette": 61,
-    "button": 7
+    "hex": 2,
+    "arbitrary": 2,
+    "palette": 2,
+    "button": 3
   },
   "features/shift-list/components/HelpTip.tsx": {
-    "arbitrary": 1,
-    "palette": 7,
     "button": 1
   },
   "features/shift-list/components/ManualScheduleEditorSidebar.tsx": {
-    "hex": 4,
-    "arbitrary": 15,
-    "palette": 32,
+    "arbitrary": 2,
+    "palette": 1,
     "button": 1
   },
   "features/shift-list/components/RouteRelationGraphEditor.tsx": {
-    "hex": 40,
-    "arbitrary": 23,
-    "palette": 82,
-    "button": 8
+    "hex": 37,
+    "arbitrary": 4,
+    "palette": 26,
+    "button": 5
   },
   "features/shift-list/components/ScheduleAnalysisReportPanel.tsx": {
-    "arbitrary": 22,
-    "palette": 76,
-    "button": 3
+    "arbitrary": 1,
+    "palette": 9
   },
   "features/shift-list/components/ScheduleDataCheckPanel.tsx": {
-    "palette": 36,
-    "button": 2
+    "palette": 3
   },
   "features/shift-list/components/ScheduleTimeZoomToolbar.tsx": {
-    "arbitrary": 1,
-    "palette": 13,
-    "button": 3
+    "button": 2
   },
   "features/shift-list/components/ShiftListPage.tsx": {
-    "hex": 14,
-    "arbitrary": 16,
-    "palette": 57,
-    "button": 11
-  },
-  "features/shift-list/components/ShiftMenuSelect.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 4
+    "hex": 1,
+    "arbitrary": 3,
+    "button": 8
   },
   "features/shift-list/components/ShiftSchedulePlanGrid.tsx": {
-    "hex": 21,
-    "arbitrary": 69,
+    "hex": 14,
+    "arbitrary": 23,
     "rgb": 2,
-    "palette": 143,
+    "palette": 21,
     "button": 7
   },
-  "features/shift-list/components/ShiftScheduleResultPreviewPage.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 12,
-    "button": 1
-  },
-  "features/shift-list/components/ShiftSelectionEmptyState.tsx": {
-    "palette": 1
-  },
   "features/shift-list/components/StepShiftActionSettings.tsx": {
-    "hex": 22,
-    "arbitrary": 34,
+    "hex": 1,
+    "arbitrary": 8,
     "rgb": 1,
-    "palette": 46,
-    "button": 9
+    "palette": 8,
+    "button": 5
   },
   "features/shift-list/components/StepShiftMaintenanceTask.tsx": {
-    "hex": 6,
-    "arbitrary": 6,
-    "palette": 29
+    "palette": 1
   },
   "features/shift-list/components/StepShiftRouteGroups.tsx": {
-    "hex": 31,
-    "arbitrary": 46,
-    "rgb": 2,
-    "palette": 144,
-    "button": 13
+    "hex": 4,
+    "arbitrary": 5,
+    "rgb": 1,
+    "palette": 8,
+    "button": 4
   },
   "features/shift-list/components/StepShiftScheduleAdjust.tsx": {
-    "hex": 12,
-    "arbitrary": 14,
-    "palette": 113,
-    "button": 16
+    "hex": 1,
+    "arbitrary": 1,
+    "palette": 4,
+    "button": 12
   },
   "features/shift-list/components/StepShiftSchedulePreview.tsx": {
-    "hex": 16,
-    "arbitrary": 25,
+    "arbitrary": 1,
     "rgb": 1,
-    "palette": 113,
+    "palette": 6,
     "button": 5
   },
   "features/shift-list/components/StepShiftTimeTemplate.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 18
+    "palette": 2
   },
   "features/shift-list/components/TransitionCardCodesBar.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 23,
-    "button": 1
+    "palette": 2
   },
   "features/shift-list/components/YardEntryAllowancePanel.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 37
+    "palette": 3
   },
   "features/shift-list/types.ts": {
     "hex": 6,
@@ -1138,118 +1106,92 @@
     "button": 5
   },
   "features/time-templates/components/AttributeColorPalette.tsx": {
-    "hex": 3,
-    "arbitrary": 2,
+    "hex": 2,
+    "arbitrary": 1,
     "rgb": 3,
-    "palette": 1,
     "button": 1
   },
   "features/time-templates/components/CreateTimeTemplateModal.tsx": {
-    "hex": 21,
-    "arbitrary": 30,
+    "hex": 3,
+    "arbitrary": 9,
     "rgb": 4,
-    "palette": 47,
-    "button": 6
-  },
-  "features/time-templates/components/FillEmptySlotsConfirmModal.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 9,
     "button": 3
   },
   "features/time-templates/components/PanelNoData.tsx": {
-    "hex": 1,
-    "arbitrary": 3
+    "arbitrary": 2
   },
   "features/time-templates/components/ScheduleIntervalSelection.tsx": {
     "hex": 2,
-    "arbitrary": 3,
-    "palette": 6,
+    "arbitrary": 1,
+    "palette": 1,
     "button": 1
   },
   "features/time-templates/components/scheduleTimelineBackground.tsx": {
     "hex": 1
   },
   "features/time-templates/components/StepOverallPreview.tsx": {
-    "hex": 13,
-    "arbitrary": 16,
+    "hex": 5,
+    "arbitrary": 5,
     "rgb": 2,
-    "palette": 24
+    "palette": 3
   },
   "features/time-templates/components/StepTaskScheduling.tsx": {
-    "hex": 8,
-    "arbitrary": 26,
+    "arbitrary": 9,
     "rgb": 2,
-    "palette": 78,
-    "button": 8
+    "palette": 7,
+    "button": 6
   },
   "features/time-templates/components/TaskSettingsForm.tsx": {
-    "hex": 2,
-    "arbitrary": 4,
-    "palette": 10
+    "arbitrary": 2,
+    "palette": 1
   },
   "features/time-templates/components/TaskTypeHelpAnchor.tsx": {
-    "arbitrary": 3,
-    "palette": 7
+    "arbitrary": 1,
+    "palette": 1
   },
   "features/time-templates/components/TimeOfDayPicker.tsx": {
-    "hex": 13,
-    "arbitrary": 23,
+    "hex": 1,
+    "arbitrary": 9,
     "rgb": 5,
-    "palette": 2,
-    "button": 4
+    "button": 2
   },
   "features/time-templates/components/TimeRangeField.tsx": {
-    "hex": 5,
-    "arbitrary": 7,
-    "palette": 6,
-    "button": 3
+    "arbitrary": 2,
+    "button": 2
   },
   "features/time-templates/components/TimeSlotAttributeCard.tsx": {
-    "hex": 17,
-    "arbitrary": 27,
+    "arbitrary": 3,
     "rgb": 3,
-    "palette": 12,
-    "button": 5
+    "button": 3
   },
   "features/time-templates/components/TimeSlotAttributesPanel.tsx": {
     "arbitrary": 1,
     "rgb": 1
   },
   "features/time-templates/components/TimeSlotIntervalsPanel.tsx": {
-    "hex": 15,
-    "arbitrary": 38,
+    "hex": 2,
+    "arbitrary": 25,
     "rgb": 11,
-    "palette": 14,
+    "palette": 2,
     "button": 3
   },
   "features/time-templates/components/TimeTemplateListPage.tsx": {
-    "hex": 5,
-    "arbitrary": 7,
-    "palette": 78,
-    "button": 13,
-    "selection": 2
+    "arbitrary": 2,
+    "palette": 9,
+    "button": 9
   },
   "features/time-templates/components/TimeTemplatePanelHeader.tsx": {
-    "hex": 3,
-    "arbitrary": 9,
+    "arbitrary": 6,
     "rgb": 2,
     "button": 1
   },
-  "features/time-templates/components/TimeTemplatePreviewModal.tsx": {
-    "hex": 4,
-    "arbitrary": 5,
-    "palette": 4,
-    "button": 1
-  },
   "features/time-templates/components/TurnaroundLimitGrid.tsx": {
-    "hex": 2,
-    "arbitrary": 8,
-    "palette": 14
+    "arbitrary": 1,
+    "palette": 3
   },
   "features/time-templates/components/VehicleCapacitySlider.tsx": {
-    "hex": 5,
-    "arbitrary": 7,
+    "hex": 1,
+    "arbitrary": 2,
     "palette": 1
   },
   "features/time-templates/types.ts": {

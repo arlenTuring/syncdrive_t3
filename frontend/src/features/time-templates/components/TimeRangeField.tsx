@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { snapSecondsToScheduleAlign } from '../types/editor';
 import { TimePickerPanel } from './TimeOfDayPicker';
+import { IconButton } from '../../../components/ui';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -106,37 +107,30 @@ export function TimeRangeField({
     <div ref={rootRef} className="relative min-w-0">
       <div
         ref={triggerRef}
-        className={`flex h-[34px] min-w-0 items-center rounded-lg bg-zinc-900/80 px-3 text-sm leading-[18px] tracking-[0.5px] ${
-          open ? 'ring-1 ring-[#2B7FFF]/60' : ''
+        className={`flex h-[34px] min-w-0 items-center rounded-lg bg-surface-primary px-3 text-body-s leading-[18px] tracking-[0.5px] ${
+          open ? 'ring-1 ring-border-theme-light' : ''
         }`}
       >
         <button
           type="button"
           onClick={() => openPicker('start')}
           className={`shrink-0 whitespace-nowrap tabular-nums ${
-            active === 'start' && open ? 'text-white' : 'text-[#D1D5DC] hover:text-white'
+            active === 'start' && open ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           {startTime || '--:--'}
         </button>
-        <span className="mx-2 shrink-0 text-zinc-500">→</span>
+        <span className="mx-2 shrink-0 text-text-quaternary">→</span>
         <button
           type="button"
           onClick={() => openPicker('end')}
           className={`shrink-0 whitespace-nowrap tabular-nums ${
-            active === 'end' && open ? 'text-white' : 'text-[#D1D5DC] hover:text-white'
+            active === 'end' && open ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           {endTime || '--:--'}
         </button>
-        <button
-          type="button"
-          onClick={() => openPicker(active)}
-          className="ml-auto flex shrink-0 items-center justify-center text-[#99A1AF] hover:text-[#D1D5DC]"
-          aria-label="選擇時間"
-        >
-          <Clock className="size-4" />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" className="ml-auto shrink-0" onPress={() => openPicker(active)} label="選擇時間" icon={<Clock />} />
       </div>
       {open &&
         createPortal(

@@ -30,10 +30,10 @@ import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
 
 /** 設計稿：無外框、灰藍底 */
 const SELECT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const CODE_INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-[#232730] px-3 text-sm uppercase tracking-wider text-zinc-100 placeholder:text-zinc-500 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
+  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s uppercase text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const SECTION_TITLE: Record<MaintenanceSectionCodeKey, string> = {
   charging: '充電任務',
@@ -231,7 +231,7 @@ export function StepShiftMaintenanceTask({
   const cardLabelField = (key: MaintenanceSectionCodeKey) => (
     <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
       <label className="block">
-        <span className="mb-2 block px-1 text-sm text-zinc-300">班次卡標籤</span>
+        <span className="mb-2 block px-1 text-body-s text-text-secondary">班次卡標籤</span>
         <input
           type="text"
           value={sectionCardLabelBySection[key]}
@@ -241,7 +241,7 @@ export function StepShiftMaintenanceTask({
           className={SELECT_CLASS}
         />
       </label>
-      <p className="self-end pb-2.5 text-xs text-zinc-400">顯示在即時數據儀表板的班次卡左上角。</p>
+      <p className="self-end pb-2.5 text-body-xs text-text-tertiary">顯示在即時數據儀表板的班次卡左上角。</p>
     </div>
   );
 
@@ -250,8 +250,8 @@ export function StepShiftMaintenanceTask({
     return (
       <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-            <span className="text-red-500">*</span>
+          <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+            <span className="text-status-error">*</span>
             整備代號
           </span>
           <input
@@ -260,14 +260,14 @@ export function StepShiftMaintenanceTask({
             onChange={(e) => patchSectionCode(key, e.target.value)}
             placeholder="例：M"
             maxLength={2}
-            className={`${CODE_INPUT_CLASS} ${issue ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/30' : ''}`}
+            className={`${CODE_INPUT_CLASS} ${issue ? 'border-status-error focus:border-status-error focus:ring-status-error-light' : ''}`}
             autoComplete="off"
             spellCheck={false}
           />
-          <span className="mt-1.5 block px-1 text-xs text-zinc-500">最長 2 字元，僅限英文字母</span>
-          {issue ? <span className="mt-1 block px-1 text-xs text-red-400">{issue}</span> : null}
+          <span className="mt-1.5 block px-1 text-body-xs text-text-quaternary">最長 2 字元，僅限英文字母</span>
+          {issue ? <span className="mt-1 block px-1 text-body-xs text-status-error-emphasis">{issue}</span> : null}
         </label>
-        <p className="flex items-center gap-1.5 self-start pt-[2.1rem] text-xs text-zinc-400">
+        <p className="flex items-center gap-1.5 self-start pt-[2.1rem] text-body-xs text-text-tertiary">
           <Lightbulb className="size-3.5 shrink-0" aria-hidden />
           預覽班次代號 {'{整備代號}{列碼}{開始時刻}'}
         </p>
@@ -277,12 +277,12 @@ export function StepShiftMaintenanceTask({
 
   const slackField = (key: MaintenanceEntrySlackSectionKey) => (
     <div>
-      <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-        <span className="text-red-500">*</span>
+      <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+        <span className="text-status-error">*</span>
         正線優先讓渡餘裕
       </span>
       <div className="grid items-center gap-x-6 gap-y-2 md:grid-cols-2">
-        <label className="flex items-center gap-3 text-sm text-zinc-300">
+        <label className="flex items-center gap-3 text-body-s text-text-secondary">
           <span className="shrink-0">正線可壓縮整備開頭，最多</span>
           <span className="relative min-w-0 flex-1">
             <input
@@ -293,10 +293,10 @@ export function StepShiftMaintenanceTask({
               aria-label={`${SECTION_TITLE[key]}正線可壓縮整備開頭秒數`}
               className={`${SELECT_CLASS} pr-10`}
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">秒</span>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-s text-text-tertiary">秒</span>
           </span>
         </label>
-        <p className="flex items-center gap-1.5 text-xs text-amber-300">
+        <p className="flex items-center gap-1.5 text-body-xs text-status-warning">
           <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
           超出此秒數上限時，系統將判定衝突不予排班
         </p>
@@ -345,16 +345,16 @@ export function StepShiftMaintenanceTask({
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="mb-5 flex shrink-0 flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-medium text-zinc-100">選擇要套用的整備計畫</h2>
+        <h2 className="text-headline-5 text-text-primary">選擇要套用的整備計畫</h2>
       </div>
 
       <label className="block shrink-0">
-        <span className="mb-2 flex items-center px-1 text-sm text-zinc-300">
-          <span className="text-red-500">*</span>
+        <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary">
+          <span className="text-status-error">*</span>
           整備任務
         </span>
         {loading ? (
-          <div className="flex h-[42px] items-center gap-2 text-sm text-zinc-500">
+          <div className="flex h-[42px] items-center gap-2 text-body-s text-text-quaternary">
             <Loader2 className="size-4 animate-spin" />
             載入整備任務中…
           </div>
@@ -374,24 +374,24 @@ export function StepShiftMaintenanceTask({
             ))}
           </SiteSelect>
         )}
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-body-s text-status-error-emphasis">{error}</p>}
         {!loading && !error && items.length === 0 && (
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-body-s text-text-quaternary">
             尚無整備任務可選，請先至「整備任務管理」建立。
           </p>
         )}
       </label>
 
-      <div className={`mt-6 min-h-[280px] flex-1 ${draft.taskId && !previewLoading && !previewError ? '' : 'overflow-auto rounded-xl border border-zinc-800/80 bg-zinc-950/40'}`}>
+      <div className={`mt-6 min-h-[280px] flex-1 ${draft.taskId && !previewLoading && !previewError ? '' : 'overflow-auto rounded-xl border border-border-quaternary bg-black-30'}`}>
         {!draft.taskId ? (
           <ShiftSelectionEmptyState />
         ) : previewLoading ? (
-          <div className="flex min-h-[280px] items-center justify-center gap-2 text-sm text-zinc-500">
+          <div className="flex min-h-[280px] items-center justify-center gap-2 text-body-s text-text-quaternary">
             <Loader2 className="size-4 animate-spin" />
             載入整備任務預覽中…
           </div>
         ) : previewError ? (
-          <div className="flex min-h-[280px] items-center justify-center px-6 text-sm text-red-400">
+          <div className="flex min-h-[280px] items-center justify-center px-6 text-body-s text-status-error-emphasis">
             {previewError}
           </div>
         ) : (

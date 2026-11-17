@@ -23,7 +23,7 @@ function TaskTypeHelpHoverCard({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10050] w-max max-w-[248px] -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700/90 bg-zinc-950 px-3 py-2.5 shadow-2xl shadow-black/50"
+      className="pointer-events-none fixed z-[10050] w-max max-w-[248px] -translate-x-1/2 -translate-y-full rounded-lg border border-border-quaternary bg-surface-sub-background px-3 py-2.5 shadow-2xl shadow-black-50"
       style={{ top: pos.top, left: pos.left }}
       role="tooltip"
     >
@@ -33,19 +33,19 @@ function TaskTypeHelpHoverCard({
           style={{ backgroundColor: colors.bar }}
           aria-hidden
         />
-        <span className="text-[11px] font-semibold leading-4 text-zinc-100">
+        <span className="text-body-xs-bold text-text-primary">
           {description.title}
         </span>
       </div>
-      <ul className="mt-2 space-y-1.5 pl-4 text-[10px] leading-[15px] text-zinc-300">
+      <ul className="mt-2 space-y-1.5 pl-4 text-caption-2 leading-[15px] text-text-secondary">
         {description.bullets.map((bullet) => (
-          <li key={bullet} className="list-disc marker:text-zinc-500">
+          <li key={bullet} className="list-disc marker:text-text-quaternary">
             {bullet}
           </li>
         ))}
       </ul>
       <div
-        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
+        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-border-quaternary"
         aria-hidden
       />
     </div>,

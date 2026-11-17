@@ -24,6 +24,7 @@ import {
   type ShiftRouteRelationGraph,
   type ShiftRouteRelationLink,
 } from '../utils/routeRelationGraph';
+import { Button } from '../../../components/ui';
 
 type AnchorKey = 'n' | 'e' | 's' | 'w';
 
@@ -736,31 +737,31 @@ export function RouteRelationGraphEditor({
   return (
     <div
       className={
-        framed ? 'rounded-xl border border-zinc-800/80 bg-zinc-950/50' : undefined
+        framed ? 'rounded-xl border border-border-quaternary bg-black-30' : undefined
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-800/70 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border-quaternary px-4 py-3">
         <div>
-          <h3 className="text-sm font-medium text-zinc-100">{t('shiftList.routeRelation.title')}</h3>
-          <p className="mt-0.5 text-[11px] text-zinc-500">
+          <h3 className="text-body-s-bold text-text-primary">{t('shiftList.routeRelation.title')}</h3>
+          <p className="mt-0.5 text-body-xs text-text-quaternary">
             {t('shiftList.routeRelation.hint')}
           </p>
         </div>
         {selectedLinkId ? (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-md border border-zinc-700">
+            <div className="flex overflow-hidden rounded-md border border-border-quaternary">
               <button
                 type="button"
                 onClick={() => {
                   onChange(updateRouteRelationLinkNextKind(synced, selectedLinkId, 'priority'));
                 }}
                 className={[
-                  'px-2.5 py-1 text-[11px]',
+                  'px-2.5 py-1 text-body-xs',
                   resolveRouteRelationNextKind(
                     synced.links.find((link) => link.id === selectedLinkId),
                   ) === 'priority'
                     ? 'bg-[#2B7FFF]/25 text-[#9ec5ff]'
-                    : 'text-zinc-400 hover:bg-sky-950/60 hover:text-sky-200',
+                    : 'text-text-tertiary hover:bg-sky-950/60 hover:text-text-theme',
                 ].join(' ')}
               >
                 {t('shiftList.routeRelation.primaryRoute')}
@@ -771,37 +772,25 @@ export function RouteRelationGraphEditor({
                   onChange(updateRouteRelationLinkNextKind(synced, selectedLinkId, 'secondary'));
                 }}
                 className={[
-                  'border-l border-zinc-700 px-2.5 py-1 text-[11px]',
+                  'border-l border-border-quaternary px-2.5 py-1 text-body-xs',
                   resolveRouteRelationNextKind(
                     synced.links.find((link) => link.id === selectedLinkId),
                   ) === 'secondary'
                     ? 'bg-violet-500/25 text-violet-100'
-                    : 'text-zinc-400 hover:bg-violet-950/60 hover:text-violet-200',
+                    : 'text-text-tertiary hover:bg-violet-950/60 hover:text-violet-200',
                 ].join(' ')}
               >
                 {t('shiftList.routeRelation.secondaryRoute')}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="outlined" onPress={() => {
                 onChange(reverseRouteRelationLink(synced, selectedLinkId));
                 setSelectedLinkId(null);
-              }}
-              className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500"
-            >
-              {t('shiftList.routeRelation.reverseDirection')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
+              }}>{t('shiftList.routeRelation.reverseDirection')}</Button>
+            <Button hierarchy="danger" variant="outlined" onPress={() => {
                 onChange(removeRouteRelationLink(synced, selectedLinkId));
                 setSelectedLinkId(null);
-              }}
-              className="rounded-md border border-rose-500/40 px-2.5 py-1 text-[11px] text-rose-300 hover:bg-rose-500/10"
-            >
-              {t('shiftList.routeRelation.deleteEdge')}
-            </button>
+              }}>{t('shiftList.routeRelation.deleteEdge')}</Button>
           </div>
         ) : routes.length > 0 &&
           (onSetHead || onToggleStartInstance || onToggleEndInstance) ? (
@@ -810,11 +799,11 @@ export function RouteRelationGraphEditor({
               <div className="space-y-1.5">
                 <p>{t('shiftList.routeRelation.markHelpSelect')}</p>
                 <p>
-                  <span className="text-amber-200">{t('shiftList.routeRelation.firstTrip')}</span>
+                  <span className="text-status-warning">{t('shiftList.routeRelation.firstTrip')}</span>
                   {t('shiftList.routeRelation.firstTripHint')}
                 </p>
                 <p>
-                  <span className="text-sky-200">{t('shiftList.routeRelation.startFrom')}</span>
+                  <span className="text-text-theme">{t('shiftList.routeRelation.startFrom')}</span>
                   {t('shiftList.routeRelation.startFromHint')}
                 </p>
                 <p>
@@ -827,18 +816,12 @@ export function RouteRelationGraphEditor({
               <>
                 {onSetHead ? (
                   headInstanceId === selectedNodeId ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-300">
+                    <span className="inline-flex items-center gap-1 text-body-xs text-status-success">
                       <Check className="size-3.5" strokeWidth={2.5} />
                       {t('shiftList.routeRelation.alreadyFirst')}
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => onSetHead(selectedNodeId)}
-                      className="rounded-md border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-100 hover:bg-amber-500/20"
-                    >
-                      {t('shiftList.routeRelation.setFirst')}
-                    </button>
+                    <Button hierarchy="subordinate" variant="outlined" onPress={() => onSetHead(selectedNodeId)}>{t('shiftList.routeRelation.setFirst')}</Button>
                   )
                 ) : null}
                 {onToggleStartInstance ? (
@@ -847,12 +830,12 @@ export function RouteRelationGraphEditor({
                     disabled={endSet.has(selectedNodeId) && !startSet.has(selectedNodeId)}
                     onClick={() => onToggleStartInstance(selectedNodeId)}
                     className={[
-                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px]',
+                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-body-xs',
                       startSet.has(selectedNodeId)
-                        ? 'border-sky-500/50 bg-sky-500/20 text-sky-100'
+                        ? 'border-sky-500/50 bg-sky-500/20 text-text-theme'
                         : endSet.has(selectedNodeId)
-                          ? 'cursor-not-allowed border-zinc-800 text-zinc-600'
-                          : 'border-zinc-700 text-zinc-300 hover:border-sky-500/40 hover:text-sky-100',
+                          ? 'cursor-not-allowed border-border-quaternary text-text-disabled'
+                          : 'border-border-quaternary text-text-secondary hover:border-border-theme-light hover:text-text-theme',
                     ].join(' ')}
                     title={
                       endSet.has(selectedNodeId) && !startSet.has(selectedNodeId)
@@ -860,7 +843,7 @@ export function RouteRelationGraphEditor({
                         : undefined
                     }
                   >
-                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-sky-500/30 text-[9px] font-semibold text-sky-100">
+                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-link-tonal-hover text-caption-2 text-text-theme">
                       {t('shiftList.routeRelation.startShort')}
                     </span>
                     {startSet.has(selectedNodeId) ? t('shiftList.routeRelation.cancelStart') : t('shiftList.routeRelation.startFrom')}
@@ -872,12 +855,12 @@ export function RouteRelationGraphEditor({
                     disabled={startSet.has(selectedNodeId) && !endSet.has(selectedNodeId)}
                     onClick={() => onToggleEndInstance(selectedNodeId)}
                     className={[
-                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px]',
+                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-body-xs',
                       endSet.has(selectedNodeId)
                         ? 'border-violet-500/50 bg-violet-500/20 text-violet-100'
                         : startSet.has(selectedNodeId)
-                          ? 'cursor-not-allowed border-zinc-800 text-zinc-600'
-                          : 'border-zinc-700 text-zinc-300 hover:border-violet-500/40 hover:text-violet-100',
+                          ? 'cursor-not-allowed border-border-quaternary text-text-disabled'
+                          : 'border-border-quaternary text-text-secondary hover:border-violet-500/40 hover:text-violet-100',
                     ].join(' ')}
                     title={
                       startSet.has(selectedNodeId) && !endSet.has(selectedNodeId)
@@ -885,7 +868,7 @@ export function RouteRelationGraphEditor({
                         : undefined
                     }
                   >
-                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-violet-500/30 text-[9px] font-semibold text-violet-100">
+                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-violet-500/30 text-caption-2 text-violet-100">
                       {t('shiftList.routeRelation.endShort')}
                     </span>
                     {endSet.has(selectedNodeId) ? t('shiftList.routeRelation.cancelEnd') : t('shiftList.routeRelation.endAt')}
@@ -893,18 +876,18 @@ export function RouteRelationGraphEditor({
                 ) : null}
               </>
             ) : (
-              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+              <div className="flex flex-wrap items-center gap-3 text-body-xs">
                 {onSetHead ? (
                   <span
                     className={[
                       'inline-flex items-center gap-1',
-                      headInstanceId ? 'text-emerald-300' : 'text-zinc-600',
+                      headInstanceId ? 'text-status-success' : 'text-text-disabled',
                     ].join(' ')}
                   >
                     {headInstanceId ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
-                      <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
+                      <span className="inline-block size-3.5 rounded-full border border-border-quaternary" />
                     )}
                     {t('shiftList.routeRelation.firstTrip')}
                   </span>
@@ -913,17 +896,17 @@ export function RouteRelationGraphEditor({
                   <span
                     className={[
                       'inline-flex items-center gap-1',
-                      startSet.size > 0 ? 'text-emerald-300' : 'text-zinc-600',
+                      startSet.size > 0 ? 'text-status-success' : 'text-text-disabled',
                     ].join(' ')}
                   >
                     {startSet.size > 0 ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
-                      <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
+                      <span className="inline-block size-3.5 rounded-full border border-border-quaternary" />
                     )}
                     {t('shiftList.routeRelation.startLabel')}
                     {startSet.size > 0 ? (
-                      <span className="tabular-nums text-zinc-500">{startSet.size}</span>
+                      <span className="tabular-nums text-text-quaternary">{startSet.size}</span>
                     ) : null}
                   </span>
                 ) : null}
@@ -931,17 +914,17 @@ export function RouteRelationGraphEditor({
                   <span
                     className={[
                       'inline-flex items-center gap-1',
-                      endSet.size > 0 ? 'text-emerald-300' : 'text-zinc-600',
+                      endSet.size > 0 ? 'text-status-success' : 'text-text-disabled',
                     ].join(' ')}
                   >
                     {endSet.size > 0 ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
-                      <span className="inline-block size-3.5 rounded-full border border-zinc-700" />
+                      <span className="inline-block size-3.5 rounded-full border border-border-quaternary" />
                     )}
                     {t('shiftList.routeRelation.endLabel')}
                     {endSet.size > 0 ? (
-                      <span className="tabular-nums text-zinc-500">{endSet.size}</span>
+                      <span className="tabular-nums text-text-quaternary">{endSet.size}</span>
                     ) : null}
                   </span>
                 ) : null}
@@ -994,7 +977,7 @@ export function RouteRelationGraphEditor({
                   'absolute z-0 select-none rounded-lg border shadow-sm',
                   isHead
                     ? 'border-amber-400/70 bg-amber-950/55'
-                    : 'border-zinc-700/90 bg-zinc-900/95',
+                    : 'border-border-quaternary bg-zinc-900/95',
                   hovered
                     ? 'ring-2 ring-[#2B7FFF]/50'
                     : isSelected
@@ -1016,13 +999,13 @@ export function RouteRelationGraphEditor({
                 }}
               >
                 {isHead ? (
-                  <div className="pointer-events-none absolute left-1.5 top-1 z-30 rounded bg-amber-500/90 px-1 py-px text-[8px] font-semibold tracking-wide text-zinc-950">
+                  <div className="pointer-events-none absolute left-1.5 top-1 z-30 rounded bg-amber-500/90 px-1 py-px text-[8px] font-semibold tracking-wide text-text-invert">
                     {t('shiftList.routeRelation.firstTrip')}
                   </div>
                 ) : null}
                 {isStart ? (
                   <span
-                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-sky-500/35 text-[9px] font-semibold text-sky-50"
+                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-sky-500/35 text-caption-2 text-sky-50"
                     title={t('shiftList.routeRelation.startFrom')}
                     aria-label={t('shiftList.routeRelation.startFrom')}
                   >
@@ -1031,7 +1014,7 @@ export function RouteRelationGraphEditor({
                 ) : null}
                 {isEnd ? (
                   <span
-                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-violet-500/35 text-[9px] font-semibold text-violet-50"
+                    className="pointer-events-none absolute right-1.5 top-1 z-30 inline-flex size-4 items-center justify-center rounded-full bg-violet-500/35 text-caption-2 text-violet-50"
                     title={t('shiftList.routeRelation.endAt')}
                     aria-label={t('shiftList.routeRelation.endAt')}
                   >
@@ -1041,27 +1024,27 @@ export function RouteRelationGraphEditor({
                 <div className="flex h-full flex-col items-center justify-center gap-0.5 px-2.5 py-1.5 text-center">
                   <div
                     className={[
-                      'text-lg font-semibold tracking-wide',
-                      isHead ? 'text-amber-100' : 'text-[#7CB8FF]',
+                      'text-headline-5',
+                      isHead ? 'text-status-warning' : 'text-text-theme',
                     ].join(' ')}
                   >
                     {code}
                   </div>
                   <div
-                    className="max-w-full truncate text-[9px] leading-tight text-zinc-400"
+                    className="max-w-full truncate text-caption-2 text-text-tertiary"
                     title={route.routeName}
                   >
                     {route.routeName}
                   </div>
                   <div
-                    className="mt-0.5 max-w-full overflow-x-auto whitespace-nowrap border-t border-zinc-800/90 pt-1 text-[10px] leading-tight text-zinc-300 [scrollbar-width:thin]"
+                    className="mt-0.5 max-w-full overflow-x-auto whitespace-nowrap border-t border-border-quaternary pt-1 text-caption-2 text-text-secondary [scrollbar-width:thin]"
                     title={`${origin?.stationName ?? '—'} → ${terminal?.stationName ?? '—'}`}
                   >
-                    <span className="text-zinc-500">{t('shiftList.routeRelation.origin')}</span>
+                    <span className="text-text-quaternary">{t('shiftList.routeRelation.origin')}</span>
                     {' '}
                     {origin?.stationName ?? '—'}
-                    <span className="mx-1 text-zinc-600">→</span>
-                    <span className="text-zinc-500">{t('shiftList.routeRelation.terminus')}</span>
+                    <span className="mx-1 text-text-disabled">→</span>
+                    <span className="text-text-quaternary">{t('shiftList.routeRelation.terminus')}</span>
                     {' '}
                     {terminal?.stationName ?? '—'}
                   </div>
@@ -1184,7 +1167,7 @@ export function RouteRelationGraphEditor({
                   type="button"
                   aria-label={t('shiftList.routeRelation.dragHandleAria', { code, anchor })}
                   title={t('shiftList.routeRelation.dragHandle')}
-                  className="absolute z-20 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-zinc-400 bg-zinc-700 hover:border-[#2B7FFF] hover:bg-[#2B7FFF]"
+                  className="absolute z-20 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-zinc-400 bg-link-standard-hover hover:border-border-theme hover:bg-link-theme-filled"
                   style={{ left: pt.x, top: pt.y }}
                   onPointerDown={(event) =>
                     onAnchorPointerDown(event, node.instanceId, anchor)

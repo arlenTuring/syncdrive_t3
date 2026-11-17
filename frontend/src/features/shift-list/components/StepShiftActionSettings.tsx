@@ -49,26 +49,27 @@ import {
   type ShiftMenuGroup,
   type ShiftMenuOption,
 } from './ShiftMenuSelect';
+import { IconButton } from '../../../components/ui';
 
 const INPUT_CLASS =
-  'h-10 w-[56px] shrink-0 rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-2 text-sm tabular-nums text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/30';
-const FIELD_LABEL_CLASS = 'mb-1.5 block text-xs leading-none text-zinc-400';
+  'h-10 w-[56px] shrink-0 rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s tabular-nums text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+const FIELD_LABEL_CLASS = 'mb-1.5 block text-body-xs text-text-tertiary';
 const MEDIA_FIELD_WIDTH_CLASS = 'w-[168px]';
 
 const MENU_PANEL_WIDTH = 160;
 const menuPanelClass =
-  'absolute flex max-h-[312px] flex-col items-stretch overflow-hidden rounded-lg bg-[#18181B] py-1 shadow-lg shadow-black/40';
+  'absolute flex max-h-[312px] flex-col items-stretch overflow-hidden rounded-lg bg-surface-primary py-1 shadow-lg shadow-black-30';
 const menuListClass =
   'flex max-h-[304px] w-full flex-col items-stretch overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]';
 
 function menuOptionClass(active: boolean, disabled = false) {
   return [
-    'flex h-10 w-full shrink-0 items-center px-3 text-left text-[14px] font-normal leading-[18px] tracking-[0.5px] transition-colors',
+    'flex h-10 w-full shrink-0 items-center px-3 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] transition-colors',
     disabled
-      ? 'cursor-not-allowed text-[#6A7282]'
+      ? 'cursor-not-allowed text-text-quaternary'
       : active
-        ? 'bg-white/10 text-[#F3F4F6]'
-        : 'text-[#F3F4F6] hover:bg-white/5',
+        ? 'bg-link-standard-hover text-text-primary'
+        : 'text-text-primary hover:bg-link-standard',
   ].join(' ');
 }
 
@@ -238,24 +239,24 @@ function FacilityTargetPicker({
       <button
         type="button"
         className={[
-          'flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-zinc-900/80 px-3 text-left text-sm focus:outline-none',
+          'flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-surface-primary px-3 text-left text-body-s focus:outline-none',
           open
-            ? 'border-[#7CB8FF] text-zinc-100'
-            : 'border-zinc-700/80 text-zinc-100 focus:border-[#2B7FFF] focus:ring-1 focus:ring-[#2B7FFF]/30',
+            ? 'border-[#7CB8FF] text-text-primary'
+            : 'border-border-quaternary text-text-primary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn',
         ].join(' ')}
         aria-label={t('shiftList.actionSettings.facilityTargetAria')}
         aria-expanded={open}
         onClick={() => (open ? closePicker() : openPicker())}
       >
         <span
-          className={`truncate text-[14px] leading-[18px] tracking-[0.5px] ${
-            selectedValue ? 'text-[#F3F4F6]' : 'text-[#99A1AF]'
+          className={`truncate text-body-s leading-[18px] tracking-[0.5px] ${
+            selectedValue ? 'text-text-primary' : 'text-text-tertiary'
           }`}
         >
           {displayLabel}
         </span>
         <ChevronDown
-          className={`size-3.5 shrink-0 text-[#6A7282] transition-transform ${
+          className={`size-3.5 shrink-0 text-text-quaternary transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         />
@@ -285,7 +286,7 @@ function FacilityTargetPicker({
                 return (
                   <div key={category} className="flex w-full flex-col items-stretch">
                     <div className="flex h-8 items-center px-3">
-                      <span className="px-2 text-[11px] font-medium tracking-[0.5px] text-[#99A1AF]">
+                      <span className="px-2 text-body-xs-bold tracking-[0.5px] text-text-tertiary">
                         {category === 'equipment'
                           ? t('shiftList.actionSettings.equipment')
                           : t('shiftList.actionSettings.facility')}
@@ -311,7 +312,7 @@ function FacilityTargetPicker({
                           <span className="min-w-0 flex-1 truncate px-2">
                             {group.typeLabel}
                           </span>
-                          <ChevronRight className="size-3.5 shrink-0 text-[#6A7282]" />
+                          <ChevronRight className="size-3.5 shrink-0 text-text-quaternary" />
                         </button>
                       );
                     })}
@@ -370,11 +371,11 @@ function FacilityTargetPicker({
                       ? t('shiftList.actionSettings.specifyFacility')
                       : t('shiftList.actionSettings.specifyEquipment')}
                   </span>
-                  <span className="mr-1 shrink-0 text-[12px] leading-4 tracking-[0.5px] text-[#99A1AF]">
+                  <span className="mr-1 shrink-0 text-body-xs tracking-[0.5px] text-text-tertiary">
                     ({activeGroup.facilities.length})
                   </span>
                   {canPickSpecific ? (
-                    <ChevronRight className="size-3.5 shrink-0 text-[#6A7282]" />
+                    <ChevronRight className="size-3.5 shrink-0 text-text-quaternary" />
                   ) : null}
                 </button>
               </div>
@@ -454,36 +455,18 @@ function ActionCard({
   const mediaGroups = mediaOptions.filter((item) => item.kind === 'group');
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/70 px-4 py-3.5">
+    <div className="flex items-center gap-3 rounded-xl border border-border-quaternary bg-zinc-950/70 px-4 py-3.5">
       <div className="flex shrink-0 flex-col items-center gap-1">
-        <button
-          type="button"
-          disabled={index <= 0}
-          onClick={() => onMove('up')}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-zinc-700 text-zinc-400 transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-          title={t('shiftList.actionSettings.moveUp')}
-          aria-label={t('shiftList.actionSettings.moveUp')}
-        >
-          <ArrowUp className="size-3.5" />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" disabled={index <= 0} onPress={() => onMove('up')} title={t('shiftList.actionSettings.moveUp')} label={t('shiftList.actionSettings.moveUp')} icon={<ArrowUp />} />
         <span
-          className="flex size-7 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-xs font-semibold uppercase text-[#7CB8FF]"
+          className="flex size-7 items-center justify-center rounded-full bg-surface-theme text-body-xs-bold uppercase text-text-theme"
           aria-label={t('shiftList.actionSettings.itemAria', {
             letter: String.fromCharCode(97 + index),
           })}
         >
           {String.fromCharCode(97 + index)}
         </span>
-        <button
-          type="button"
-          disabled={index >= total - 1}
-          onClick={() => onMove('down')}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-zinc-700 text-zinc-400 transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-          title={t('shiftList.actionSettings.moveDown')}
-          aria-label={t('shiftList.actionSettings.moveDown')}
-        >
-          <ArrowDown className="size-3.5" />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" disabled={index >= total - 1} onPress={() => onMove('down')} title={t('shiftList.actionSettings.moveDown')} label={t('shiftList.actionSettings.moveDown')} icon={<ArrowDown />} />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-nowrap items-end gap-5">
@@ -640,15 +623,7 @@ function ActionCard({
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={onRemove}
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-400 transition hover:border-rose-500/50 hover:text-rose-300"
-        title={t('shiftList.actionSettings.removeAction')}
-        aria-label={t('shiftList.actionSettings.removeAction')}
-      >
-        <Trash2 className="size-4" />
-      </button>
+      <IconButton size="small" hierarchy="danger" variant="standard" className="shrink-0" onPress={onRemove} title={t('shiftList.actionSettings.removeAction')} label={t('shiftList.actionSettings.removeAction')} icon={<Trash2 />} />
     </div>
   );
 }
@@ -682,9 +657,9 @@ function ActionZonePanel({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-xl border border-dashed border-zinc-700/70 bg-zinc-950/40 px-5 py-4">
+    <div className="rounded-xl border border-dashed border-border-quaternary bg-black-30 px-5 py-4">
       <div className="mb-4 flex min-w-0 flex-wrap items-end gap-3">
-        <p className="pb-2 text-sm font-medium text-zinc-200">{title}</p>
+        <p className="pb-2 text-body-s-bold text-text-primary">{title}</p>
         <ActionMenuSelect
           label={t('shiftList.actionSettings.applyModule')}
           value=""
@@ -727,15 +702,7 @@ function ActionZonePanel({
         ))}
 
         <div className="flex justify-center py-1">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="inline-flex size-8 items-center justify-center rounded-full border border-zinc-700 text-zinc-400 transition hover:border-[#2B7FFF]/60 hover:text-[#7CB8FF]"
-            title={t('shiftList.actionSettings.addAction')}
-            aria-label={t('shiftList.actionSettings.addAction')}
-          >
-            <Plus className="size-4" />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onAdd} title={t('shiftList.actionSettings.addAction')} label={t('shiftList.actionSettings.addAction')} icon={<Plus />} />
         </div>
       </div>
     </div>
@@ -848,17 +815,17 @@ export function StepShiftActionSettings({
   if (orderedRoutes.length === 0) {
     return (
       <div className="flex min-h-[240px] flex-col">
-        <h2 className="mb-2 text-lg font-medium text-zinc-100">
+        <h2 className="mb-2 text-headline-5 text-text-primary">
           {t('shiftList.actionSettings.title')}
         </h2>
-        <p className="text-sm text-zinc-500">{t('shiftList.actionSettings.needRouteGroups')}</p>
+        <p className="text-body-s text-text-quaternary">{t('shiftList.actionSettings.needRouteGroups')}</p>
       </div>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
+      <h2 className="mb-6 shrink-0 text-headline-5 text-text-primary">
         {t('shiftList.actionSettings.title')}
       </h2>
 
@@ -868,17 +835,17 @@ export function StepShiftActionSettings({
             {routeIndex > 0 ? (
               <div className="my-8 flex items-center gap-4" aria-hidden>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-600 to-zinc-600" />
-                <span className="shrink-0 rounded-full border border-zinc-600 bg-zinc-900 px-3 py-1 text-[11px] font-medium tracking-[0.2em] text-zinc-400">
+                <span className="shrink-0 rounded-full border border-border-tertiary bg-surface-primary px-3 py-1 text-body-xs-bold tracking-[0.2em] text-text-tertiary">
                   {t('shiftList.actionSettings.nextRoute')}
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-l from-transparent via-zinc-600 to-zinc-600" />
               </div>
             ) : null}
-            <section className="rounded-2xl border border-zinc-700/90 bg-zinc-950/40 p-5 shadow-[inset_3px_0_0_0_rgba(43,127,255,0.55)]">
+            <section className="rounded-2xl border border-border-quaternary bg-black-30 p-5 shadow-[inset_3px_0_0_0_rgba(43,127,255,0.55)]">
               <div className="mb-5 flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-medium text-zinc-100">{route.routeName}</h3>
+                <h3 className="text-body-m-bold text-text-primary">{route.routeName}</h3>
                 {route.routeCode ? (
-                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+                  <span className="rounded bg-surface-secondary px-2 py-0.5 text-body-xs text-text-tertiary">
                     {route.routeCode}
                   </span>
                 ) : null}
@@ -955,11 +922,11 @@ export function StepShiftActionSettings({
                         })}
                       />
 
-                      <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3">
-                        <span className="flex size-7 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-xs font-semibold tabular-nums text-[#7CB8FF]">
+                      <div className="flex items-center gap-3 rounded-xl border border-border-quaternary bg-surface-primary px-4 py-3">
+                        <span className="flex size-7 items-center justify-center rounded-full bg-surface-theme text-body-xs-bold tabular-nums text-text-theme">
                           {stationIndex + 1}
                         </span>
-                        <span className="text-base font-medium text-zinc-100">
+                        <span className="text-body-m-bold text-text-primary">
                           {station.stationName}
                         </span>
                       </div>

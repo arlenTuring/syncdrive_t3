@@ -53,7 +53,7 @@ export function HelpTip({
       <button
         ref={buttonRef}
         type="button"
-        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-zinc-600 text-zinc-400 hover:border-zinc-400 hover:text-zinc-200"
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border-tertiary text-text-tertiary hover:border-border-secondary hover:text-text-primary"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
         onMouseEnter={show}
@@ -69,7 +69,7 @@ export function HelpTip({
               id={tipId}
               role="tooltip"
               className={[
-                'pointer-events-none fixed z-[300] -translate-x-1/2 rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-[11px] font-normal leading-relaxed text-zinc-300 shadow-xl',
+                'pointer-events-none fixed z-[300] -translate-x-1/2 rounded-md border border-border-quaternary bg-surface-sub-background px-2.5 py-2 text-body-xs font-normal text-text-secondary shadow-xl',
                 side === 'top' ? '-translate-y-full' : '',
                 widthClass,
               ].join(' ')}

@@ -17,7 +17,7 @@ export function PanelNoData({ className = '', message = 'No Data' }: PanelNoData
           height={22}
         />
       </div>
-      <span className="text-sm font-medium leading-[18px] tracking-[0.5px] text-[#D1D5DC]">
+      <span className="text-body-s-bold leading-[18px] tracking-[0.5px] text-text-secondary">
         {message}
       </span>
     </div>

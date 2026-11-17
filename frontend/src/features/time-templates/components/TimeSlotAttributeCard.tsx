@@ -12,9 +12,10 @@ import {
   type TimeSlotAttribute,
 } from '../types/editor';
 import { AttributeColorPalette } from './AttributeColorPalette';
+import { Button } from '../../../components/ui';
 
 const EDIT_FIELD_CLASS =
-  'w-full rounded-md bg-[rgba(142,197,255,0.08)] px-2 py-0 text-xs leading-none text-[#D1D5DC] placeholder:text-[#99A1AF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/40';
+  'w-full rounded-md bg-[rgba(142,197,255,0.08)] px-2 py-0 text-body-xs text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const CARD_CLASS =
   'relative flex shrink-0 flex-col gap-0.5 rounded-lg bg-[rgba(142,197,255,0.08)] px-2.5 pb-1 pt-0.5';
@@ -146,7 +147,7 @@ function EditModeCard({
           type="button"
           disabled={!canConfirm}
           onClick={onConfirm}
-          className="inline-flex shrink-0 items-center justify-center rounded-md bg-[#2B7FFF] text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex shrink-0 items-center justify-center rounded-md bg-link-theme-filled text-text-primary transition hover:bg-link-theme-filled-hover disabled:cursor-not-allowed disabled:opacity-40"
           style={ACTION_BUTTON_STYLE}
           aria-label={t('timeTemplates.attributes.confirm')}
         >
@@ -156,7 +157,7 @@ function EditModeCard({
 
       <div className="flex w-full items-center gap-3">
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] font-medium leading-none text-[#99A1AF] pb-0.5">
+          <div className="text-caption-2 text-text-tertiary pb-0.5">
             {t('timeTemplates.attributes.headway')}
           </div>
           <input
@@ -175,14 +176,14 @@ function EditModeCard({
         </div>
 
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">
+          <div className="text-caption-2 text-text-tertiary pb-0.5">
             {t('timeTemplates.attributes.capacity')}
           </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
-            <span className="text-xs font-medium leading-none text-[#D1D5DC]">
+            <span className="text-body-xs-bold text-text-secondary">
               {attribute.capacityPphpd}
             </span>
-            <span className="text-[9px] leading-none text-[#99A1AF] pb-[1px]">pphpd</span>
+            <span className="text-caption-2 text-text-tertiary pb-[1px]">pphpd</span>
           </div>
         </div>
       </div>
@@ -222,37 +223,23 @@ function ViewModeCard({
           buttonRef={colorRef}
           ariaLabel={t('timeTemplates.attributes.selectColor')}
         />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium leading-none text-[#F3F4F6]">
+        <span className="min-w-0 flex-1 truncate text-body-xs-bold text-text-primary">
           {attribute.name}
         </span>
         <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={onToggleMenu}
-            className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300"
+            className="inline-flex items-center justify-center rounded-md text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary"
             style={ACTION_BUTTON_STYLE}
             aria-label={t('common.moreActions')}
           >
             <MoreHorizontal className="size-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-30 mt-1 min-w-[90px] overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 py-0.5 shadow-xl">
-              <button
-                type="button"
-                onClick={onStartEdit}
-                className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs text-zinc-200 hover:bg-zinc-800"
-              >
-                <Pencil className="size-3 text-zinc-400" />
-                {t('common.edit')}
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs text-zinc-200 hover:bg-zinc-800"
-              >
-                <Trash2 className="size-3 text-zinc-400" />
-                {t('common.delete')}
-              </button>
+            <div className="absolute right-0 top-full z-30 mt-1 min-w-[90px] overflow-hidden rounded-md border border-border-quaternary bg-surface-primary py-0.5 shadow-xl">
+              <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={onStartEdit}>{t('common.edit')}</Button>
+              <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Trash2 />} onPress={onDelete}>{t('common.delete')}</Button>
             </div>
           )}
         </div>
@@ -260,33 +247,33 @@ function ViewModeCard({
 
       <div className="flex w-full items-center gap-3">
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] font-medium leading-none text-[#99A1AF] pb-0.5">
+          <div className="text-caption-2 text-text-tertiary pb-0.5">
             {t('timeTemplates.attributes.headway')}
           </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
             {headwaySeconds != null ? (
               <>
-                <span className="text-xs font-medium leading-none text-[#D1D5DC]">
+                <span className="text-body-xs-bold text-text-secondary">
                   {headwaySeconds}
                 </span>
-                <span className="text-[9px] leading-none text-[#D1D5DC] pb-[1px]">
+                <span className="text-caption-2 text-text-secondary pb-[1px]">
                   {t('timeTemplates.attributes.seconds')}
                 </span>
               </>
             ) : (
-              <span className="text-xs font-medium leading-none text-[#D1D5DC]">—</span>
+              <span className="text-body-xs-bold text-text-secondary">—</span>
             )}
           </div>
         </div>
         <div className="w-[72px] shrink-0">
-          <div className="text-[10px] leading-none text-[#99A1AF] pb-0.5">
+          <div className="text-caption-2 text-text-tertiary pb-0.5">
             {t('timeTemplates.attributes.capacity')}
           </div>
           <div className={CARD_VALUE_ROW_CLASS} style={CARD_VALUE_ROW_STYLE}>
-            <span className="text-xs font-medium leading-none text-[#D1D5DC]">
+            <span className="text-body-xs-bold text-text-secondary">
               {attribute.capacityPphpd.toLocaleString('en-US')}
             </span>
-            <span className="text-[9px] leading-none text-[#99A1AF] pb-[1px]">pphpd</span>
+            <span className="text-caption-2 text-text-tertiary pb-[1px]">pphpd</span>
           </div>
         </div>
       </div>

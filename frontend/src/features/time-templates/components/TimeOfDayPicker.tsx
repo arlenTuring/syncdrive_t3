@@ -6,9 +6,10 @@ import {
   SCHEDULE_TIME_ALIGN_SECONDS,
   snapSecondsToScheduleAlign,
 } from '../types/editor';
+import { Button } from '../../../components/ui';
 
 const FIELD_CLASS =
-  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-left text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC] focus:outline-none';
+  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-left text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none';
 
 const FIELD_STYLE = { height: INTERVAL_TABLE_FIELD_HEIGHT_PX };
 
@@ -71,10 +72,10 @@ function TimeColumn({
             className="mb-0 flex h-8 w-12 items-center justify-center"
           >
             <span
-              className={`flex h-8 w-12 items-center justify-center rounded-lg text-sm tracking-[0.5px] ${
+              className={`flex h-8 w-12 items-center justify-center rounded-lg text-body-s tracking-[0.5px] ${
                 selected
-                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-[#D1D5DC]'
-                  : 'font-normal text-[#D1D5DC] hover:bg-zinc-800/50'
+                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-text-secondary'
+                  : 'font-normal text-text-secondary hover:bg-link-standard'
               }`}
             >
               {pad2(n)}
@@ -113,7 +114,7 @@ export function TimePickerPanel({
 }: TimePickerPanelProps) {
   return (
     <div
-      className={`relative rounded-xl bg-[#18181B] shadow-[0px_4px_24px_rgba(98,116,142,0.2)] ${
+      className={`relative rounded-xl bg-surface-primary shadow-[0px_4px_24px_rgba(98,116,142,0.2)] ${
         showSeconds ? 'w-[190px]' : 'w-[136px]'
       }`}
     >
@@ -142,21 +143,9 @@ export function TimePickerPanel({
       <div className="h-px w-full bg-[rgba(212,212,212,0.15)]" />
       <div className={`flex items-center px-2 py-2 ${onNow ? 'justify-between' : 'justify-end'}`}>
         {onNow ? (
-          <button
-            type="button"
-            onClick={onNow}
-            className="rounded-lg px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-[#51A2FF] hover:bg-[#51A2FF]/10"
-          >
-            此刻
-          </button>
+          <Button variant="text" onPress={onNow}>此刻</Button>
         ) : null}
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium tracking-[0.5px] text-white hover:bg-[#2569e6]"
-        >
-          確定
-        </button>
+        <Button onPress={onConfirm}>確定</Button>
       </div>
     </div>
   );
@@ -258,13 +247,13 @@ export function TimeOfDayPicker({ value, label, role = 'start', onChange }: Time
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className={`${FIELD_CLASS} relative w-full pr-9 ${
-          open ? 'ring-1 ring-[#2B7FFF]/60' : ''
-        } ${value ? 'text-[#D1D5DC]' : 'text-[#99A1AF]'}`}
+          open ? 'ring-1 ring-border-theme-light' : ''
+        } ${value ? 'text-text-secondary' : 'text-text-tertiary'}`}
         style={FIELD_STYLE}
       >
         {displayText}
       </button>
-      <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#99A1AF]" />
+      <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-tertiary" />
       {open &&
         createPortal(
           <div

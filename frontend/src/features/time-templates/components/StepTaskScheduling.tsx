@@ -58,6 +58,7 @@ import {
   ScheduleIntervalHeaderColumnHighlight,
   ScheduleIntervalHeaderHits,
 } from './ScheduleIntervalSelection';
+import { Button, IconButton } from '../../../components/ui';
 import { TaskSettingsForm, type TaskSettingsFormHandle } from './TaskSettingsForm';
 import { ScrollPinnedCardLabel } from '../../../components/ScrollPinnedCardLabel';
 import {
@@ -142,8 +143,8 @@ function ScheduleToolbarIconButton({
         flash ? 'schedule-history-flash' : ''
       } ${
         active
-          ? 'text-zinc-200 hover:bg-zinc-800/80'
-          : 'text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-300'
+          ? 'text-text-primary hover:bg-surface-secondary'
+          : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
       } disabled:cursor-not-allowed disabled:opacity-35`}
       aria-label={label}
       title={label}
@@ -268,8 +269,8 @@ function ScheduleViewModeButton({
       aria-pressed={active}
       className={`inline-flex size-8 items-center justify-center rounded-lg transition ${
         active
-          ? 'bg-[rgba(43,127,255,0.24)] text-[#51A2FF]'
-          : 'text-zinc-500 hover:bg-zinc-800/80 hover:text-zinc-300'
+          ? 'bg-[rgba(43,127,255,0.24)] text-text-theme'
+          : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
       }`}
       aria-label={label}
       title={label}
@@ -331,14 +332,14 @@ function ScheduleTaskToolbar({
   return (
     <div
       className={`flex shrink-0 items-center justify-between gap-3 ${
-        inline ? '' : 'border-b border-zinc-800/60 px-3 py-2'
+        inline ? '' : 'border-b border-border-quaternary px-3 py-2'
       }`}
       role="toolbar"
       aria-label={t('timeTemplates.scheduling.toolbarAria')}
     >
       {/* 左側：來回一趟預估秒數（供建議列數） */}
       <div className="flex items-center gap-1.5" title={t('timeTemplates.scheduling.tripSecondsHint')}>
-        <label className="text-[11px] text-zinc-500 whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsLabel')}</label>
+        <label className="text-body-xs text-text-quaternary whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsLabel')}</label>
         <input
           type="number"
           min={1}
@@ -351,10 +352,10 @@ function ScheduleTaskToolbar({
             if (Number.isFinite(v) && v > 0) onEstimatedTripSecondsChange(v);
           }}
           onBlur={() => setDraft(null)}
-          className="h-[26px] w-[72px] rounded-md border border-zinc-700/60 bg-zinc-900/80 px-2 text-center text-[11px] tabular-nums text-zinc-200 outline-none focus:border-zinc-500"
+          className="h-[26px] w-[72px] rounded-md border border-border-quaternary bg-surface-primary px-2 text-center text-body-xs tabular-nums text-text-primary outline-none focus:border-border-primary"
           placeholder="600"
         />
-        <span className="text-[10px] text-zinc-600 whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsUnit')}</span>
+        <span className="text-caption-2 text-text-disabled whitespace-nowrap">{t('timeTemplates.scheduling.tripSecondsUnit')}</span>
       </div>
 
       {/* 右側：操作按鈕群組 */}
@@ -441,7 +442,7 @@ function PeriodLegend({
           return (
           <span
             key={key}
-            className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-lg border px-3 text-xs font-medium ${tag.chipClass}`}
+            className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-lg border px-3 text-body-xs-bold ${tag.chipClass}`}
           >
             {t(`timeTemplates.periodFallback.${key}`)}
           </span>
@@ -488,7 +489,7 @@ function TaskTypeChip({
       taskKey={taskKey}
       draggable
       onDragStart={handleDragStart}
-      className="isolate relative inline-flex h-[32px] cursor-grab items-center justify-center overflow-hidden whitespace-nowrap rounded px-3 text-sm font-normal leading-[18px] tracking-[0.5px] transition select-none hover:brightness-110 active:cursor-grabbing"
+      className="isolate relative inline-flex h-[32px] cursor-grab items-center justify-center overflow-hidden whitespace-nowrap rounded px-3 text-body-s font-normal leading-[18px] tracking-[0.5px] transition select-none hover:brightness-110 active:cursor-grabbing"
       style={{ backgroundColor: colors.bg, color: colors.text }}
     >
       <div
@@ -504,7 +505,7 @@ function TaskTypeChip({
 /* ── Fill empty schedule slots ── */
 
 const FILL_TASK_SELECT_CLASS =
-  'h-8 w-full min-w-0 rounded-lg bg-zinc-900/80 px-2.5 text-xs leading-[18px] text-[#D1D5DC] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/40';
+  'h-8 w-full min-w-0 rounded-lg bg-surface-primary px-2.5 text-body-xs leading-[18px] text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 function FillEmptySlotsControl({
   disabled,
@@ -520,7 +521,7 @@ function FillEmptySlotsControl({
 
   return (
     <>
-      <div className="mt-3 flex items-center gap-2 border-t border-zinc-800/60 pt-3">
+      <div className="mt-3 flex items-center gap-2 border-t border-border-quaternary pt-3">
         <div className="relative min-w-0 flex-1">
           <SiteSelect
             value={taskType}
@@ -530,21 +531,14 @@ function FillEmptySlotsControl({
             aria-label={t('timeTemplates.scheduling.fillTypeAria')}
           >
             {TASK_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.key} value={opt.key} className="bg-zinc-900">
+              <option key={opt.key} value={opt.key} className="bg-surface-primary">
                 {t(`timeTemplates.taskTypes.${opt.key}`)}
               </option>
             ))}
           </SiteSelect>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-text-quaternary" />
         </div>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setShowConfirm(true)}
-          className="h-8 shrink-0 rounded-lg bg-[#2B7FFF] px-2.5 text-xs font-medium text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
-        >
-          {t('timeTemplates.scheduling.fillEmpty')}
-        </button>
+        <Button className="shrink-0" disabled={disabled} onPress={() => setShowConfirm(true)}>{t('timeTemplates.scheduling.fillEmpty')}</Button>
       </div>
       {showConfirm && (
         <FillEmptySlotsConfirmModal
@@ -574,10 +568,10 @@ function ScheduleGapCheckButton({
       type="button"
       disabled={!hasGaps}
       onClick={onJump}
-      className={`mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition ${
+      className={`mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-body-xs font-medium transition ${
         hasGaps
-          ? 'border border-amber-500/50 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
-          : 'cursor-not-allowed border border-zinc-800 bg-zinc-900/60 text-zinc-600'
+          ? 'border border-status-warning-light bg-status-warning-light text-status-warning hover:bg-amber-500/25'
+          : 'cursor-not-allowed border border-border-quaternary bg-surface-primary text-text-disabled'
       }`}
       title={
         hasGaps
@@ -588,7 +582,7 @@ function ScheduleGapCheckButton({
       <ScanSearch className="size-3.5 shrink-0" aria-hidden />
       {t('timeTemplates.scheduling.gapCheck')}
       {hasGaps ? (
-        <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] tabular-nums text-amber-100">
+        <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-caption-2 tabular-nums text-status-warning">
           {gaps.length}
         </span>
       ) : null}
@@ -610,9 +604,9 @@ function SidebarCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50">
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-3 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-black-30">
+      <div className="flex shrink-0 items-center justify-between border-b border-border-quaternary px-3 py-2.5">
+        <div className="flex items-center gap-2 text-body-s-bold text-text-primary">
           {icon}
           {title}
         </div>
@@ -803,7 +797,7 @@ function TaskBar({
       )}
       {selected && resizePreview && (
         <div
-          className={`pointer-events-none absolute -top-7 z-30 whitespace-nowrap rounded border border-zinc-700/80 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-100 shadow-lg ${
+          className={`pointer-events-none absolute -top-7 z-30 whitespace-nowrap rounded border border-border-quaternary bg-surface-primary px-1.5 py-0.5 text-caption-2 font-medium tabular-nums text-text-primary shadow-lg ${
             resizePreview.edge === 'left' ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'
           }`}
         >
@@ -811,7 +805,7 @@ function TaskBar({
         </div>
       )}
       {movePreview && (
-        <div className="pointer-events-none absolute -top-7 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded border border-zinc-700/80 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-100 shadow-lg">
+        <div className="pointer-events-none absolute -top-7 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded border border-border-quaternary bg-surface-primary px-1.5 py-0.5 text-caption-2 tabular-nums text-text-primary shadow-lg">
           {formatMinutesToTime(movePreview.minute)}–{formatMinutesToTime(movePreview.minute + task.durationMinutes)}
         </div>
       )}
@@ -826,7 +820,7 @@ function TaskBar({
           cardLeftPx={trackOffsetPx + leftPx}
           cardWidthPx={widthPx}
           rowLabelWidth={ROW_LABEL_WIDTH}
-          className="w-fit min-w-0 max-w-full truncate text-left text-[10px] font-normal leading-[18px] tracking-[0.5px] will-change-transform"
+          className="w-fit min-w-0 max-w-full truncate text-left text-caption-2 font-normal leading-[18px] tracking-[0.5px] will-change-transform"
         >
           <span style={{ color: colors.text }}>
             {task.label}
@@ -843,7 +837,7 @@ function TaskBar({
             e.stopPropagation();
             onDelete();
           }}
-          className="absolute right-3 top-1/2 z-[11] flex size-5 -translate-y-1/2 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
+          className="absolute right-3 top-1/2 z-[11] flex size-5 -translate-y-1/2 items-center justify-center rounded text-text-tertiary hover:bg-link-standard-hover hover:text-status-error-emphasis"
           aria-label={t('timeTemplates.scheduling.deleteTask')}
         >
           <Trash2 className="size-3" />
@@ -1307,19 +1301,19 @@ export function StepTaskScheduling({
     <div className={`flex min-h-0 flex-1 ${fullscreen ? 'gap-3' : 'gap-4'}`}>
       {/* 左：排班格線 */}
       <div
-        className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-zinc-950/40 ${
+        className={`flex min-w-0 flex-1 flex-col overflow-hidden bg-black-30 ${
           fullscreen
-            ? 'border border-zinc-800/80'
-            : 'rounded-xl border border-zinc-800/80'
+            ? 'border border-border-quaternary'
+            : 'rounded-xl border border-border-quaternary'
         }`}
       >
         <div
-          className={`flex shrink-0 items-center gap-4 border-b border-zinc-800/60 ${
+          className={`flex shrink-0 items-center gap-4 border-b border-border-quaternary ${
             fullscreen ? 'px-4 py-2' : 'px-3 py-2'
           }`}
         >
           {fullscreen && panelTitle ? (
-            <h2 className="shrink-0 text-base font-medium text-zinc-100">{panelTitle}</h2>
+            <h2 className="shrink-0 text-body-m-bold text-text-primary">{panelTitle}</h2>
           ) : null}
           <div className="min-w-0 flex-1">
             <PeriodLegend
@@ -1396,9 +1390,9 @@ export function StepTaskScheduling({
             ))}
 
             {/* Time header + 車輛折返時限（與甘特圖同步捲動） */}
-            <div className="relative sticky top-0 z-10 bg-[#0c0c0e]/95 backdrop-blur-sm">
-              <div className="flex border-b border-zinc-800/80">
-                <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-zinc-800/60 bg-[#0c0c0e]/95" />
+            <div className="relative sticky top-0 z-10 bg-surface-sub-background backdrop-blur-sm">
+              <div className="flex border-b border-border-quaternary">
+                <div className="sticky left-0 z-20 w-12 shrink-0 border-r border-border-quaternary bg-surface-sub-background" />
                 {dayCopies.map((copyIndex) => (
                 <div key={copyIndex} className="relative flex shrink-0" style={{ width: trackWidthPx }}>
                   <div className="pointer-events-none absolute inset-0 z-0">
@@ -1413,7 +1407,7 @@ export function StepTaskScheduling({
                     return (
                       <div
                         key={slot}
-                        className={`pointer-events-none relative z-[1] shrink-0 border-r border-zinc-800/40 py-2 pl-1 text-left text-[11px] tabular-nums ${
+                        className={`pointer-events-none relative z-[1] shrink-0 border-r border-border-quaternary py-2 pl-1 text-left text-body-xs tabular-nums ${
                           slotActive
                             ? SCHEDULE_TIME_AXIS_TEXT_CLASS
                             : `schedule-inactive-cell ${SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS}`
@@ -1428,7 +1422,7 @@ export function StepTaskScheduling({
                       它會疊在下一份的 00:00 上，變成重複的雜訊 */}
                   {copyIndex === dayCopies.length - 1 ? (
                     <span
-                      className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-[11px] tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
+                      className={`pointer-events-none absolute top-2 z-[2] pl-0.5 text-body-xs tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS}`}
                       style={{ left: SCHEDULE_VISIBLE_SLOTS * slotWidthPx }}
                       aria-hidden
                     >
@@ -1483,11 +1477,11 @@ export function StepTaskScheduling({
                 <div
                   key={row}
                   data-schedule-row={row}
-                  className="relative flex border-b border-zinc-800/50"
+                  className="relative flex border-b border-border-quaternary"
                   onClick={() => setSelectedTaskId(null)}
                 >
                   {/* Row label (sticky) */}
-                  <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90 text-xs text-zinc-500">
+                  <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-border-quaternary bg-surface-sub-background text-body-xs text-text-quaternary">
                     {String(row).padStart(2, '0')}
                   </div>
                   {/* Grid cells (drop zones)：每一份日拷貝各畫一次 */}
@@ -1507,7 +1501,7 @@ export function StepTaskScheduling({
                       return (
                         <div
                           key={col}
-                          className={`relative z-[1] shrink-0 border-r border-zinc-800/30 transition-colors ${
+                          className={`relative z-[1] shrink-0 border-r border-border-disabled transition-colors ${
                             isOver
                               ? 'bg-[rgba(43,127,255,0.25)]'
                               : slotActive
@@ -1570,16 +1564,9 @@ export function StepTaskScheduling({
             })}
 
             {/* Add row button */}
-            <div className="flex border-b border-zinc-800/50">
-              <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-zinc-800/60 bg-zinc-950/90">
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="inline-flex size-6 items-center justify-center rounded-md bg-zinc-800 text-zinc-400 transition hover:bg-zinc-700 hover:text-zinc-200"
-                  aria-label={t('timeTemplates.scheduling.addRow')}
-                >
-                  <Plus className="size-3.5" />
-                </button>
+            <div className="flex border-b border-border-quaternary">
+              <div className="sticky left-0 z-10 flex w-12 shrink-0 items-center justify-center border-r border-border-quaternary bg-surface-sub-background">
+                <IconButton size="small" hierarchy="subordinate" variant="tonal" onPress={addRow} label={t('timeTemplates.scheduling.addRow')} icon={<Plus />} />
               </div>
               <div style={{ height: ROW_HEIGHT_PX }} />
             </div>
@@ -1587,14 +1574,14 @@ export function StepTaskScheduling({
         </div>
 
         {/* Footer hint */}
-        <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800/60 px-3 py-2 text-xs text-zinc-500">
-          <Info className="size-3.5 shrink-0 text-zinc-600" aria-hidden />
+        <div className="flex shrink-0 items-center gap-2 border-t border-border-quaternary px-3 py-2 text-body-xs text-text-quaternary">
+          <Info className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
           <span>
             {activeIntervalRanges.length === 0
               ? t('timeTemplates.scheduling.hintNoIntervals')
               : t('timeTemplates.scheduling.hintScroll')}
           </span>
-          <span className="text-zinc-600">← →</span>
+          <span className="text-text-disabled">← →</span>
         </div>
       </div>
 
@@ -1602,7 +1589,7 @@ export function StepTaskScheduling({
       {viewMode === 'split' && (
       <aside className="flex w-[248px] shrink-0 flex-col gap-3">
         <SidebarCard
-          icon={<Tag className="size-4 text-zinc-400" />}
+          icon={<Tag className="size-4 text-text-tertiary" />}
           title={t('timeTemplates.scheduling.taskTypesTitle')}
         >
           <div className="grid grid-cols-2 gap-2">
@@ -1625,7 +1612,7 @@ export function StepTaskScheduling({
         </SidebarCard>
 
         <SidebarCard
-          icon={<SlidersHorizontal className="size-4 text-zinc-400" />}
+          icon={<SlidersHorizontal className="size-4 text-text-tertiary" />}
           title={t('timeTemplates.scheduling.taskSettingsTitle')}
           headerAction={
             selectedTask ? (
@@ -1634,7 +1621,7 @@ export function StepTaskScheduling({
                   type="button"
                   disabled={!taskFormDirty}
                   onClick={() => taskSettingsFormRef.current?.reset()}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex size-7 items-center justify-center rounded-md text-text-quaternary transition hover:bg-link-standard-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={t('timeTemplates.scheduling.cancelChangesAria')}
                   title={t('timeTemplates.scheduling.cancelChanges')}
                 >
@@ -1644,7 +1631,7 @@ export function StepTaskScheduling({
                   type="submit"
                   form={TASK_SETTINGS_FORM_ID}
                   disabled={!taskFormCanConfirm}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-[#51A2FF] transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-40"
+                  className="inline-flex size-7 items-center justify-center rounded-md text-text-theme transition hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:text-text-quaternary disabled:opacity-40"
                   aria-label={t('timeTemplates.scheduling.confirmChangesAria')}
                   title={t('timeTemplates.scheduling.confirmChanges')}
                 >

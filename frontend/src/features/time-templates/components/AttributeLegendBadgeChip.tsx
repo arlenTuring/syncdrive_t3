@@ -7,7 +7,7 @@ import {
 } from '../types/editor';
 
 export const ATTRIBUTE_LEGEND_BADGE_CHIP_CLASS =
-  'inline-flex h-[26px] items-center whitespace-nowrap rounded-lg border px-3 text-xs font-medium';
+  'inline-flex h-[26px] items-center whitespace-nowrap rounded-lg border px-3 text-body-xs-bold';
 
 export function AttributeLegendBadgeChip({
   item,

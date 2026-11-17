@@ -96,7 +96,7 @@ function TurnaroundLimitHoverCard({
     <div
       ref={tipRef}
       className={[
-        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-zinc-700/90 bg-zinc-950 px-2.5 py-1.5 shadow-xl shadow-black/40',
+        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-border-quaternary bg-surface-sub-background px-2.5 py-1.5 shadow-xl shadow-black-30',
         placed ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
       style={{
@@ -106,10 +106,10 @@ function TurnaroundLimitHoverCard({
       }}
       role="tooltip"
     >
-      <div className="text-[11px] font-medium leading-4 text-zinc-100">
+      <div className="text-body-xs-bold text-text-primary">
         {t('timeTemplates.turnaround.existing', { count: existingVehicles })}
       </div>
-      <div className="text-[11px] font-medium leading-4 text-zinc-100">
+      <div className="text-body-xs-bold text-text-primary">
         {recommendedVehicles != null
           ? t('timeTemplates.turnaround.recommended', { count: recommendedVehicles })
           : t('timeTemplates.turnaround.recommendedEmpty')}
@@ -117,7 +117,7 @@ function TurnaroundLimitHoverCard({
           ? t('timeTemplates.turnaround.theoreticalMin', { count: theoreticalMin })
           : null}
       </div>
-      <div className="mt-1 space-y-0.5 text-[10px] leading-[14px] tabular-nums text-zinc-300">
+      <div className="mt-1 space-y-0.5 text-caption-2 leading-[14px] tabular-nums text-text-secondary">
         <div>{t('timeTemplates.turnaround.start', { time: formatMinuteAsHms(segment.startMinute) })}</div>
         <div>{t('timeTemplates.turnaround.end', { time: formatMinuteAsHms(segment.endMinute) })}</div>
         {segment.headwaySeconds ? (
@@ -125,7 +125,7 @@ function TurnaroundLimitHoverCard({
         ) : null}
       </div>
       <div
-        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
+        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-border-quaternary"
         aria-hidden
       />
     </div>,
@@ -150,7 +150,7 @@ function TurnaroundLimitCell({
 
   return (
     <div
-      className={`absolute inset-y-0 z-[1] flex items-center justify-center border-x border-zinc-700 bg-zinc-900/85 text-[11px] font-medium tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS} transition-colors hover:bg-zinc-800/85 hover:border-zinc-500`}
+      className={`absolute inset-y-0 z-[1] flex items-center justify-center border-x border-border-quaternary bg-zinc-900/85 text-body-xs-bold tabular-nums ${SCHEDULE_TIME_AXIS_TEXT_CLASS} transition-colors hover:bg-zinc-800/85 hover:border-border-primary`}
       style={{ left: leftPx, width: widthPx }}
       onMouseEnter={(e) => setPos({ clientX: e.clientX, clientY: e.clientY })}
       onMouseMove={(e) => setPos({ clientX: e.clientX, clientY: e.clientY })}
@@ -195,11 +195,11 @@ export function TurnaroundLimitGrid({
 
   return (
     <div
-      className="flex border-b border-zinc-800/80 bg-[#0a0a0c]/95"
+      className="flex border-b border-border-quaternary bg-surface-sub-background"
       style={{ height: TURNAROUND_LIMIT_ROW_HEIGHT_PX }}
     >
       <div
-        className={`sticky left-0 z-20 flex shrink-0 items-center justify-center border-r border-zinc-800/60 bg-[#0a0a0c]/95 ${SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS}`}
+        className={`sticky left-0 z-20 flex shrink-0 items-center justify-center border-r border-border-quaternary bg-surface-sub-background ${SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS}`}
         style={{ width: rowLabelWidth }}
         title={`${rowTitle}：${rowHint}`}
         aria-label={rowTitle}
@@ -218,7 +218,7 @@ export function TurnaroundLimitGrid({
         </div>
 
         {segments.length === 0 ? (
-          <div className="relative z-[1] flex h-full items-center px-2 text-[10px] text-zinc-600">
+          <div className="relative z-[1] flex h-full items-center px-2 text-caption-2 text-text-disabled">
             {t('timeTemplates.turnaround.empty')}
           </div>
         ) : (

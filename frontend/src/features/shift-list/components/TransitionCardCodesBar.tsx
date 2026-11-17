@@ -11,6 +11,7 @@ import {
   type TransitionCardCodeKey,
   type TransitionCardCodes,
 } from '../utils/cardCode';
+import { Button } from '../../../components/ui';
 
 /**
  * 路線群組步驟的「過渡卡代號」：入場、出場、暫停／停留各一個 1～2 個大寫英文字母。
@@ -37,22 +38,16 @@ export function TransitionCardCodesBar({
   if (!codes) {
     return (
       <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-warning-light bg-status-warning-light px-4 py-3"
         data-transition-card-codes="pending"
       >
-        <div className="text-sm text-amber-200">
+        <div className="text-body-s text-status-warning">
           <span className="font-medium">過渡卡代號：待補設定。</span>
-          <span className="text-amber-200/80">
+          <span className="text-status-warning">
             這份班表建立時還沒有這項設定，整備與過渡卡目前照舊代號顯示（已執行的訂單不受影響）。
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => onChange(emptyTransitionCardCodes())}
-          className="h-[32px] rounded-lg border border-amber-500/60 px-3 text-sm text-amber-100 hover:bg-amber-500/10"
-        >
-          開始設定
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" onPress={() => onChange(emptyTransitionCardCodes())}>開始設定</Button>
       </div>
     );
   }
@@ -67,16 +62,16 @@ export function TransitionCardCodesBar({
   const issuesFor = (key: TransitionCardCodeKey) => issues.filter((issue) => issue.key === key);
 
   return (
-    <div className="rounded-xl bg-[#232329] px-5 py-4" data-transition-card-codes="set">
-      <h3 className="text-base font-medium text-zinc-100">過渡卡代號</h3>
-      <div className="mt-4 grid gap-2 rounded-lg bg-[#1b1b1f] px-4 py-2.5 text-sm text-zinc-300 md:grid-cols-2" title="待命用整備任務的代號">
+    <div className="rounded-xl bg-surface-secondary px-5 py-4" data-transition-card-codes="set">
+      <h3 className="text-body-m-bold text-text-primary">過渡卡代號</h3>
+      <div className="mt-4 grid gap-2 rounded-lg bg-surface-primary px-4 py-2.5 text-body-s text-text-secondary md:grid-cols-2" title="待命用整備任務的代號">
         <p className="flex items-center gap-1.5">
-          <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
-          輸入代號<span className="text-zinc-600" aria-hidden>｜</span>1～2 個大寫英文字母
+          <Lightbulb className="size-3.5 shrink-0 text-text-tertiary" aria-hidden />
+          輸入代號<span className="text-text-disabled" aria-hidden>｜</span>1～2 個大寫英文字母
         </p>
         <p className="flex items-center gap-1.5">
-          <Lightbulb className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
-          班次代號<span className="text-zinc-600" aria-hidden>｜</span>代號 + 列號 + 計畫開始時間 (HHMM)
+          <Lightbulb className="size-3.5 shrink-0 text-text-tertiary" aria-hidden />
+          班次代號<span className="text-text-disabled" aria-hidden>｜</span>代號 + 列號 + 計畫開始時間 (HHMM)
         </p>
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -87,8 +82,8 @@ export function TransitionCardCodesBar({
           const fieldIssues = issuesFor(key);
           return (
             <label key={key} className="block min-w-0">
-              <span className="mb-2 flex items-center px-1 text-sm text-zinc-300" title={meta.description}>
-                {required ? <span className="text-red-400">*</span> : null}
+              <span className="mb-2 flex items-center px-1 text-body-s text-text-secondary" title={meta.description}>
+                {required ? <span className="text-status-error-emphasis">*</span> : null}
                 {meta.label === '暫停 / 停留' || meta.label === '暫停／停留' ? '停留' : meta.label}
               </span>
               <input
@@ -101,17 +96,17 @@ export function TransitionCardCodesBar({
                 aria-label={`${meta.label}代號`}
                 aria-invalid={fieldIssues.length > 0}
                 data-transition-code={key}
-                className={`h-9 w-full rounded-lg border bg-[#2a2e37] px-3 text-sm tracking-wider text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 ${
+                className={`h-9 w-full rounded-lg border bg-link-standard-hover px-3 text-body-s tracking-wider text-text-primary placeholder:text-text-quaternary focus:outline-none focus:ring-1 ${
                   fieldIssues.length > 0
-                    ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500'
-                    : 'border-transparent focus:border-[#2B7FFF] focus:ring-[#2B7FFF]'
+                    ? 'border-red-500/70 focus:border-status-error focus:ring-red-500'
+                    : 'border-transparent focus:border-border-theme focus:ring-border-theme'
                 }`}
               />
-              <span className="mt-1.5 block px-1 text-xs text-zinc-400">
+              <span className="mt-1.5 block px-1 text-body-xs text-text-tertiary">
                 預覽：{isValidCardCode(normalizeCardCode(value)) ? `${normalizeCardCode(value)}011030` : '尚未填入代號'}
               </span>
               {fieldIssues.map((issue) => (
-                <span key={issue.message} className="mt-1 block text-xs text-red-400" data-transition-code-issue={key}>
+                <span key={issue.message} className="mt-1 block text-body-xs text-status-error-emphasis" data-transition-code-issue={key}>
                   {issue.message}
                 </span>
               ))}
@@ -120,7 +115,7 @@ export function TransitionCardCodesBar({
         })}
       </div>
       {issues.filter((issue) => !issue.key).map((issue) => (
-        <p key={issue.message} className="mt-2 text-xs text-red-400">
+        <p key={issue.message} className="mt-2 text-body-xs text-status-error-emphasis">
           {issue.message}
         </p>
       ))}

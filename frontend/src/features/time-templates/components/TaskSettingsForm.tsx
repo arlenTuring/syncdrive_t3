@@ -16,9 +16,9 @@ import {
 import { TimeRangeField } from './TimeRangeField';
 
 const FIELD_CLASS =
-  'h-[34px] w-full min-w-0 rounded-lg bg-zinc-900/80 px-3 text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/40';
+  'h-[34px] w-full min-w-0 rounded-lg bg-surface-primary px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
-const LABEL_CLASS = 'shrink-0 text-sm leading-5 text-zinc-400';
+const LABEL_CLASS = 'shrink-0 text-body-s text-text-tertiary';
 
 export type TaskSettingsFormHandle = {
   reset: () => void;
@@ -38,7 +38,7 @@ type TaskSettingsFormProps = {
 function InactiveZoneWarning() {
   const { t } = useTranslation();
   return (
-    <div className="flex items-start gap-2 rounded-lg bg-red-500/5 px-3 py-2 text-xs text-red-400">
+    <div className="flex items-start gap-2 rounded-lg bg-status-error-light px-3 py-2 text-body-xs text-status-error-emphasis">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
@@ -60,7 +60,7 @@ function InactiveZoneWarning() {
 function OverlapWarning() {
   const { t } = useTranslation();
   return (
-    <div className="flex items-start gap-2 rounded-lg bg-red-500/5 px-3 py-2 text-xs text-red-400">
+    <div className="flex items-start gap-2 rounded-lg bg-status-error-light px-3 py-2 text-body-xs text-status-error-emphasis">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
@@ -204,12 +204,12 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
               className={`${FIELD_CLASS} appearance-none pr-9`}
             >
               {TASK_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.key} value={opt.key} className="bg-zinc-900">
+                <option key={opt.key} value={opt.key} className="bg-surface-primary">
                   {t(`timeTemplates.taskTypes.${opt.key}`)}
                 </option>
               ))}
             </SiteSelect>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           </div>
 
           <span className={`${LABEL_CLASS} self-center`}>{t('timeTemplates.taskSettings.timeRange')}</span>
@@ -232,7 +232,7 @@ export const TaskSettingsForm = forwardRef<TaskSettingsFormHandle, TaskSettingsF
         {isDirty && outsideActive && <InactiveZoneWarning />}
         {isDirty && overlaps && !outsideActive && <OverlapWarning />}
 
-        {error && !overlaps && !outsideActive && <p className="text-xs text-red-400">{error}</p>}
+        {error && !overlaps && !outsideActive && <p className="text-body-xs text-status-error-emphasis">{error}</p>}
       </form>
     );
   },

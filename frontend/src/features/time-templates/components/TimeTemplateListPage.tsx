@@ -34,6 +34,7 @@ import {
   type TimeTemplateListItem,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
+import { Button, Checkbox, IconButton } from '../../../components/ui';
 
 type TimeTemplateListPageProps = {
   onBackToHome?: () => void;
@@ -197,34 +198,34 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0b] text-zinc-100">
-      <header className="border-b border-zinc-800/80 bg-zinc-950/90 px-6 py-4">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+      <header className="border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
         <div className="flex items-center gap-3">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
           <FileText className="size-5 text-violet-400" aria-hidden />
-          <h1 className="text-lg font-semibold tracking-tight">{t('timeTemplates.title')}</h1>
+          <h1 className="text-headline-5">{t('timeTemplates.title')}</h1>
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800/60 px-6 py-4">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
         <button
           type="button"
           onClick={resetFilters}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-s text-text-primary transition hover:border-border-primary hover:bg-link-standard-hover"
           title={t('common.resetFiltersTitle')}
         >
           <RotateCcw className="size-3.5" aria-hidden />
           {t('common.resetFilters')}
         </button>
         <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
             type="search"
             placeholder={t('common.keywordPlaceholder')}
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-600 focus:outline-none"
+            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-violet-600 focus:outline-none"
           />
         </div>
         <SiteSelect
@@ -233,7 +234,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             setPublishStatus(e.target.value as PublishStatusKey | 'all');
             setPage(1);
           }}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+          size="md"
         >
           {PUBLISH_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -250,7 +251,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           className={`inline-flex size-9 items-center justify-center rounded-lg border transition ${
             canSearch
               ? 'border-violet-600 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30'
-              : 'cursor-not-allowed border-zinc-800 bg-zinc-900/50 text-zinc-600'
+              : 'cursor-not-allowed border-border-quaternary bg-surface-primary text-text-disabled'
           }`}
           title={t('common.search')}
         >
@@ -260,7 +261,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           type="button"
           onClick={() => void handleDownload()}
           disabled={exporting || !hasSelection}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg border border-border-quaternary bg-surface-primary px-4 py-2 text-body-s text-text-primary hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
           {t('common.download')}
@@ -268,7 +269,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2B7FFF] px-3.5 py-2 text-sm font-medium leading-[18px] tracking-[0.5px] text-white transition hover:bg-[#2569e6]"
+          className="ml-auto inline-flex h-[34px] w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-link-theme-filled px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary transition hover:bg-link-theme-filled-hover"
         >
           <Plus className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
           {t('timeTemplates.create')}
@@ -277,20 +278,15 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
         {error && (
-          <div className="mb-3 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          <div className="mb-3 rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
             {error}
           </div>
         )}
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+        <table className="w-full min-w-[960px] border-collapse text-body-s">
           <thead>
-            <tr className="border-b border-zinc-800 text-left text-zinc-500">
+            <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="w-10 py-3 pr-2">
-                <input
-                  type="checkbox"
-                  checked={items.length > 0 && selected.size === items.length}
-                  onChange={toggleAll}
-                  className="rounded border-zinc-600 bg-zinc-900"
-                />
+                <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.name')}</th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.preview')}</th>
@@ -304,14 +300,14 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-zinc-500">
+                <td colSpan={8} className="py-16 text-center text-text-quaternary">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
                   {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-zinc-500">
+                <td colSpan={8} className="py-16 text-center text-text-quaternary">
                   {t('timeTemplates.empty')}
                 </td>
               </tr>
@@ -319,25 +315,14 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
               items.map((row) => (
                 <tr
                   key={row.template_id}
-                  className="border-b border-zinc-800/60 hover:bg-zinc-900/50"
+                  className="border-b border-border-quaternary hover:bg-surface-primary"
                 >
                   <td className="py-3 pr-2">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.template_id)}
-                      onChange={() => toggleRow(row.template_id)}
-                      className="rounded border-zinc-600 bg-zinc-900"
-                    />
+                    <Checkbox checked={selected.has(row.template_id)} onCheckedChange={() => toggleRow(row.template_id)} />
                   </td>
-                  <td className="py-3 pr-4 font-medium text-zinc-100">{row.name}</td>
+                  <td className="py-3 pr-4 font-medium text-text-primary">{row.name}</td>
                   <td className="py-3 pr-4">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTarget({ id: row.template_id, name: row.name })}
-                      className="text-sm text-[#51A2FF] transition hover:text-[#7BB8FF] hover:underline"
-                    >
-                      {t('timeTemplates.preview')}
-                    </button>
+                    <Button variant="text" onPress={() => setPreviewTarget({ id: row.template_id, name: row.name })}>{t('timeTemplates.preview')}</Button>
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
@@ -351,50 +336,29 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                       style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
-                  <td className="py-3 pr-4 font-mono text-zinc-400">{row.created_at}</td>
-                  <td className="py-3 pr-4 font-mono text-zinc-400">{row.updated_at}</td>
+                  <td className="py-3 pr-4 font-mono text-text-tertiary">{row.created_at}</td>
+                  <td className="py-3 pr-4 font-mono text-text-tertiary">{row.updated_at}</td>
                   <td className="relative py-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenMenuId((prev) => (prev === row.template_id ? null : row.template_id))
-                      }
-                      className="inline-flex size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      title={t('common.moreActions')}
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
+                    <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
+            setOpenMenuId((prev) => (prev === row.template_id ? null : row.template_id))
+           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
                     {openMenuId === row.template_id && (
                       <div
                         ref={menuRef}
-                        className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
+                        className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
                       >
-                        <button
-                          type="button"
-                          onClick={() => void handleDownload([row.template_id])}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                        >
-                          <Download className="size-4 text-zinc-400" />
-                          {t('common.download')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(row)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
-                        >
-                          <Pencil className="size-4 text-zinc-400" />
-                          {t('common.edit')}
-                        </button>
+                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Download />} onPress={() => void handleDownload([row.template_id])}>{t('common.download')}</Button>
+                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => handleEdit(row)}>{t('common.edit')}</Button>
                         <button
                           type="button"
                           onClick={() => void handleDuplicate(row)}
                           disabled={duplicatingId === row.template_id}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-primary hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {duplicatingId === row.template_id ? (
-                            <Loader2 className="size-4 animate-spin text-zinc-400" />
+                            <Loader2 className="size-4 animate-spin text-text-tertiary" />
                           ) : (
-                            <Copy className="size-4 text-zinc-400" />
+                            <Copy className="size-4 text-text-tertiary" />
                           )}
                           {t('common.duplicate')}
                         </button>
@@ -402,10 +366,10 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                           type="button"
                           onClick={() => void handleDelete(row)}
                           disabled={row.usage_status === 'in_use' || deletingId === row.template_id}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-body-s ${
                             row.usage_status === 'in_use'
-                              ? 'cursor-not-allowed text-zinc-600'
-                              : 'text-zinc-200 hover:bg-zinc-800 hover:text-red-300'
+                              ? 'cursor-not-allowed text-text-disabled'
+                              : 'text-text-primary hover:bg-link-standard-hover hover:text-status-error-emphasis'
                           }`}
                           title={
                             row.usage_status === 'in_use'
@@ -414,9 +378,9 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
                           }
                         >
                           {deletingId === row.template_id ? (
-                            <Loader2 className="size-4 animate-spin text-zinc-400" />
+                            <Loader2 className="size-4 animate-spin text-text-tertiary" />
                           ) : (
-                            <Trash2 className="size-4 text-zinc-400" />
+                            <Trash2 className="size-4 text-text-tertiary" />
                           )}
                           {t('common.delete')}
                         </button>
@@ -430,12 +394,12 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-zinc-800/80 px-6 py-4">
+      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronLeft className="size-4" />
         </button>
@@ -444,10 +408,10 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             key={n}
             type="button"
             onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-sm ${
+            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
               n === page
                 ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40'
-                : 'text-zinc-500 hover:bg-zinc-800'
+                : 'text-text-quaternary hover:bg-link-standard-hover'
             }`}
           >
             {n}
@@ -457,7 +421,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           type="button"
           disabled={page >= totalPages}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-800 disabled:opacity-30"
+          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
         >
           <ChevronRight className="size-4" />
         </button>

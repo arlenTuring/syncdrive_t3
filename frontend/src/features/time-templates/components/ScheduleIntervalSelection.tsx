@@ -64,7 +64,7 @@ function IntervalAttributeHoverCard({
     <div
       ref={tipRef}
       className={[
-        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-zinc-700/90 bg-zinc-950 px-2.5 py-1.5 shadow-xl shadow-black/40',
+        'pointer-events-none fixed z-[10050] w-max max-w-[200px] -translate-x-1/2 -translate-y-full overflow-y-auto rounded-md border border-border-quaternary bg-surface-sub-background px-2.5 py-1.5 shadow-xl shadow-black-30',
         placed ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
       style={{
@@ -80,17 +80,17 @@ function IntervalAttributeHoverCard({
           style={{ backgroundColor: accent }}
           aria-hidden
         />
-        <span className="text-[11px] font-semibold leading-4 text-zinc-100">
+        <span className="text-body-xs-bold text-text-primary">
           {content.title}
         </span>
       </div>
-      <div className="mt-1 space-y-0.5 text-[10px] leading-[14px] text-zinc-300">
+      <div className="mt-1 space-y-0.5 text-caption-2 leading-[14px] text-text-secondary">
         {content.lines.map((line) => (
           <div key={line}>{line}</div>
         ))}
       </div>
       <div
-        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-700/90"
+        className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-border-quaternary"
         aria-hidden
       />
     </div>,

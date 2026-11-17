@@ -27,7 +27,7 @@ import {
 } from './TimeTemplatePanelHeader';
 
 const FIELD_CLASS =
-  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]/40';
+  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const FIELD_STYLE = { height: INTERVAL_TABLE_FIELD_HEIGHT_PX };
 
@@ -113,7 +113,7 @@ function DayTimeline({
             className="flex items-center justify-center gap-2.5 px-1 py-3"
             style={{ height: INTERVAL_TIMELINE_BAR_HEIGHT_PX }}
           >
-            <span className="text-center text-sm leading-[18px] tracking-[0.5px] text-[#D1D5DC]">
+            <span className="text-center text-body-s leading-[18px] tracking-[0.5px] text-text-secondary">
               {t('timeTemplates.intervals.timelineLine1')}
               <br />
               {t('timeTemplates.intervals.timelineLine2')}
@@ -142,7 +142,7 @@ function DayTimeline({
                     }}
                   >
                     <span
-                      className={`flex items-center justify-center text-sm leading-[18px] tracking-[0.5px] text-[#99A1AF] whitespace-nowrap ${alignClass}`}
+                      className={`flex items-center justify-center text-body-s leading-[18px] tracking-[0.5px] text-text-tertiary whitespace-nowrap ${alignClass}`}
                       style={{ height: INTERVAL_TIMELINE_AXIS_HEIGHT_PX }}
                     >
                       {String(h).padStart(2, '0')}:00
@@ -186,13 +186,13 @@ function DayTimeline({
                       title={`${slot.name} ${slot.startTime} - ${slot.endTime}`}
                     >
                       <span
-                        className="max-w-full truncate text-sm font-medium leading-[18px] tracking-[0.5px]"
+                        className="max-w-full truncate text-body-s-bold leading-[18px] tracking-[0.5px]"
                         style={{ color: accent }}
                       >
                         {slot.name}
                       </span>
                       <span
-                        className="max-w-full truncate text-xs leading-4"
+                        className="max-w-full truncate text-body-xs"
                         style={{ color: accent }}
                       >
                         {slot.startTime} - {slot.endTime}
@@ -226,12 +226,12 @@ function AttributeSelect({
       <SiteSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${FIELD_CLASS} appearance-none pr-9 ${!value ? 'text-[#99A1AF]' : 'pl-7'}`}
+        className={`${FIELD_CLASS} appearance-none pr-9 ${!value ? 'text-text-tertiary' : 'pl-7'}`}
         style={FIELD_STYLE}
       >
         <option value="">{t('timeTemplates.intervals.selectPlaceholder')}</option>
         {attributes.map((attr) => (
-          <option key={attr.id} value={attr.id} className="bg-zinc-900 text-zinc-100">
+          <option key={attr.id} value={attr.id} className="bg-surface-primary text-text-primary">
             {attr.name}
           </option>
         ))}
@@ -242,7 +242,7 @@ function AttributeSelect({
           style={{ backgroundColor: selected.color }}
         />
       )}
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#99A1AF]" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-tertiary" />
     </div>
   );
 }
@@ -309,7 +309,7 @@ export function TimeSlotIntervalsPanel({
       <>
       <tr
         key={slot.id}
-        className={`border-b border-[rgba(212,212,212,0.15)] ${draft && overlaps ? 'bg-red-500/5' : ''}`}
+        className={`border-b border-[rgba(212,212,212,0.15)] ${draft && overlaps ? 'bg-status-error-light' : ''}`}
       >
         <td className={TABLE_CELL_CLASS} style={TABLE_CELL_STYLE}>
           {draft ? (
@@ -325,7 +325,7 @@ export function TimeSlotIntervalsPanel({
               }}
             />
           ) : (
-            <div className="flex items-center gap-2 px-1 text-sm text-[#D1D5DC]">
+            <div className="flex items-center gap-2 px-1 text-body-s text-text-secondary">
               <span
                 className="size-2.5 shrink-0 rounded-sm"
                 style={{
@@ -348,7 +348,7 @@ export function TimeSlotIntervalsPanel({
               />
             </div>
           ) : (
-            <span className="px-1 text-sm text-[#D1D5DC]">{slot.startTime}</span>
+            <span className="px-1 text-body-s text-text-secondary">{slot.startTime}</span>
           )}
         </td>
         <td className={TABLE_CELL_CLASS} style={TABLE_CELL_STYLE}>
@@ -362,10 +362,10 @@ export function TimeSlotIntervalsPanel({
               />
             </div>
           ) : (
-            <span className="px-1 text-sm text-[#D1D5DC]">{slot.endTime}</span>
+            <span className="px-1 text-body-s text-text-secondary">{slot.endTime}</span>
           )}
         </td>
-        <td className={`${TABLE_CELL_CLASS} text-sm text-[#99A1AF]`} style={TABLE_CELL_STYLE}>
+        <td className={`${TABLE_CELL_CLASS} text-body-s text-text-tertiary`} style={TABLE_CELL_STYLE}>
           {intervalDurationTableLabel(slot.startTime, slot.endTime)}
         </td>
         <td className="px-3 text-right" style={TABLE_CELL_STYLE}>
@@ -375,7 +375,7 @@ export function TimeSlotIntervalsPanel({
                 type="button"
                 disabled={!canConfirm}
                 onClick={() => confirmInterval(slot.id)}
-                className="inline-flex items-center justify-center rounded-lg bg-[#2B7FFF] text-white transition hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center justify-center rounded-lg bg-link-theme-filled text-text-primary transition hover:bg-link-theme-filled-hover disabled:cursor-not-allowed disabled:opacity-40"
                 style={ACTION_BUTTON_STYLE}
                 aria-label={t('timeTemplates.intervals.confirmAria')}
                 title={overlaps ? t('timeTemplates.intervals.overlapTitle') : undefined}
@@ -389,7 +389,7 @@ export function TimeSlotIntervalsPanel({
                 type="button"
                 onClick={() => startEditInterval(slot.id)}
                 disabled={hasDraft}
-                className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center justify-center rounded-md text-text-quaternary hover:bg-link-standard-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
                 style={ACTION_BUTTON_STYLE}
                 aria-label={t('timeTemplates.intervals.editAria')}
               >
@@ -398,7 +398,7 @@ export function TimeSlotIntervalsPanel({
               <button
                 type="button"
                 onClick={() => removeInterval(slot.id)}
-                className="inline-flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                className="inline-flex items-center justify-center rounded-md text-text-quaternary hover:bg-link-standard-hover hover:text-status-error-emphasis"
                 style={ACTION_BUTTON_STYLE}
                 aria-label={t('timeTemplates.intervals.deleteAria')}
               >
@@ -409,9 +409,9 @@ export function TimeSlotIntervalsPanel({
         </td>
       </tr>
       {draft && overlaps && (
-        <tr key={`${slot.id}-overlap-warning`} className="border-b border-[rgba(212,212,212,0.15)] bg-red-500/5">
+        <tr key={`${slot.id}-overlap-warning`} className="border-b border-[rgba(212,212,212,0.15)] bg-status-error-light">
           <td colSpan={5} className="px-4 py-2">
-            <div className="flex items-center gap-2 text-xs text-red-400">
+            <div className="flex items-center gap-2 text-body-xs text-status-error-emphasis">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 shrink-0">
                 <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
@@ -450,7 +450,7 @@ export function TimeSlotIntervalsPanel({
           <DayTimeline intervals={intervals} attributes={attributes} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[rgba(212,212,212,0.1)]">
-          <table className="w-full shrink-0 table-fixed text-left text-sm">
+          <table className="w-full shrink-0 table-fixed text-left text-body-s">
             <colgroup>
               <col style={{ width: 400 }} />
               <col style={{ width: 212 }} />
@@ -459,27 +459,27 @@ export function TimeSlotIntervalsPanel({
               <col style={{ width: 100 }} />
             </colgroup>
             <thead className="bg-[rgba(142,197,255,0.08)]">
-              <tr className="border-b border-[rgba(212,212,212,0.15)] text-[#99A1AF]">
+              <tr className="border-b border-[rgba(212,212,212,0.15)] text-text-tertiary">
                 <th
-                  className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
+                  className="px-3 py-0.5 text-body-s font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
                   {t('timeTemplates.intervals.colName')}
                 </th>
                 <th
-                  className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
+                  className="px-3 py-0.5 text-body-s font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
                   {t('timeTemplates.intervals.colStart')}
                 </th>
                 <th
-                  className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
+                  className="px-3 py-0.5 text-body-s font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
                   {t('timeTemplates.intervals.colEnd')}
                 </th>
                 <th
-                  className="px-3 py-0.5 text-sm font-normal leading-[18px] tracking-[0.5px]"
+                  className="px-3 py-0.5 text-body-s font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}
                 >
                   {t('timeTemplates.intervals.colDuration')}
@@ -492,7 +492,7 @@ export function TimeSlotIntervalsPanel({
             <PanelNoData className="flex-1" />
           ) : (
             <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full table-fixed text-left text-sm">
+              <table className="w-full table-fixed text-left text-body-s">
                 <colgroup>
                   <col style={{ width: 400 }} />
                   <col style={{ width: 212 }} />

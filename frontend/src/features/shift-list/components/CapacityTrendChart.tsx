@@ -214,8 +214,8 @@ export function CapacityTrendChart({
 
   return (
     <div className={`flex min-h-0 flex-col ${className}`}>
-      <div className="relative overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0b0d12]">
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/60 px-3 py-2">
+      <div className="relative overflow-hidden rounded-xl border border-border-quaternary bg-[#0b0d12]">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border-quaternary px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {drawableStreams.map((stream) => {
               const hidden = hiddenStreamKeys.has(stream.streamKey);
@@ -226,10 +226,10 @@ export function CapacityTrendChart({
                   onClick={() => toggleStreamVisibility(stream.streamKey)}
                   aria-pressed={!hidden}
                   title={hidden ? t('shiftList.capacityTrend.showStream', { label: stream.label }) : t('shiftList.capacityTrend.hideStream', { label: stream.label })}
-                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-body-xs transition ${
                     hidden
-                      ? 'border-zinc-800 bg-transparent text-zinc-600 hover:text-zinc-400'
-                      : 'border-zinc-800/80 bg-zinc-900/70 text-zinc-300 hover:text-zinc-100'
+                      ? 'border-border-quaternary bg-transparent text-text-disabled hover:text-text-tertiary'
+                      : 'border-border-quaternary bg-zinc-900/70 text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   <span
@@ -278,7 +278,7 @@ export function CapacityTrendChart({
                   x={PAD.left - 10}
                   y={y + 3}
                   textAnchor="end"
-                  className="fill-zinc-500"
+                  className="fill-text-quaternary"
                   style={{ fontSize: 11 }}
                 >
                   {tick.toLocaleString('en-US')}
@@ -302,7 +302,7 @@ export function CapacityTrendChart({
                   x={x}
                   y={CHART_HEIGHT - 8}
                   textAnchor="middle"
-                  className="fill-zinc-500"
+                  className="fill-text-quaternary"
                   style={{ fontSize: 11 }}
                 >
                   {formatMinuteAsHm(tick)}
@@ -316,7 +316,7 @@ export function CapacityTrendChart({
             y={PAD.top + PLOT_H / 2}
             textAnchor="middle"
             transform={`rotate(-90 16 ${PAD.top + PLOT_H / 2})`}
-            className="fill-zinc-500"
+            className="fill-text-quaternary"
             style={{ fontSize: 11 }}
           >
             pphpd
@@ -455,25 +455,25 @@ export function CapacityTrendChart({
 
         {hoverSample ? (
           <div
-            className="pointer-events-none absolute z-10 min-w-[168px] max-w-[280px] rounded-lg border border-zinc-700/80 bg-[#141820]/95 px-3 py-2 shadow-lg backdrop-blur-sm"
+            className="pointer-events-none absolute z-10 min-w-[168px] max-w-[280px] rounded-lg border border-border-quaternary bg-[#141820]/95 px-3 py-2 shadow-lg backdrop-blur-sm"
             style={{
               left: `${(tooltipLeft / CHART_WIDTH) * 100}%`,
               top: `${(tooltipTop / CHART_HEIGHT) * 100}%`,
             }}
           >
-            <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-zinc-100">
+            <div className="mb-1.5 flex items-center gap-2 text-body-xs-bold text-text-primary">
               <span
                 className="inline-block h-3 w-1 rounded-sm"
                 style={{ backgroundColor: hoverBand?.color ?? '#7CB8FF' }}
               />
               <span className="truncate">{hoverBand?.name ?? t('shiftList.capacityTrend.noBand')}</span>
-              <span className="ml-auto tabular-nums text-zinc-400">
+              <span className="ml-auto tabular-nums text-text-tertiary">
                 {formatMinuteAsHm(hoverSample.minute)}
               </span>
             </div>
-            <p className="text-xs text-zinc-300">
+            <p className="text-body-xs text-text-secondary">
               {t('shiftList.capacityTrend.headway')}{' '}
-              <span className="tabular-nums text-zinc-100">
+              <span className="tabular-nums text-text-primary">
                 {formatRouteStreamHeadwayTooltip(
                   hoverSample.headwayByStream,
                   visibleStreams,
@@ -483,12 +483,12 @@ export function CapacityTrendChart({
                     : '—')}
               </span>
               {hoverBand?.headwaySeconds != null ? (
-                <span className="ml-1 text-zinc-500">
+                <span className="ml-1 text-text-quaternary">
                   {t('shiftList.capacityTrend.targetSeconds', { value: hoverBand.headwaySeconds.toLocaleString('en-US') })}
                 </span>
               ) : null}
             </p>
-            <div className="mt-0.5 space-y-0.5 text-xs text-zinc-300">
+            <div className="mt-0.5 space-y-0.5 text-body-xs text-text-secondary">
               {visibleStreams.map((stream) => {
                 const pphpd = hoverSample.pphpdByStream[stream.streamKey];
                 if (pphpd == null) return null;
@@ -499,15 +499,15 @@ export function CapacityTrendChart({
                       style={{ backgroundColor: stream.color }}
                       aria-hidden
                     />
-                    <span className="truncate text-zinc-400">{stream.label}</span>
-                    <span className="ml-auto tabular-nums text-zinc-100">
+                    <span className="truncate text-text-tertiary">{stream.label}</span>
+                    <span className="ml-auto tabular-nums text-text-primary">
                       {pphpd.toLocaleString('en-US')} pphpd
                     </span>
                   </p>
                 );
               })}
               {hoverBand != null && hoverBand.capacityPphpd > 0 ? (
-                <p className="text-zinc-500">
+                <p className="text-text-quaternary">
                   {t('shiftList.capacityTrend.required')}{' '}
                   <span className="tabular-nums" style={{ color: hoverBand.color }}>
                     {hoverBand.capacityPphpd.toLocaleString('en-US')}
@@ -515,15 +515,15 @@ export function CapacityTrendChart({
                 </p>
               ) : null}
             </div>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-body-xs text-text-quaternary">
               {t('shiftList.capacityTrend.activeMainline')}{' '}
-              <span className="tabular-nums text-zinc-400">
+              <span className="tabular-nums text-text-tertiary">
                 {t('shiftList.capacityTrend.vehicles', { count: hoverSample.activeVehicleCount.toLocaleString('en-US') })}
               </span>
               <span className="ml-1">{t('shiftList.capacityTrend.reference')}</span>
             </p>
             {capacityGapHint ? (
-              <p className="mt-1.5 max-w-[240px] text-[11px] leading-snug text-amber-200/90">
+              <p className="mt-1.5 max-w-[240px] text-body-xs text-status-warning">
                 {capacityGapHint}
               </p>
             ) : null}
@@ -531,7 +531,7 @@ export function CapacityTrendChart({
         ) : null}
 
         {!canDraw ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0d12]/70 px-6 text-center text-sm text-zinc-500">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0d12]/70 px-6 text-center text-body-s text-text-quaternary">
             {series.passengerBlockCount >= 2
               ? t('shiftList.capacityTrend.needMoreSameDirection')
               : t('shiftList.capacityTrend.needTwoTrips')}

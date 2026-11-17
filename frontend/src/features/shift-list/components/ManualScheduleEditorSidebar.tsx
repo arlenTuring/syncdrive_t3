@@ -29,11 +29,11 @@ import {
 } from '../utils/manualScheduleEdit';
 import type { MaintenanceSectionCodeBySection } from '../utils/maintenanceSectionCode';
 
-const LABEL_CLASS = 'text-xs text-zinc-400';
+const LABEL_CLASS = 'text-body-xs text-text-tertiary';
 const INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-2.5 text-sm text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]';
+  'h-9 w-full rounded-lg border border-border-quaternary bg-surface-primary px-2.5 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme';
 const SMALL_INPUT_CLASS =
-  'h-8 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 px-2 text-xs tabular-nums text-zinc-100 focus:border-[#2B7FFF] focus:outline-none focus:ring-1 focus:ring-[#2B7FFF]';
+  'h-8 w-full rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-xs tabular-nums text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme';
 
 function SidebarCard({
   icon,
@@ -47,11 +47,11 @@ function SidebarCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2.5">
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-black-30">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border-quaternary px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           {icon}
-          <h3 className="truncate text-sm font-medium text-zinc-100">{title}</h3>
+          <h3 className="truncate text-body-s-bold text-text-primary">{title}</h3>
         </div>
         {headerAction}
       </div>
@@ -71,7 +71,7 @@ function TripTypeChip({ taskKey, label }: { taskKey: TaskTypeKey; label: string 
         event.dataTransfer.setData('application/x-shift-block-type', taskKey);
         event.dataTransfer.effectAllowed = 'copy';
       }}
-      className="isolate relative inline-flex h-[32px] cursor-grab items-center justify-center overflow-hidden whitespace-nowrap rounded px-3 text-sm font-normal leading-[18px] tracking-[0.5px] transition select-none hover:brightness-110 active:cursor-grabbing"
+      className="isolate relative inline-flex h-[32px] cursor-grab items-center justify-center overflow-hidden whitespace-nowrap rounded px-3 text-body-s font-normal leading-[18px] tracking-[0.5px] transition select-none hover:brightness-110 active:cursor-grabbing"
       style={{ backgroundColor: colors.bg, color: colors.text }}
       title={t('shiftList.manualSidebar.dragChipTitle', { label })}
     >
@@ -284,7 +284,7 @@ function ManualBlockSettingsForm({
           type="text"
           readOnly
           value={tripCode}
-          className={`${INPUT_CLASS} cursor-default text-zinc-300`}
+          className={`${INPUT_CLASS} cursor-default text-text-secondary`}
           aria-label={t('shiftList.manualSidebar.tripCodeAria')}
         />
 
@@ -359,10 +359,10 @@ function ManualBlockSettingsForm({
       </div>
 
       {showDwellEditor ? (
-        <div className="space-y-2 border-t border-zinc-800/70 pt-3">
+        <div className="space-y-2 border-t border-border-quaternary pt-3">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-medium text-zinc-200">{t('shiftList.manualSidebar.stationDwells')}</h4>
-            <span className="text-[10px] text-zinc-500">
+            <h4 className="text-body-xs-bold text-text-primary">{t('shiftList.manualSidebar.stationDwells')}</h4>
+            <span className="text-caption-2 text-text-quaternary">
               {t('shiftList.manualSidebar.dwellTotalMin', { total: dwellTotalSeconds, min: Math.ceil(minDurationMinutes * 60) })}
             </span>
           </div>
@@ -375,10 +375,10 @@ function ManualBlockSettingsForm({
                     key={dwell.stationId}
                     className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
                   >
-                    <span className="truncate text-[11px] text-zinc-400" title={dwell.stationName}>
+                    <span className="truncate text-body-xs text-text-tertiary" title={dwell.stationName}>
                       {dwell.stationName || dwell.stationId}
                     </span>
-                    <span className="rounded-md border border-zinc-800/80 bg-zinc-900/40 px-2.5 py-1.5 text-[11px] text-zinc-500">
+                    <span className="rounded-md border border-border-quaternary bg-surface-primary px-2.5 py-1.5 text-body-xs text-text-quaternary">
                       {formatStationDwellRoleLabel(role)}
                     </span>
                   </div>
@@ -391,7 +391,7 @@ function ManualBlockSettingsForm({
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
                 >
                   <span
-                    className="truncate text-[11px] text-zinc-400"
+                    className="truncate text-body-xs text-text-tertiary"
                     title={t('shiftList.manualSidebar.stationPrefix', { name: dwell.stationName || dwell.stationId })}
                   >
                     {t('shiftList.manualSidebar.stationPrefix', { name: dwell.stationName || dwell.stationId })}
@@ -399,7 +399,7 @@ function ManualBlockSettingsForm({
                   <div className="flex items-center justify-center gap-1">
                     <SiteSelect
                       value={mode}
-                      className="h-8 rounded-md border border-zinc-700/80 bg-zinc-900/80 px-1 text-center text-[11px] text-zinc-100"
+                      size="sm"
                       aria-label={t('shiftList.manualSidebar.dwellModeAria', { name: dwell.stationName })}
                       onChange={(event) => {
                         const nextMode = event.target.value as ShiftStationDwellMode;
@@ -463,7 +463,7 @@ function ManualBlockSettingsForm({
             })}
           </div>
           <label className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2 pt-1">
-            <span className="text-[11px] text-zinc-400">{t('shiftList.manualSidebar.dwellSlack')}</span>
+            <span className="text-body-xs text-text-tertiary">{t('shiftList.manualSidebar.dwellSlack')}</span>
             <input
               type="text"
               inputMode="numeric"
@@ -477,12 +477,12 @@ function ManualBlockSettingsForm({
               }}
             />
           </label>
-          <p className="text-[10px] leading-4 text-zinc-500">
+          <p className="text-caption-2 text-text-quaternary">
             {t('shiftList.manualSidebar.dwellSlackHint')}
           </p>
           {durationShorterThanDwells ? (
             <p
-              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-4 text-amber-200"
+              className="rounded-lg border border-status-warning-light bg-status-warning-light px-2.5 py-2 text-body-xs text-status-warning"
               role="status"
             >
               {t('shiftList.manualSidebar.durationTooShort', {
@@ -494,7 +494,7 @@ function ManualBlockSettingsForm({
         </div>
       ) : null}
 
-      {error ? <p className="text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="text-body-xs text-status-error-emphasis">{error}</p> : null}
     </div>
   );
 }
@@ -517,7 +517,7 @@ export function ManualScheduleEditorSidebar({
   const { t } = useTranslation();
   return (
     <aside className="flex w-[248px] shrink-0 flex-col gap-3">
-      <SidebarCard icon={<Tag className="size-4 text-zinc-400" />} title={t('shiftList.manualSidebar.taskTypes')}>
+      <SidebarCard icon={<Tag className="size-4 text-text-tertiary" />} title={t('shiftList.manualSidebar.taskTypes')}>
         <div className="grid grid-cols-2 gap-2">
           {TASK_TYPE_OPTIONS.map((task) => (
             <TripTypeChip
@@ -527,13 +527,13 @@ export function ManualScheduleEditorSidebar({
             />
           ))}
         </div>
-        <p className="mt-3 text-[11px] leading-4 text-zinc-500">
+        <p className="mt-3 text-body-xs text-text-quaternary">
           {t('shiftList.manualSidebar.dragHint')}
         </p>
       </SidebarCard>
 
       <SidebarCard
-        icon={<SlidersHorizontal className="size-4 text-zinc-400" />}
+        icon={<SlidersHorizontal className="size-4 text-text-tertiary" />}
         title={t('shiftList.manualSidebar.taskSettings')}
       >
         {selectedBlock && selectedBlock.source === 'template_bar' ? (

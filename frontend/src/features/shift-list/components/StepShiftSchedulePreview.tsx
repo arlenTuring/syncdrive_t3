@@ -136,12 +136,12 @@ function ActionZoneReviewBlock({
 }) {
   if (actions.length === 0) return null;
   return (
-    <div className="rounded-lg border border-dashed border-zinc-700/60 bg-zinc-950/50 px-3 py-2.5">
-      <p className="text-[11px] font-medium tracking-wide text-zinc-400">{zoneLabel}</p>
+    <div className="rounded-lg border border-dashed border-border-quaternary bg-black-30 px-3 py-2.5">
+      <p className="text-body-xs-bold text-text-tertiary">{zoneLabel}</p>
       <ul className="mt-1.5 space-y-1">
         {actions.map((action, index) => (
-          <li key={action.id} className="text-xs text-zinc-300">
-            <span className="mr-1.5 font-semibold uppercase text-[#7CB8FF]">
+          <li key={action.id} className="text-body-xs text-text-secondary">
+            <span className="mr-1.5 font-semibold uppercase text-text-theme">
               {String.fromCharCode(97 + index)}.
             </span>
             {formatActionReviewLine(action, mediaById, facilityGroups)}
@@ -175,21 +175,21 @@ function ReviewSection({
         unstyled
           ? 'flex min-h-0 flex-1 flex-col'
           : wizard
-            ? 'rounded-xl bg-[#232329] px-6 py-5'
-            : 'rounded-xl border border-zinc-800/80 bg-[#0c0c0e] px-5 py-4'
+            ? 'rounded-xl bg-surface-secondary px-6 py-5'
+            : 'rounded-xl border border-border-quaternary bg-surface-sub-background px-5 py-4'
       }
     >
       {title ? (
         <div className={`flex items-center justify-between gap-3 ${wizard ? 'mb-4' : 'mb-3'}`}>
           {wizard ? (
-            <h3 className="flex items-center gap-3 text-base font-medium text-zinc-100">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-[#1b1b1f] text-sm tabular-nums text-zinc-300">
+            <h3 className="flex items-center gap-3 text-body-m-bold text-text-primary">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border-tertiary bg-surface-primary text-body-s tabular-nums text-text-secondary">
                 {step}
               </span>
               {title}
             </h3>
           ) : (
-            <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+            <h3 className="text-body-s-bold text-text-primary">{title}</h3>
           )}
           {onNavigate ? (
             <button
@@ -197,7 +197,7 @@ function ReviewSection({
               onClick={() => onNavigate(step)}
               title={t('shiftList.schedulePreview.goTo', { title })}
               aria-label={t('shiftList.schedulePreview.goTo', { title })}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-[#2B7FFF] transition hover:bg-[rgba(43,127,255,0.12)]"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-text-theme-light transition hover:bg-[rgba(43,127,255,0.12)]"
             >
               <Pencil className="size-4" strokeWidth={2} />
             </button>
@@ -218,8 +218,8 @@ function MetaGrid({
     <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
-          <dt className="text-xs text-zinc-500">{item.label}</dt>
-          <dd className="mt-0.5 truncate text-sm text-zinc-200">
+          <dt className="text-body-xs text-text-quaternary">{item.label}</dt>
+          <dd className="mt-0.5 truncate text-body-s text-text-primary">
             {item.value.trim() ? item.value : '—'}
           </dd>
         </div>
@@ -231,11 +231,11 @@ function MetaGrid({
 /** 精靈：名稱在左、值在右的一欄清單 */
 function MetaRows({ items }: { items: Array<{ label: string; value: string }> }) {
   return (
-    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-8 gap-y-3 text-sm">
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-8 gap-y-3 text-body-s">
       {items.map((item) => (
         <div key={item.label} className="contents">
-          <dt className="text-zinc-400">{item.label}</dt>
-          <dd className="min-w-0 truncate text-zinc-100">{item.value.trim() ? item.value : ''}</dd>
+          <dt className="text-text-tertiary">{item.label}</dt>
+          <dd className="min-w-0 truncate text-text-primary">{item.value.trim() ? item.value : ''}</dd>
         </div>
       ))}
     </dl>
@@ -262,8 +262,8 @@ function describeStationDwellSeconds(routes: ShiftScheduleSelectedRoute[]): stri
 
 function SimpleNameLine({ label, value, wizard = false }: { label?: string; value: string; wizard?: boolean }) {
   return (
-    <p className={`text-sm ${wizard ? 'text-zinc-100' : 'text-zinc-200'}`}>
-      {label ? <span className="text-zinc-500">{label}：</span> : null}
+    <p className={`text-body-s ${wizard ? 'text-text-primary' : 'text-text-primary'}`}>
+      {label ? <span className="text-text-quaternary">{label}：</span> : null}
       {value.trim() ? value : '—'}
     </p>
   );
@@ -281,11 +281,11 @@ function RouteGroupsCycleSummaryPanel({
   const isOver = hasLimit && summary.totalMinCycleSeconds > (turnaroundLimitSeconds ?? 0);
 
   return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-4">
+    <div className="rounded-xl border border-border-quaternary bg-black-30 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-zinc-200">{t('shiftList.schedulePreview.overallValues')}</h4>
+        <h4 className="text-body-s-bold text-text-primary">{t('shiftList.schedulePreview.overallValues')}</h4>
         {hasLimit ? (
-          <span className="text-xs text-zinc-500">
+          <span className="text-body-xs text-text-quaternary">
             {t('shiftList.schedulePreview.turnaroundLimit', { value: formatSeconds(turnaroundLimitSeconds) })}
           </span>
         ) : null}
@@ -295,31 +295,31 @@ function RouteGroupsCycleSummaryPanel({
         <div
           className={`rounded-lg border p-4 ${
             isOver
-              ? 'border-red-500/30 bg-red-500/5'
+              ? 'border-border-danger-light bg-status-error-light'
               : hasLimit
-                ? 'border-emerald-500/20 bg-emerald-500/5'
-                : 'border-zinc-800 bg-zinc-900/30'
+                ? 'border-status-success-light bg-emerald-500/5'
+                : 'border-border-quaternary bg-surface-primary'
           }`}
         >
-          <div className="text-xs font-medium text-zinc-400">{t('shiftList.schedulePreview.cycleFastest')}</div>
+          <div className="text-body-xs-bold text-text-tertiary">{t('shiftList.schedulePreview.cycleFastest')}</div>
           <div
-            className={`mt-2 text-2xl font-bold tabular-nums ${
-              isOver ? 'text-red-400' : hasLimit ? 'text-emerald-400' : 'text-zinc-200'
+            className={`mt-2 text-headline-3 font-bold tabular-nums ${
+              isOver ? 'text-status-error-emphasis' : hasLimit ? 'text-status-success' : 'text-text-primary'
             }`}
           >
             {formatSeconds(summary.totalMinCycleSeconds)}
           </div>
-          <div className="mt-1.5 text-[10px] font-medium text-zinc-500">
+          <div className="mt-1.5 text-caption-2 text-text-quaternary">
             {t('shiftList.schedulePreview.cycleBreakdown', { travel: summary.totalMinTravelSeconds, dwell: summary.totalDwellWithSlackSeconds, switch: summary.totalSwitchBufferSeconds, recovery: summary.recoverySeconds })}
           </div>
         </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-          <div className="text-xs font-medium text-zinc-400">{t('shiftList.schedulePreview.cycleAverage')}</div>
-          <div className="mt-2 text-2xl font-bold tabular-nums text-zinc-200">
+        <div className="rounded-lg border border-border-quaternary bg-surface-primary p-4">
+          <div className="text-body-xs-bold text-text-tertiary">{t('shiftList.schedulePreview.cycleAverage')}</div>
+          <div className="mt-2 text-headline-3 tabular-nums text-text-primary">
             {formatSeconds(summary.totalAvgCycleSeconds)}
           </div>
-          <div className="mt-1.5 text-[10px] font-medium text-zinc-500">
+          <div className="mt-1.5 text-caption-2 text-text-quaternary">
             {t('shiftList.schedulePreview.cycleBreakdown', { travel: summary.totalAvgTravelSeconds, dwell: summary.totalDwellWithSlackSeconds, switch: summary.totalSwitchBufferSeconds, recovery: summary.recoverySeconds })}
           </div>
         </div>
@@ -328,15 +328,15 @@ function RouteGroupsCycleSummaryPanel({
       {hasLimit ? (
         <div className="mt-3">
           {isOver ? (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
+            <div className="flex items-start gap-2 rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-xs text-status-error-emphasis">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-error-emphasis" />
               <span>
                 {t('shiftList.schedulePreview.overLimit')}
               </span>
             </div>
           ) : (
-            <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-              <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+            <div className="flex items-start gap-2 rounded-lg border border-status-success-light bg-status-success-light px-3 py-2 text-body-xs text-status-success">
+              <Check className="mt-0.5 size-4 shrink-0 text-status-success" />
               <span>{t('shiftList.schedulePreview.withinLimit')}</span>
             </div>
           )}
@@ -358,21 +358,21 @@ function RouteReviewCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
+    <div className="rounded-lg border border-border-quaternary bg-black-30 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-xs font-semibold tabular-nums text-[#7CB8FF]">
+            <span className="flex size-6 items-center justify-center rounded-full bg-surface-theme text-body-xs-bold tabular-nums text-text-theme">
               {route.executionOrder}
             </span>
-            <p className="truncate text-sm font-medium text-zinc-100">{route.routeName}</p>
+            <p className="truncate text-body-s-bold text-text-primary">{route.routeName}</p>
             {route.routeCode ? (
-              <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+              <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-caption-2 text-text-tertiary">
                 {route.routeCode}
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-body-xs text-text-quaternary">
             {t('shiftList.schedulePreview.group', { name: route.groupName || '—' })}
             {compact
               ? null
@@ -385,18 +385,18 @@ function RouteReviewCard({
 
       {compact ? (
         <div className="mt-3">
-          <p className="mb-1.5 text-xs text-zinc-500">{t('shiftList.schedulePreview.stations')}</p>
+          <p className="mb-1.5 text-body-xs text-text-quaternary">{t('shiftList.schedulePreview.stations')}</p>
           {route.stationDwells.length === 0 ? (
-            <p className="text-xs text-zinc-600">{t('shiftList.schedulePreview.noStationData')}</p>
+            <p className="text-body-xs text-text-disabled">{t('shiftList.schedulePreview.noStationData')}</p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
               {route.stationDwells.map((dwell, index) => (
                 <li
                   key={`${route.routeId}-${dwell.stationId}`}
-                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-300"
+                  className="rounded-md border border-border-quaternary bg-surface-primary px-2 py-1 text-body-xs text-text-secondary"
                 >
-                  <span className="mr-1 tabular-nums text-zinc-500">{index + 1}.</span>
-                  <span className="text-zinc-200">{dwell.stationName || dwell.stationId}</span>
+                  <span className="mr-1 tabular-nums text-text-quaternary">{index + 1}.</span>
+                  <span className="text-text-primary">{dwell.stationName || dwell.stationId}</span>
                 </li>
               ))}
             </ul>
@@ -426,33 +426,33 @@ function RouteReviewCardParametricDetails({
 
   return (
     <>
-      <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 gap-2 text-body-xs sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="text-zinc-500">{t('shiftList.schedulePreview.avgTravel')}</p>
-          <p className="mt-0.5 tabular-nums text-zinc-200">
+          <p className="text-text-quaternary">{t('shiftList.schedulePreview.avgTravel')}</p>
+          <p className="mt-0.5 tabular-nums text-text-primary">
             {formatSeconds(route.avgTravelTimeSeconds)}
           </p>
         </div>
         <div>
-          <p className="text-zinc-500">{t('shiftList.schedulePreview.minTravel')}</p>
-          <p className="mt-0.5 tabular-nums text-zinc-200">
+          <p className="text-text-quaternary">{t('shiftList.schedulePreview.minTravel')}</p>
+          <p className="mt-0.5 tabular-nums text-text-primary">
             {formatSeconds(route.minTravelTimeSeconds)}
           </p>
         </div>
         <div>
-          <p className="text-zinc-500">{t('shiftList.schedulePreview.switchBuffer')}</p>
-          <p className="mt-0.5 tabular-nums text-zinc-200">{formatSeconds(switchBuffer)}</p>
+          <p className="text-text-quaternary">{t('shiftList.schedulePreview.switchBuffer')}</p>
+          <p className="mt-0.5 tabular-nums text-text-primary">{formatSeconds(switchBuffer)}</p>
         </div>
         <div>
-          <p className="text-zinc-500">{t('shiftList.schedulePreview.dwellSlack')}</p>
-          <p className="mt-0.5 tabular-nums text-zinc-200">{formatSeconds(dwellSlack)}</p>
+          <p className="text-text-quaternary">{t('shiftList.schedulePreview.dwellSlack')}</p>
+          <p className="mt-0.5 tabular-nums text-text-primary">{formatSeconds(dwellSlack)}</p>
         </div>
       </div>
 
       <div className="mt-3">
-        <p className="mb-1.5 text-xs text-zinc-500">{t('shiftList.schedulePreview.stationDwells')}</p>
+        <p className="mb-1.5 text-body-xs text-text-quaternary">{t('shiftList.schedulePreview.stationDwells')}</p>
         {route.stationDwells.length === 0 ? (
-          <p className="text-xs text-zinc-600">{t('shiftList.schedulePreview.noStationData')}</p>
+          <p className="text-body-xs text-text-disabled">{t('shiftList.schedulePreview.noStationData')}</p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {route.stationDwells.map((dwell, index) => {
@@ -469,23 +469,23 @@ function RouteReviewCardParametricDetails({
               return (
                 <li
                   key={`${route.routeId}-${dwell.stationId}`}
-                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-[11px] text-zinc-300"
+                  className="rounded-md border border-border-quaternary bg-surface-primary px-2 py-1 text-body-xs text-text-secondary"
                 >
-                  <span className="text-zinc-200">{dwell.stationName}</span>
-                  <span className="ml-1.5 tabular-nums text-zinc-500">{modeLabel}</span>
+                  <span className="text-text-primary">{dwell.stationName}</span>
+                  <span className="ml-1.5 tabular-nums text-text-quaternary">{modeLabel}</span>
                 </li>
               );
             })}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-zinc-500">
+        <p className="mt-2 text-body-xs text-text-quaternary">
           {t('shiftList.schedulePreview.effectiveDwell')}{' '}
-          <span className="tabular-nums text-zinc-300">
+          <span className="tabular-nums text-text-secondary">
             {formatSeconds(dwellWithSlack)}
           </span>
-          <span className="mx-1.5 text-zinc-700">·</span>
+          <span className="mx-1.5 text-text-disabled">·</span>
           {t('shiftList.schedulePreview.recovery')}{' '}
-          <span className="tabular-nums text-zinc-300">{formatSeconds(recoverySeconds)}</span>
+          <span className="tabular-nums text-text-secondary">{formatSeconds(recoverySeconds)}</span>
         </p>
       </div>
     </>
@@ -630,7 +630,7 @@ export function StepShiftSchedulePreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {!previewBoardOnly && !resultView ? (
-        <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
+        <h2 className="mb-6 shrink-0 text-headline-5 text-text-primary">
           {t('shiftList.schedulePreview.confirmTitle')}
         </h2>
       ) : null}
@@ -669,16 +669,16 @@ export function StepShiftSchedulePreview({
 
         <ReviewSection step={4} title={t('shiftList.schedulePreview.routeGroups')} onNavigate={onNavigateToStep} wizard={wizard}>
           {orderedRoutes.length === 0 ? (
-            <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noRoutes')}</p>
+            <p className="text-body-s text-text-quaternary">{t('shiftList.schedulePreview.noRoutes')}</p>
           ) : wizard && !routeDetailsOpen ? (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <p className="min-w-0 text-sm text-zinc-100">
+              <p className="min-w-0 text-body-s text-text-primary">
                 {orderedRoutes.map((route) => route.routeName).join('、')}
               </p>
               <button
                 type="button"
                 onClick={() => setRouteDetailsOpen(true)}
-                className="inline-flex items-center gap-1 text-sm text-[#2B7FFF] transition hover:text-[#5a9aff]"
+                className="inline-flex items-center gap-1 text-body-s text-text-theme-light transition hover:text-text-theme"
               >
                 展開明細
                 <ChevronDown className="size-4" aria-hidden />
@@ -688,43 +688,43 @@ export function StepShiftSchedulePreview({
             <div className="space-y-3">
               {wizard ? (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <p className="min-w-0 text-sm text-zinc-100">
+                  <p className="min-w-0 text-body-s text-text-primary">
                     {orderedRoutes.map((route) => route.routeName).join('、')}
                   </p>
                   <button
                     type="button"
                     onClick={() => setRouteDetailsOpen(false)}
-                    className="inline-flex items-center gap-1 text-sm text-[#2B7FFF] transition hover:text-[#5a9aff]"
+                    className="inline-flex items-center gap-1 text-body-s text-text-theme-light transition hover:text-text-theme"
                   >
                     收起明細
                     <ChevronDown className="size-4 rotate-180" aria-hidden />
                   </button>
                 </div>
               ) : null}
-              <div className="rounded-lg border border-zinc-800/60 bg-zinc-950/30 px-3 py-2 text-xs text-zinc-400">
+              <div className="rounded-lg border border-border-quaternary bg-black-30 px-3 py-2 text-body-xs text-text-tertiary">
                 {draft.creationMode !== 'manual' ? (
                   <>
                     <span>{t('shiftList.schedulePreview.strategyMinRecovery')} </span>
-                    <span className="tabular-nums text-zinc-200">
+                    <span className="tabular-nums text-text-primary">
                       {formatSeconds(recoverySeconds)}
                     </span>
-                    <span className="mx-2 text-zinc-700">·</span>
+                    <span className="mx-2 text-text-disabled">·</span>
                     <span>{t('shiftList.schedulePreview.collisionProtect')} </span>
-                    <span className="tabular-nums text-zinc-200">
+                    <span className="tabular-nums text-text-primary">
                       {formatSeconds(
                         normalizeCollisionProtectionSeconds(
                           draft.routeGroups.collisionProtectionSeconds,
                         ),
                       )}
                     </span>
-                    <span className="mx-2 text-zinc-700">·</span>
+                    <span className="mx-2 text-text-disabled">·</span>
                   </>
                 ) : null}
                 <span>{t('shiftList.schedulePreview.selectedRoutes')} </span>
-                <span className="tabular-nums text-zinc-200">{orderedRoutes.length}</span>
-                <span className="mx-2 text-zinc-700">·</span>
+                <span className="tabular-nums text-text-primary">{orderedRoutes.length}</span>
+                <span className="mx-2 text-text-disabled">·</span>
                 <span>{t('shiftList.schedulePreview.execOrder')} </span>
-                <span className="text-zinc-200">
+                <span className="text-text-primary">
                   {orderedRoutes.map((route) => route.routeName).join(' → ')}
                 </span>
               </div>
@@ -763,9 +763,9 @@ export function StepShiftSchedulePreview({
               return stationCount + movingCount === 0;
             }) ? (
               wizard ? (
-                <p className="text-sm text-zinc-100">暫時不做</p>
+                <p className="text-body-s text-text-primary">暫時不做</p>
               ) : (
-                <p className="text-sm text-zinc-500">{t('shiftList.schedulePreview.noActions')}</p>
+                <p className="text-body-s text-text-quaternary">{t('shiftList.schedulePreview.noActions')}</p>
               )
             ) : (
               <div className="space-y-4">
@@ -784,12 +784,12 @@ export function StepShiftSchedulePreview({
                   return (
                     <div
                       key={route.routeId}
-                      className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3"
+                      className="rounded-lg border border-border-quaternary bg-black-30 px-4 py-3"
                     >
-                      <p className="text-sm font-medium text-zinc-100">
+                      <p className="text-body-s-bold text-text-primary">
                         {route.routeName}
                         {route.routeCode ? (
-                          <span className="ml-2 text-xs text-zinc-500">{route.routeCode}</span>
+                          <span className="ml-2 text-body-xs text-text-quaternary">{route.routeCode}</span>
                         ) : null}
                       </p>
 
@@ -812,10 +812,10 @@ export function StepShiftSchedulePreview({
                           return (
                             <div key={station.stationId} className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <span className="flex size-6 items-center justify-center rounded-full bg-[#2B7FFF]/15 text-[10px] font-semibold tabular-nums text-[#7CB8FF]">
+                                <span className="flex size-6 items-center justify-center rounded-full bg-surface-theme text-caption-2 tabular-nums text-text-theme">
                                   {stationIndex + 1}
                                 </span>
-                                <span className="text-xs font-medium text-zinc-200">
+                                <span className="text-body-xs-bold text-text-primary">
                                   {station.stationName}
                                 </span>
                               </div>
@@ -870,14 +870,14 @@ export function StepShiftSchedulePreview({
           ) : (
             <div className="flex min-h-0 flex-col">
               {!output.feasibilityReport.ok && draft.creationMode !== 'manual' && (
-                <div className={wizard ? 'mb-4 space-y-2 rounded-lg bg-[#1b1b1f] px-4 py-3' : 'mb-3 space-y-2'}>
+                <div className={wizard ? 'mb-4 space-y-2 rounded-lg bg-surface-primary px-4 py-3' : 'mb-3 space-y-2'}>
                   {wizard ? (
-                    <p className="mb-1 text-sm font-medium text-zinc-100">系統可行性檢驗</p>
+                    <p className="mb-1 text-body-s-bold text-text-primary">系統可行性檢驗</p>
                   ) : null}
                   {output.feasibilityReport.errors.map((issue) => (
                     <div
                       key={`${issue.code}-${issue.message}`}
-                      className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+                      className="flex items-start gap-2 rounded-lg border border-border-danger-light bg-status-error-light px-3 py-2 text-body-s text-status-error-emphasis"
                     >
                       <AlertCircle className="mt-0.5 size-4 shrink-0" />
                       <span>{issue.message}</span>
@@ -886,7 +886,7 @@ export function StepShiftSchedulePreview({
                   {output.feasibilityReport.warnings.map((issue) => (
                     <div
                       key={`warn-${issue.code}-${issue.message}`}
-                      className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
+                      className="flex items-start gap-2 rounded-lg border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-s text-status-warning"
                     >
                       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                       <span>{issue.message}</span>
@@ -896,33 +896,33 @@ export function StepShiftSchedulePreview({
               )}
 
               <div className="mb-3 flex shrink-0 items-center gap-4">
-                <div className="flex shrink-0 items-center gap-5 border-b border-zinc-800/80">
+                <div className="flex shrink-0 items-center gap-5 border-b border-border-quaternary">
                   <button
                     type="button"
                     onClick={() => setActiveTab('schedule')}
-                    className={`relative pb-2 text-sm transition ${
+                    className={`relative pb-2 text-body-s transition ${
                       activeTab === 'schedule'
-                        ? 'font-medium text-zinc-100'
-                        : 'text-zinc-500 hover:text-zinc-300'
+                        ? 'font-medium text-text-primary'
+                        : 'text-text-quaternary hover:text-text-secondary'
                     }`}
                   >
                     {t('shiftList.schedulePreview.tripPreview')}
                     {activeTab === 'schedule' ? (
-                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
                     ) : null}
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab('capacity')}
-                    className={`relative pb-2 text-sm transition ${
+                    className={`relative pb-2 text-body-s transition ${
                       activeTab === 'capacity'
-                        ? 'font-medium text-zinc-100'
-                        : 'text-zinc-500 hover:text-zinc-300'
+                        ? 'font-medium text-text-primary'
+                        : 'text-text-quaternary hover:text-text-secondary'
                     }`}
                   >
                     {t('shiftList.schedulePreview.capacityTrend')}
                     {activeTab === 'capacity' ? (
-                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
                     ) : null}
                   </button>
                 </div>
@@ -933,7 +933,7 @@ export function StepShiftSchedulePreview({
                       <AttributeLegendBadgeChip
                         key={item.attributeId}
                         item={item}
-                        className={wizard ? 'inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm' : undefined}
+                        className={wizard ? 'inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-body-s' : undefined}
                       />
                     ))}
                   </div>
@@ -950,7 +950,7 @@ export function StepShiftSchedulePreview({
               {/* 保持掛載以免切換運能趨勢後橫移位置被重置 */}
               <div className={activeTab === 'schedule' ? '' : 'hidden'}>
                 {templateLoading ? (
-                  <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+                  <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
                     <Loader2 className="size-5 animate-spin" />
                     {t('shiftList.schedulePreview.loadingPreview')}
                   </div>
@@ -974,7 +974,7 @@ export function StepShiftSchedulePreview({
               </div>
               {activeTab === 'capacity' ? (
                 templateLoading ? (
-                  <div className="flex min-h-[240px] items-center justify-center gap-2 text-zinc-500">
+                  <div className="flex min-h-[240px] items-center justify-center gap-2 text-text-quaternary">
                     <Loader2 className="size-5 animate-spin" />
                     {t('shiftList.schedulePreview.loadingCapacity')}
                   </div>

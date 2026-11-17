@@ -58,6 +58,7 @@ import {
   layerSortKey,
   resolveIssueDisplayLayerFromIssue,
 } from '../utils/scheduleAcceptance';
+import { Button, Dialog, IconButton } from '../../../components/ui';
 import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
@@ -390,31 +391,25 @@ function ScheduleGeneratingSkeleton({
   const widths = [82, 54, 68, 91, 47, 73, 60, 88, 51, 76];
   return (
         <div
-      className="flex min-h-[320px] flex-1 flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3"
+      className="flex min-h-[320px] flex-1 flex-col gap-2 rounded-xl border border-border-quaternary bg-black-30 p-3"
       role="status"
       aria-live="polite"
         >
-      <div className="flex flex-wrap items-center gap-2 text-[12px] text-zinc-400">
+      <div className="flex flex-wrap items-center gap-2 text-body-xs text-text-tertiary">
         <Loader2 className="size-4 animate-spin" />
         {t('shiftList.scheduleAdjust.generating')}
         {progress ? (
-          <span className="text-zinc-500">
+          <span className="text-text-quaternary">
             {progress.message}（約 {Math.round(progress.fraction * 100)}%）
           </span>
         ) : null}
         {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="ml-auto rounded-md border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
-          >
-            取消生成
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="ml-auto" onPress={onCancel}>取消生成</Button>
         ) : null}
         </div>
       {progress ? (
-        <div className="h-1 w-full shrink-0 overflow-hidden rounded bg-zinc-800">
-          <div className="h-full bg-[#2B7FFF] transition-[width] duration-300" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
+        <div className="h-1 w-full shrink-0 overflow-hidden rounded bg-surface-secondary">
+          <div className="h-full bg-link-theme-filled transition-[width] duration-300" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
         </div>
       ) : null}
       {/* 時間軸 */}
@@ -463,8 +458,8 @@ function IssueSearchLog({ lines }: { lines: string[] }) {
   const { t } = useTranslation();
   if (lines.length === 0) return null;
   return (
-    <details className="mt-1 rounded border border-white/10 bg-black/10 px-2 py-1 text-[11px] text-zinc-400">
-      <summary className="cursor-pointer select-none text-zinc-300">
+    <details className="mt-1 rounded border border-border-quaternary bg-black/10 px-2 py-1 text-body-xs text-text-tertiary">
+      <summary className="cursor-pointer select-none text-text-secondary">
         {t('shiftList.scheduleAdjust.searchLog', { count: lines.length })}
       </summary>
       <ul className="mt-1 list-disc space-y-0.5 pl-4">
@@ -524,16 +519,16 @@ function CheckReport({
   const blocking = Math.max(report.errors.length, acceptance.publishBlockingCount);
 
   return (
-    <div className={`overflow-hidden rounded-xl bg-[#232329] ${allPassed ? 'border-t-2 border-emerald-500' : 'border-t-2 border-red-500'}`}>
+    <div className={`overflow-hidden rounded-xl bg-surface-secondary ${allPassed ? 'border-t-2 border-status-success' : 'border-t-2 border-status-error'}`}>
       <div className="flex items-center gap-2 px-5 pb-3 pt-4">
-        <ClipboardList className="size-5 text-zinc-300" aria-hidden />
-        <h3 className="text-base font-medium text-zinc-100">{t('shiftList.scheduleAdjust.checkReport')}</h3>
-        <span className="text-xs text-zinc-500">{formatGeneratedClock(plan?.generatedAt)}</span>
+        <ClipboardList className="size-5 text-text-secondary" aria-hidden />
+        <h3 className="text-body-m-bold text-text-primary">{t('shiftList.scheduleAdjust.checkReport')}</h3>
+        <span className="text-body-xs text-text-quaternary">{formatGeneratedClock(plan?.generatedAt)}</span>
         <button
           type="button"
           onClick={onRecheck}
           disabled={checking}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-600 px-3.5 py-1.5 text-sm text-zinc-200 transition hover:border-zinc-400 disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary px-3.5 py-1.5 text-body-s text-text-primary transition hover:border-border-secondary disabled:opacity-50"
         >
           {checking ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           {t('shiftList.scheduleAdjust.recheck')}
@@ -541,23 +536,23 @@ function CheckReport({
       </div>
       <div className="space-y-3 px-5 pb-5">
         {acceptance.gatePassed ? (
-          <p className="flex items-center gap-2 rounded-lg bg-emerald-500/15 px-4 py-2.5 text-sm text-emerald-300">
+          <p className="flex items-center gap-2 rounded-lg bg-status-success-light px-4 py-2.5 text-body-s text-status-success">
             <Check className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.safetyPassed')}
           </p>
         ) : (
-          <p className="flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+          <p className="flex items-center gap-2 rounded-lg bg-status-error-light px-4 py-2.5 text-body-s text-status-error-emphasis">
             <X className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.safetyFailed', { count: blocking })}
           </p>
         )}
         {acceptance.qualityPassed ? (
-          <p className="flex items-center gap-2 rounded-lg bg-emerald-500/15 px-4 py-2.5 text-sm text-emerald-300">
+          <p className="flex items-center gap-2 rounded-lg bg-status-success-light px-4 py-2.5 text-body-s text-status-success">
             <Check className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.qualityPassed')}
           </p>
         ) : (
-          <p className="flex items-center gap-2 rounded-lg bg-red-500/15 px-4 py-2.5 text-sm text-red-300">
+          <p className="flex items-center gap-2 rounded-lg bg-status-error-light px-4 py-2.5 text-body-s text-status-error-emphasis">
             <X className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.qualityFailed')}
           </p>
@@ -575,15 +570,9 @@ function CheckReport({
           />
         ))}
         {policyCount > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowPolicy((value) => !value)}
-            className="text-xs text-zinc-500 transition hover:text-zinc-300"
-          >
-            {showPolicy
+          <Button hierarchy="subordinate" variant="text" onPress={() => setShowPolicy((value) => !value)}>{showPolicy
               ? t('shiftList.scheduleAdjust.hidePolicyWarnings')
-              : t('shiftList.scheduleAdjust.showPolicyWarnings', { count: policyCount })}
-          </button>
+              : t('shiftList.scheduleAdjust.showPolicyWarnings', { count: policyCount })}</Button>
         ) : null}
       </div>
     </div>
@@ -612,27 +601,27 @@ function CheckGroupCard({
   const meta = resolveFeasibilityIssueMeta(group.issues[0]!);
   const isError = group.severity === 'error';
   return (
-    <div className={`rounded-xl border ${isError ? 'border-red-500/60' : 'border-amber-500/50'} bg-[#26262b]`}>
+    <div className={`rounded-xl border ${isError ? 'border-red-500/60' : 'border-status-warning-light'} bg-surface-secondary`}>
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
         aria-expanded={expanded}
       >
-        <Info className={`size-5 shrink-0 ${isError ? 'text-red-400' : 'text-amber-400'}`} aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-base text-zinc-100">{meta.groupTitle}</span>
-        <span className={`shrink-0 rounded-md px-2.5 py-1 text-sm ${isError ? 'bg-red-500/20 text-red-300' : 'bg-amber-900/50 text-amber-200'}`}>
+        <Info className={`size-5 shrink-0 ${isError ? 'text-status-error-emphasis' : 'text-status-warning'}`} aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-body-m text-text-primary">{meta.groupTitle}</span>
+        <span className={`shrink-0 rounded-md px-2.5 py-1 text-body-s ${isError ? 'bg-status-error-light text-status-error-emphasis' : 'bg-amber-900/50 text-status-warning'}`}>
           {isError ? t('shiftList.scheduleAdjust.blocksPublish') : t('shiftList.scheduleAdjust.unresolved')}
         </span>
-        <span className="shrink-0 text-sm tabular-nums text-zinc-400">
+        <span className="shrink-0 text-body-s tabular-nums text-text-tertiary">
           {t('shiftList.scheduleAdjust.itemCount', { count: group.issues.length })}
         </span>
-        <ChevronDown className={`size-5 shrink-0 text-zinc-400 transition ${expanded ? 'rotate-180' : ''}`} aria-hidden />
+        <ChevronDown className={`size-5 shrink-0 text-text-tertiary transition ${expanded ? 'rotate-180' : ''}`} aria-hidden />
       </button>
       {expanded ? (
         <div className="space-y-1 px-5 pb-4">
           {causeNote || meta.guidance ? (
-            <p className="pb-2 text-xs leading-relaxed text-zinc-500">
+            <p className="pb-2 text-body-xs text-text-quaternary">
               {[meta.guidance, causeNote].filter(Boolean).join(' ')}
             </p>
           ) : null}
@@ -644,15 +633,15 @@ function CheckGroupCard({
               return (
                 <li key={`${group.key}-${index}-${issue.message}`}>
                   <div className="flex items-start gap-4 py-2">
-                    <span className="mt-0.5 inline-flex min-w-[6.5rem] shrink-0 justify-center rounded-lg border border-[#2B7FFF]/80 px-2.5 py-1 font-mono text-sm tabular-nums text-[#5a9aff]">
+                    <span className="mt-0.5 inline-flex min-w-[6.5rem] shrink-0 justify-center rounded-lg border border-[#2B7FFF]/80 px-2.5 py-1 font-mono text-body-s tabular-nums text-text-theme">
                       {tripCode === '----' ? '--' : tripCode}
                     </span>
-                    <span className="min-w-0 flex-1 text-sm leading-6 text-zinc-200">{issue.message}</span>
+                    <span className="min-w-0 flex-1 text-body-s text-text-primary">{issue.message}</span>
                     {jumpable ? (
                       <button
                         type="button"
                         onClick={() => onIssueClick(issue)}
-                        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-zinc-100"
+                        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-standard-hover hover:text-text-primary"
                         title={t('shiftList.scheduleAdjust.jump')}
                         aria-label={`${t('shiftList.scheduleAdjust.jump')} ${tripCode}`}
                       >
@@ -1404,16 +1393,10 @@ export function StepShiftScheduleAdjust({
   if (error && !plan) {
     return (
       <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 p-4">
-        <div className="max-w-3xl whitespace-pre-line rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200">
+        <div className="max-w-3xl whitespace-pre-line rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">
           {error}
         </div>
-        <button
-          type="button"
-          className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
-          onClick={() => setGenerationAttempt((attempt) => attempt + 1)}
-        >
-          重新生成
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" onPress={() => setGenerationAttempt((attempt) => attempt + 1)}>重新生成</Button>
       </div>
     );
   }
@@ -1427,8 +1410,8 @@ export function StepShiftScheduleAdjust({
           onClick={() => handleDeleteBlock()}
           className={`rounded p-1.5 transition ${
             selectedBlockId
-              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-red-400'
-              : 'cursor-not-allowed text-zinc-600 opacity-40'
+              ? 'text-text-secondary hover:bg-surface-secondary hover:text-status-error-emphasis'
+              : 'cursor-not-allowed text-text-disabled opacity-40'
           }`}
           title={t('shiftList.scheduleAdjust.deleteSelected')}
         >
@@ -1442,8 +1425,8 @@ export function StepShiftScheduleAdjust({
             onClick={() => handleDuplicateBlock()}
             className={`rounded p-1.5 transition ${
               selectedBlockId
-                ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-sky-300'
-                : 'cursor-not-allowed text-zinc-600 opacity-40'
+                ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-theme'
+                : 'cursor-not-allowed text-text-disabled opacity-40'
             }`}
             title={t('shiftList.scheduleAdjust.duplicateSelected')}
           >
@@ -1451,7 +1434,7 @@ export function StepShiftScheduleAdjust({
           </button>
         ) : null}
 
-        <div className="h-4 w-px bg-zinc-700" />
+        <div className="h-4 w-px bg-link-standard-hover" />
 
         <button
           type="button"
@@ -1459,8 +1442,8 @@ export function StepShiftScheduleAdjust({
           onClick={handleUndo}
           className={`rounded p-1.5 transition ${
             historyIndex > 0
-              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-              : 'cursor-not-allowed text-zinc-600 opacity-40'
+              ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+              : 'cursor-not-allowed text-text-disabled opacity-40'
           }`}
           title={isManual ? t('shiftList.scheduleAdjust.undoManual', { shortcut: undoShortcutLabel }) : t('shiftList.scheduleAdjust.undo')}
         >
@@ -1473,15 +1456,15 @@ export function StepShiftScheduleAdjust({
           onClick={handleRedo}
           className={`rounded p-1.5 transition ${
             historyIndex < history.length - 1
-              ? 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
-              : 'cursor-not-allowed text-zinc-600 opacity-40'
+              ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+              : 'cursor-not-allowed text-text-disabled opacity-40'
           }`}
           title={isManual ? t('shiftList.scheduleAdjust.redoManual', { shortcut: redoShortcutLabel }) : t('shiftList.scheduleAdjust.redo')}
         >
           <Redo className="size-4" />
         </button>
 
-        <div className="h-4 w-px bg-zinc-700" />
+        <div className="h-4 w-px bg-link-standard-hover" />
 
         <button
           type="button"
@@ -1489,12 +1472,12 @@ export function StepShiftScheduleAdjust({
           onClick={() => void handleRunPublishCheck()}
           className={`rounded p-1.5 transition ${
             !plan
-              ? 'cursor-not-allowed text-zinc-600 opacity-40'
+              ? 'cursor-not-allowed text-text-disabled opacity-40'
               : publishState === 'blocked'
-                ? 'text-red-400 hover:bg-zinc-800/60 hover:text-red-300'
+                ? 'text-status-error-emphasis hover:bg-surface-secondary hover:text-status-error-emphasis'
                 : publishState === 'ready'
-                  ? 'text-emerald-400 hover:bg-zinc-800/60 hover:text-emerald-300'
-                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+                  ? 'text-status-success hover:bg-surface-secondary hover:text-status-success'
+                  : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
           }`}
           title={
             publishState === 'blocked'
@@ -1513,12 +1496,12 @@ export function StepShiftScheduleAdjust({
           onClick={() => setShowAnalysisReport((open) => !open)}
           className={`rounded p-1.5 transition ${
             !analysisReport
-              ? 'cursor-not-allowed text-zinc-600 opacity-40'
+              ? 'cursor-not-allowed text-text-disabled opacity-40'
               : showAnalysisReport
-                ? 'bg-zinc-800/80 text-zinc-100'
+                ? 'bg-surface-secondary text-text-primary'
                 : analysisReport.hasFindings
-                  ? 'text-amber-400 hover:bg-zinc-800/60 hover:text-amber-300'
-                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
+                  ? 'text-status-warning hover:bg-surface-secondary hover:text-status-warning'
+                  : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
           }`}
           title={
             analysisReport?.hasFindings
@@ -1529,16 +1512,16 @@ export function StepShiftScheduleAdjust({
           <ClipboardList className="size-4" />
         </button>
 
-        <div className="h-4 w-px bg-zinc-700" />
+        <div className="h-4 w-px bg-link-standard-hover" />
 
         <ScheduleTimeZoomToolbar zoom={gridZoom} onChange={setGridZoom} />
 
-        <div className="h-4 w-px bg-zinc-700" />
+        <div className="h-4 w-px bg-link-standard-hover" />
 
         <button
           type="button"
           onClick={() => setIsMaximized(!isMaximized)}
-          className="rounded p-1.5 text-zinc-300 transition hover:bg-zinc-800/60 hover:text-zinc-100"
+          className="rounded p-1.5 text-text-secondary transition hover:bg-surface-secondary hover:text-text-primary"
           title={isMaximized ? t('shiftList.scheduleAdjust.restoreWindow') : t('shiftList.scheduleAdjust.maximize')}
         >
           {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
@@ -1548,84 +1531,67 @@ export function StepShiftScheduleAdjust({
   };
 
   return (
-    <div className={isMaximized ? "fixed inset-0 z-50 bg-[#1b1b1f] p-6 flex flex-col overflow-hidden" : "flex min-h-0 flex-1 flex-col"}>
+    <div className={isMaximized ? "fixed inset-0 z-50 bg-surface-primary p-6 flex flex-col overflow-hidden" : "flex min-h-0 flex-1 flex-col"}>
       {error && plan ? (
-        <div className="mb-3 max-h-60 shrink-0 overflow-y-auto whitespace-pre-line rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm leading-relaxed text-amber-200">
+        <div className="mb-3 max-h-60 shrink-0 overflow-y-auto whitespace-pre-line rounded-lg border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-s text-status-warning">
           {error}
         </div>
       ) : null}
       {duplicateWarning ? (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
-          onClick={() => setDuplicateWarning(null)}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="duplicate-warning-title"
-            className="w-full max-w-[520px] rounded-2xl bg-[#222225] px-8 py-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Dialog headerless padded={false} title={t('shiftList.scheduleAdjust.cannotDuplicate')} onClose={() => setDuplicateWarning(null)} widthClassName="w-full max-w-[520px]">
+<div className="px-8 py-8 flex min-h-0 flex-1 flex-col overflow-auto">
             <div className="flex items-start justify-between gap-4">
               <h2
                 id="duplicate-warning-title"
-                className="text-lg font-semibold leading-7 text-[#F3F4F6]"
+                className="text-headline-5 text-text-primary"
               >
                 {t('shiftList.scheduleAdjust.cannotDuplicate')}
               </h2>
-              <button
-                type="button"
-                onClick={() => setDuplicateWarning(null)}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
-                aria-label={t('shiftList.scheduleAdjust.close')}
-              >
-                <X className="size-5" />
-              </button>
+              <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" onPress={() => setDuplicateWarning(null)} label={t('shiftList.scheduleAdjust.close')} icon={<X />} />
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-zinc-400">
+            <p className="mt-4 text-body-s text-text-tertiary">
               {duplicateWarning === i18n.t('shiftList.scheduleAdjust.noSpaceDuplicate')
                 ? t('shiftList.scheduleAdjust.noSpaceDuplicateBody')
                 : duplicateWarning}
             </p>
           </div>
-        </div>
+</Dialog>
       ) : null}
       {!isMaximized ? (
-        <h2 className="mb-6 shrink-0 text-lg font-medium text-zinc-100">
+        <h2 className="mb-6 shrink-0 text-headline-5 text-text-primary">
           {isManual ? '編排班表細節' : '調整自動生成的班表細節'}
         </h2>
       ) : null}
-      <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-[#2B7FFF]/60 bg-[#232329] p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
+      <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-border-theme-light bg-surface-secondary p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
       <div className="mb-4 flex shrink-0 flex-wrap items-center gap-4">
         <div className="flex shrink-0 items-center gap-5">
           <button
             type="button"
             onClick={() => setActiveTab('schedule')}
-            className={`relative pb-2 text-sm transition ${
+            className={`relative pb-2 text-body-s transition ${
               activeTab === 'schedule'
-                ? 'font-medium text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'font-medium text-text-primary'
+                : 'text-text-quaternary hover:text-text-secondary'
             }`}
           >
             {t('shiftList.scheduleAdjust.tripPreview')}
             {activeTab === 'schedule' ? (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
             ) : null}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('capacity')}
-            className={`relative pb-2 text-sm transition ${
+            className={`relative pb-2 text-body-s transition ${
               activeTab === 'capacity'
-                ? 'font-medium text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'font-medium text-text-primary'
+                : 'text-text-quaternary hover:text-text-secondary'
             }`}
           >
             {t('shiftList.scheduleAdjust.capacityTrend')}
             {activeTab === 'capacity' ? (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#2B7FFF]" />
+              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
             ) : null}
           </button>
         </div>
@@ -1635,7 +1601,7 @@ export function StepShiftScheduleAdjust({
             <AttributeLegendBadgeChip
               key={item.attributeId}
               item={item}
-              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm"
+              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-body-s"
             />
           ))}
           {renderToolbar()}
@@ -1728,10 +1694,10 @@ export function StepShiftScheduleAdjust({
       <div className={`mt-4 flex shrink-0 flex-col gap-4 ${activeTab === 'schedule' && !isMaximized ? '' : 'hidden'}`}>
           {cardCodeCheck.lines.length > 0 ? (
             <div
-              className="shrink-0 rounded-xl border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-200"
+              className="shrink-0 rounded-xl border border-border-danger-light bg-status-error-light px-3 py-2 text-body-xs text-status-error-emphasis"
               data-card-code-issues={cardCodeCheck.lines.length}
             >
-              <div className="mb-1 font-semibold text-red-300">
+              <div className="mb-1 font-semibold text-status-error-emphasis">
                 班次代號檢查未通過（禁止發布／採用；草稿可保存）：請調整代號或計畫安排
               </div>
               <ul className="list-disc space-y-0.5 pl-4">
