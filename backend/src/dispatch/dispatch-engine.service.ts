@@ -681,6 +681,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
           now,
           leadSeconds: dispatchConfig.leadSeconds,
           catchUpSeconds: dispatchConfig.catchUpSeconds,
+          windowEndAt: item.kind === 'maintenance' ? item.arriveAt : null,
         });
         if (decision === 'dispatch') due.push(item);
         else if (decision === 'expired') expired.push(item);

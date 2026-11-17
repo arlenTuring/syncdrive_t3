@@ -519,19 +519,32 @@ export function fillMissingEndpoints(
  *   <li>在提前量之內、或已經過了但還在補發窗口 → 下</li>
  *   <li>過太久 → 放棄。那已經不是「晚一點出發」而是「這班不用跑了」</li>
  * </ul>
+ *
+ * 作業時段（保養、充電、待命、暫停）例外：它是一整段時間，不是一個發車時刻。只要時段還剩
+ * {@link MIN_REMAINING_WINDOW_MS} 以上就照樣下，車去做剩下的那段——跟模擬器對作業時段的規則
+ * 一致。否則調度暫停後恢復、或後端重啟時，正在進行中的整天保養與待命會被放棄，車留在原地
+ * 擋住別台車的格位（2026-11-17 本地實測：PMS09 該在 M3 保養卻留在 H1，PMS05 進不了 H1 待命）。
  */
 export function dispatchDecision(args: {
   departAt: number;
   now: number;
   leadSeconds: number;
   catchUpSeconds: number;
+  /** 作業時段的結束時刻；給了就照時段規則判斷補發，不給＝一般班次 */
+  windowEndAt?: number | null;
 }): 'wait' | 'dispatch' | 'expired' {
-  const { departAt, now, leadSeconds, catchUpSeconds } = args;
+  const { departAt, now, leadSeconds, catchUpSeconds, windowEndAt } = args;
   const lead = departAt - now;
   if (lead > leadSeconds * 1000) return 'wait';
-  if (lead < -catchUpSeconds * 1000) return 'expired';
+  if (lead < -catchUpSeconds * 1000) {
+    if (windowEndAt != null && windowEndAt - now >= MIN_REMAINING_WINDOW_MS) return 'dispatch';
+    return 'expired';
+  }
   return 'dispatch';
 }
+
+/** 作業時段過了補發窗口後，至少還要剩這麼久才補下（剩不到就不值得把車叫過去） */
+export const MIN_REMAINING_WINDOW_MS = 60_000;
 
 /**
  * 同一份計畫展開出兩張同編號的單（同一個顯示代號）：一張都不發，列出衝突。

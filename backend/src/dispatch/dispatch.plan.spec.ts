@@ -230,6 +230,35 @@ describe('dispatchDecision', () => {
       'expired',
     );
   });
+
+  it('作業時段過了補發窗口、但還剩一分鐘以上 → 照樣下，車去做剩下那段', () => {
+    expect(
+      dispatchDecision({
+        ...base,
+        now,
+        departAt: now - 10 * 3600_000,
+        windowEndAt: now + 3600_000,
+      }),
+    ).toBe('dispatch');
+    expect(
+      dispatchDecision({ ...base, now, departAt: now - 600_000, windowEndAt: now + 60_000 }),
+    ).toBe('dispatch');
+  });
+
+  it('作業時段剩不到一分鐘或已結束 → 放棄', () => {
+    expect(
+      dispatchDecision({ ...base, now, departAt: now - 600_000, windowEndAt: now + 59_000 }),
+    ).toBe('expired');
+    expect(
+      dispatchDecision({ ...base, now, departAt: now - 600_000, windowEndAt: now - 1_000 }),
+    ).toBe('expired');
+  });
+
+  it('作業時段還沒到提前量 → 一樣等', () => {
+    expect(
+      dispatchDecision({ ...base, now, departAt: now + 600_000, windowEndAt: now + 3600_000 }),
+    ).toBe('wait');
+  });
 });
 
 describe('planYardMoves：途經點寫進訂單站序', () => {
