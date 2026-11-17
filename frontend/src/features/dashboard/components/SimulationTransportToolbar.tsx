@@ -229,15 +229,7 @@ export function SimulationTransportToolbar() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setToolbarVisible(false)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary"
-          title={t('dashboard.simulation.hideTitle')}
-        >
-          {t('dashboard.simulation.hide')}
-          <ChevronUp size={12} />
-        </button>
+        <Button hierarchy="subordinate" variant="standard" trailingIcon={<ChevronUp />} onPress={() => setToolbarVisible(false)} title={t('dashboard.simulation.hideTitle')}>{t('dashboard.simulation.hide')}</Button>
       </div>
 
       {!running ? (

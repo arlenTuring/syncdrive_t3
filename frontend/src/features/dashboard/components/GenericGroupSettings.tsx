@@ -17,7 +17,7 @@ import type {
 import { createGroupTemplate, duplicateGroupTemplate } from '../utils/groupTemplateEdit';
 import { DataSourceIdSelect } from '../elements/DataSourceIdSelect';
 import { POST_PROCESSOR_DEFINITIONS, getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
-import { Checkbox, Radio } from '../../../components/ui';
+import { Checkbox, IconButton, Radio } from '../../../components/ui';
 
 /**
  * 泛用群組的設定介面：資料來源、有效性、優先程度、排序、樣板、容量、轉場。
@@ -83,9 +83,7 @@ function ConditionRow({
           className={`${inputCls} flex-1`}
         />
       )}
-      <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis">
-        <Trash2 size={12} />
-      </button>
+      <IconButton size="small" hierarchy="danger" variant="standard" onPress={onRemove} label="刪除" icon={<Trash2 />} />
     </div>
   );
 }
@@ -113,9 +111,7 @@ function SourceEditor({
           className={`${inputCls} flex-1 font-bold`}
         />
         <span className="text-caption-2 text-text-disabled font-mono">{source.id}</span>
-        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis">
-          <Trash2 size={12} />
-        </button>
+        <IconButton size="small" hierarchy="danger" variant="standard" onPress={onRemove} label="刪除" icon={<Trash2 />} />
       </div>
       {open && (
         <div className="space-y-2 pl-4">
@@ -270,9 +266,9 @@ function PriorityRuleRow({
           onChange={e => onUpdate({ priority: Number(e.target.value) || 0 })}
           className={`${inputCls} w-16`}
         />
-        <button type="button" onClick={() => onMove(-1)} className="p-0.5 text-text-disabled hover:text-text-secondary"><ChevronUp size={12} /></button>
-        <button type="button" onClick={() => onMove(1)} className="p-0.5 text-text-disabled hover:text-text-secondary"><ChevronDown size={12} /></button>
-        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis"><Trash2 size={12} /></button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => onMove(-1)} label="上移" icon={<ChevronUp />} />
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => onMove(1)} label="下移" icon={<ChevronDown />} />
+        <IconButton size="small" hierarchy="danger" variant="standard" onPress={onRemove} label="刪除" icon={<Trash2 />} />
       </div>
       <div className="space-y-1 pl-4">
         {conditions.map((c, i) => (
@@ -315,10 +311,8 @@ function TemplateRow({
           <Radio checked={!!tpl.isDefault} onChange={onSetDefault} />
           預設
         </label>
-        <button type="button" onClick={onDuplicate} className="p-1 text-text-quaternary hover:text-text-secondary" title="複製">
-          <Plus size={12} />
-        </button>
-        <button type="button" onClick={onRemove} className="p-1 text-text-disabled hover:text-status-error-emphasis"><Trash2 size={12} /></button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onDuplicate} title="複製" label="複製" icon={<Plus />} />
+        <IconButton size="small" hierarchy="danger" variant="standard" onPress={onRemove} label="刪除" icon={<Trash2 />} />
       </div>
       <div className="space-y-1 pl-4">
         <div className="text-caption-2 text-text-quaternary">符合以下條件時使用（都沒設定就當預設）：</div>

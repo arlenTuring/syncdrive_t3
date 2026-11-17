@@ -3,7 +3,8 @@
 import re,sys,os
 sys.path.insert(0,os.path.dirname(__file__))
 from swap import _ranges, _open_end, ensure_import
-LAYOUT=re.compile(r'^(?:(?:sm|md|lg|xl|2xl):)?(?:-?m[trblxy]?-\S+|ml-auto|mr-auto|mx-auto|w-\S+|min-w-\S+|max-w-\S+|flex-1|flex-none|grow|shrink-0|self-\S+|justify-self-\S+|col-span-\S+|row-span-\S+|order-\S+|absolute|relative|fixed|sticky|inset-\S+|-?top-\S+|-?right-\S+|-?bottom-\S+|-?left-\S+|-?translate-[xy]-\S+|z-\S+|hidden|block|inline-flex|flex)$')
+# 版面與行為 class（位置、尺寸、顯示時機、可否點擊）要留下；外觀交給元件
+LAYOUT=re.compile(r'^(?:(?:sm|md|lg|xl|2xl|group-hover|group-hover/[\w-]+|group-focus-within|focus-visible|focus-within|hover):)?(?:pointer-events-\S+|opacity-0|opacity-100|invisible|visible|select-none|touch-\S+|cursor-\S+|-?m[trblxy]?-\S+|ml-auto|mr-auto|mx-auto|w-\S+|min-w-\S+|max-w-\S+|flex-1|flex-none|grow|shrink-0|self-\S+|justify-self-\S+|col-span-\S+|row-span-\S+|order-\S+|absolute|relative|fixed|sticky|inset-\S+|-?top-\S+|-?right-\S+|-?bottom-\S+|-?left-\S+|-?translate-[xy]-\S+|z-\S+|hidden|block|inline-flex|flex)$')
 SKIP_ATTR=re.compile(r'\bstyle=|\bref=\{(?!\w+Ref\b)|\brole=|aria-pressed|aria-selected|aria-checked|draggable|onPointer|onMouse|onDrag|onKey|\{\.\.\.|data-captures')
 def parse_attrs(tag):
     # tag = '<button ...>' ; returns list of (name, raw_value or None)
@@ -32,10 +33,12 @@ def parse_attrs(tag):
         else: val=None
         out.append((name,val))
     return out
-ICON=r'<([A-Z]\w*)(?:\s+className=(?:"[^"]*"|\{[^{}]*\}))?\s*/>'
+ICON=r'<([A-Z]\w*)(?:\s+[\w-]+=(?:"[^"]*"|\{[^{}]*\}))*\s*/>'
+# 只有圖示、沒寫 aria-label / title 時，依圖示補可及名稱
+ICON_LABELS={'Trash2':'刪除','Trash':'刪除','Plus':'新增','X':'移除','Edit2':'編輯','Edit3':'編輯','Pencil':'編輯','ChevronUp':'上移','ChevronDown':'下移','RefreshCw':'重新整理','Copy':'複製','Settings':'設定','Search':'搜尋'}
 def classify(cls,children,is_icon):
     c=' '+cls+' '
-    filled_blue=any(k in c for k in [' bg-link-theme-filled ',' bg-blue-6',' bg-blue-5',' bg-sky-6',' bg-sky-5',' bg-cta '])
+    filled_blue=any(k in c for k in [' bg-link-theme-filled ',' bg-cta ']) or re.search(r' bg-(?:blue|sky|cyan|purple|violet|indigo|emerald|green|teal)-[567]00 ',c) is not None
     filled_red=any(k in c for k in [' bg-link-danger-filled ',' bg-red-6',' bg-red-5',' bg-rose-6',' bg-rose-7',' bg-status-error '])
     danger_text='text-status-error' in c or 'hover:text-status-error' in c
     border=re.search(r'(?<![\w:-])border(?:-\d)?(?![\w-])',cls) is not None
@@ -79,7 +82,11 @@ def convert_file(path, ui):
         # {條件 ? <IconA /> : <IconB />}：只有圖示、依狀態換圖示
         mc=re.fullmatch(r'\{([^{}?]+?)\s*\?\s*('+ICON+r')\s*:\s*('+ICON+r')\s*\}',ch)
         is_icon=bool(mi or mc)
-        if is_icon and 'aria-label' not in d and 'title' not in d: skipped+=1; continue
+        icon_name=mi.group(1) if mi else None
+        auto_label=None
+        if is_icon and 'aria-label' not in d and 'title' not in d:
+            if icon_name in ICON_LABELS: auto_label=ICON_LABELS[icon_name]
+            else: skipped+=1; continue
         lead=trail=None; label=ch
         if not is_icon:
             m=re.match(r'^'+ICON+r'\s*(.+)$',ch,re.S)
@@ -99,13 +106,14 @@ def convert_file(path, ui):
             if is_icon and name=='aria-label': parts.append(f'label={val}'); continue
             parts.append(name if val is None else f'{name}={val}')
         if 'type' not in d: parts.append('type="submit"')
-        if is_icon and 'aria-label' not in d: parts.append(f'label={d["title"]}')
+        if is_icon and auto_label: parts.append(f'label="{auto_label}"')
+        elif is_icon and 'aria-label' not in d: parts.append(f'label={d["title"]}')
         hv=[]
         if h!='superior': hv.append(f'hierarchy="{h}"')
         if v!='filled': hv.append(f'variant="{v}"')
         if keep: hv.append(f'className="{" ".join(keep)}"')
         if is_icon:
-            small=' size="small"' if re.search(r'size-(?:3|3\.5|4)\b',ch) else ''
+            small=' size="small"' if re.search(r'size-(?:3|3\.5|4)\b|size=\{1[0-6]\}',ch) else ''
             icon_expr=f'<{mi.group(1)} />' if mi else f'{mc.group(1).strip()} ? <{mc.group(3)} /> : <{mc.group(5)} />'
             new=f'<IconButton{small} {" ".join(hv+parts)} icon={{{icon_expr}}} />'.replace('  ',' ')
             need.add('IconButton')

@@ -51,7 +51,7 @@ import { GenericGroupSettings } from './components/GenericGroupSettings';
 import { VehicleRoofIndicatorSettings } from './components/VehicleRoofIndicatorSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 import { systemConfirm } from '../../lib/systemDialog';
-import { Button, Checkbox } from '../../components/ui';
+import { Button, Checkbox, IconButton } from '../../components/ui';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
@@ -150,14 +150,7 @@ function AlertRulesEditor({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-text-quaternary text-caption-2 uppercase">{t('dashboard.properties.alertRules.title')}</label>
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); add(); }}
-          className="p-1 hover:bg-link-standard-hover rounded text-cyan-500 transition-colors"
-          title={t('dashboard.properties.alertRules.addTitle')}
-        >
-          <Plus size={14} />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={(e) => { e.preventDefault(); e.stopPropagation(); add(); }} title={t('dashboard.properties.alertRules.addTitle')} label={t('dashboard.properties.alertRules.addTitle')} icon={<Plus />} />
       </div>
       <p className="text-caption-2 text-text-quaternary">
         {t('dashboard.properties.alertRules.hint')}<strong className="text-text-tertiary">{t('dashboard.properties.alertRules.hintMulti')}</strong>
@@ -169,9 +162,7 @@ function AlertRulesEditor({
         <div key={rule.id} className="p-2.5 bg-zinc-800/40 rounded-md border border-border-quaternary space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-caption-2 text-text-tertiary">{t('dashboard.properties.alertRules.ruleN', { n: i + 1 })}</span>
-            <button type="button" onClick={() => remove(i)} className="p-0.5 text-text-quaternary hover:text-status-error-emphasis transition-colors">
-              <X size={12} />
-            </button>
+            <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => remove(i)} label="移除" icon={<X />} />
           </div>
 
           <Field label={t('dashboard.properties.alertRules.content')}>
@@ -282,17 +273,13 @@ function ColorRulesEditor({
           <SH icon={<Palette size={12} />} label={t('dashboard.properties.colorRules.title')} color="#ec4899" />
         </div>
         {enabled && (
-          <button onClick={addRule} className="p-1 hover:bg-link-standard-hover rounded text-cyan-500 transition-colors">
-            <Plus size={14} />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addRule} type="submit" label="新增" icon={<Plus />} />
         )}
       </div>
       
       {enabled && rules.map((rule, i) => (
         <div key={i} className="p-2 bg-zinc-800/40 rounded-md border border-border-quaternary space-y-2 relative group">
-          <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-            <X size={10} />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="tonal" className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100" onPress={() => removeRule(i)} type="submit" label="移除" icon={<X />} />
           <div className="flex gap-1.5 items-center">
             <SiteSelect value={rule.condition} onChange={e => updateRule(i, { condition: e.target.value as any })} className={`${selectCls} flex-1`}>
               <option value="gt">{t('dashboard.properties.colorRules.opGt')}</option><option value="lt">{t('dashboard.properties.colorRules.opLt')}</option>
@@ -1142,14 +1129,7 @@ function LineChartSeriesFields({
 
   return (
     <div className="space-y-2 rounded-lg border border-border-quaternary p-2.5 bg-surface-primary relative group">
-      <button
-        type="button"
-        onClick={onRemove}
-        className="absolute top-2 right-2 p-1 text-text-quaternary hover:text-status-error-emphasis hover:bg-link-standard-hover rounded opacity-0 group-hover:opacity-100"
-        title={t('dashboard.properties.widgets.chart.removeSeries')}
-      >
-        <X size={12} />
-      </button>
+      <IconButton size="small" hierarchy="danger" variant="standard" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100" onPress={onRemove} title={t('dashboard.properties.widgets.chart.removeSeries')} label={t('dashboard.properties.widgets.chart.removeSeries')} icon={<X />} />
       <p className="text-caption-2 text-text-tertiary uppercase pr-6">{t('dashboard.properties.widgets.chart.seriesTitle')}</p>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.chart.yField')}>
@@ -1315,11 +1295,11 @@ function AxisBandFields({
       <div className="space-y-1.5 pt-1 border-t border-border-quaternary">
         <div className="flex items-center justify-between">
           <span className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.widgets.chart.valueColorMap')}</span>
-          <button type="button" onClick={addRule} className="p-1 text-cyan-500 hover:bg-link-standard-hover rounded"><Plus size={12} /></button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addRule} label="新增" icon={<Plus />} />
         </div>
         {rules.map((rule, i) => (
           <div key={i} className="flex items-center gap-1.5 p-1.5 bg-zinc-800/40 rounded border border-border-quaternary relative group">
-            <button type="button" onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100"><X size={10} /></button>
+            <IconButton size="small" hierarchy="subordinate" variant="tonal" className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100" onPress={() => removeRule(i)} label="移除" icon={<X />} />
             <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} flex-1 font-mono`} placeholder="IN_SERVICE" />
             <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer shrink-0"  />
           </div>
@@ -1383,18 +1363,12 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <div className="flex items-center justify-between">
           <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.seriesSection')} color="#06b6d4" />
-          <button
-            type="button"
-            onClick={() =>
+          <Button variant="outlined" leadingIcon={<Plus />} onPress={() =>
               setSeriesList([
                 ...seriesList,
                 { id: newSeriesId(), yField: 'value', color: '#22c55e', strokeWidth: 2 },
               ])
-            }
-            className="flex items-center gap-1 px-2 py-1 text-caption-2 text-text-theme hover:bg-link-standard-hover rounded border border-border-quaternary"
-          >
-            <Plus size={12} /> {t('dashboard.properties.add')}
-          </button>
+            }>{t('dashboard.properties.add')}</Button>
         </div>
         {seriesList.map((s, i) => (
           <LineChartSeriesFields
@@ -1556,13 +1530,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
         </div>
 
         <div className="pt-4 border-t border-border-quaternary">
-          <button 
-            onClick={async () => { if((await systemConfirm(t('dashboard.properties.plane.deleteConfirm'), { tone: 'danger' }))) onDelete(); }} 
-            className="w-full py-2.5 rounded-lg bg-red-950/20 border border-red-900/30 text-status-error-emphasis text-body-xs 
-                       flex items-center justify-center gap-2 hover:bg-red-600 hover:text-text-primary transition-all duration-300"
-          >
-            <Trash2 size={13} /> {t('dashboard.properties.plane.delete')}
-          </button>
+          <Button hierarchy="danger" variant="outlined" className="w-full" leadingIcon={<Trash2 />} onPress={async () => { if((await systemConfirm(t('dashboard.properties.plane.deleteConfirm'), { tone: 'danger' }))) onDelete(); }} type="submit">{t('dashboard.properties.plane.delete')}</Button>
         </div>
       </div>
     </div>
@@ -2157,11 +2125,11 @@ function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <span className="text-caption-2 text-text-quaternary uppercase">{t('dashboard.properties.widgets.statusBadge.rules')}</span>
-          <button onClick={addRule} className="p-1 text-cyan-500 hover:bg-link-standard-hover rounded"><Plus size={12} /></button>
+          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addRule} type="submit" label="新增" icon={<Plus />} />
         </div>
         {w.rules.map((rule, i) => (
           <div key={i} className="p-2 bg-zinc-800/40 rounded border border-border-quaternary space-y-1.5 relative group">
-            <button onClick={() => removeRule(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-link-standard-hover rounded-full text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
+            <IconButton size="small" hierarchy="subordinate" variant="tonal" className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100" onPress={() => removeRule(i)} type="submit" label="移除" icon={<X />} />
             <div className="grid grid-cols-2 gap-1">
               <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} font-mono`} placeholder={t('dashboard.properties.widgets.statusBadge.valuePlaceholder')} />
               <input value={rule.label} onChange={e => updateRule(i, { label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statusBadge.labelPlaceholder')} />
@@ -2894,13 +2862,7 @@ function TabListSettings({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-text-tertiary text-body-xs-bold">{t('dashboard.properties.widgets.tabList.tabList')}</label>
-          <button
-            type="button"
-            onClick={addTab}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-600/30 text-text-theme hover:bg-blue-600/50 text-caption-2"
-          >
-            <Plus size={11} /> {t('dashboard.properties.widgets.tabList.addTab')}
-          </button>
+          <Button variant="text" leadingIcon={<Plus />} onPress={addTab}>{t('dashboard.properties.widgets.tabList.addTab')}</Button>
         </div>
         <div className="flex flex-wrap gap-1">
           {tabs.map(tab => (
@@ -2927,13 +2889,7 @@ function TabListSettings({
               {t('dashboard.properties.widgets.tabList.configureTab', { label: activeTab.label })}
             </span>
             {tabs.length > 1 && (
-              <button
-                type="button"
-                onClick={() => deleteTab(activeTab.id)}
-                className="text-status-error-emphasis hover:text-status-error-emphasis text-caption-2 flex items-center gap-0.5"
-              >
-                <Trash2 size={11} /> {t('dashboard.properties.widgets.tabList.deleteTab')}
-              </button>
+              <Button hierarchy="danger" variant="text" leadingIcon={<Trash2 />} onPress={() => deleteTab(activeTab.id)}>{t('dashboard.properties.widgets.tabList.deleteTab')}</Button>
             )}
           </div>
 
@@ -2998,13 +2954,7 @@ function TabListSettings({
           <div className="pt-2 border-t border-border-quaternary space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-text-secondary text-body-xs-bold">{t('dashboard.properties.widgets.tabList.columns')}</label>
-              <button
-                type="button"
-                onClick={addColumn}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/30 text-status-success hover:bg-emerald-600/50 text-caption-2 transition-colors"
-              >
-                <Plus size={12} /> {t('dashboard.properties.widgets.tabList.addColumn')}
-              </button>
+              <Button hierarchy="subordinate" variant="standard" leadingIcon={<Plus />} onPress={addColumn}>{t('dashboard.properties.widgets.tabList.addColumn')}</Button>
             </div>
 
             <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
@@ -3022,14 +2972,7 @@ function TabListSettings({
                         {t('dashboard.properties.widgets.tabList.columnTitle', { n: idx + 1 })}
                       </label>
                       {activeTab.columns.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => deleteColumn(col.id)}
-                          className="text-text-quaternary hover:text-status-error-emphasis p-1 rounded hover:bg-red-950/40"
-                          title={t('dashboard.properties.widgets.tabList.deleteColumn')}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => deleteColumn(col.id)} title={t('dashboard.properties.widgets.tabList.deleteColumn')} label={t('dashboard.properties.widgets.tabList.deleteColumn')} icon={<Trash2 />} />
                       )}
                     </div>
                     <input
@@ -3098,13 +3041,7 @@ function TabListSettings({
                   })()}
 
                   {/* 第 5 行：進入元件編輯按鈕 */}
-                  <button
-                    type="button"
-                    onClick={() => onEnterEditColumn?.(activeTab.id, col.id)}
-                    className="w-full mt-1 py-2 px-3 rounded-md bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-text-theme text-body-xs-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                  >
-                    <Edit3 size={13} /> {t('dashboard.properties.widgets.tabList.editCell')}
-                  </button>
+                  <Button variant="outlined" className="w-full mt-1" leadingIcon={<Edit3 />} onPress={() => onEnterEditColumn?.(activeTab.id, col.id)}>{t('dashboard.properties.widgets.tabList.editCell')}</Button>
                 </div>
               );
               })}
@@ -3300,9 +3237,7 @@ function TabListSettings({
 function DeleteBtn({ onDelete }: { onDelete: () => void }) {
   const { t } = useTranslation();
   return (
-    <button onClick={onDelete} className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-status-error-emphasis text-caption-2 uppercase flex items-center justify-center gap-1.5 hover:bg-status-error-light transition-colors mt-2">
-      <Trash2 size={12} /> {t('dashboard.properties.removeWidget')}
-    </button>
+    <Button hierarchy="danger" variant="outlined" className="w-full mt-2" leadingIcon={<Trash2 />} onPress={onDelete} type="submit">{t('dashboard.properties.removeWidget')}</Button>
   );
 }
 

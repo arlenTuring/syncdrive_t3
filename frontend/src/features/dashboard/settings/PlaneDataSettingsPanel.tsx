@@ -14,6 +14,7 @@ import {
   withSourceSelection,
 } from '../utils/planeDataSources';
 import { systemAlert } from '../../../lib/systemDialog';
+import { Button } from '../../../components/ui';
 
 interface Props {
   plane: DashboardPlane;
@@ -108,15 +109,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
                 ))}
               </SiteSelect>
               {selected && (
-                <button
-                  type="button"
-                  disabled={busy === boundId}
-                  onClick={() => makePlaneCopy(boundId, selected)}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-quaternary text-body-xs text-text-secondary hover:border-cyan-600 hover:text-text-theme disabled:opacity-50"
-                  title="複製目前選的連線定義，只給這張儀表板用"
-                >
-                  <Copy size={13} /> 建立本儀表板專用連線
-                </button>
+                <Button variant="outlined" className="shrink-0" leadingIcon={<Copy />} disabled={busy === boundId} onPress={() => makePlaneCopy(boundId, selected)} title="複製目前選的連線定義，只給這張儀表板用">建立本儀表板專用連線</Button>
               )}
             </div>
             {selected && sharedWith.length > 0 && (

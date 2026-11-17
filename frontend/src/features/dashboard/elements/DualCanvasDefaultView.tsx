@@ -4,6 +4,7 @@ import { VariableProvider } from '../VariableContext';
 import { EditModeProvider } from '../context/EditModeContext';
 import { getDefaultChildren } from '../utils/dualCanvas';
 import { Edit3 } from 'lucide-react';
+import { Button } from '../../../components/ui';
 
 function buildIndexVariables(element: CanvasElementProps): Record<string, number> {
   const varName = element.variableName || 'item';
@@ -51,16 +52,10 @@ export function DualCanvasDefaultView({
           className="absolute inset-0 z-50 flex items-center justify-center rounded opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100"
           style={{ pointerEvents: 'none' }}
         >
-          <button
-            type="button"
-            onClick={(e) => {
+          <Button className="pointer-events-auto" leadingIcon={<Edit3 />} onPress={(e) => {
               e.stopPropagation();
               onEnterEditMode();
-            }}
-            className="pointer-events-auto flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-body-s-bold text-text-primary shadow-lg hover:bg-purple-500"
-          >
-            <Edit3 size={16} /> 編輯子畫布範本
-          </button>
+            }}>編輯子畫布範本</Button>
         </div>
       )}
     </div>

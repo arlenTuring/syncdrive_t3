@@ -7,7 +7,8 @@
 
 ```bash
 node scripts/codemod-design-tokens.mjs <檔案…>                 # 1. 顏色、字級 class → token
-python3 scripts/design-migration/convbtn.py src <檔案…>         # 2. <button> → Button / IconButton
+python3 scripts/design-migration/flatdisabled.py <檔案…>         # 2a. 只靠三元式切停用外觀的 class → 靜態 class
+python3 scripts/design-migration/convbtn.py src <檔案…>         # 2b. <button> → Button / IconButton
 python3 scripts/design-migration/postbtn.py src <檔案…>         # 3. 圖示放進 leadingIcon、只有圖示的改 IconButton
 python3 scripts/design-migration/convsel.py src <檔案…>         # 4. 原生 checkbox / radio → Checkbox / Radio
 python3 scripts/design-migration/convfield.py <檔案…>           # 5. SiteSelect / SiteDateTimeInput 寫死樣式 → size
@@ -19,3 +20,7 @@ npx tsc -p tsconfig.app.json --noEmit && npm test && npm run lint:design:update
 - `convbtn.py` 對沒寫 `type` 的原生 button 會補 `type="submit"`（保留原生預設行為）。
 - `convdlg.py` 的 `onClose` 是從遮罩的點擊處理或檔案裡的 onClose／onCancel 猜的；標題取第一個 h1–h4。轉完要逐一確認，
   處理中不能關的對話框要補 `busy`。
+- `convbtn.py` 會留下版面與行為 class（位置、尺寸、`pointer-events-*`、`opacity-0`／`group-hover:` 顯示時機），外觀交給元件；
+  只有圖示又沒寫 `aria-label`／`title` 時，依圖示補名稱（Trash2→刪除、Plus→新增、X→移除…）。
+- 不是動作按鈕的可點區塊（表格列、卡片、選單項目、下拉觸發、拖曳把手、畫布上的控制點、側欄導覽、Logo、表頭排序）
+  維持原生 `<button>`；工具若誤轉要還原。

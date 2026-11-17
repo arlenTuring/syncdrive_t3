@@ -13,7 +13,7 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 interface Props {
   onClose: () => void;
@@ -88,9 +88,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
             <button onClick={() => setActiveTab('datasource')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabDatasource')}</button>
             <button onClick={() => setActiveTab('general')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabGeneral')}</button>
           </div>
-          <button onClick={onClose} className="text-text-quaternary hover:text-text-primary transition-colors p-1">
-            <X size={18} />
-          </button>
+          <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} type="submit" label="關閉" icon={<X />} />
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
@@ -166,13 +164,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                     onCancel={() => setShowAddForm(false)}
                   />
                 : (
-                  <button
-                    onClick={() => setShowAddForm(true)}
-                    className="w-full py-3 border-2 border-dashed border-border-quaternary rounded-xl text-text-quaternary text-body-s
-                               hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus size={16} /> {t('dashboard.settings.addDatasource')}
-                  </button>
+                  <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={() => setShowAddForm(true)} type="submit">{t('dashboard.settings.addDatasource')}</Button>
                 )
               }
             </>
@@ -300,18 +292,12 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
           )}
           {!isDefault && (
             <>
-              <button onClick={onEdit} className="p-1.5 rounded-lg text-text-quaternary hover:text-text-primary hover:bg-link-standard-hover transition-colors">
-                <Edit2 size={13} />
-              </button>
-              <button onClick={onDelete} className="p-1.5 rounded-lg text-text-quaternary hover:text-status-error-emphasis hover:bg-red-900/20 transition-colors">
-                <Trash2 size={13} />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onEdit} type="submit" label="編輯" icon={<Edit2 />} />
+              <IconButton size="small" hierarchy="danger" variant="standard" onPress={onDelete} type="submit" label="刪除" icon={<Trash2 />} />
             </>
           )}
           {isDefault && (
-            <button onClick={onEdit} className="p-1.5 rounded-lg text-text-quaternary hover:text-text-primary hover:bg-link-standard-hover transition-colors">
-              <Edit2 size={13} />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onEdit} type="submit" label="編輯" icon={<Edit2 />} />
           )}
         </div>
       </div>
@@ -350,10 +336,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
           </div>
           <div className="flex gap-2 pt-1">
-            <button onClick={() => onSave(form)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-600 text-text-primary text-body-xs hover:bg-purple-500 transition-colors">
-              <Save size={12} /> {t('dashboard.settings.save')}
-            </button>
+            <Button leadingIcon={<Save />} onPress={() => onSave(form)} type="submit">{t('dashboard.settings.save')}</Button>
             <Button hierarchy="subordinate" variant="outlined" onPress={onEdit} type="submit">{t('dashboard.settings.cancel')}</Button>
           </div>
         </div>
@@ -420,8 +403,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
         <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inputCls} />
       </div>
       <div className="flex gap-2 pt-1">
-        <button
-          onClick={() => {
+        <Button leadingIcon={<Plus />} onPress={() => {
             if (!form.name) return;
             const { mqttTopic, ...rest } = form;
             onAdd(
@@ -429,12 +411,7 @@ function AddDataSourceForm({ onAdd, onCancel }: {
                 ? { ...rest, mqttTopic: mqttTopic || undefined }
                 : rest,
             );
-          }}
-          disabled={!form.name}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-text-primary text-body-xs hover:bg-purple-500 disabled:opacity-40 transition-colors"
-        >
-          <Plus size={12} /> {t('dashboard.settings.add')}
-        </button>
+          }} disabled={!form.name} type="submit">{t('dashboard.settings.add')}</Button>
         <Button hierarchy="subordinate" variant="outlined" onPress={onCancel} type="submit">{t('dashboard.settings.cancel')}</Button>
       </div>
     </div>

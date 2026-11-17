@@ -1617,26 +1617,8 @@ export function StepTaskScheduling({
           headerAction={
             selectedTask ? (
               <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  disabled={!taskFormDirty}
-                  onClick={() => taskSettingsFormRef.current?.reset()}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-text-quaternary transition hover:bg-link-standard-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={t('timeTemplates.scheduling.cancelChangesAria')}
-                  title={t('timeTemplates.scheduling.cancelChanges')}
-                >
-                  <X className="size-4" strokeWidth={2.5} />
-                </button>
-                <button
-                  type="submit"
-                  form={TASK_SETTINGS_FORM_ID}
-                  disabled={!taskFormCanConfirm}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-text-theme transition hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:text-text-quaternary disabled:opacity-40"
-                  aria-label={t('timeTemplates.scheduling.confirmChangesAria')}
-                  title={t('timeTemplates.scheduling.confirmChanges')}
-                >
-                  <Check className="size-4" strokeWidth={2.5} />
-                </button>
+                <IconButton size="small" hierarchy="subordinate" variant="standard" disabled={!taskFormDirty} onPress={() => taskSettingsFormRef.current?.reset()} label={t('timeTemplates.scheduling.cancelChangesAria')} title={t('timeTemplates.scheduling.cancelChanges')} icon={<X />} />
+                <IconButton size="small" hierarchy="subordinate" variant="standard" type="submit" form={TASK_SETTINGS_FORM_ID} disabled={!taskFormCanConfirm} label={t('timeTemplates.scheduling.confirmChangesAria')} title={t('timeTemplates.scheduling.confirmChanges')} icon={<Check />} />
               </div>
             ) : null
           }

@@ -577,16 +577,7 @@ function RecoveryAndServiceDirectionBar({
                 className="w-28 bg-transparent px-1.5 text-body-s text-text-primary placeholder-zinc-600 focus:outline-none"
                 aria-label={t('shiftList.routeGroups.newDirAria')}
               />
-              <button
-                type="button"
-                title={t('shiftList.routeGroups.confirmAdd')}
-                aria-label={t('shiftList.routeGroups.confirmAddDirAria')}
-                onClick={commitDraft}
-                disabled={!draftName.trim()}
-                className="rounded-md p-1 text-status-success hover:bg-status-success-light disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Check className="size-4" strokeWidth={2.5} />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('shiftList.routeGroups.confirmAdd')} label={t('shiftList.routeGroups.confirmAddDirAria')} onPress={commitDraft} disabled={!draftName.trim()} icon={<Check />} />
               <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('common.cancel')} label={t('shiftList.routeGroups.cancelAddDirAria')} onPress={() => {
          setDrafting(false);
          setDraftName('');
@@ -674,19 +665,10 @@ function RoutePickerBar({
             aria-label={title}
           />
         </div>
-        <button
-          type="button"
-          disabled={!canConfirm || availableGroups.length === 0}
-          onClick={() => {
-            if (!selectedRouteId || excludedRouteIds.has(selectedRouteId)) return;
-            onConfirm(selectedRouteId);
-          }}
-          title={confirmLabel}
-          aria-label={confirmLabel}
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-status-success-emphasis text-text-primary transition hover:bg-status-success disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:text-text-disabled"
-        >
-          <Check className="size-5" strokeWidth={2.5} />
-        </button>
+        <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" disabled={!canConfirm || availableGroups.length === 0} onPress={() => {
+      if (!selectedRouteId || excludedRouteIds.has(selectedRouteId)) return;
+      onConfirm(selectedRouteId);
+     }} title={confirmLabel} label={confirmLabel} icon={<Check />} />
       </div>
       {onCancel ? (
         <Button hierarchy="subordinate" variant="tonal" onPress={onCancel}>{t('common.cancel')}</Button>

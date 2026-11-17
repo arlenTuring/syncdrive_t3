@@ -2,7 +2,7 @@ import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Monitor, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../../components/ui';
+import { Button, IconButton } from '../../components/ui';
 
 const PRESETS = [
   { label: '32:9 — 3840×1080', width: 3840, height: 1080 },
@@ -41,13 +41,7 @@ export function NewPlaneDialog({ onConfirm, onCancel }: Props) {
             <Monitor className="text-text-theme" size={20} />
             <h2 className="text-text-primary text-body-m-bold">{t('dashboard.newPlane.title')}</h2>
           </div>
-          <button
-            onClick={onCancel}
-            className="text-text-quaternary hover:text-text-primary transition-colors"
-            aria-label={t('common.close')}
-          >
-            <X size={18} />
-          </button>
+          <IconButton hierarchy="subordinate" variant="standard" onPress={onCancel} label={t('common.close')} type="submit" icon={<X />} />
         </div>
 
         {/* Name */}

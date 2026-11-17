@@ -23,28 +23,12 @@ export function ExportTemplateButton({ plane, variant = 'button' }: ExportProps)
 
   if (variant === 'menu-item') {
     return (
-      <button
-        type="button"
-        onClick={handleExport}
-        className="flex items-center gap-2 w-full px-3 py-2 text-body-s text-text-secondary hover:bg-link-standard-hover rounded-lg"
-      >
-        <Download size={16} className="text-text-theme" />
-        匯出樣板 JSON
-      </button>
+      <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Download />} onPress={handleExport}>匯出樣板 JSON</Button>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleExport}
-      title="匯出為儀表板樣板 JSON（含資料來源連線設定）"
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-bold
-                 border border-border-quaternary text-text-tertiary hover:border-cyan-600 hover:text-text-theme transition-colors"
-    >
-      <Download size={14} />
-      匯出樣板
-    </button>
+    <Button variant="outlined" leadingIcon={<Download />} onPress={handleExport} title="匯出為儀表板樣板 JSON（含資料來源連線設定）">匯出樣板</Button>
   );
 }
 
@@ -119,15 +103,7 @@ export function ImportTemplateDialog({ onImported, onClose }: { onImported: (res
         />
         <div className="mt-4 flex justify-end gap-3">
           <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>取消</Button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => inputRef.current?.click()}
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 text-body-s-bold text-text-primary hover:bg-link-theme-filled-hover disabled:opacity-50"
-          >
-            <Upload size={16} />
-            {busy ? '匯入中…' : '選擇樣板檔案'}
-          </button>
+          <Button leadingIcon={<Upload />} disabled={busy} onPress={() => inputRef.current?.click()}>{busy ? '匯入中…' : '選擇樣板檔案'}</Button>
         </div>
       </div>
     </div>
@@ -150,17 +126,7 @@ export function ImportTemplateButton({ onImported, variant = 'card' }: ImportPro
             if (f) handleFile(f);
           }}
         />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          title="匯入儀表板樣板 JSON"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-bold
-                     border border-border-quaternary text-text-tertiary hover:border-amber-600 hover:text-status-warning transition-colors disabled:opacity-50"
-        >
-          <Upload size={14} />
-          {busy ? '匯入中…' : '匯入樣板'}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Upload />} disabled={busy} onPress={() => inputRef.current?.click()} title="匯入儀表板樣板 JSON">{busy ? '匯入中…' : '匯入樣板'}</Button>
       </>
     );
   }
@@ -191,16 +157,7 @@ export function ImportTemplateButton({ onImported, variant = 'card' }: ImportPro
           if (f) handleFile(f);
         }}
       />
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => inputRef.current?.click()}
-        className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-amber-600/20 border border-amber-600/40
-                   text-status-warning text-body-s font-bold hover:bg-amber-600/30 transition-colors disabled:opacity-50"
-      >
-        <Upload size={16} />
-        {busy ? '匯入中…' : '選擇樣板檔案'}
-      </button>
+      <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Upload />} disabled={busy} onPress={() => inputRef.current?.click()}>{busy ? '匯入中…' : '選擇樣板檔案'}</Button>
     </div>
   );
 }

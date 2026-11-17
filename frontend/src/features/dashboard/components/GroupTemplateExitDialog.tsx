@@ -1,6 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 interface Props {
   groupLabel: string;
@@ -36,14 +36,7 @@ export function GroupTemplateExitDialog({ groupLabel, onCancel, onDiscard, onSav
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-text-quaternary hover:text-text-primary transition-colors p-1 shrink-0"
-            aria-label={t('common.close')}
-          >
-            <X size={18} />
-          </button>
+          <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" onPress={onCancel} label={t('common.close')} icon={<X />} />
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">

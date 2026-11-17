@@ -19,7 +19,7 @@ import {
 } from '../vehicle-operation-actions';
 import { DashboardIconPicker } from '../components/DashboardIconPicker';
 import { WidgetDataBindingSettings } from '../elements/WidgetDataBindingSettings';
-import { Button, Checkbox } from '../../../components/ui';
+import { Button, Checkbox, IconButton } from '../../../components/ui';
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
 
@@ -321,13 +321,7 @@ export function RouteProgressSettings({
         <div className="space-y-2 pt-2 border-t border-border-quaternary">
           <div className="flex items-center justify-between">
             <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.manualStations')} color="#10b981" />
-            <button
-              type="button"
-              onClick={addStation}
-              className="p-1 hover:bg-link-standard-hover rounded text-green-500 transition-colors"
-            >
-              <Plus size={14} />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addStation} label="新增" icon={<Plus />} />
           </div>
           {w.stations.map((s, i) => (
             <div
@@ -341,13 +335,7 @@ export function RouteProgressSettings({
                 placeholder={t('dashboard.routeProgress.stationName')}
                 style={{ fontSize: 10 }}
               />
-              <button
-                type="button"
-                onClick={() => removeStation(i)}
-                className="p-1 text-text-quaternary hover:text-status-error-emphasis"
-              >
-                <Trash2 size={12} />
-              </button>
+              <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => removeStation(i)} label="刪除" icon={<Trash2 />} />
             </div>
           ))}
         </div>
@@ -359,13 +347,7 @@ export function RouteProgressSettings({
           <div className="flex gap-1">
             <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadCatalog')} onPress={() => onUpdate({ actionIconRules: buildCatalogActionRules() })}>{t('dashboard.routeProgress.catalogBtn')}</Button>
             <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadSample')} onPress={() => onUpdate({ actionIconRules: [...DEFAULT_ROUTE_ACTION_ICON_RULES] })}>{t('dashboard.routeProgress.sampleBtn')}</Button>
-            <button
-              type="button"
-              onClick={addRule}
-              className="p-1 hover:bg-link-standard-hover rounded text-status-warning"
-            >
-              <Plus size={14} />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addRule} label="新增" icon={<Plus />} />
           </div>
         </div>
         {rules.length === 0 && (
@@ -381,9 +363,7 @@ export function RouteProgressSettings({
                 placeholder={t('dashboard.routeProgress.ruleLabel')}
                 style={{ fontSize: 10 }}
               />
-              <button type="button" onClick={() => removeRule(i)} className="p-1 text-text-quaternary hover:text-status-error-emphasis">
-                <Trash2 size={12} />
-              </button>
+              <IconButton size="small" hierarchy="danger" variant="standard" onPress={() => removeRule(i)} label="刪除" icon={<Trash2 />} />
             </div>
             <input
               value={rule.sourceVarKey}
@@ -519,13 +499,7 @@ export function RouteProgressSettings({
       </div>
 
       <PositionFields widget={w} onUpdate={onUpdate} />
-      <button
-        type="button"
-        onClick={onDelete}
-        className="w-full py-2 rounded-lg bg-red-900/20 border border-red-800/40 text-status-error-emphasis text-caption-2 uppercase flex items-center justify-center gap-1.5 hover:bg-status-error-light transition-colors mt-2"
-      >
-        <Trash2 size={12} /> {t('dashboard.routeProgress.removeWidget')}
-      </button>
+      <Button hierarchy="danger" variant="outlined" className="w-full mt-2" leadingIcon={<Trash2 />} onPress={onDelete}>{t('dashboard.routeProgress.removeWidget')}</Button>
     </div>
   );
 }

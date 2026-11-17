@@ -24,6 +24,7 @@ import {
   mergeMaintenanceShiftRoster,
 } from '../utils/mergeShiftRosterRows';
 import { Edit3, Variable } from 'lucide-react';
+import { Button } from '../../../components/ui';
 
 function isShiftRosterGroup(label: string | undefined): boolean {
   return label === '正線班次' || label === '整備班表';
@@ -987,16 +988,10 @@ export function GroupCanvasRenderer({ element, isEditMode, isCanvasSelected, onE
           className="absolute inset-0 z-50 flex items-center justify-center rounded"
           style={{ pointerEvents: 'none' }}
         >
-          <button
-            type="button"
-            onClick={(e) => {
+          <Button className="pointer-events-auto" leadingIcon={<Edit3 />} onPress={(e) => {
               e.stopPropagation();
               onEnterEditMode();
-            }}
-            className="bg-purple-600 hover:bg-purple-500 text-text-primary px-4 py-2 rounded shadow-lg flex items-center gap-2 text-body-s-bold pointer-events-auto"
-          >
-            <Edit3 size={16} /> 編輯子畫布範本
-          </button>
+            }}>編輯子畫布範本</Button>
         </div>
       )}
     </div>

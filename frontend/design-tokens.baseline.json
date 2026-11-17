@@ -67,11 +67,10 @@
   },
   "features/dashboard/components/GenericGroupSettings.tsx": {
     "palette": 13,
-    "button": 14
+    "button": 7
   },
   "features/dashboard/components/GroupTemplateExitDialog.tsx": {
-    "palette": 2,
-    "button": 1
+    "palette": 2
   },
   "features/dashboard/components/IconImageField.tsx": {
     "palette": 4,
@@ -83,7 +82,7 @@
   },
   "features/dashboard/components/SimulationTransportToolbar.tsx": {
     "palette": 18,
-    "button": 8
+    "button": 7
   },
   "features/dashboard/components/SnapGuideLines.tsx": {
     "hex": 1
@@ -91,8 +90,7 @@
   "features/dashboard/components/TemplateFileActions.tsx": {
     "arbitrary": 2,
     "rgb": 2,
-    "palette": 9,
-    "button": 5
+    "palette": 4
   },
   "features/dashboard/components/VehicleRoofIndicatorSettings.tsx": {
     "palette": 1
@@ -150,11 +148,7 @@
   },
   "features/dashboard/elements/DataSourcePicker.tsx": {
     "palette": 8,
-    "button": 4
-  },
-  "features/dashboard/elements/DualCanvasDefaultView.tsx": {
-    "palette": 2,
-    "button": 1
+    "button": 3
   },
   "features/dashboard/elements/EmptyStateWidget.tsx": {
     "hex": 5,
@@ -169,9 +163,7 @@
   },
   "features/dashboard/elements/GroupCanvasRenderer.tsx": {
     "hex": 3,
-    "rgb": 12,
-    "palette": 2,
-    "button": 1
+    "rgb": 12
   },
   "features/dashboard/elements/ImageWidget.tsx": {
     "hex": 1,
@@ -249,12 +241,12 @@
   "features/dashboard/index.tsx": {
     "hex": 7,
     "rgb": 3,
-    "palette": 26,
-    "button": 14
+    "palette": 14,
+    "button": 6
   },
   "features/dashboard/NewPlaneDialog.tsx": {
     "palette": 6,
-    "button": 2
+    "button": 1
   },
   "features/dashboard/PlaneWorkspace.tsx": {
     "hex": 16,
@@ -266,13 +258,12 @@
     "hex": 79,
     "arbitrary": 3,
     "rgb": 3,
-    "palette": 80,
-    "button": 27
+    "palette": 63,
+    "button": 10
   },
   "features/dashboard/route-progress/RouteProgressSettings.tsx": {
     "hex": 6,
-    "palette": 7,
-    "button": 5
+    "palette": 4
   },
   "features/dashboard/route-progress/RouteTrackView.tsx": {
     "hex": 16,
@@ -283,12 +274,11 @@
     "rgb": 2
   },
   "features/dashboard/settings/PlaneDataSettingsPanel.tsx": {
-    "palette": 6,
-    "button": 1
+    "palette": 5
   },
   "features/dashboard/settings/SettingsModal.tsx": {
-    "palette": 36,
-    "button": 11
+    "palette": 29,
+    "button": 4
   },
   "features/dashboard/types.ts": {
     "hex": 91,
@@ -904,7 +894,7 @@
     "arbitrary": 5,
     "rgb": 1,
     "palette": 8,
-    "button": 4
+    "button": 2
   },
   "features/shift-list/components/StepShiftScheduleAdjust.tsx": {
     "hex": 1,
@@ -1019,7 +1009,7 @@
     "arbitrary": 9,
     "rgb": 2,
     "palette": 7,
-    "button": 6
+    "button": 4
   },
   "features/time-templates/components/TaskSettingsForm.tsx": {
     "arbitrary": 2,

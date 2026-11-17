@@ -10,7 +10,7 @@ import {
 import { DataSourceIdSelect } from './DataSourceIdSelect';
 import { useVariables, interpolateVariables } from '../VariableContext';
 import { usePlaneSourceId } from '../context/PlaneDataSourceContext';
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 interface Props {
   dataSourceId: string;
@@ -114,10 +114,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
             <label className="text-text-quaternary text-body-xs flex items-center gap-1">
               <Table size={10} /> {t('dashboard.dataSourcePicker.selectTable')}
             </label>
-            <button onClick={() => loadTables(dataSourceId)}
-              className="text-text-disabled hover:text-text-tertiary transition-colors">
-              <RefreshCw size={10} className={loadingTables ? 'animate-spin' : ''} />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => loadTables(dataSourceId)} type="submit" label="重新整理" icon={<RefreshCw />} />
           </div>
 
           {/* 資料表下拉 */}
