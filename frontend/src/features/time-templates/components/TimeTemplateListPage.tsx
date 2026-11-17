@@ -244,19 +244,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             </option>
           ))}
         </SiteSelect>
-        <button
-          type="button"
-          onClick={applySearch}
-          disabled={!canSearch}
-          className={`inline-flex size-9 items-center justify-center rounded-lg border transition ${
-            canSearch
-              ? 'border-violet-600 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30'
-              : 'cursor-not-allowed border-border-quaternary bg-surface-primary text-text-disabled'
-          }`}
-          title={t('common.search')}
-        >
-          <Search className="size-4" />
-        </button>
+        <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <button
           type="button"
           onClick={() => void handleDownload()}

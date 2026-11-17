@@ -50,6 +50,7 @@ import {
   parseModuleDashboardViewId,
 } from "../utils/moduleDashboardPages";
 import { ShellClock } from "./ShellClock";
+import { IconButton } from '../../../components/ui';
 
 const SIDEBAR_COLLAPSED_KEY = "syncdrive_vtms_sidebar_collapsed";
 const VTMS_MARK_SRC = "/logo.svg";
@@ -280,16 +281,7 @@ export function ScheduleModuleSidebar({
       >
         {collapsed ? (
           <>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex size-9 items-center justify-center rounded-md text-text-secondary transition hover:bg-link-standard hover:text-text-primary"
-              title={t("shell.expandSidebar")}
-              aria-label={t("shell.expandSidebar")}
-              aria-expanded={false}
-            >
-              <PanelLeftOpen className="size-5" />
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" onPress={toggleCollapsed} title={t("shell.expandSidebar")} label={t("shell.expandSidebar")} aria-expanded={false} icon={<PanelLeftOpen />} />
             <button
               type="button"
               onClick={() => onViewChange("shift-records")}
@@ -312,16 +304,7 @@ export function ScheduleModuleSidebar({
                 VTMS
               </span>
             </button>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-standard hover:text-text-primary"
-              title={t("shell.collapseSidebar")}
-              aria-label={t("shell.collapseSidebar")}
-              aria-expanded
-            >
-              <PanelLeftClose className="size-5" />
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" onPress={toggleCollapsed} title={t("shell.collapseSidebar")} label={t("shell.collapseSidebar")} aria-expanded icon={<PanelLeftClose />} />
           </>
         )}
       </div>
@@ -445,21 +428,13 @@ export function ScheduleModuleSidebar({
                 </button>
 
                 {!collapsed && adminMode ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onAddModuleDashboard?.(group.id);
-                      setExpanded((prev) => ({ ...prev, [group.id]: true }));
-                    }}
-                    className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-link-tonal hover:text-text-theme"
-                    title={t("shell.addModulePage", { module: groupLabel })}
-                    aria-label={t("shell.addModulePageAria", {
-                      module: groupLabel,
-                    })}
-                  >
-                    <Plus className="size-4" />
-                  </button>
+                  <IconButton size="small" hierarchy="subordinate" variant="standard" className="mr-1 shrink-0" onPress={(event) => {
+           event.stopPropagation();
+           onAddModuleDashboard?.(group.id);
+           setExpanded((prev) => ({ ...prev, [group.id]: true }));
+          }} title={t("shell.addModulePage", { module: groupLabel })} label={t("shell.addModulePageAria", {
+           module: groupLabel,
+          })} icon={<Plus />} />
                 ) : null}
               </div>
 
@@ -561,28 +536,12 @@ export function ScheduleModuleSidebar({
                         )}
                         {adminMode && !isRenaming ? (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => startRename(page)}
-                              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-disabled opacity-0 transition hover:bg-surface-theme hover:text-text-theme group-hover/item:opacity-100"
-                              title={t("shell.renamePage")}
-                              aria-label={t("shell.renamePageAria", {
-                                name: page.label,
-                              })}
-                            >
-                              <Pencil className="size-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onRemoveModuleDashboard?.(page.id)}
-                              className="mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-text-disabled opacity-0 transition hover:bg-status-error-light hover:text-status-error-emphasis group-hover/item:opacity-100"
-                              title={t("shell.removePage")}
-                              aria-label={t("shell.removePageAria", {
-                                name: page.label,
-                              })}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
+                            <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0 opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100" onPress={() => startRename(page)} title={t("shell.renamePage")} label={t("shell.renamePageAria", {
+                name: page.label,
+               })} icon={<Pencil />} />
+                            <IconButton size="small" hierarchy="danger" variant="standard" className="mr-1 shrink-0 opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100" onPress={() => onRemoveModuleDashboard?.(page.id)} title={t("shell.removePage")} label={t("shell.removePageAria", {
+                name: page.label,
+               })} icon={<Trash2 />} />
                           </>
                         ) : null}
                       </div>

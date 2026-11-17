@@ -9,7 +9,7 @@ import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Mani
 import { SegmentFollower } from './SegmentFollower';
 import type { HistoryRequest } from './history-link';
 import { OPTION_STATE_LABEL } from './status';
-import { Button, IconButton, cn, fieldClass } from '../../components/ui';
+import { Button, cn, fieldClass, IconButton } from '../../components/ui';
 
 /** 歷史多畫面：依路數決定欄數（歷史回放的格子大小不需保存） */
 function historyGrid(count: number) {
@@ -384,7 +384,7 @@ export function VideoHistoryPage({ request }: { request?: HistoryRequest | null 
       )}
       {availability && days.length ? (
         <div className="text-body-xs text-text-quaternary">本月有錄影的日期：{days.map((d) => (
-          <button key={d} type="button" onClick={() => { const parsed = rangeToQuery({ from: `${d}T00:00:00`, to: `${d}T23:59:59` }, timeZone); if (!('error' in parsed)) setRange({ from: toLocalInput(parsed.from, timeZone), to: toLocalInput(parsed.to - 1000, timeZone) }); }} className="mr-1 text-text-theme underline">{d.slice(5)}</button>
+          <Button variant="text" className="mr-1" key={d} onPress={() => { const parsed = rangeToQuery({ from: `${d}T00:00:00`, to: `${d}T23:59:59` }, timeZone); if (!('error' in parsed)) setRange({ from: toLocalInput(parsed.from, timeZone), to: toLocalInput(parsed.to - 1000, timeZone) }); }}>{d.slice(5)}</Button>
         ))}</div>
       ) : null}
 

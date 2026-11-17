@@ -6,7 +6,7 @@ import {
   GRID_ZOOM_STEP,
 } from '../../time-templates/types/editor';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../../../components/ui';
+import { Button, IconButton } from '../../../components/ui';
 
 type ScheduleTimeZoomToolbarProps = {
   zoom: number;
@@ -27,35 +27,11 @@ export function ScheduleTimeZoomToolbar({
   const { t } = useTranslation();
   const inner = (
     <>
-      <button
-        type="button"
-        disabled={zoom <= GRID_ZOOM_MIN}
-        onClick={() => onChange(clampGridZoom(zoom - GRID_ZOOM_STEP))}
-        className={`rounded p-1.5 transition ${
-          zoom > GRID_ZOOM_MIN
-            ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-            : 'cursor-not-allowed text-text-disabled opacity-40'
-        }`}
-        title={t('shiftList.timeZoom.zoomOut')}
-      >
-        <Minus className="size-4" />
-      </button>
+      <IconButton size="small" hierarchy="subordinate" variant="standard" disabled={zoom <= GRID_ZOOM_MIN} onPress={() => onChange(clampGridZoom(zoom - GRID_ZOOM_STEP))} title={t('shiftList.timeZoom.zoomOut')} label={t('shiftList.timeZoom.zoomOut')} icon={<Minus />} />
 
       <Button hierarchy="subordinate" variant="standard" className="w-10 shrink-0" onPress={() => onChange(1)} title={t('shiftList.timeZoom.reset')}>{Math.round(zoom * 100)}%</Button>
 
-      <button
-        type="button"
-        disabled={zoom >= GRID_ZOOM_MAX}
-        onClick={() => onChange(clampGridZoom(zoom + GRID_ZOOM_STEP))}
-        className={`rounded p-1.5 transition ${
-          zoom < GRID_ZOOM_MAX
-            ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-            : 'cursor-not-allowed text-text-disabled opacity-40'
-        }`}
-        title={t('shiftList.timeZoom.zoomIn')}
-      >
-        <Plus className="size-4" />
-      </button>
+      <IconButton size="small" hierarchy="subordinate" variant="standard" disabled={zoom >= GRID_ZOOM_MAX} onPress={() => onChange(clampGridZoom(zoom + GRID_ZOOM_STEP))} title={t('shiftList.timeZoom.zoomIn')} label={t('shiftList.timeZoom.zoomIn')} icon={<Plus />} />
     </>
   );
 

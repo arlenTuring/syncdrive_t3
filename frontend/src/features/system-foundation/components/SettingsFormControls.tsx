@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, UserRound, X } from 'lucide-react'
 import { Button, Checkbox, CheckboxIndicator, cn, MENU_PANEL_CLASS, menuItemClass, Switch, TextInput } from '../../../components/ui'
+import { IconButton } from '../../../components/ui';
 
 export function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="mb-1.5 block text-body-xs text-text-tertiary">{children}</span>
@@ -237,17 +238,10 @@ export function ChipMultiSelectField({
                 >
                   <UserRound className="size-3.5 text-text-tertiary" />
                   {item.name}
-                  <button
-                    type="button"
-                    className="ml-0.5 rounded p-0.5 text-text-quaternary hover:bg-link-standard-hover hover:text-text-primary"
-                    aria-label={`移除 ${item.name}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onChange(selectedIds.filter((id) => id !== item.id))
-                    }}
-                  >
-                    <X className="size-3" />
-                  </button>
+                  <IconButton size="small" hierarchy="subordinate" variant="standard" className="ml-0.5" label={`移除 ${item.name}`} onPress={(e) => {
+           e.stopPropagation()
+           onChange(selectedIds.filter((id) => id !== item.id))
+          }} icon={<X />} />
                 </span>
               ))
             )}

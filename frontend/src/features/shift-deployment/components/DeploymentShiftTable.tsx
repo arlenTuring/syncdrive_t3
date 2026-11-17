@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShiftDeploymentAction, ShiftListTab, ShiftRow } from '../types';
 import { ShiftRouteTrack } from './ShiftRouteTrack';
-import { Button } from '../../../components/ui';
+import { Button, Tabs } from '../../../components/ui';
 
 export function DeploymentShiftTable({
   scheduleName,
@@ -23,14 +23,15 @@ export function DeploymentShiftTable({
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup">
       <div className="flex shrink-0 items-end justify-between gap-3 border-b border-border-quaternary px-4 pt-3">
-        <div className="flex gap-5">
-          <TabButton active={tab === 'mainline'} onClick={() => setTab('mainline')}>
-            {t('shiftDeployment.table.tabMainline')}
-          </TabButton>
-          <TabButton active={tab === 'maintenance'} onClick={() => setTab('maintenance')}>
-            {t('shiftDeployment.table.tabMaintenance')}
-          </TabButton>
-        </div>
+        <Tabs
+          label="班次類別"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'mainline', label: t('shiftDeployment.table.tabMainline') },
+            { id: 'maintenance', label: t('shiftDeployment.table.tabMaintenance') },
+          ]}
+        />
         <div className="pb-2 text-body-xs text-text-tertiary">
           {t('shiftDeployment.table.currentSchedule')}{' '}
           <span className="text-text-primary">{scheduleName}</span>
@@ -121,30 +122,6 @@ export function DeploymentShiftTable({
         </table>
       </div>
     </section>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-2 pb-2 text-body-s transition ${
-        active
-          ? 'border-border-theme font-medium text-text-theme'
-          : 'border-transparent text-text-quaternary hover:text-text-secondary'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

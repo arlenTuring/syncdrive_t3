@@ -789,15 +789,9 @@ export function CreateShiftSchedulePage({
             <Button hierarchy="danger" variant="outlined" className="mr-auto" leadingIcon={<Trash2 />} onPress={() => void handleDiscard()} disabled={!savedShiftId || loading}>{t('shiftList.createWizard.discardDraft')}</Button>
             <Button variant="text" onPress={handlePrevious} disabled={draft.currentStep <= 1 || loading || Boolean(loadError)}>{t('shiftList.createWizard.previous')}</Button>
             {showInvalidationChrome ? (
-              <button
-                type="button"
-                onClick={() => void handleRebuildAndGoToAdjust()}
-                disabled={loading || Boolean(loadError)}
-                className="inline-flex items-center gap-2 rounded-lg bg-status-warning px-4 py-2 text-body-s-bold text-text-invert transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw className="size-4" aria-hidden />
+              <Button leadingIcon={<RefreshCw />} onPress={() => void handleRebuildAndGoToAdjust()} disabled={loading || Boolean(loadError)}>
                 {t('shiftList.createWizard.rebuildSchedule')}
-              </button>
+              </Button>
             ) : draft.currentStep === 4 && draft.creationMode === 'parametric' && !canGoNext ? (
               <Button onPress={() => {
                   setRouteCheckSignal((value) => value + 1);
@@ -810,22 +804,13 @@ export function CreateShiftSchedulePage({
                   || draft.routeGroups.selectedRoutes.length === 0
                 }>檢查</Button>
             ) : (
-              <button
-                type="button"
-                onClick={draft.currentStep === 7 ? handleFinish : handleNext}
-                disabled={!canGoNext || loading || Boolean(loadError)}
-                className={`rounded-lg px-5 py-2 text-body-s font-medium transition ${
-                  canGoNext && !loading && !loadError
-                    ? 'bg-link-theme-filled text-text-primary hover:bg-link-theme-filled-hover'
-                    : 'cursor-not-allowed bg-surface-secondary text-text-disabled'
-                }`}
-              >
+              <Button onPress={draft.currentStep === 7 ? handleFinish : handleNext} disabled={!canGoNext || loading || Boolean(loadError)}>
                 {draft.currentStep === 7
                   ? t('shiftList.createWizard.saveCreate')
                   : draft.currentStep === 6
                     ? t('shiftList.createWizard.saveAndPreview')
                     : t('shiftList.createWizard.next')}
-              </button>
+              </Button>
             )}
           </div>
         </footer>

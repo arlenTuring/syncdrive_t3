@@ -11,6 +11,7 @@ import type {
   TextHorizontalAlign,
   TextVerticalAlign,
 } from '../lib/textAlignment';
+import { IconButton } from './ui';
 
 type Props = {
   horizontal: TextHorizontalAlign;
@@ -36,21 +37,17 @@ function AlignButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
+    <IconButton
+      size="small"
+      hierarchy="subordinate"
+      variant="outlined"
+      pressed={active}
       disabled={disabled}
-      onClick={onClick}
-      className={[
-        'flex size-8 items-center justify-center rounded-md border transition-colors',
-        active
-          ? 'border-border-theme-light bg-surface-theme text-text-theme'
-          : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-primary hover:text-text-primary',
-        disabled ? 'cursor-not-allowed opacity-50' : '',
-      ].join(' ')}
-    >
-      {children}
-    </button>
+      onPress={onClick}
+      title={title}
+      label={title}
+      icon={children}
+    />
   );
 }
 

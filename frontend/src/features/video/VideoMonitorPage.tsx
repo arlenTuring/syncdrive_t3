@@ -9,7 +9,7 @@ import { CANVAS } from './layout';
 import { LayoutEditorDialog } from './LayoutEditorDialog';
 import { SourcePicker } from './SourcePicker';
 import { TileView } from './TileView';
-import { Button, MENU_PANEL_CLASS, cn, fieldClass, menuItemClass } from '../../components/ui';
+import { Button, cn, fieldClass, IconButton, MENU_PANEL_CLASS, menuItemClass } from '../../components/ui';
 
 const PREF_KEY = 'vtms.video.monitor';
 /** 標籤頁整體全螢幕容器的標記（判斷目前的原生全螢幕是不是這一頁的） */
@@ -231,9 +231,7 @@ export function VideoMonitorPage() {
                   <span className="ml-1.5 text-body-xs text-text-quaternary">{tab.tileCount} 格</span>
                 </button>
               )}
-              <button type="button" aria-label={`${tab.name} 更多操作`} onClick={() => setMenu(menu === tab.id ? null : tab.id)} className="rounded p-1 text-text-quaternary hover:text-text-primary">
-                <MoreHorizontal className="size-3.5" />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" label={`${tab.name} 更多操作`} onPress={() => setMenu(menu === tab.id ? null : tab.id)} icon={<MoreHorizontal />} />
               {menu === tab.id ? (
                 <div role="menu" className={cn(MENU_PANEL_CLASS, 'absolute top-full left-0 z-30 mt-1 w-40')}>
                   {[

@@ -61,15 +61,7 @@ export function ShellAccountToolbar({
   return (
     <>
       <div ref={rootRef} className="relative flex items-center gap-2">
-        <button
-          type="button"
-          onClick={cycleLocale}
-          className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-surface-secondary px-2.5 text-body-xs-bold text-text-primary transition hover:bg-link-standard-hover"
-          title={t('shell.language')}
-          aria-label={t('shell.language')}
-        >
-          {localeToolbarCode(currentLocale)}
-        </button>
+        <Button hierarchy="subordinate" variant="tonal" className="min-w-8" onPress={cycleLocale} title={t('shell.language')} aria-label={t('shell.language')}>{localeToolbarCode(currentLocale)}</Button>
         <span className="h-4 w-px bg-border-tertiary" aria-hidden />
         <button
           type="button"
@@ -105,18 +97,10 @@ export function ShellAccountToolbar({
         {auth.can('system.health.view') ? (
         <>
         <span className="h-4 w-px bg-border-tertiary" aria-hidden />
-        <button
-          type="button"
-          onClick={() => {
-            setSettingsOpen(false);
-            onOpenSystemFoundation();
-          }}
-          className="inline-flex size-8 items-center justify-center rounded-full bg-surface-secondary text-text-secondary transition hover:bg-link-standard-hover hover:text-text-primary"
-          title={t('shell.settings')}
-          aria-label={t('shell.settings')}
-        >
-          <Settings className="size-4" />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="tonal" onPress={() => {
+      setSettingsOpen(false);
+      onOpenSystemFoundation();
+     }} title={t('shell.settings')} label={t('shell.settings')} icon={<Settings />} />
         </>
         ) : null}
 

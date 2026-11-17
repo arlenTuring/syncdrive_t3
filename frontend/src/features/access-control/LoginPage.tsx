@@ -1,6 +1,6 @@
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '../../components/ui';
+import { Button, IconButton } from '../../components/ui';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
@@ -42,7 +42,7 @@ export function LoginPage() {
           <label className="block text-body-s text-text-secondary">密碼
             <span className="relative mt-2 block">
               <input autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} type={show ? 'text' : 'password'} className="w-full rounded-xl border border-transparent bg-surface-secondary px-4 py-3.5 pr-12 outline-none placeholder:text-text-quaternary focus:border-border-theme" placeholder="請輸入密碼" />
-              <button type="button" onClick={() => setShow((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-text-quaternary hover:text-text-primary" aria-label={show ? '隱藏密碼' : '顯示密碼'}>{show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button>
+              <IconButton hierarchy="subordinate" variant="standard" className="absolute right-3 top-1/2 -translate-y-1/2" onPress={() => setShow((value) => !value)} label={show ? '隱藏密碼' : '顯示密碼'} icon={show ? <EyeOff /> : <Eye />} />
             </span>
           </label>
           {error ? <p role="alert" className="rounded-xl border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis">{error}</p> : null}

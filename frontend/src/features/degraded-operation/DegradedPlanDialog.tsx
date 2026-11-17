@@ -167,8 +167,9 @@ export function DegradedPlanDialog({
           </div>
           <div className="flex shrink-0 justify-end gap-3 border-t border-border-quaternary px-6 py-4">
             <Button hierarchy="subordinate" variant="tonal" disabled={saving} onPress={onClose}>取消</Button>
-            <button
+            <Button
               type="submit"
+              hierarchy={kind === "execute" ? "danger" : "superior"}
               disabled={
                 !payload ||
                 saving ||
@@ -176,7 +177,6 @@ export function DegradedPlanDialog({
                   schedule.schedule_mode === "scheduled" &&
                   !schedule.scheduled_time)
               }
-              className={`rounded-xl px-5 py-2.5 font-medium text-text-primary disabled:cursor-not-allowed disabled:bg-link-standard-hover disabled:text-text-quaternary ${kind === "execute" ? "bg-red-600 hover:bg-status-error" : "bg-blue-600 hover:bg-blue-500"}`}
             >
               {saving
                 ? "處理中…"
@@ -185,7 +185,7 @@ export function DegradedPlanDialog({
                   : kind === "edit"
                     ? "儲存"
                     : "執行降級"}
-            </button>
+            </Button>
           </div>
         </form>
       </Dialog>

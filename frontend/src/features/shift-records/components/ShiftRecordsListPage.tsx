@@ -290,19 +290,7 @@ export function ShiftRecordsListPage({
         <div className="shrink-0 min-w-[400px] max-w-[520px] flex-1 basis-[400px]">
           <DateTimeRangePicker value={dateRange} onChange={setDateRange} />
         </div>
-        <button
-          type="button"
-          onClick={applySearch}
-          disabled={!canSearch}
-          className={`inline-flex size-9 items-center justify-center rounded-lg border transition ${
-            canSearch
-              ? 'border-sky-600 bg-link-tonal text-text-theme hover:bg-sky-600/30'
-              : 'cursor-not-allowed border-border-quaternary bg-surface-primary text-text-disabled'
-          }`}
-          title={t('common.search')}
-        >
-          <Search className="size-4" />
-        </button>
+        <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => void handleDownload()} disabled={exporting}>{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
           {t('common.download')}</Button>
       </div>

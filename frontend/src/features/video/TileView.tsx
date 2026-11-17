@@ -4,7 +4,7 @@ import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { SourcePicker } from './SourcePicker';
 import { videoApi, type LiveSession, type SourceOption, type Tile } from './api';
 import { BADGE_TONE, tileBadges } from './status';
-import { Button } from '../../components/ui';
+import { Button, IconButton } from '../../components/ui';
 
 /**
  * 監控格子：大小由版面決定（父層絕對定位），影片 cover 填滿、置中裁切，不因影片尺寸改變格子。
@@ -98,19 +98,13 @@ export function TileView({
             </span>
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={onAudio} aria-label={audio ? `關閉 ${title} 聲音` : `開啟 ${title} 聲音`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
-              {audio ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onAudio} label={audio ? `關閉 ${title} 聲音` : `開啟 ${title} 聲音`} icon={audio ? <Volume2 /> : <VolumeX />} />
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={fullscreen} aria-label={zoomed ? `${title} 返回整頁` : pageFullscreen ? `${title} 放大` : `${title} 全螢幕`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
-              {zoomed ? <Minimize className="size-3.5" /> : <Maximize className="size-3.5" />}
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={fullscreen} label={zoomed ? `${title} 返回整頁` : pageFullscreen ? `${title} 放大` : `${title} 全螢幕`} icon={zoomed ? <Minimize /> : <Maximize />} />
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={onSettings} aria-label={`設定 ${title} 的來源`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
-              <Settings2 className="size-3.5" />
-            </button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onSettings} label={`設定 ${title} 的來源`} icon={<Settings2 />} />
           ) : null}
         </div>
       </div>

@@ -1,7 +1,5 @@
 import { SiteSelect } from '../../../components/SiteSelect';
 import {
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Copy,
   FilePenLine,
@@ -10,9 +8,8 @@ import {
   Pencil,
   Plus,
   Search,
-  Trash2,
-} from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+  Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import { StatusTag } from '../../../components/StatusTag';
@@ -33,7 +30,7 @@ import {
   type UsageStatusKey,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, Pagination } from '../../../components/ui';
 
 function resolveCreationMode(row: OperationShiftListItem): CreationModeKey {
   return row.creation_mode === 'manual' ? 'manual' : 'parametric';
@@ -70,7 +67,6 @@ export function ShiftListPage({
   const [copyingAsManualId, setCopyingAsManualId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canSearch = keywordDraft.trim().length > 0;
 
   const load = useCallback(async () => {
@@ -109,11 +105,6 @@ export function ShiftListPage({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [openMenuId]);
 
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(5, totalPages);
-    const start = Math.max(1, Math.min(page - 2, totalPages - max + 1));
-    return Array.from({ length: max }, (_, i) => start + i);
-  }, [page, totalPages]);
 
   const applySearch = () => {
     setPage(1);
@@ -203,19 +194,7 @@ export function ShiftListPage({
             className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none"
           />
         </div>
-        <button
-          type="button"
-          onClick={applySearch}
-          disabled={!canSearch}
-          className={`inline-flex size-9 items-center justify-center rounded-lg border transition ${
-            canSearch
-              ? 'border-border-theme-light bg-surface-theme text-text-theme hover:bg-link-tonal-hover'
-              : 'cursor-not-allowed border-border-quaternary bg-surface-primary text-text-disabled'
-          }`}
-          title={t('common.search')}
-        >
-          <Search className="size-4" />
-        </button>
+        <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <button
           type="button"
           onClick={() => onCreateClick?.()}
@@ -384,37 +363,8 @@ export function ShiftListPage({
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronLeft className="size-4" />
-        </button>
-        {pageNumbers.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
-              n === page
-                ? 'bg-[#2B7FFF]/20 text-text-theme ring-1 ring-border-theme-light'
-                : 'text-text-quaternary hover:bg-link-standard-hover'
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronRight className="size-4" />
-        </button>
+      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
     </div>
   );

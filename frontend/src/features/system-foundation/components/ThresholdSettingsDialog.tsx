@@ -9,7 +9,7 @@ import {
   type MonitoringThresholdSettings,
   type ThresholdMetricKey,
 } from '../thresholdSettings'
-import { Button, CheckboxIndicator, Dialog, IconButton, MENU_PANEL_CLASS, Tabs, TextInput, cn, menuItemClass } from '../../../components/ui';
+import { Button, CheckboxIndicator, cn, Dialog, IconButton, MENU_PANEL_CLASS, menuItemClass, Tabs, TextInput } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -127,19 +127,12 @@ function NotifyeePicker({
               >
                 <UserRound className="size-3.5 text-text-tertiary" />
                 {person.name}
-                <button
-                  type="button"
-                  className="ml-0.5 rounded p-0.5 text-text-quaternary hover:bg-link-standard-hover hover:text-text-primary"
-                  aria-label={t('systemFoundation.threshold.removePerson', {
-                    name: person.name,
-                  })}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onChange(selectedIds.filter((id) => id !== person.id))
-                  }}
-                >
-                  <X className="size-3" />
-                </button>
+                <IconButton size="small" hierarchy="subordinate" variant="standard" className="ml-0.5" label={t('systemFoundation.threshold.removePerson', {
+          name: person.name,
+         })} onPress={(e) => {
+          e.stopPropagation()
+          onChange(selectedIds.filter((id) => id !== person.id))
+         }} icon={<X />} />
               </span>
             ))
           )}

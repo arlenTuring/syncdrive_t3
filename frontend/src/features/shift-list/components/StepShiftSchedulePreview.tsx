@@ -56,6 +56,7 @@ import {
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 import { ScheduleTimeZoomToolbar } from './ScheduleTimeZoomToolbar';
+import { Button, IconButton, Tabs } from '../../../components/ui';
 
 type PreviewTab = 'schedule' | 'capacity';
 
@@ -192,15 +193,14 @@ function ReviewSection({
             <h3 className="text-body-s-bold text-text-primary">{title}</h3>
           )}
           {onNavigate ? (
-            <button
-              type="button"
-              onClick={() => onNavigate(step)}
+            <IconButton
+              size="small"
+              variant="standard"
+              onPress={() => onNavigate(step)}
               title={t('shiftList.schedulePreview.goTo', { title })}
-              aria-label={t('shiftList.schedulePreview.goTo', { title })}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-text-theme-light transition hover:bg-[rgba(43,127,255,0.12)]"
-            >
-              <Pencil className="size-4" strokeWidth={2} />
-            </button>
+              label={t('shiftList.schedulePreview.goTo', { title })}
+              icon={<Pencil />}
+            />
           ) : null}
         </div>
       ) : null}
@@ -675,14 +675,9 @@ export function StepShiftSchedulePreview({
               <p className="min-w-0 text-body-s text-text-primary">
                 {orderedRoutes.map((route) => route.routeName).join('、')}
               </p>
-              <button
-                type="button"
-                onClick={() => setRouteDetailsOpen(true)}
-                className="inline-flex items-center gap-1 text-body-s text-text-theme-light transition hover:text-text-theme"
-              >
+              <Button variant="text" trailingIcon={<ChevronDown />} aria-expanded={false} onPress={() => setRouteDetailsOpen(true)}>
                 展開明細
-                <ChevronDown className="size-4" aria-hidden />
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -691,14 +686,9 @@ export function StepShiftSchedulePreview({
                   <p className="min-w-0 text-body-s text-text-primary">
                     {orderedRoutes.map((route) => route.routeName).join('、')}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setRouteDetailsOpen(false)}
-                    className="inline-flex items-center gap-1 text-body-s text-text-theme-light transition hover:text-text-theme"
-                  >
+                  <Button variant="text" trailingIcon={<ChevronDown className="rotate-180" />} aria-expanded onPress={() => setRouteDetailsOpen(false)}>
                     收起明細
-                    <ChevronDown className="size-4 rotate-180" aria-hidden />
-                  </button>
+                  </Button>
                 </div>
               ) : null}
               <div className="rounded-lg border border-border-quaternary bg-black-30 px-3 py-2 text-body-xs text-text-tertiary">
@@ -896,36 +886,7 @@ export function StepShiftSchedulePreview({
               )}
 
               <div className="mb-3 flex shrink-0 items-center gap-4">
-                <div className="flex shrink-0 items-center gap-5 border-b border-border-quaternary">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('schedule')}
-                    className={`relative pb-2 text-body-s transition ${
-                      activeTab === 'schedule'
-                        ? 'font-medium text-text-primary'
-                        : 'text-text-quaternary hover:text-text-secondary'
-                    }`}
-                  >
-                    {t('shiftList.schedulePreview.tripPreview')}
-                    {activeTab === 'schedule' ? (
-                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
-                    ) : null}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('capacity')}
-                    className={`relative pb-2 text-body-s transition ${
-                      activeTab === 'capacity'
-                        ? 'font-medium text-text-primary'
-                        : 'text-text-quaternary hover:text-text-secondary'
-                    }`}
-                  >
-                    {t('shiftList.schedulePreview.capacityTrend')}
-                    {activeTab === 'capacity' ? (
-                      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
-                    ) : null}
-                  </button>
-                </div>
+                <Tabs label="班表檢視" className="shrink-0 border-b border-border-quaternary" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.schedulePreview.tripPreview') }, { id: 'capacity', label: t('shiftList.schedulePreview.capacityTrend') }]} />
 
                 <div className="flex min-w-0 flex-1 items-center gap-2 pb-2">
                   <div className={`flex min-w-0 flex-1 items-center gap-2 ${wizard ? 'flex-wrap justify-end' : 'overflow-x-auto'}`}>

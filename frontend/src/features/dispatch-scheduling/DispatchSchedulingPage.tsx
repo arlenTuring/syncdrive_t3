@@ -1,14 +1,11 @@
 import { SiteSelect } from '../../components/SiteSelect';
 import {
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
-} from 'lucide-react';
+  Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatusTag } from '../../components/StatusTag';
@@ -30,7 +27,7 @@ import {
   type DispatchPriorityKey,
   type DispatchStatusKey,
 } from './types';
-import { Button, IconButton } from '../../components/ui';
+import { Button, IconButton, Pagination } from '../../components/ui';
 
 const PAGE_SIZE = 20;
 const SELECT =
@@ -146,11 +143,6 @@ export function DispatchSchedulingPage() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [openMenuId]);
 
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(5, totalPages);
-    const start = Math.max(1, Math.min(page - 2, totalPages - max + 1));
-    return Array.from({ length: max }, (_, i) => start + i);
-  }, [page, totalPages]);
 
   const applyFilters = () => {
     setApplied({ priority, status, vehicleCode, location });
@@ -296,7 +288,7 @@ export function DispatchSchedulingPage() {
             </option>
           ))}
         </SiteSelect>
-        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={applyFilters} title={t('common.search')} label={t('common.search')} icon={<Search />} />
+        <IconButton hierarchy="subordinate" variant="tonal" onPress={applyFilters} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <Button className="ml-auto w-fit shrink-0" onPress={() => setCreating(true)} leadingIcon={<Plus />}>{t('dispatchScheduling.create')}</Button>
       </div>
 
@@ -392,37 +384,8 @@ export function DispatchSchedulingPage() {
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronLeft className="size-4" />
-        </button>
-        {pageNumbers.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
-              n === page
-                ? 'bg-[#2B7FFF]/20 text-text-theme ring-1 ring-border-theme-light'
-                : 'text-text-quaternary hover:bg-link-standard-hover'
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronRight className="size-4" />
-        </button>
+      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
 
       {creating ? (

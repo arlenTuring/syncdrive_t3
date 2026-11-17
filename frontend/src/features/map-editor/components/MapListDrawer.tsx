@@ -20,6 +20,7 @@ import {
   type FacilityListEntry,
 } from '../utils/facilityListEntries'
 import type { RoutePlanningDraft } from '../utils/routePlanning'
+import { IconButton } from '../../../components/ui';
 export type MapListDrawerTab = 'docking' | 'facility' | 'equipment' | 'routes' | 'geofence' | 'palette' | null
 
 type Props = {
@@ -345,15 +346,7 @@ export function MapListDrawer({
         >
           {/* 設計稿 rgba(212,212,216,0.1) 是放在黑底上（≈#151516）；這裡疊在地圖上，用等值實色才不會透出軌道 */}
           <div className="pointer-events-auto flex w-12 min-h-0 flex-1 flex-col items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[#151516] px-1.5 py-2">
-            <button
-              type="button"
-              title={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')}
-              aria-label={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')}
-              onClick={() => onOpenTab(panelOpen ? null : lastTab.current)}
-              className="flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 text-text-secondary transition-colors hover:bg-link-standard-hover"
-            >
-              {panelOpen ? <KeyboardArrowLeft className="size-6" /> : <KeyboardArrowRight className="size-6" />}
-            </button>
+            <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" title={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')} label={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')} onPress={() => onOpenTab(panelOpen ? null : lastTab.current)} icon={panelOpen ? <KeyboardArrowLeft /> : <KeyboardArrowRight />} />
             <div className="flex min-h-0 w-7 flex-1 flex-col gap-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
               <TabUnit
                 label={t('mapEditor.listDrawer.tabDocking')}

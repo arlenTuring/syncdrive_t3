@@ -1,7 +1,7 @@
 import { Hourglass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ControlMode } from '../constants';
-import { Button } from '../../../components/ui';
+import { Button, SegmentedControl } from '../../../components/ui';
 
 export type DoorKind = 'vehicle' | 'platform';
 
@@ -37,24 +37,18 @@ function ModeToggle({
   onChange: (next: ControlMode) => void;
 }) {
   const { t } = useTranslation();
-  const btn = (active: boolean) =>
-    `rounded px-3 py-1.5 text-body-xs leading-none ${
-      active
-        ? 'border border-border-theme bg-link-theme-filled text-text-primary'
-        : 'border border-border-tertiary bg-surface-primary text-text-primary hover:border-white/40'
-    }`;
-
   return (
     <div className="flex items-center gap-2">
       <span className="text-body-xs text-text-secondary">{t('psdControl.controlMode')}</span>
-      <div className="flex items-center gap-1">
-        <button type="button" onClick={() => onChange('auto')} className={btn(value === 'auto')}>
-          {t('psdControl.autoControl')}
-        </button>
-        <button type="button" onClick={() => onChange('manual')} className={btn(value === 'manual')}>
-          {t('psdControl.manualControl')}
-        </button>
-      </div>
+      <SegmentedControl
+        label={t('psdControl.controlMode')}
+        value={value}
+        onChange={onChange}
+        options={[
+          { id: 'auto', label: t('psdControl.autoControl') },
+          { id: 'manual', label: t('psdControl.manualControl') },
+        ]}
+      />
     </div>
   );
 }

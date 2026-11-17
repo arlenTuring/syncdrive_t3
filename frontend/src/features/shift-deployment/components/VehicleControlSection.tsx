@@ -1,11 +1,8 @@
 import { Bus, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import type { ShiftDeploymentAction } from '../types';
+import { Button } from '../../../components/ui';
 
-const btnBlue =
-  'h-8 rounded-md border border-[#3B82F6] bg-transparent text-body-xs text-[#60A5FA] transition hover:bg-surface-theme';
-const btnRed =
-  'h-8 w-full rounded-md border border-[#EF4444] bg-transparent text-body-xs text-[#F87171] transition hover:bg-status-error-light';
 
 export function VehicleControlSection({
   vehicles,
@@ -40,28 +37,10 @@ export function VehicleControlSection({
                 <span className="truncate">{code}</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}
-                  className={btnBlue}
-                >
-                  自駕停駛
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}
-                  className={btnBlue}
-                >
-                  自駕啟動
-                </button>
+                <Button block hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}>自駕停駛</Button>
+                <Button block hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}>自駕啟動</Button>
               </div>
-              <button
-                type="button"
-                onClick={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}
-                className={btnRed}
-              >
-                系統重置
-              </button>
+              <Button block hierarchy="danger" variant="outlined" onPress={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}>系統重置</Button>
             </article>
           ))}
         </div>

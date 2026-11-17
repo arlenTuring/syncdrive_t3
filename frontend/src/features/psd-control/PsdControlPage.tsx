@@ -16,6 +16,7 @@ import {
   type PsdVehicleCard,
 } from './loadPsdSources';
 import { useDoorBodyMqtt } from './useDoorBodyMqtt';
+import { Tabs } from '../../components/ui';
 
 type TabKey = 'vehicle' | 'platform';
 
@@ -151,32 +152,7 @@ export function PsdControlPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
-      <div className="flex shrink-0 gap-6 border-b border-border-quaternary px-6">
-        <button
-          type="button"
-          onClick={() => setTab('vehicle')}
-          className={`relative py-3 text-body-s tracking-[0.5px] ${
-            tab === 'vehicle' ? 'text-text-theme' : 'text-text-quaternary hover:text-text-secondary'
-          }`}
-        >
-          {t('psdControl.tabVehicle')}
-          {tab === 'vehicle' ? (
-            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-link-theme-filled" />
-          ) : null}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('platform')}
-          className={`relative py-3 text-body-s tracking-[0.5px] ${
-            tab === 'platform' ? 'text-text-theme' : 'text-text-quaternary hover:text-text-secondary'
-          }`}
-        >
-          {t('psdControl.tabPlatform')}
-          {tab === 'platform' ? (
-            <span className="absolute inset-x-0 -bottom-px h-0.5 bg-link-theme-filled" />
-          ) : null}
-        </button>
-      </div>
+      <Tabs label="門控分類" className="shrink-0 border-b border-border-quaternary px-4" value={tab} onChange={setTab} items={[{ id: 'vehicle', label: t('psdControl.tabVehicle') }, { id: 'platform', label: t('psdControl.tabPlatform') }]} />
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {tab === 'vehicle' ? (

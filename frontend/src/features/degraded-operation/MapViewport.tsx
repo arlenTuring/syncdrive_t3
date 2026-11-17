@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { stepPlaneZoom } from "../dashboard/utils/planeViewScaleLock";
+import { IconButton } from '../../components/ui';
 
 /**
  * 降級頁的地圖視角：縮放、平移、適配、鎖定。
@@ -178,8 +179,6 @@ export function MapViewport({
     drag.current = null;
   }, []);
 
-  const button =
-    "flex size-8 items-center justify-center rounded-lg text-text-secondary hover:bg-zinc-700/70 disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div
@@ -203,56 +202,53 @@ export function MapViewport({
         data-map-viewport-controls
         className="absolute right-3 bottom-3 z-10 flex items-center gap-0.5 rounded-xl border border-border-quaternary bg-surface-primary p-1 shadow-lg"
       >
-        <button
-          type="button"
-          className={button}
-          onClick={() => step(-1)}
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
           disabled={view.locked}
-          aria-label="縮小"
+          onPress={() => step(-1)}
+          label="縮小"
           title={view.locked ? "視角已鎖定" : "縮小 5%"}
-        >
-          <ZoomOut className="size-4" />
-        </button>
+          icon={<ZoomOut />}
+        />
         <span
           className="min-w-12 text-center font-mono text-body-xs text-text-secondary"
           aria-label="目前縮放比例"
         >
           {Math.round(view.zoom * 100)}%
         </span>
-        <button
-          type="button"
-          className={button}
-          onClick={() => step(1)}
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
           disabled={view.locked}
-          aria-label="放大"
+          onPress={() => step(1)}
+          label="放大"
           title={view.locked ? "視角已鎖定" : "放大 5%"}
-        >
-          <ZoomIn className="size-4" />
-        </button>
-        <button
-          type="button"
-          className={button}
-          onClick={fit}
+          icon={<ZoomIn />}
+        />
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
           disabled={view.locked}
-          aria-label="適配視角"
+          onPress={fit}
+          label="適配視角"
           title={view.locked ? "視角已鎖定" : "適配並重置視角"}
-        >
-          <Crosshair className="size-4" />
-        </button>
-        <button
-          type="button"
-          className={`${button} ${view.locked ? "text-status-warning" : ""}`}
-          onClick={toggleLock}
-          aria-pressed={view.locked}
-          aria-label={view.locked ? "解鎖視角" : "鎖定視角"}
+          icon={<Crosshair />}
+        />
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
+          className={view.locked ? "text-status-warning" : undefined}
+          pressed={view.locked}
+          onPress={toggleLock}
+          label={view.locked ? "解鎖視角" : "鎖定視角"}
           title={view.locked ? "解鎖視角" : "鎖定視角（內容照常更新）"}
-        >
-          {view.locked ? (
-            <Lock className="size-4" />
-          ) : (
-            <LockOpen className="size-4" />
-          )}
-        </button>
+          icon={view.locked ? <Lock /> : <LockOpen />}
+        />
       </div>
     </div>
   );

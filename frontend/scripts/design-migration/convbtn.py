@@ -76,7 +76,9 @@ def convert_file(path, ui):
         else: skipped+=1; continue  # 動態 class：人工
         ch=children.strip()
         mi=re.fullmatch(ICON,ch)
-        is_icon=bool(mi)
+        # {條件 ? <IconA /> : <IconB />}：只有圖示、依狀態換圖示
+        mc=re.fullmatch(r'\{([^{}?]+?)\s*\?\s*('+ICON+r')\s*:\s*('+ICON+r')\s*\}',ch)
+        is_icon=bool(mi or mc)
         if is_icon and 'aria-label' not in d and 'title' not in d: skipped+=1; continue
         lead=trail=None; label=ch
         if not is_icon:
@@ -104,7 +106,8 @@ def convert_file(path, ui):
         if keep: hv.append(f'className="{" ".join(keep)}"')
         if is_icon:
             small=' size="small"' if re.search(r'size-(?:3|3\.5|4)\b',ch) else ''
-            new=f'<IconButton{small} {" ".join(hv+parts)} icon={{<{mi.group(1)} />}} />'.replace('  ',' ')
+            icon_expr=f'<{mi.group(1)} />' if mi else f'{mc.group(1).strip()} ? <{mc.group(3)} /> : <{mc.group(5)} />'
+            new=f'<IconButton{small} {" ".join(hv+parts)} icon={{{icon_expr}}} />'.replace('  ',' ')
             need.add('IconButton')
         else:
             if lead: hv.append(f'leadingIcon={{<{lead} />}}')

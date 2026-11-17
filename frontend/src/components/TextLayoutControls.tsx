@@ -11,6 +11,7 @@ import {
 import type { TextWrapMode } from '../lib/textLayout';
 import type { LabelPlacement } from '../features/map-editor/utils/facilityLabelStyle';
 import { LABEL_PLACEMENT_LABELS } from '../features/map-editor/utils/facilityLabelStyle';
+import { Button, IconButton } from './ui';
 
 type Props = {
   textWrap: TextWrapMode;
@@ -39,21 +40,17 @@ function LayoutButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
+    <IconButton
+      size="small"
+      hierarchy="subordinate"
+      variant="outlined"
+      pressed={active}
       disabled={disabled}
-      onClick={onClick}
-      className={[
-        'flex size-8 items-center justify-center rounded-md border transition-colors',
-        active
-          ? 'border-border-theme-light bg-surface-theme text-text-theme'
-          : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-primary hover:text-text-primary',
-        disabled ? 'cursor-not-allowed opacity-50' : '',
-      ].join(' ')}
-    >
-      {children}
-    </button>
+      onPress={onClick}
+      title={title}
+      label={title}
+      icon={children}
+    />
   );
 }
 
@@ -126,14 +123,7 @@ export function TextLayoutControls({
               }}
               className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
             />
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onLabelBoxWidthChange(undefined)}
-              className="shrink-0 rounded border border-border-tertiary px-1.5 py-1 text-caption-2 text-text-tertiary hover:bg-link-standard-hover disabled:opacity-50"
-            >
-              自動
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={disabled} onPress={() => onLabelBoxWidthChange(undefined)}>自動</Button>
           </div>
         </div>
         <div>
@@ -158,14 +148,7 @@ export function TextLayoutControls({
               }}
               className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
             />
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onLabelBoxHeightChange(undefined)}
-              className="shrink-0 rounded border border-border-tertiary px-1.5 py-1 text-caption-2 text-text-tertiary hover:bg-link-standard-hover disabled:opacity-50"
-            >
-              自動
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={disabled} onPress={() => onLabelBoxHeightChange(undefined)}>自動</Button>
           </div>
         </div>
       </div>

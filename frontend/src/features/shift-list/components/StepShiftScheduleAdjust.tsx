@@ -58,7 +58,7 @@ import {
   layerSortKey,
   resolveIssueDisplayLayerFromIssue,
 } from '../utils/scheduleAcceptance';
-import { Button, Dialog } from '../../../components/ui';
+import { Button, Dialog, IconButton, Tabs } from '../../../components/ui';
 import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
@@ -524,15 +524,16 @@ function CheckReport({
         <ClipboardList className="size-5 text-text-secondary" aria-hidden />
         <h3 className="text-body-m-bold text-text-primary">{t('shiftList.scheduleAdjust.checkReport')}</h3>
         <span className="text-body-xs text-text-quaternary">{formatGeneratedClock(plan?.generatedAt)}</span>
-        <button
-          type="button"
-          onClick={onRecheck}
+        <Button
+          hierarchy="subordinate"
+          variant="outlined"
+          className="ml-auto"
+          onPress={onRecheck}
           disabled={checking}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary px-3.5 py-1.5 text-body-s text-text-primary transition hover:border-border-secondary disabled:opacity-50"
+          leadingIcon={checking ? <Loader2 className="animate-spin" /> : undefined}
         >
-          {checking ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           {t('shiftList.scheduleAdjust.recheck')}
-        </button>
+        </Button>
       </div>
       <div className="space-y-3 px-5 pb-5">
         {acceptance.gatePassed ? (
@@ -1404,81 +1405,63 @@ export function StepShiftScheduleAdjust({
   const renderToolbar = () => {
   return (
       <div className="ml-auto flex shrink-0 select-none items-center gap-1.5">
-        <button
-          type="button"
+        <IconButton
+          size="small"
+          hierarchy="danger"
+          variant="standard"
           disabled={!selectedBlockId}
-          onClick={() => handleDeleteBlock()}
-          className={`rounded p-1.5 transition ${
-            selectedBlockId
-              ? 'text-text-secondary hover:bg-surface-secondary hover:text-status-error-emphasis'
-              : 'cursor-not-allowed text-text-disabled opacity-40'
-          }`}
+          onPress={() => handleDeleteBlock()}
           title={t('shiftList.scheduleAdjust.deleteSelected')}
-        >
-          <Trash2 className="size-4" />
-        </button>
+          label={t('shiftList.scheduleAdjust.deleteSelected')}
+          icon={<Trash2 />}
+        />
 
         {isManual ? (
-          <button
-            type="button"
+          <IconButton
+            size="small"
+            hierarchy="subordinate"
+            variant="standard"
             disabled={!selectedBlockId}
-            onClick={() => handleDuplicateBlock()}
-            className={`rounded p-1.5 transition ${
-              selectedBlockId
-                ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-theme'
-                : 'cursor-not-allowed text-text-disabled opacity-40'
-            }`}
+            onPress={() => handleDuplicateBlock()}
             title={t('shiftList.scheduleAdjust.duplicateSelected')}
-          >
-            <CopyPlus className="size-4" />
-          </button>
+            label={t('shiftList.scheduleAdjust.duplicateSelected')}
+            icon={<CopyPlus />}
+          />
         ) : null}
 
         <div className="h-4 w-px bg-link-standard-hover" />
 
-        <button
-          type="button"
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
           disabled={historyIndex <= 0}
-          onClick={handleUndo}
-          className={`rounded p-1.5 transition ${
-            historyIndex > 0
-              ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-              : 'cursor-not-allowed text-text-disabled opacity-40'
-          }`}
+          onPress={handleUndo}
           title={isManual ? t('shiftList.scheduleAdjust.undoManual', { shortcut: undoShortcutLabel }) : t('shiftList.scheduleAdjust.undo')}
-        >
-          <Undo className="size-4" />
-        </button>
+          label={t('shiftList.scheduleAdjust.undo')}
+          icon={<Undo />}
+        />
 
-        <button
-          type="button"
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
           disabled={historyIndex >= history.length - 1}
-          onClick={handleRedo}
-          className={`rounded p-1.5 transition ${
-            historyIndex < history.length - 1
-              ? 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-              : 'cursor-not-allowed text-text-disabled opacity-40'
-          }`}
+          onPress={handleRedo}
           title={isManual ? t('shiftList.scheduleAdjust.redoManual', { shortcut: redoShortcutLabel }) : t('shiftList.scheduleAdjust.redo')}
-        >
-          <Redo className="size-4" />
-        </button>
+          label={t('shiftList.scheduleAdjust.redo')}
+          icon={<Redo />}
+        />
 
         <div className="h-4 w-px bg-link-standard-hover" />
 
-        <button
-          type="button"
+        <IconButton
+          size="small"
+          hierarchy={publishState === 'blocked' ? 'danger' : 'subordinate'}
+          variant="standard"
+          className={publishState === 'ready' && plan ? 'text-status-success' : undefined}
           disabled={!plan || checkingPublish}
-          onClick={() => void handleRunPublishCheck()}
-          className={`rounded p-1.5 transition ${
-            !plan
-              ? 'cursor-not-allowed text-text-disabled opacity-40'
-              : publishState === 'blocked'
-                ? 'text-status-error-emphasis hover:bg-surface-secondary hover:text-status-error-emphasis'
-                : publishState === 'ready'
-                  ? 'text-status-success hover:bg-surface-secondary hover:text-status-success'
-                  : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-          }`}
+          onPress={() => void handleRunPublishCheck()}
           title={
             publishState === 'blocked'
               ? t('shiftList.scheduleAdjust.publishBlocked', { label: PUBLISH_STATE_LABEL.blocked, count: publishCheck?.publishBlockingCount ?? 0 })
@@ -1486,31 +1469,26 @@ export function StepShiftScheduleAdjust({
                 ? t('shiftList.scheduleAdjust.publishReady', { label: PUBLISH_STATE_LABEL.ready })
                 : t('shiftList.scheduleAdjust.publishUnchecked')
           }
-        >
-          {checkingPublish ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-        </button>
+          label={t('shiftList.scheduleAdjust.publishUnchecked')}
+          icon={checkingPublish ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+        />
 
-        <button
-          type="button"
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="standard"
+          className={analysisReport?.hasFindings && !showAnalysisReport ? 'text-status-warning' : undefined}
           disabled={!analysisReport}
-          onClick={() => setShowAnalysisReport((open) => !open)}
-          className={`rounded p-1.5 transition ${
-            !analysisReport
-              ? 'cursor-not-allowed text-text-disabled opacity-40'
-              : showAnalysisReport
-                ? 'bg-surface-secondary text-text-primary'
-                : analysisReport.hasFindings
-                  ? 'text-status-warning hover:bg-surface-secondary hover:text-status-warning'
-                  : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
-          }`}
+          pressed={showAnalysisReport}
+          onPress={() => setShowAnalysisReport((open) => !open)}
           title={
             analysisReport?.hasFindings
               ? t('shiftList.scheduleAdjust.analysisWithIssues', { count: analysisReport.suggestions.length })
               : t('shiftList.scheduleAdjust.analysisReport')
           }
-        >
-          <ClipboardList className="size-4" />
-        </button>
+          label={t('shiftList.scheduleAdjust.analysisReport')}
+          icon={<ClipboardList />}
+        />
 
         <div className="h-4 w-px bg-link-standard-hover" />
 
@@ -1518,14 +1496,7 @@ export function StepShiftScheduleAdjust({
 
         <div className="h-4 w-px bg-link-standard-hover" />
 
-        <button
-          type="button"
-          onClick={() => setIsMaximized(!isMaximized)}
-          className="rounded p-1.5 text-text-secondary transition hover:bg-surface-secondary hover:text-text-primary"
-          title={isMaximized ? t('shiftList.scheduleAdjust.restoreWindow') : t('shiftList.scheduleAdjust.maximize')}
-        >
-          {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => setIsMaximized(!isMaximized)} title={isMaximized ? t('shiftList.scheduleAdjust.restoreWindow') : t('shiftList.scheduleAdjust.maximize')} label={isMaximized ? t('shiftList.scheduleAdjust.restoreWindow') : t('shiftList.scheduleAdjust.maximize')} icon={isMaximized ? <Minimize2 /> : <Maximize2 />} />
       </div>
     );
   };
@@ -1553,36 +1524,7 @@ export function StepShiftScheduleAdjust({
       ) : null}
       <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-border-theme-light bg-surface-secondary p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
       <div className="mb-4 flex shrink-0 flex-wrap items-center gap-4">
-        <div className="flex shrink-0 items-center gap-5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('schedule')}
-            className={`relative pb-2 text-body-s transition ${
-              activeTab === 'schedule'
-                ? 'font-medium text-text-primary'
-                : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            {t('shiftList.scheduleAdjust.tripPreview')}
-            {activeTab === 'schedule' ? (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('capacity')}
-            className={`relative pb-2 text-body-s transition ${
-              activeTab === 'capacity'
-                ? 'font-medium text-text-primary'
-                : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            {t('shiftList.scheduleAdjust.capacityTrend')}
-            {activeTab === 'capacity' ? (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-link-theme-filled" />
-            ) : null}
-          </button>
-        </div>
+        <Tabs label="班表檢視" className="shrink-0" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.scheduleAdjust.tripPreview') }, { id: 'capacity', label: t('shiftList.scheduleAdjust.capacityTrend') }]} />
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {periodLegends.map((item) => (
