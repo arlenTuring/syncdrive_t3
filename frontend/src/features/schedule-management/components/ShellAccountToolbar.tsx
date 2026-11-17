@@ -16,6 +16,7 @@ import {
   type AppLocale,
 } from '../../../i18n/localePreference';
 import { useAuth } from '../../access-control/AuthContext';
+import { Button, IconButton } from '../../../components/ui';
 
 type ShellAccountToolbarProps = {
   notificationCount?: number;
@@ -78,7 +79,7 @@ export function ShellAccountToolbar({
         >
           <Bell className="size-4" />
           {notificationCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-error px-1 text-caption-2 leading-none text-text-primary">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-error px-1 text-caption-2 text-text-primary">
               {notificationCount > 99 ? '99+' : notificationCount}
             </span>
           ) : null}
@@ -123,9 +124,7 @@ export function ShellAccountToolbar({
           <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50">
             <div className="flex items-center justify-between border-b border-border-quaternary px-4 py-3">
               <h2 className="text-body-s-bold text-text-primary">帳號資訊</h2>
-              <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-md p-1 text-text-quaternary transition hover:bg-link-standard-hover hover:text-text-primary" aria-label="關閉">
-                <X className="size-4" />
-              </button>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" label="關閉" icon={<X />} onPress={() => setSettingsOpen(false)} />
             </div>
             <div className="space-y-4 px-4 py-4">
               <div className="rounded-xl bg-surface-primary p-3">
@@ -135,9 +134,9 @@ export function ShellAccountToolbar({
                   {auth.user.roles.map((role) => <span key={role.id} className="rounded bg-link-standard-hover px-2 py-0.5 text-body-xs">{role.name}</span>)}
                 </div>
               </div>
-              <button type="button" onClick={() => { setSettingsOpen(false); void auth.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-border-quaternary py-2 text-text-secondary transition hover:bg-link-standard hover:text-text-primary">
-                <LogOut className="size-4" />登出
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" block leadingIcon={<LogOut />} onPress={() => { setSettingsOpen(false); void auth.logout(); }}>
+                登出
+              </Button>
             </div>
           </div>
         ) : null}

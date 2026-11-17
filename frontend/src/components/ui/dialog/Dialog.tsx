@@ -38,6 +38,8 @@ export type DialogProps = {
   padded?: boolean;
   /** 寬度：預設依 size；要特殊寬度時給 max-w-* class（只放寬度） */
   widthClassName?: string;
+  /** 固定高度等尺寸 class（例如 h-[min(820px,92vh)]）；只放尺寸，不放顏色 */
+  heightClassName?: string;
   /** 給了就把內容與底部按鈕包成一個 <form>：底部的 type="submit" 按鈕直接送出 */
   onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
 };
@@ -63,6 +65,7 @@ export function Dialog({
   bodyClassName,
   padded = true,
   widthClassName,
+  heightClassName,
   onSubmit,
 }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
@@ -151,7 +154,7 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         onKeyDown={onKeyDown}
-        className={cn(DIALOG_PANEL_CLASS, widthClassName ?? DIALOG_WIDTHS[size])}
+        className={cn(DIALOG_PANEL_CLASS, widthClassName ?? DIALOG_WIDTHS[size], heightClassName)}
       >
         <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
           <div className="min-w-0 flex-1">

@@ -171,13 +171,13 @@ export function ReplayMapLayer({
 
   if (error)
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center text-sm text-red-300">
+      <div className="flex h-full items-center justify-center px-6 text-center text-body-s text-status-error-emphasis">
         {error}
       </div>
     );
   if (!parsed)
     return (
-      <div className="flex h-full items-center justify-center text-zinc-500">
+      <div className="flex h-full items-center justify-center text-text-quaternary">
         <MapIcon className="mr-2 size-5 animate-pulse" />
         載入當時的地圖…
       </div>

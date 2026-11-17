@@ -17,6 +17,7 @@ import { fetchHistoryMap, fetchVehicleRelated, type Coverage, type InvestigatedV
 import { historySource, type Window } from "./historySource";
 import { QueryPanel } from "./QueryPanel";
 import { appliedVehicle, type Resolved } from "./queryConditions";
+import { Button, IconButton, Tabs } from '../../components/ui';
 
 /**
  * 載具管理模組 → 運行管理紀錄：固定一台調查載具，回放它在指定期間（或某次班次執行）的歷史。
@@ -36,53 +37,48 @@ export function RunHistoryPage() {
   const onResolved = useCallback((value: Resolved | null) => setResolved(value), []);
 
   return (
-    <div className="relative grid h-full min-h-0 grid-cols-1 bg-black xl:grid-cols-[minmax(0,1.7fr)_minmax(380px,1fr)]">
-      <section className="relative flex min-h-[420px] min-w-0 flex-col p-4 xl:min-h-0 xl:border-r xl:border-zinc-800">
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-black/80 px-3 py-1.5 text-sm text-zinc-200 xl:hidden"
+    <div className="relative grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(380px,1fr)]">
+      <section className="relative flex min-h-[420px] min-w-0 flex-col p-4 xl:min-h-0 xl:border-r xl:border-border-quaternary">
+        <Button
+          hierarchy="subordinate"
+          variant="tonal"
+          className="absolute top-4 right-4 z-20 xl:hidden"
+          leadingIcon={<PanelRightOpen />}
+          onPress={() => setDrawerOpen(true)}
         >
-          <PanelRightOpen className="size-4" />
           條件與車輛資料
-        </button>
+        </Button>
         {/* 以查詢 id（含調查載具）為 key：換一次查詢就整個重建，舊播放、請求、緩衝、游標一起丟掉 */}
         <ReplayStage key={resolved?.id ?? "none"} resolved={resolved} panelSlot={panelSlot} />
       </section>
       {/* 右側：窄螢幕時是抽屜；查詢表單不隨查詢重建（待查詢條件保留） */}
       <aside
-        className={`fixed inset-y-0 right-0 z-40 flex w-[min(420px,92vw)] flex-col border-l border-zinc-800 bg-[#121214] shadow-2xl transition-transform xl:static xl:z-auto xl:min-h-0 xl:w-auto xl:translate-x-0 xl:shadow-none ${
+        className={`fixed inset-y-0 right-0 z-40 flex w-[min(420px,92vw)] flex-col border-l border-border-quaternary bg-surface-primary shadow-2xl transition-transform xl:static xl:z-auto xl:min-h-0 xl:w-auto xl:translate-x-0 xl:shadow-none ${
           drawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
         aria-label="回放條件與車輛資料"
       >
-        <div className="flex shrink-0 items-center border-b border-zinc-800 px-3" role="tablist">
-          {(
-            [
-              ["query", "播放條件"],
-              ["vehicle", "車輛資料"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              onClick={() => setTab(id)}
-              className={`-mb-px border-b-2 px-4 py-3 text-sm ${tab === id ? "border-blue-500 text-blue-300" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
-            >
-              {label}
-              {id === "vehicle" && investigated ? <span className="ml-1.5 text-xs text-amber-300">{investigated.display_name}</span> : null}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(false)}
-            aria-label="收合"
-            className="ml-auto rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 xl:hidden"
-          >
-            <X className="size-4" />
-          </button>
+        <div className="flex shrink-0 items-center border-b border-border-quaternary px-3">
+          <Tabs
+            className="-mb-px"
+            value={tab}
+            onChange={setTab}
+            items={(
+              [
+                ["query", "播放條件"],
+                ["vehicle", "車輛資料"],
+              ] as const
+            ).map(([id, label]) => ({
+              id,
+              label: (
+                <>
+                  {label}
+                  {id === "vehicle" && investigated ? <span className="ml-1.5 text-body-xs text-status-warning">{investigated.display_name}</span> : null}
+                </>
+              ),
+            }))}
+          />
+          <IconButton label="收合" size="small" hierarchy="subordinate" variant="standard" className="ml-auto xl:hidden" icon={<X />} onPress={() => setDrawerOpen(false)} />
         </div>
         <div role="tabpanel" className={`min-h-0 flex-1 flex-col ${tab === "query" ? "flex" : "hidden"}`}>
           <QueryPanel resolved={resolved} onResolved={onResolved} />
@@ -257,7 +253,7 @@ export function ReplayStage({
       timelineLabel="後端收到時間"
     />
   ) : (
-    <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-zinc-500">
+    <div className="flex flex-1 items-center justify-center px-6 text-center text-body-s text-text-quaternary">
       查詢成功後，這裡只顯示該次調查載具的資料
     </div>
   );
@@ -265,30 +261,30 @@ export function ReplayStage({
   const shift = resolved?.kind === "shift" ? resolved.value : null;
   return (
     <>
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 max-xl:mt-10">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background max-xl:mt-10">
         {body}
         {source && vehicle ? (
-          <div className="pointer-events-none absolute top-3 left-3 z-10 text-xs">
+          <div className="pointer-events-none absolute top-3 left-3 z-10 text-body-xs">
             <span
-              className="inline-block rounded-lg border border-amber-500/70 bg-black/80 px-3 py-1.5 text-amber-100"
+              className="inline-block rounded-lg border border-status-warning bg-black-50 px-3 py-1.5 text-status-warning"
               data-testid="stage-investigated"
               title={position.state === "missing" ? `調查載具無有效位置：${position.reason}` : undefined}
             >
               調查載具：<VehicleName vehicle={vehicle} />
-              {position.state === "missing" ? <span className="ml-2 text-red-200">（無有效位置：{position.reason}）</span> : null}
+              {position.state === "missing" ? <span className="ml-2 text-status-error-emphasis">（無有效位置：{position.reason}）</span> : null}
             </span>
           </div>
         ) : null}
         {source && inGap ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <div
-              className={`rounded-2xl px-6 py-4 text-center ${inGap.reason === "not_recorded" ? "bg-zinc-900/90 text-zinc-200" : "bg-red-950/85 text-red-100"}`}
+              className={`rounded-2xl px-6 py-4 text-center ${inGap.reason === "not_recorded" ? "bg-surface-primary text-text-primary" : "bg-status-error-light text-status-error-emphasis"}`}
             >
-              <div className="flex items-center justify-center gap-2 text-lg">
+              <div className="flex items-center justify-center gap-2 text-headline-5">
                 <AlertTriangle className="size-5" />
                 {inGap.reason === "not_recorded" ? "未錄製" : `資料缺段：${GAP_REASON[inGap.reason] ?? inGap.reason}`}
               </div>
-              <p className="mt-1 text-xs opacity-80">
+              <p className="mt-1 text-body-xs opacity-80">
                 {inGap.from != null ? formatDateTime(inGap.from) : "—"}～{inGap.to != null ? formatDateTime(inGap.to) : "—"}
                 {inGap.count ? `・遺失 ${inGap.count} 筆` : ""}・此段沒有車輛資料，不補畫
               </p>
@@ -322,7 +318,7 @@ function VehicleName({ vehicle }: { vehicle: InvestigatedVehicle }) {
 
 function StageMessage({ children, tone }: { children: React.ReactNode; tone?: "warn" }) {
   return (
-    <div className={`flex h-full items-center justify-center px-6 text-center ${tone === "warn" ? "text-amber-200" : "text-zinc-400"}`}>
+    <div className={`flex h-full items-center justify-center px-6 text-center ${tone === "warn" ? "text-status-warning" : "text-text-tertiary"}`}>
       {children}
     </div>
   );

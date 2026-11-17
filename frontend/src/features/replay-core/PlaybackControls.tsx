@@ -5,6 +5,7 @@ import type { TimelineGap, ReplayFrame } from "./replayState";
 import { formatClock, formatClockMs, formatDateTime, REPLAY_TIME_ZONE } from "./time";
 import { GAP_REASON, SOURCE_LABEL, STREAM_LABEL } from "./replayLabels";
 import { REPLAY_SPEEDS, type ReplayPlayer, type ReplaySpeed } from "./useReplayPlayer";
+import { IconButton } from '../../components/ui';
 
 /**
  * 回放控制列（一般運行紀錄、歷史降級共用）：播放／暫停、上一幀／下一幀、時間軸（含缺段）、
@@ -42,51 +43,46 @@ export function PlaybackControls({
     }
   };
   return (
-    <div className="mt-3 shrink-0 rounded-2xl border border-zinc-800 bg-[#0f1013] px-5 py-4" onKeyDown={onKeyDown}>
-      <h3 className="text-blue-400">{heading}</h3>
+    <div className="mt-3 shrink-0 rounded-2xl border border-border-quaternary bg-surface-sub-background px-5 py-4" onKeyDown={onKeyDown}>
+      <h3 className="text-text-theme">{heading}</h3>
       {!window_ ? (
-        <p className="mt-2 text-sm text-zinc-500">{emptyMessage}</p>
+        <p className="mt-2 text-body-s text-text-quaternary">{emptyMessage}</p>
       ) : (
         <>
-          <p className="mt-1 text-sm text-zinc-300">
+          <p className="mt-1 text-body-s text-text-secondary">
             {subtitle ? <>{subtitle}{"\u3000"}</> : null}
             {formatDateTime(window_.from)}～{formatClock(window_.to)}
             {window_.ongoing ? "（進行中，載入時為止）" : ""}
-            <span className="ml-2 text-xs text-zinc-500">
+            <span className="ml-2 text-body-xs text-text-quaternary">
               {timelineLabel}・{REPLAY_TIME_ZONE}
             </span>
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
-            <button
-              type="button"
-              onClick={player.stepPrev}
-              disabled={disabled || player.stepping || player.atStart}
-              aria-label="上一幀"
+            <IconButton
+              label="上一幀"
               title="上一幀（Shift＋←）"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40"
-            >
-              <SkipBack className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={player.playing ? player.pause : player.play}
+              hierarchy="subordinate"
+              variant="tonal"
+              onPress={player.stepPrev}
+              disabled={disabled || player.stepping || player.atStart}
+              icon={<SkipBack />}
+            />
+            <IconButton
+              label={player.playing ? "暫停" : "播放"}
+              onPress={player.playing ? player.pause : player.play}
               disabled={disabled}
-              aria-label={player.playing ? "暫停" : "播放"}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40"
-            >
-              {player.playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </button>
-            <button
-              type="button"
-              onClick={player.stepNext}
-              disabled={disabled || player.stepping || player.atEnd}
-              aria-label="下一幀"
+              icon={player.playing ? <Pause /> : <Play />}
+            />
+            <IconButton
+              label="下一幀"
               title="下一幀（Shift＋→）"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40"
-            >
-              <SkipForward className="size-4" />
-            </button>
-            <span className="w-28 shrink-0 font-mono text-sm text-zinc-200" aria-live="polite">
+              hierarchy="subordinate"
+              variant="tonal"
+              onPress={player.stepNext}
+              disabled={disabled || player.stepping || player.atEnd}
+              icon={<SkipForward />}
+            />
+            <span className="w-28 shrink-0 font-mono text-body-s text-text-primary" aria-live="polite">
               {cursor != null ? formatClockMs(cursor.t) : "—"}
             </span>
             <div className="relative order-last w-full min-w-0 flex-1 sm:order-none sm:w-auto">
@@ -100,7 +96,7 @@ export function PlaybackControls({
                     return (
                       <span
                         key={index}
-                        className={`absolute h-full rounded ${gap.reason === "not_recorded" ? "bg-zinc-500/60" : "bg-red-500/50"}`}
+                        className={`absolute h-full rounded ${gap.reason === "not_recorded" ? "bg-status-inactive-light" : "bg-status-error-light"}`}
                         style={{ left: `${from * 100}%`, width: `${Math.max(0.5, (to - from) * 100)}%` }}
                         title={GAP_REASON[gap.reason] ?? gap.reason}
                       />
@@ -115,14 +111,15 @@ export function PlaybackControls({
                 value={cursor != null ? Math.min(span, Math.max(0, cursor.t - window_.from)) : 0}
                 onChange={(event) => player.seek(window_.from + Number(event.target.value))}
                 aria-label="回放時間軸"
-                className="relative w-full accent-blue-500"
+                className="relative w-full accent-link-theme-filled"
               />
             </div>
             <SiteSelect
               value={player.speed}
               onChange={(event) => player.setSpeed(Number(event.target.value) as ReplaySpeed)}
               aria-label="回放倍速"
-              className="shrink-0 rounded-lg bg-zinc-800 px-2 py-1.5 text-sm"
+              size="sm"
+              className="shrink-0"
             >
               {REPLAY_SPEEDS.map((speed) => (
                 <option key={speed} value={speed}>
@@ -143,11 +140,11 @@ function FrameInfo({ player }: { player: ReplayPlayer }) {
   const frame: ReplayFrame | null = player.state?.last ?? null;
   const position = player.framePosition;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-body-xs text-text-quaternary">
       {frame ? (
         <>
           <span>
-            目前幀：<span className="text-zinc-300">{STREAM_LABEL[frame.stream] ?? frame.stream}</span>
+            目前幀：<span className="text-text-secondary">{STREAM_LABEL[frame.stream] ?? frame.stream}</span>
             {frame.vehicle_code ? `・${frame.vehicle_code}` : ""}
             {frame.source ? `・${SOURCE_LABEL[frame.source] ?? frame.source}` : ""}
           </span>
@@ -162,10 +159,10 @@ function FrameInfo({ player }: { player: ReplayPlayer }) {
       ) : (
         <span>目前幀：起點狀態（游標之前最後保存的資料）</span>
       )}
-      {player.atStart ? <span className="text-amber-300">已是第一幀</span> : null}
-      {player.atEnd ? <span className="text-amber-300">已是最後一幀</span> : null}
+      {player.atStart ? <span className="text-status-warning">已是第一幀</span> : null}
+      {player.atEnd ? <span className="text-status-warning">已是最後一幀</span> : null}
       {player.buffering || player.stepping ? <span>載入回放資料…</span> : null}
-      <span className="ml-auto hidden text-zinc-600 sm:inline">逐幀：Shift＋← ／ Shift＋→</span>
+      <span className="ml-auto hidden text-text-disabled sm:inline">逐幀：Shift＋← ／ Shift＋→</span>
     </div>
   );
 }

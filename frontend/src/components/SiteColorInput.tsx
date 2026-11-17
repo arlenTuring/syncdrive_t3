@@ -48,11 +48,11 @@ export function SiteColorInput({ value, onChange, disabled, className = '', name
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`relative overflow-hidden border border-zinc-700 bg-transparent disabled:opacity-50 ${className}`}
+        className={`relative overflow-hidden border border-border-quaternary bg-transparent disabled:opacity-50 ${className}`}
         style={{ backgroundColor: source }}
       >
         <span className="absolute inset-0 bg-[linear-gradient(45deg,#777_25%,transparent_25%,transparent_75%,#777_75%),linear-gradient(45deg,#777_25%,#fff_25%,#fff_75%,#777_75%)] bg-[length:8px_8px] bg-[position:0_0,4px_4px] opacity-20" aria-hidden />
-        <Pipette className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow" aria-hidden />
+        <Pipette className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 text-text-primary drop-shadow" aria-hidden />
       </button>
       <AnchoredPopover
         open={open}
@@ -60,22 +60,22 @@ export function SiteColorInput({ value, onChange, disabled, className = '', name
         onClose={() => setOpen(false)}
         role="dialog"
         ariaLabel={ariaLabel || title || '選擇色彩'}
-        className="w-64 rounded-xl border border-zinc-700 bg-[#18181b] p-3 shadow-xl shadow-black/50"
+        className="w-64 rounded-xl border border-border-quaternary bg-surface-popup p-3 shadow-xl shadow-black-50"
       >
         <div className="mb-3 grid grid-cols-6 gap-2">
-          {PALETTE.map((color) => <button key={color} type="button" aria-label={color} onClick={() => emit(color)} className="size-7 rounded border border-white/20" style={{ backgroundColor: color }} />)}
+          {PALETTE.map((color) => <button key={color} type="button" aria-label={color} onClick={() => emit(color)} className="size-7 rounded border border-border-tertiary" style={{ backgroundColor: color }} />)}
         </div>
-        <label className="block text-xs text-zinc-400">
+        <label className="block text-body-xs text-text-tertiary">
           HEX / CSS 色彩
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => { if (parseColor(draft)) emit(draft.trim()); else setDraft(source); }}
             onKeyDown={(event) => { if (event.key === 'Enter' && parseColor(draft)) { emit(draft.trim()); setOpen(false); } }}
-            className={`mt-1 w-full rounded-lg border bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100 outline-none ${parseColor(draft) ? 'border-zinc-700 focus:border-sky-500' : 'border-red-500'}`}
+            className={`mt-1 w-full rounded-lg border bg-surface-primary px-2 py-1.5 font-mono text-body-s text-text-primary outline-none ${parseColor(draft) ? 'border-border-quaternary focus:border-border-theme' : 'border-status-error'}`}
           />
         </label>
-        <label className="mt-3 block text-xs text-zinc-400">
+        <label className="mt-3 block text-body-xs text-text-tertiary">
           透明度 {Math.round(parsed.a * 100)}%
           <input type="range" min={0} max={100} value={Math.round(parsed.a * 100)} onChange={(event) => updateAlpha(Number(event.target.value) / 100)} className="mt-1 w-full accent-sky-500" />
         </label>

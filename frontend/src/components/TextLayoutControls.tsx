@@ -47,8 +47,8 @@ function LayoutButton({
       className={[
         'flex size-8 items-center justify-center rounded-md border transition-colors',
         active
-          ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300'
-          : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200',
+          ? 'border-border-theme-light bg-surface-theme text-text-theme'
+          : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-primary hover:text-text-primary',
         disabled ? 'cursor-not-allowed opacity-50' : '',
       ].join(' ')}
     >
@@ -82,7 +82,7 @@ export function TextLayoutControls({
   return (
     <div className="space-y-2">
       <div>
-        <p className="mb-1.5 text-[10px] text-zinc-500">文字排列</p>
+        <p className="mb-1.5 text-caption-2 text-text-quaternary">文字排列</p>
         <div className="flex gap-1">
           <LayoutButton
             active={textWrap === 'single'}
@@ -105,7 +105,7 @@ export function TextLayoutControls({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">標籤寬度（px）</label>
+          <label className="mb-1 block text-caption-2 text-text-quaternary">標籤寬度（px）</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -124,20 +124,20 @@ export function TextLayoutControls({
                 const n = Number(raw);
                 if (Number.isFinite(n)) onLabelBoxWidthChange(n);
               }}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
             />
             <button
               type="button"
               disabled={disabled}
               onClick={() => onLabelBoxWidthChange(undefined)}
-              className="shrink-0 rounded border border-zinc-600 px-1.5 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
+              className="shrink-0 rounded border border-border-tertiary px-1.5 py-1 text-caption-2 text-text-tertiary hover:bg-link-standard-hover disabled:opacity-50"
             >
               自動
             </button>
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[10px] text-zinc-500">標籤高度（px）</label>
+          <label className="mb-1 block text-caption-2 text-text-quaternary">標籤高度（px）</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -156,13 +156,13 @@ export function TextLayoutControls({
                 const n = Number(raw);
                 if (Number.isFinite(n)) onLabelBoxHeightChange(n);
               }}
-              className="w-full rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50"
+              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
             />
             <button
               type="button"
               disabled={disabled}
               onClick={() => onLabelBoxHeightChange(undefined)}
-              className="shrink-0 rounded border border-zinc-600 px-1.5 py-1 text-[10px] text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
+              className="shrink-0 rounded border border-border-tertiary px-1.5 py-1 text-caption-2 text-text-tertiary hover:bg-link-standard-hover disabled:opacity-50"
             >
               自動
             </button>
@@ -172,7 +172,7 @@ export function TextLayoutControls({
 
       {showPlacement && onLabelPlacementChange ? (
         <div>
-          <p className="mb-1.5 text-[10px] text-zinc-500">名稱位置</p>
+          <p className="mb-1.5 text-caption-2 text-text-quaternary">名稱位置</p>
           <div className="flex flex-wrap gap-1">
             {PLACEMENT_ORDER.map((placement) => (
               <LayoutButton

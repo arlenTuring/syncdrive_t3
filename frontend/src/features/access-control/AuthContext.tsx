@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   }), [user, loading]);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 2600); return () => window.clearTimeout(timer); }, [notice]);
-  return <Context.Provider value={value}>{children}{notice ? <div role="alert" className="fixed bottom-8 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-red-600 px-5 py-3 text-white shadow-2xl">{notice}</div> : null}</Context.Provider>;
+  return <Context.Provider value={value}>{children}{notice ? <div role="alert" className="fixed bottom-8 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-link-danger-filled px-5 py-3 text-body-s text-text-primary shadow-2xl">{notice}</div> : null}</Context.Provider>;
 }
 
 export function useAuth() {

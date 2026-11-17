@@ -44,8 +44,8 @@ function AlignButton({
       className={[
         'flex size-8 items-center justify-center rounded-md border transition-colors',
         active
-          ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300'
-          : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200',
+          ? 'border-border-theme-light bg-surface-theme text-text-theme'
+          : 'border-border-quaternary bg-surface-primary text-text-tertiary hover:border-border-primary hover:text-text-primary',
         disabled ? 'cursor-not-allowed opacity-50' : '',
       ].join(' ')}
     >
@@ -66,7 +66,7 @@ export function TextAlignmentControls({
   return (
     <div className="space-y-2">
       <div>
-        <p className="mb-1.5 text-[10px] text-zinc-500">{horizontalLabel}</p>
+        <p className="mb-1.5 text-caption-2 text-text-quaternary">{horizontalLabel}</p>
         <div className="flex gap-1">
           <AlignButton
             active={horizontal === 'left'}
@@ -95,7 +95,7 @@ export function TextAlignmentControls({
         </div>
       </div>
       <div>
-        <p className="mb-1.5 text-[10px] text-zinc-500">{verticalLabel}</p>
+        <p className="mb-1.5 text-caption-2 text-text-quaternary">{verticalLabel}</p>
         <div className="flex gap-1">
           <AlignButton
             active={vertical === 'top'}

@@ -126,7 +126,7 @@ async function query(vehicle: InvestigatedVehicle) {
 }
 
 const currentSeq = () => /seq (\d+)/.exec(box!.textContent ?? "")?.[1] ?? null;
-const panelText = () => (box!.querySelector('[aria-label$="車輛資料"][class*="text-sm"]') as HTMLElement | null)?.textContent ?? "";
+const panelText = () => (box!.querySelector('[aria-label$="車輛資料"][class*="text-body-s"]') as HTMLElement | null)?.textContent ?? "";
 
 async function step(dir: "上一幀" | "下一幀") {
   act(() => byLabel<HTMLButtonElement>(dir).click());

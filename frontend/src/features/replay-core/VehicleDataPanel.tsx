@@ -12,6 +12,7 @@ import {
   streamStatuses,
   type FieldNode,
 } from "./vehiclePanelModel";
+import { IconButton } from '../../components/ui';
 
 export type RelatedRecords = {
   events: Array<Record<string, unknown> & { at: number | null }>;
@@ -77,8 +78,8 @@ export function VehicleDataPanel({
   const searching = query.trim() !== "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col text-sm" aria-label={`${vehicleCode} 車輛資料`}>
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
+    <div className="flex min-h-0 flex-1 flex-col text-body-s" aria-label={`${vehicleCode} 車輛資料`}>
+      <div className="flex items-center gap-2 border-b border-border-quaternary px-3 py-2">
         {onSelect && !investigated ? (
           <>
             <label className="sr-only" htmlFor="replay-vehicle-select">
@@ -88,7 +89,8 @@ export function VehicleDataPanel({
               id="replay-vehicle-select"
               value={vehicleCode}
               onChange={(event) => onSelect(event.target.value)}
-              className="min-w-0 flex-1 rounded-lg bg-zinc-800 px-2 py-1.5 font-mono"
+              size="sm"
+              className="min-w-0 flex-1 font-mono"
             >
               {options.map((code) => (
                 <option key={code} value={code}>
@@ -100,28 +102,26 @@ export function VehicleDataPanel({
           </>
         ) : (
           <p className="min-w-0 flex-1 truncate" data-testid="investigated-vehicle">
-            <span className="text-zinc-400">調查載具：</span>
-            <span className="text-zinc-100">{investigated?.displayName ?? vehicleCode}</span>
+            <span className="text-text-tertiary">調查載具：</span>
+            <span className="text-text-primary">{investigated?.displayName ?? vehicleCode}</span>
             {investigated && investigated.displayName !== investigated.vehicleCode ? (
-              <span className="ml-1.5 font-mono text-xs text-zinc-500">{investigated.vehicleCode}</span>
+              <span className="ml-1.5 font-mono text-body-xs text-text-quaternary">{investigated.vehicleCode}</span>
             ) : null}
           </p>
         )}
         {onClose ? (
-          <button type="button" onClick={onClose} aria-label="關閉車輛資料" className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10">
-            <X className="size-4" />
-          </button>
+          <IconButton label="關閉車輛資料" size="small" hierarchy="subordinate" variant="standard" icon={<X />} onPress={onClose} />
         ) : null}
       </div>
-      <div className="relative border-b border-zinc-800 px-3 py-2">
-        <Search className="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-zinc-500" />
+      <div className="relative border-b border-border-quaternary px-3 py-2">
+        <Search className="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-text-quaternary" />
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜尋欄位名稱、原始路徑或值"
           aria-label="搜尋欄位"
-          className="w-full rounded-lg bg-zinc-900 py-1.5 pr-2 pl-8 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-lg bg-surface-primary py-1.5 pr-2 pl-8 text-body-s outline-none focus:ring-1 focus:ring-border-theme"
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
@@ -129,25 +129,25 @@ export function VehicleDataPanel({
           {statuses.map((status) => (
             <div
               key={status.stream}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs ${
-                !status.frame ? "border-zinc-800 text-zinc-500" : status.stale ? "border-amber-600/60 bg-amber-500/5" : "border-zinc-800"
+              className={`rounded-lg border px-2.5 py-1.5 text-body-xs ${
+                !status.frame ? "border-border-quaternary text-text-quaternary" : status.stale ? "border-status-warning-light bg-status-warning-light" : "border-border-quaternary"
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="font-medium text-zinc-200">{status.label}</span>
+                <span className="font-medium text-text-primary">{status.label}</span>
                 {status.frame ? (
                   status.stale ? (
-                    <span className="rounded bg-amber-500/20 px-1.5 text-amber-200">過期</span>
+                    <span className="rounded bg-status-warning-light px-1.5 text-status-warning">過期</span>
                   ) : (
-                    <span className="rounded bg-emerald-500/15 px-1.5 text-emerald-300">有效</span>
+                    <span className="rounded bg-status-success-light px-1.5 text-status-success">有效</span>
                   )
                 ) : (
-                  <span className="rounded bg-zinc-800 px-1.5">無資料</span>
+                  <span className="rounded bg-surface-secondary px-1.5">無資料</span>
                 )}
-                {status.ageMs != null ? <span className="ml-auto text-zinc-500">{(status.ageMs / 1000).toFixed(1)} 秒前</span> : null}
+                {status.ageMs != null ? <span className="ml-auto text-text-quaternary">{(status.ageMs / 1000).toFixed(1)} 秒前</span> : null}
               </div>
               {status.frame ? (
-                <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-zinc-400">
+                <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-text-tertiary">
                   <dt>後端收到</dt>
                   <dd className="font-mono">{formatDateTime(status.frame.received_at)}.{String(status.frame.received_at % 1000).padStart(3, "0")}</dd>
                   <dt>車端時間</dt>
@@ -161,27 +161,27 @@ export function VehicleDataPanel({
                 </dl>
               ) : null}
               {status.stream === "health" && status.frame && healthKeepaliveMs ? (
-                <p className="mt-1 text-zinc-500">健康內容沒變時降頻保存（每 {Math.round(healthKeepaliveMs / 1000)} 秒一筆），內容有變一定保存</p>
+                <p className="mt-1 text-text-quaternary">健康內容沒變時降頻保存（每 {Math.round(healthKeepaliveMs / 1000)} 秒一筆），內容有變一定保存</p>
               ) : null}
-              {status.note ? <p className={`mt-1 ${status.stale ? "text-amber-200" : "text-zinc-500"}`}>{status.note}</p> : null}
+              {status.note ? <p className={`mt-1 ${status.stale ? "text-status-warning" : "text-text-quaternary"}`}>{status.note}</p> : null}
             </div>
           ))}
-          <p className="text-[11px] text-zinc-600">時間軸：{timelineLabel}。內容只來自游標之前保存的資料，不以即時資料補。</p>
+          <p className="text-body-xs text-text-disabled">時間軸：{timelineLabel}。內容只來自游標之前保存的資料，不以即時資料補。</p>
         </section>
         {filtered.map((section) => {
           const relatedHere = section.category === "events" && related ? related : null;
           const count = countLeaves(section.nodes);
           if (searching && count === 0) return null;
           return (
-            <details key={section.category} open className="group mb-2 rounded-lg border border-zinc-800">
+            <details key={section.category} open className="group mb-2 rounded-lg border border-border-quaternary">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 select-none">
-                <ChevronRight className="size-4 text-zinc-500 transition group-open:rotate-90" />
-                <span className="text-zinc-100">{CATEGORY_LABEL[section.category]}</span>
-                <span className="ml-auto text-xs text-zinc-500">{count} 欄</span>
+                <ChevronRight className="size-4 text-text-quaternary transition group-open:rotate-90" />
+                <span className="text-text-primary">{CATEGORY_LABEL[section.category]}</span>
+                <span className="ml-auto text-body-xs text-text-quaternary">{count} 欄</span>
               </summary>
-              <div className="border-t border-zinc-800 px-2 py-1.5">
+              <div className="border-t border-border-quaternary px-2 py-1.5">
                 {section.nodes.length === 0 && !relatedHere ? (
-                  <p className="px-1 py-1 text-xs text-zinc-500">此分類在游標當下沒有保存的資料</p>
+                  <p className="px-1 py-1 text-body-xs text-text-quaternary">此分類在游標當下沒有保存的資料</p>
                 ) : (
                   <ul className="space-y-0.5">
                     {section.nodes.map((node) => (
@@ -203,25 +203,25 @@ function FieldItem({ node, depth, expand }: { node: FieldNode; depth: number; ex
   const name = (
     <span className="min-w-0">
       {node.label ? (
-        <span className="text-zinc-200">{node.label}</span>
+        <span className="text-text-primary">{node.label}</span>
       ) : (
-        <span className="rounded bg-zinc-800 px-1 text-[11px] text-amber-200/90">尚無中文對照</span>
+        <span className="rounded bg-surface-secondary px-1 text-body-xs text-status-warning">尚無中文對照</span>
       )}
-      <span className="ml-1.5 font-mono text-[11px] break-all text-zinc-500">{node.path}</span>
+      <span className="ml-1.5 font-mono text-body-xs break-all text-text-quaternary">{node.path}</span>
     </span>
   );
   if (node.children.length) {
     return (
       <li>
         <details open={expand || depth < 1} className="group/field">
-          <summary className="flex cursor-pointer list-none items-start gap-1 rounded px-1 py-0.5 hover:bg-white/5">
-            <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-zinc-500 transition group-open/field:rotate-90" />
+          <summary className="flex cursor-pointer list-none items-start gap-1 rounded px-1 py-0.5 hover:bg-link-standard">
+            <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-text-quaternary transition group-open/field:rotate-90" />
             {name}
-            <span className="ml-auto shrink-0 pl-2 text-[11px] text-zinc-500">
+            <span className="ml-auto shrink-0 pl-2 text-body-xs text-text-quaternary">
               {node.kind === "array" ? `陣列 ${node.children.length} 項` : `物件 ${node.children.length} 欄`}
             </span>
           </summary>
-          <ul className="ml-3 border-l border-zinc-800 pl-2">
+          <ul className="ml-3 border-l border-border-quaternary pl-2">
             {node.children.map((child) => (
               <FieldItem key={child.id} node={child} depth={depth + 1} expand={expand} />
             ))}
@@ -231,7 +231,7 @@ function FieldItem({ node, depth, expand }: { node: FieldNode; depth: number; ex
     );
   }
   return (
-    <li className="flex items-start gap-2 rounded px-1 py-0.5 pl-5 hover:bg-white/5">
+    <li className="flex items-start gap-2 rounded px-1 py-0.5 pl-5 hover:bg-link-standard">
       {name}
       <span className="ml-auto shrink-0 pl-2 text-right">
         <FieldValue node={node} />
@@ -243,44 +243,44 @@ function FieldItem({ node, depth, expand }: { node: FieldNode; depth: number; ex
 function FieldValue({ node }: { node: FieldNode }) {
   switch (node.kind) {
     case "missing":
-      return <span className="text-amber-300">缺少（這筆沒有此欄位）</span>;
+      return <span className="text-status-warning">缺少（這筆沒有此欄位）</span>;
     case "null":
-      return <span className="font-mono text-zinc-400">null（空值）</span>;
+      return <span className="font-mono text-text-tertiary">null（空值）</span>;
     case "empty-string":
-      return <span className="font-mono text-zinc-400">""（空字串）</span>;
+      return <span className="font-mono text-text-tertiary">""（空字串）</span>;
     case "empty-array":
-      return <span className="font-mono text-zinc-400">[]（空陣列）</span>;
+      return <span className="font-mono text-text-tertiary">[]（空陣列）</span>;
     case "empty-object":
-      return <span className="font-mono text-zinc-400">{"{}"}（空物件）</span>;
+      return <span className="font-mono text-text-tertiary">{"{}"}（空物件）</span>;
     case "boolean":
       return (
-        <span className="font-mono text-zinc-100">
+        <span className="font-mono text-text-primary">
           {String(node.value)}
-          <span className="text-zinc-500">（{node.value ? "是" : "否"}）</span>
+          <span className="text-text-quaternary">（{node.value ? "是" : "否"}）</span>
         </span>
       );
     case "number": {
       const value = node.value as number;
       if (node.unit === "Unix ms")
         return (
-          <span className="font-mono text-zinc-100">
+          <span className="font-mono text-text-primary">
             {value}
-            <span className="block text-[11px] text-zinc-500">{formatDateTime(value)}.{String(value % 1000).padStart(3, "0")}</span>
+            <span className="block text-body-xs text-text-quaternary">{formatDateTime(value)}.{String(value % 1000).padStart(3, "0")}</span>
           </span>
         );
       return (
-        <span className="font-mono text-zinc-100">
+        <span className="font-mono text-text-primary">
           {value}
-          {node.unit ? <span className="ml-1 text-zinc-500">{node.unit}</span> : null}
+          {node.unit ? <span className="ml-1 text-text-quaternary">{node.unit}</span> : null}
         </span>
       );
     }
     default:
       return (
-        <span className="font-mono break-all text-zinc-100">
+        <span className="font-mono break-all text-text-primary">
           {String(node.value)}
-          {node.valueText ? <span className="ml-1 text-zinc-500">（{node.valueText}）</span> : null}
-          {node.unit ? <span className="ml-1 text-zinc-500">{node.unit}</span> : null}
+          {node.valueText ? <span className="ml-1 text-text-quaternary">（{node.valueText}）</span> : null}
+          {node.unit ? <span className="ml-1 text-text-quaternary">{node.unit}</span> : null}
         </span>
       );
   }
@@ -327,45 +327,45 @@ function RelatedList({
   enabled: boolean;
 }) {
   if (!enabled) {
-    return <p className="mt-1 px-1 text-xs text-zinc-500">本播放器只顯示錄進回放的事件與指令回應訊息</p>;
+    return <p className="mt-1 px-1 text-body-xs text-text-quaternary">本播放器只顯示錄進回放的事件與指令回應訊息</p>;
   }
-  if (!state) return <p className="mt-1 px-1 text-xs text-zinc-500">載入 {vehicle} 的事件與指令紀錄…</p>;
-  if (state.error) return <p className="mt-1 px-1 text-xs text-red-300">事件與指令紀錄載入失敗：{state.error}</p>;
+  if (!state) return <p className="mt-1 px-1 text-body-xs text-text-quaternary">載入 {vehicle} 的事件與指令紀錄…</p>;
+  if (state.error) return <p className="mt-1 px-1 text-body-xs text-status-error-emphasis">事件與指令紀錄載入失敗：{state.error}</p>;
   const events = (state.value?.events ?? []).filter((item) => cursorT == null || (item.at ?? 0) <= cursorT);
   const commands = (state.value?.commands ?? []).filter((item) => cursorT == null || (item.sent_at ?? 0) <= cursorT);
   return (
-    <div className="mt-2 space-y-2 border-t border-zinc-800 pt-2 text-xs">
+    <div className="mt-2 space-y-2 border-t border-border-quaternary pt-2 text-body-xs">
       <div>
-        <h4 className="mb-1 text-zinc-300">事件紀錄（截至游標，最近 200 筆）</h4>
+        <h4 className="mb-1 text-text-secondary">事件紀錄（截至游標，最近 200 筆）</h4>
         {events.length === 0 ? (
-          <p className="text-zinc-500">回放時段內、游標之前沒有事件</p>
+          <p className="text-text-quaternary">回放時段內、游標之前沒有事件</p>
         ) : (
           <ul className="space-y-1">
             {events.map((item, index) => (
-              <li key={String(item.event_id ?? index)} className="rounded bg-zinc-900 px-2 py-1">
-                <span className="font-mono text-zinc-400">{item.at != null ? formatClockMs(item.at) : "—"}</span>{" "}
-                <span className="text-zinc-100">{String(item.event_code ?? "")}</span>{" "}
-                <span className="text-zinc-500">{String(item.severity ?? "")}</span>
-                {item.display_message ? <p className="text-zinc-400">{String(item.display_message)}</p> : null}
+              <li key={String(item.event_id ?? index)} className="rounded bg-surface-primary px-2 py-1">
+                <span className="font-mono text-text-tertiary">{item.at != null ? formatClockMs(item.at) : "—"}</span>{" "}
+                <span className="text-text-primary">{String(item.event_code ?? "")}</span>{" "}
+                <span className="text-text-quaternary">{String(item.severity ?? "")}</span>
+                {item.display_message ? <p className="text-text-tertiary">{String(item.display_message)}</p> : null}
               </li>
             ))}
           </ul>
         )}
       </div>
       <div>
-        <h4 className="mb-1 text-zinc-300">下發指令（截至游標）</h4>
+        <h4 className="mb-1 text-text-secondary">下發指令（截至游標）</h4>
         {commands.length === 0 ? (
-          <p className="text-zinc-500">回放時段內、游標之前沒有下發指令</p>
+          <p className="text-text-quaternary">回放時段內、游標之前沒有下發指令</p>
         ) : (
           <ul className="space-y-1">
             {commands.map((item, index) => {
               // 回應時刻晚於游標的：游標當下還沒回應（游標往回移時，舊的查詢結果也照這個規則顯示）
               const acked = item.is_acked && item.acked_at != null && cursorT != null && item.acked_at <= cursorT;
               return (
-                <li key={String(item.command_id ?? index)} className="rounded bg-zinc-900 px-2 py-1">
-                  <span className="font-mono text-zinc-400">{item.sent_at != null ? formatClockMs(item.sent_at) : "—"}</span>{" "}
-                  <span className="text-zinc-100">{String(item.action ?? "")}</span>{" "}
-                  <span className={acked ? "text-emerald-300" : "text-amber-300"}>
+                <li key={String(item.command_id ?? index)} className="rounded bg-surface-primary px-2 py-1">
+                  <span className="font-mono text-text-tertiary">{item.sent_at != null ? formatClockMs(item.sent_at) : "—"}</span>{" "}
+                  <span className="text-text-primary">{String(item.action ?? "")}</span>{" "}
+                  <span className={acked ? "text-status-success" : "text-status-warning"}>
                     {acked ? `已回應 ${formatClockMs(item.acked_at!)}` : "游標當下尚未回應"}
                   </span>
                 </li>

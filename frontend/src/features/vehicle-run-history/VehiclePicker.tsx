@@ -45,8 +45,8 @@ export function VehiclePicker({
 
   return (
     <div className="relative" ref={boxRef}>
-      <span className="mb-1 block text-zinc-400">
-        調查載具 <span className="text-red-300">*</span>
+      <span className="mb-1 block text-text-tertiary">
+        調查載具 <span className="text-status-error-emphasis">*</span>
       </span>
       <div className="relative">
         <input
@@ -81,14 +81,14 @@ export function VehiclePicker({
               setOpen(false);
             }
           }}
-          className="w-full rounded-lg bg-zinc-800 px-3 py-2 pr-8"
+          className="w-full rounded-lg bg-surface-secondary px-3 py-2 pr-8"
         />
-        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-zinc-500" />
+        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-text-quaternary" />
       </div>
       {open ? (
-        <ul id={listId} role="listbox" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+        <ul id={listId} role="listbox" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl">
           {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-zinc-500">{error ? `載具清單載入失敗：${error}` : "沒有符合的載具"}</li>
+            <li className="px-3 py-2 text-text-quaternary">{error ? `載具清單載入失敗：${error}` : "沒有符合的載具"}</li>
           ) : (
             filtered.map((item, index) => (
               <li
@@ -100,12 +100,12 @@ export function VehiclePicker({
                   pick(item);
                 }}
                 onMouseEnter={() => setActive(index)}
-                className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 ${index === active ? "bg-zinc-800" : ""}`}
+                className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 ${index === active ? "bg-surface-secondary" : ""}`}
               >
-                <span className="min-w-0 flex-1 truncate text-zinc-100">{item.display_name}</span>
-                {item.display_name !== item.vehicle_code ? <span className="font-mono text-xs text-zinc-500">{item.vehicle_code}</span> : null}
-                {!item.is_active ? <span className="rounded bg-zinc-700 px-1 text-[10px] text-zinc-300">已停用</span> : null}
-                {item.history_last_real == null ? <span className="text-[10px] text-zinc-500">無歷史</span> : null}
+                <span className="min-w-0 flex-1 truncate text-text-primary">{item.display_name}</span>
+                {item.display_name !== item.vehicle_code ? <span className="font-mono text-body-xs text-text-quaternary">{item.vehicle_code}</span> : null}
+                {!item.is_active ? <span className="rounded bg-link-standard-hover px-1 text-caption-2 text-text-secondary">已停用</span> : null}
+                {item.history_last_real == null ? <span className="text-caption-2 text-text-quaternary">無歷史</span> : null}
               </li>
             ))
           )}

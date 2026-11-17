@@ -3,10 +3,9 @@
     "button": 1
   },
   "components/SiteColorInput.tsx": {
-    "hex": 14,
-    "arbitrary": 1,
+    "hex": 13,
     "rgb": 1,
-    "palette": 13,
+    "palette": 2,
     "button": 2
   },
   "components/SiteDateTimeInput.tsx": {
@@ -20,38 +19,18 @@
     "button": 2
   },
   "components/TextAlignmentControls.tsx": {
-    "arbitrary": 2,
-    "palette": 10,
     "button": 1
   },
   "components/TextLayoutControls.tsx": {
-    "arbitrary": 8,
-    "palette": 26,
     "button": 3
   },
   "components/ui/variants.ts": {
     "palette": 2
   },
-  "components/ViewErrorBoundary.tsx": {
-    "palette": 1
-  },
   "features/access-control/AccountDialogs.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 36,
-    "button": 4
+    "button": 1
   },
   "features/access-control/AccountManagementPage.tsx": {
-    "hex": 5,
-    "arbitrary": 5,
-    "palette": 28,
-    "button": 9
-  },
-  "features/access-control/AuthContext.tsx": {
-    "palette": 2
-  },
-  "features/access-control/LoginDialog.tsx": {
-    "palette": 5,
     "button": 1
   },
   "features/access-control/LoginPage.tsx": {
@@ -59,10 +38,7 @@
     "button": 1
   },
   "features/access-control/RoleManagementPage.tsx": {
-    "hex": 10,
-    "arbitrary": 10,
-    "palette": 38,
-    "button": 13
+    "button": 3
   },
   "features/dashboard/CanvasElement.tsx": {
     "hex": 48,
@@ -981,9 +957,6 @@
   "features/media-schedules/ScheduleEditorDialog.tsx": {
     "button": 1
   },
-  "features/order-records/index.tsx": {
-    "palette": 5
-  },
   "features/psd-control/components/DockTimeDialog.tsx": {
     "hex": 16,
     "arbitrary": 29,
@@ -1013,53 +986,19 @@
     "palette": 14,
     "button": 3
   },
-  "features/replay-core/PlaybackControls.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 21,
-    "button": 3
-  },
-  "features/replay-core/ReplayMapLayer.tsx": {
-    "palette": 2
-  },
-  "features/replay-core/VehicleDataPanel.tsx": {
-    "arbitrary": 5,
-    "palette": 75,
-    "button": 1
-  },
-  "features/schedule-management/components/AttachModuleDashboardDialog.tsx": {
-    "hex": 1,
-    "arbitrary": 2,
-    "palette": 32,
-    "button": 3
-  },
-  "features/schedule-management/components/ModuleDashboardRuntimeView.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 9,
-    "button": 1
-  },
   "features/schedule-management/components/ScheduleModuleSidebar.tsx": {
     "button": 10
   },
   "features/schedule-management/components/ShellAccountToolbar.tsx": {
     "palette": 1,
-    "button": 6
+    "button": 4
   },
   "features/schedule-management/components/ShellWorkspaceFrame.tsx": {
     "palette": 1
   },
-  "features/schedule-task-types/TaskTypeBadge.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "rgb": 1
-  },
   "features/scheduled-orders/ScheduledOrdersPage.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 89,
-    "button": 15,
-    "selection": 1
+    "palette": 1,
+    "button": 3
   },
   "features/shift-deployment/components/DeploymentShiftTable.tsx": {
     "hex": 2,
@@ -1548,23 +1487,8 @@
     "palette": 14,
     "button": 3
   },
-  "features/vehicle-realtime/VehicleLocationDialog.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 13,
-    "button": 1
-  },
-  "features/vehicle-realtime/VehicleRealtimePage.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 39,
-    "button": 7
-  },
   "features/vehicle-registry/VehicleRegistryPage.tsx": {
-    "hex": 10,
-    "arbitrary": 10,
-    "palette": 58,
-    "button": 20
+    "button": 1
   },
   "features/vehicle-rotation/VehicleRotationPage.tsx": {
     "hex": 16,
@@ -1573,19 +1497,10 @@
     "button": 11
   },
   "features/vehicle-run-history/QueryPanel.tsx": {
-    "arbitrary": 1,
-    "palette": 106,
-    "button": 5
+    "button": 2
   },
   "features/vehicle-run-history/RunHistoryPage.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 27,
-    "button": 3
-  },
-  "features/vehicle-run-history/VehiclePicker.tsx": {
-    "arbitrary": 2,
-    "palette": 13
+    "palette": 1
   },
   "features/video/LayoutEditorDialog.tsx": {
     "palette": 1

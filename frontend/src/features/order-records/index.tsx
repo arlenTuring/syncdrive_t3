@@ -20,8 +20,8 @@ function Detail({ id, timeZone, onClose }: { id: string; timeZone: string; onClo
   }, [id]);
   return (
     <Dialog title={row?.order_id ?? '訂單詳情'} onClose={onClose} footer={<GhostButton onClick={onClose}>關閉</GhostButton>}>
-      {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
-      {!row && !error ? <p className="text-sm text-zinc-500">載入中…</p> : null}
+      {error ? <p role="alert" className="text-body-s text-status-error-emphasis">{error}</p> : null}
+      {!row && !error ? <p className="text-body-s text-text-quaternary">載入中…</p> : null}
       {row ? <dl>
         <DetailRow label="訂單名稱">{row.display_name}</DetailRow>
         <DetailRow label="訂單狀態">{row.category}{row.status_hint ? `・${row.status_hint}` : ''}</DetailRow>
@@ -125,7 +125,7 @@ export default function OrderRecordsPage() {
   ];
   const rows = (data?.items ?? []).map((row) => ({ ...row, id: row.order_id }));
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-text-primary">
       <div className="flex flex-wrap items-end gap-3" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(); } }}>
         <TextFilter label="關鍵字" value={draft.keyword} onChange={(keyword) => setDraft({ ...draft, keyword })} onEnter={search} placeholder="訂單、路線或載具" />
         <RangeFilter value={draft.range} onChange={(range) => setDraft({ ...draft, range })} timeZone={timeZone} error={rangeError} />
@@ -133,7 +133,7 @@ export default function OrderRecordsPage() {
         <SelectFilter label="訂單狀態" value={draft.category} onChange={(category) => setDraft({ ...draft, category })} options={options?.categories ?? []} />
         <QueryActions onSearch={search} onReset={reset} />
       </div>
-      {!applied ? <div className="flex min-h-56 flex-1 items-center justify-center rounded-2xl border border-zinc-800 text-sm text-zinc-500">請設定條件後按搜尋</div> : <>
+      {!applied ? <div className="flex min-h-56 flex-1 items-center justify-center rounded-2xl border border-border-quaternary text-body-s text-text-quaternary">請設定條件後按搜尋</div> : <>
         <DataTable columns={columns} rows={rows} sort={{ by: applied.sortBy, direction: applied.direction }} onSort={sort} onDetail={(row) => setDetailId(row.order_id)} state={<ListState loading={loading} error={error} empty={!rows.length} emptyText="這段期間沒有符合條件的訂單" onRetry={() => setRetry(Date.now())} />} />
         <ListFooter page={page} total={data?.total ?? 0} pageSize={data?.page_size ?? options?.page_size ?? 20} onPage={setPage} summary={data ? `共 ${data.total} 筆；依計畫開始時間與訂單編號穩定排序` : ''} />
       </>}

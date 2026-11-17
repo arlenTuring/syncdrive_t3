@@ -14,6 +14,7 @@ import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourc
 import { DASHBOARD_PLANES_TAG, fetchDashboardPlanes } from '../../dashboard/api/dashboardPlanesApi';
 import { DASHBOARD_PLANES_STORAGE_KEY } from '../../../lib/canvasCacheReset';
 import { findStoredDashboardPlane } from '../utils/moduleDashboardPages';
+import { IconButton } from '../../../components/ui';
 
 type ModuleDashboardRuntimeViewProps = {
   planeId: string;
@@ -121,22 +122,22 @@ export function ModuleDashboardRuntimeView({
 
   if (resolving) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0b] px-6 text-center">
-        <Loader2 className="size-8 animate-spin text-zinc-500" />
-        <p className="text-xs text-zinc-500">{t('shell.moduleDashboard.loading')}</p>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-surface-sub-background px-6 text-center">
+        <Loader2 className="size-8 animate-spin text-text-quaternary" />
+        <p className="text-body-xs text-text-quaternary">{t('shell.moduleDashboard.loading')}</p>
       </div>
     );
   }
 
   if (!plane) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0b] px-6 text-center">
-        <AlertCircle className="size-10 text-amber-500/80" />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-surface-sub-background px-6 text-center">
+        <AlertCircle className="size-10 text-status-warning" />
         <div>
-          <p className="text-sm font-medium text-zinc-200">
+          <p className="text-body-s-bold text-text-primary">
             {t('shell.moduleDashboard.notFoundTitle')}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-body-xs text-text-quaternary">
             {t('shell.moduleDashboard.notFoundHint', { name: pageLabel })}
           </p>
         </div>
@@ -160,17 +161,18 @@ export function ModuleDashboardRuntimeView({
           >
             <div
               ref={frameRef}
-              className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950 ${fullscreen === 'web' ? 'fixed inset-0 z-[120]' : 'relative'}`}
+              className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-sub-background ${fullscreen === 'web' ? 'fixed inset-0 z-[120]' : 'relative'}`}
             >
-              <button
-                type="button"
-                onClick={toggleFullscreen}
+              <IconButton
+                size="small"
+                hierarchy="subordinate"
+                variant="tonal"
+                className="absolute right-3 top-3 z-30"
+                onPress={toggleFullscreen}
                 title={t(fullscreen ? 'shell.moduleDashboard.exitFullscreen' : 'shell.moduleDashboard.fullscreen')}
-                aria-label={t(fullscreen ? 'shell.moduleDashboard.exitFullscreen' : 'shell.moduleDashboard.fullscreen')}
-                className="absolute right-3 top-3 z-30 inline-flex size-8 items-center justify-center rounded-lg bg-[#1f1f22]/80 text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-              >
-                {fullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
-              </button>
+                label={t(fullscreen ? 'shell.moduleDashboard.exitFullscreen' : 'shell.moduleDashboard.fullscreen')}
+                icon={fullscreen ? <Minimize /> : <Maximize />}
+              />
               <VariableProvider variables={{}}>
                 <PlaneWorkspace
                   plane={plane}

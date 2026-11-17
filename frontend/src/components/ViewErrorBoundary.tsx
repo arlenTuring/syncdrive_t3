@@ -49,7 +49,7 @@ export class ViewErrorBoundary extends Component<Props, State> {
             <h2 className="text-headline-5 text-text-primary">
               {this.props.title ?? '畫面載入失敗'}
             </h2>
-            <p className="break-words font-mono text-xs text-rose-300">
+            <p className="break-words font-mono text-body-xs text-status-error-emphasis">
               {error.message}
             </p>
             <p className="text-body-xs text-text-quaternary">
