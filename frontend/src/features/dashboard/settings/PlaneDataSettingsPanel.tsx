@@ -95,7 +95,7 @@ export function PlaneDataSettingsPanel({ plane, planes, onChange }: Props) {
               {boundId === 'default-internal' && <span className="text-body-xs text-text-quaternary">（也決定站內 REST 載入的後端）</span>}
               {boundId === 'default-mqtt' && <span className="text-body-xs text-text-quaternary">（也決定車隊與圖台即時資料）</span>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <SiteSelect
                 className={selectCls}
                 value={selected ? selectedId : ''}

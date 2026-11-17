@@ -37,7 +37,7 @@ export function Tabs<T extends string>({
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
             className={cn(
-              'relative px-4 py-2.5 transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
+              'relative whitespace-nowrap px-4 py-2.5 transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
               active ? 'text-body-s-bold text-text-theme' : 'text-body-s text-text-tertiary hover:text-text-primary',
             )}
           >
@@ -76,7 +76,7 @@ export function SegmentedControl<T extends string>({
             disabled={option.disabled}
             onClick={() => onChange(option.id)}
             className={cn(
-              'rounded-md px-3 py-1.5 text-body-xs transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
+              'whitespace-nowrap rounded-md px-3 py-1.5 text-body-xs transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
               active ? 'bg-link-standard-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary',
             )}
           >
