@@ -13,6 +13,7 @@ import { BADGE_TONE, onlineBadge, recordingBadge } from './status';
 import { StorageDialog } from './StorageDialog';
 import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
 import { AnchoredPopover } from '../../lib/AnchoredPopover';
+import { Button, IconButton, MENU_PANEL_CLASS, Switch, cn, menuItemClass } from '../../components/ui';
 
 const PAGE_SIZE = 20;
 const HOUR = 3_600_000;
@@ -22,14 +23,14 @@ const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in cry
 function RowActions({ source, open, busy, onToggle, onEdit, onDuplicate, onHistory, onDelete }: { source: VideoSourceItem; open: boolean; busy: boolean; onToggle: () => void; onEdit: () => void; onDuplicate: () => void; onHistory: () => void; onDelete: () => void }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const choose = (action: () => void) => { onToggle(); action(); };
-  const item = 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none disabled:opacity-50';
+  const item = cn(menuItemClass(), 'focus:bg-link-standard focus:outline-none');
   return <>
-    <button ref={anchorRef} type="button" aria-haspopup="menu" aria-expanded={open} aria-label={`${source.name} 操作`} onClick={onToggle} className="inline-flex size-8 items-center justify-center rounded-lg text-zinc-300 hover:bg-white/5"><MoreHorizontal className="size-5" /></button>
-    <AnchoredPopover open={open} anchorRef={anchorRef} onClose={onToggle} role="menu" ariaLabel={`${source.name} 操作`} className="min-w-44 overflow-hidden rounded-xl border border-zinc-700 bg-[#1b1d23] py-1 shadow-xl">
+    <IconButton ref={anchorRef} aria-haspopup="menu" aria-expanded={open} label={`${source.name} 操作`} size="small" hierarchy="subordinate" variant="standard" icon={<MoreHorizontal />} onPress={onToggle} />
+    <AnchoredPopover open={open} anchorRef={anchorRef} onClose={onToggle} role="menu" ariaLabel={`${source.name} 操作`} className={cn(MENU_PANEL_CLASS, 'min-w-44')}>
       <button type="button" role="menuitem" onClick={() => choose(onEdit)} className={item}><Pencil className="size-4" />編輯</button>
       <button type="button" role="menuitem" disabled={busy} onClick={() => choose(onDuplicate)} className={item}><Copy className="size-4" />複製</button>
       <button type="button" role="menuitem" onClick={() => choose(onHistory)} className={item}><Film className="size-4" />查看影像紀錄</button>
-      <button type="button" role="menuitem" onClick={() => choose(onDelete)} className={`${item} text-red-300`}><Trash2 className="size-4" />刪除</button>
+      <button type="button" role="menuitem" onClick={() => choose(onDelete)} className={`${item} text-status-error-emphasis`}><Trash2 className="size-4" />刪除</button>
     </AnchoredPopover>
   </>;
 }
@@ -197,10 +198,10 @@ export function VideoResourcesPage() {
   const tagSuggestions = useMemo(() => tagOptions.map((t) => t.tag), [tagOptions]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-text-primary">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-[15rem] flex-col gap-1.5">
-          <span className="text-xs text-zinc-400">來源標籤</span>
+          <span className="text-body-xs text-text-tertiary">來源標籤</span>
           <SiteMultiSelect
             ariaLabel="來源標籤"
             allLabel="全部標籤"
@@ -211,29 +212,29 @@ export function VideoResourcesPage() {
           />
         </label>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => void openStorage()} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm hover:bg-white/5 ${storage?.paused ? 'border-amber-500/40 text-amber-200' : 'border-zinc-700 text-zinc-200'}`}>
-            <HardDrive className="size-4" />{storage?.paused ? `錄影暫停：${storage.paused.reason}` : '錄影儲存狀態'}
-          </button>
-          <button type="button" onClick={() => auth.require('events.video.configure') && setDialog({ source: null })} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-blue-600 px-4 text-sm font-medium hover:bg-blue-500">
-            <Plus className="size-4" />新增來源
-          </button>
+          <Button hierarchy={storage?.paused ? 'danger' : 'subordinate'} variant="outlined" leadingIcon={<HardDrive />} onPress={() => void openStorage()}>
+            {storage?.paused ? `錄影暫停：${storage.paused.reason}` : '錄影儲存狀態'}
+          </Button>
+          <Button leadingIcon={<Plus />} onPress={() => auth.require('events.video.configure') && setDialog({ source: null })}>
+            新增來源
+          </Button>
         </div>
       </div>
       {!canList ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">權限不足</div>
+        <div className="flex flex-1 items-center justify-center text-body-s text-text-tertiary">權限不足</div>
       ) : (
         <>
-          {sourceQuery.refreshing ? <div role="status" className="text-xs text-sky-300">背景更新中，仍顯示目前資料…</div> : null}
+          {sourceQuery.refreshing ? <div role="status" className="text-body-xs text-text-theme">背景更新中，仍顯示目前資料…</div> : null}
           {sourceQuery.backgroundError ? (
-            <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <div role="alert" className="rounded-lg border border-status-warning-light bg-status-warning-light px-3 py-2 text-body-xs text-status-warning">
               背景更新失敗，已保留目前資料：{sourceQuery.backgroundError}
-              <button type="button" onClick={refresh} className="ml-2 underline">重試</button>
+              <Button variant="text" className="ml-2" onPress={refresh}>重試</Button>
             </div>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-zinc-800">
-            <table className="w-full min-w-[78rem] text-left text-sm">
-              <thead className="sticky top-0 z-10 bg-[#16181d] text-zinc-400">
-                <tr className="border-b border-zinc-800">
+          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border-quaternary">
+            <table className="w-full min-w-[78rem] text-left text-body-s">
+              <thead className="sticky top-0 z-10 bg-surface-primary text-text-tertiary">
+                <tr className="border-b border-border-quaternary">
                   <th className="px-3 py-3 font-normal">名稱</th>
                   <th className="px-3 py-3 font-normal">來源標籤</th>
                   <th className="px-3 py-3 font-normal">載具／位置</th>
@@ -251,26 +252,23 @@ export function VideoResourcesPage() {
                   const rec = recordingBadge(s);
                   const busy = pending[s.id];
                   return (
-                    <tr key={s.id} className={`border-b border-zinc-800/80 align-top ${highlight === s.id ? 'bg-sky-500/10' : ''}`}>
-                      <td className="max-w-[14rem] px-3 py-3"><span className="block truncate" title={s.name}>{s.name}</span>{highlight === s.id ? <span className="text-xs text-sky-300">新複製</span> : null}</td>
+                    <tr key={s.id} className={`border-b border-border-quaternary align-top ${highlight === s.id ? 'bg-surface-theme' : ''}`}>
+                      <td className="max-w-[14rem] px-3 py-3"><span className="block truncate" title={s.name}>{s.name}</span>{highlight === s.id ? <span className="text-body-xs text-text-theme">新複製</span> : null}</td>
                       <td className="max-w-[12rem] px-3 py-3">
-                        <div className="flex flex-wrap gap-1">{s.tags.length ? s.tags.map((t) => <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">{t}</span>) : <span className="text-xs text-zinc-600">—</span>}</div>
+                        <div className="flex flex-wrap gap-1">{s.tags.length ? s.tags.map((t) => <span key={t} className="rounded bg-surface-secondary px-1.5 py-0.5 text-body-xs text-text-secondary">{t}</span>) : <span className="text-body-xs text-text-disabled">—</span>}</div>
                       </td>
-                      <td className="px-3 py-3 text-xs text-zinc-300">{[s.vehicleCode, s.location].filter(Boolean).join('・') || '—'}</td>
+                      <td className="px-3 py-3 text-body-xs text-text-secondary">{[s.vehicleCode, s.location].filter(Boolean).join('・') || '—'}</td>
                       <td className="px-3 py-3">
-                        <button type="button" role="switch" aria-checked={s.enabled} aria-label={`${s.name} ${s.enabled ? '停用' : '啟用'}`} disabled={Boolean(busy)} onClick={() => void toggleEnabled(s)}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-60 ${s.enabled ? 'bg-blue-600' : 'bg-zinc-600'}`}>
-                          <span className={`inline-block size-4 rounded-full bg-white transition-transform ${s.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                        </button>
-                        {busy ? <span className="ml-2 text-xs text-zinc-400">{busy}</span> : null}
+                        <Switch checked={s.enabled} aria-label={`${s.name} ${s.enabled ? '停用' : '啟用'}`} disabled={Boolean(busy)} onCheckedChange={() => void toggleEnabled(s)} />
+                        {busy ? <span className="ml-2 text-body-xs text-text-tertiary">{busy}</span> : null}
                       </td>
                       <td className="px-3 py-3">
-                        <span className={`rounded px-1.5 py-0.5 text-xs ${BADGE_TONE[online.tone]}`} title={s.actualStatus.reason ?? undefined}>{online.text}</span>
-                        {s.enabled && s.actualStatus.state === 'offline' && s.actualStatus.reason && !s.actualStatus.stale ? <span className="mt-1 block max-w-[12rem] truncate text-[11px] text-zinc-500" title={s.actualStatus.reason}>{s.actualStatus.reason}</span> : null}
+                        <span className={`rounded px-1.5 py-0.5 text-body-xs ${BADGE_TONE[online.tone]}`} title={s.actualStatus.reason ?? undefined}>{online.text}</span>
+                        {s.enabled && s.actualStatus.state === 'offline' && s.actualStatus.reason && !s.actualStatus.stale ? <span className="mt-1 block max-w-[12rem] truncate text-body-xs text-text-quaternary" title={s.actualStatus.reason}>{s.actualStatus.reason}</span> : null}
                       </td>
-                      <td className="px-3 py-3 text-xs">{s.recordingEnabled ? '儲存' : '不儲存'}</td>
-                      <td className="px-3 py-3"><span className={`rounded px-1.5 py-0.5 text-xs ${BADGE_TONE[rec.tone]}`}>{rec.text}</span></td>
-                      <td className="max-w-[16rem] px-3 py-3"><span className="block truncate font-mono text-xs text-zinc-400" title={s.connection?.maskedUrl}>{s.connection?.maskedUrl ?? '—'}</span></td>
+                      <td className="px-3 py-3 text-body-xs">{s.recordingEnabled ? '儲存' : '不儲存'}</td>
+                      <td className="px-3 py-3"><span className={`rounded px-1.5 py-0.5 text-body-xs ${BADGE_TONE[rec.tone]}`}>{rec.text}</span></td>
+                      <td className="max-w-[16rem] px-3 py-3"><span className="block truncate font-mono text-body-xs text-text-tertiary" title={s.connection?.maskedUrl}>{s.connection?.maskedUrl ?? '—'}</span></td>
                       <td className="px-3 py-3"><RowActions source={s} open={openMenuId === s.id} busy={Boolean(busy)} onToggle={() => setOpenMenuId((current) => current === s.id ? null : s.id)} onEdit={() => auth.require('events.video.configure') && setDialog({ source: s })} onDuplicate={() => void duplicate(s)} onHistory={() => openHistory(s)} onDelete={() => void askDelete(s)} /></td>
                     </tr>
                   );
@@ -319,9 +317,9 @@ export function VideoResourcesPage() {
             );
           }}>刪除</PrimaryButton></>}
         >
-          <div className="space-y-2 text-sm text-zinc-300">
+          <div className="space-y-2 text-body-s text-text-secondary">
             <p>確定刪除「{deleting.source.name}」？</p>
-            <ul className="list-disc space-y-1 pl-5 text-zinc-400">
+            <ul className="list-disc space-y-1 pl-5 text-text-tertiary">
               <li>{deleting.impact.tabs ? `${deleting.impact.tabs} 個監控標籤頁（${deleting.impact.tiles} 格）引用這個來源：格子保留位置，顯示「來源已刪除」，可重新選擇。` : '沒有監控標籤頁引用這個來源。'}</li>
               <li>{deleting.impact.stopsRecording ? '會停止這個來源的錄影（完成目前片段）。' : '這個來源目前沒有錄影。'}</li>
               <li>已錄的影片與稽核紀錄保留，仍可從「歷史錄影」查詢；刪除影片需要另外的權限。</li>

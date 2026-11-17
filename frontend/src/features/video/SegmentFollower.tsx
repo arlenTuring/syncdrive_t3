@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { mediaUrl, type Manifest } from './api';
 import { nextAvailable, segmentAt, syncAction, timelineAt } from './sync';
+import { Button } from '../../components/ui';
 
 /**
  * 跟隨外部絕對時間游標播放歷史片段（多來源同步與事件回放共用）。
@@ -93,18 +94,18 @@ export function SegmentFollower({
   const gap = !segment ? timelineAt(manifest?.timeline, cursor) : null;
   const next = !segment && cursor !== null ? nextAvailable(manifest, cursor) : null;
   return (
-    <div className="relative h-full w-full bg-black">
+    <div className="relative h-full w-full bg-surface-sub-background">
       <video ref={videoRef} crossOrigin="use-credentials" playsInline muted={muted} className={`h-full w-full object-contain ${segment ? '' : 'invisible'}`} />
       {!segment ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-sm text-zinc-400">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-body-s text-text-tertiary">
           <span>{!manifest ? '載入中…' : gap?.kind === 'expired' ? '此時段的錄影已到期刪除' : gap?.kind === 'recording' ? '錄製中，片段完成後可回放' : gap?.kind === 'failed' ? '此時段錄影損壞' : '此時段沒有錄影'}</span>
-          {gap?.reason && gap.kind === 'gap' ? <span className="text-xs text-zinc-500">{gap.reason}</span> : null}
+          {gap?.reason && gap.kind === 'gap' ? <span className="text-body-xs text-text-quaternary">{gap.reason}</span> : null}
           {next && onJump ? (
-            <button type="button" onClick={() => onJump(next)} className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-white/5">跳至下一段</button>
+            <Button hierarchy="subordinate" variant="outlined" onPress={() => onJump(next)}>跳至下一段</Button>
           ) : null}
         </div>
       ) : null}
-      {error ? <div className="absolute inset-x-0 bottom-0 bg-red-900/70 px-3 py-1 text-xs text-red-100">{error}</div> : null}
+      {error ? <div className="absolute inset-x-0 bottom-0 bg-status-error-light px-3 py-1 text-body-xs text-status-error-emphasis">{error}</div> : null}
     </div>
   );
 }

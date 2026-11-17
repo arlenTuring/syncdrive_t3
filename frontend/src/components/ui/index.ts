@@ -24,6 +24,7 @@ export {
 export { cn } from './cn';
 export { Dialog, type DialogProps } from './dialog/Dialog';
 export { Field, TextArea, TextInput, type TextAreaProps, type TextInputProps } from './field/Field';
+export { Pagination } from './pagination/Pagination';
 export { Panel } from './panel/Panel';
 export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } from './radio/Radio';
 export { headerCheckState } from './checkbox/selection';

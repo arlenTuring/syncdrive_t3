@@ -187,5 +187,5 @@ export function LivePlayer({
   }, [muted]);
 
   // 影片 metadata 不參與版面：父層決定大小，影片只依 fit 填入
-  return <video ref={videoRef} muted={muted} playsInline autoPlay className={`block h-full w-full bg-black ${fit === 'cover' ? 'object-cover object-center' : 'object-contain'} ${className}`} />;
+  return <video ref={videoRef} muted={muted} playsInline autoPlay className={`block h-full w-full bg-surface-sub-background ${fit === 'cover' ? 'object-cover object-center' : 'object-contain'} ${className}`} />;
 }

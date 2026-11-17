@@ -4,6 +4,7 @@ import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { SourcePicker } from './SourcePicker';
 import { videoApi, type LiveSession, type SourceOption, type Tile } from './api';
 import { BADGE_TONE, tileBadges } from './status';
+import { Button } from '../../components/ui';
 
 /**
  * 監控格子：大小由版面決定（父層絕對定位），影片 cover 填滿、置中裁切，不因影片尺寸改變格子。
@@ -86,28 +87,28 @@ export function TileView({
   const badges = tileBadges(source, Boolean(tile.sourceId), error ? { ...(stats ?? ({} as PlayerStats)), state: 'error', error } : stats);
 
   return (
-    <div ref={boxRef} className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-black">
-      <div className="flex h-8 shrink-0 items-center gap-2 bg-[#141416] px-2 text-xs">
-        <span className="min-w-0 truncate font-medium text-zinc-100" title={title}>{title}</span>
-        {badges.map((b) => <span key={b.text} className={`hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] sm:inline ${BADGE_TONE[b.tone]}`}>{b.text}</span>)}
+    <div ref={boxRef} className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background">
+      <div className="flex h-8 shrink-0 items-center gap-2 bg-surface-popup px-2 text-body-xs">
+        <span className="min-w-0 truncate font-medium text-text-primary" title={title}>{title}</span>
+        {badges.map((b) => <span key={b.text} className={`hidden shrink-0 rounded px-1.5 py-0.5 text-body-xs sm:inline ${BADGE_TONE[b.tone]}`}>{b.text}</span>)}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {live ? (
-            <span className="mr-1 hidden text-[11px] text-zinc-500 md:inline">
+            <span className="mr-1 hidden text-body-xs text-text-quaternary md:inline">
               {stats?.fps ? `${stats.fps} fps` : ''}{stats?.transport ? `・${stats.transport === 'webrtc' ? 'WebRTC' : 'HLS'}` : ''}
             </span>
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={onAudio} aria-label={audio ? `關閉 ${title} 聲音` : `開啟 ${title} 聲音`} className="rounded p-1 text-zinc-400 hover:text-white">
+            <button type="button" onClick={onAudio} aria-label={audio ? `關閉 ${title} 聲音` : `開啟 ${title} 聲音`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
               {audio ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
             </button>
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={fullscreen} aria-label={zoomed ? `${title} 返回整頁` : pageFullscreen ? `${title} 放大` : `${title} 全螢幕`} className="rounded p-1 text-zinc-400 hover:text-white">
+            <button type="button" onClick={fullscreen} aria-label={zoomed ? `${title} 返回整頁` : pageFullscreen ? `${title} 放大` : `${title} 全螢幕`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
               {zoomed ? <Minimize className="size-3.5" /> : <Maximize className="size-3.5" />}
             </button>
           ) : null}
           {tile.sourceId ? (
-            <button type="button" onClick={onSettings} aria-label={`設定 ${title} 的來源`} className="rounded p-1 text-zinc-400 hover:text-white">
+            <button type="button" onClick={onSettings} aria-label={`設定 ${title} 的來源`} className="rounded p-1 text-text-tertiary hover:text-text-primary">
               <Settings2 className="size-3.5" />
             </button>
           ) : null}
@@ -117,10 +118,10 @@ export function TileView({
         {sourceId && live ? (
           <LivePlayer hlsUrl={live.hlsUrl} whepUrl={live.whepUrl} muted={!audio} fit="cover" onStats={setStats} onExpired={refresh} className="absolute inset-0" />
         ) : tile.sourceId ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-xs text-zinc-400">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-body-xs text-text-tertiary">
             <span>{error || (!source || source.deleted ? '來源已刪除，請重新選擇來源' : !source.enabled ? '來源已停用' : source.state === 'offline' ? '來源離線，等待恢復' : '準備播放…')}</span>
             {!source || source.deleted || !source.enabled ? (
-              <button type="button" onClick={onSettings} className="rounded-lg border border-zinc-700 px-3 py-1 text-zinc-200 hover:bg-white/5">重新選擇來源</button>
+              <Button hierarchy="subordinate" variant="outlined" onPress={onSettings}>重新選擇來源</Button>
             ) : null}
           </div>
         ) : (

@@ -8,6 +8,7 @@ import { DeleteGroupDialog, GroupNameDialog, Toast } from './dialogs';
 import { clampPage, moveItem } from './selection';
 import { Pagination, TypeBadge } from './widgets';
 import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
+import { Button, IconButton, cn, fieldClass } from '../../components/ui';
 
 type Notice = { text: string; tone: 'success' | 'error'; id: number };
 
@@ -77,10 +78,10 @@ export function MediaGroupsPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col text-text-primary">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
             value={draft}
             maxLength={120}
@@ -88,37 +89,30 @@ export function MediaGroupsPage() {
             onKeyDown={(event) => event.key === 'Enter' && search()}
             placeholder="請輸入關鍵字"
             aria-label="搜尋分組名稱"
-            className="h-11 w-64 rounded-xl bg-[#222831] pr-3 pl-10 outline-none focus:ring-1 focus:ring-sky-500"
+            className={cn(fieldClass({ fullWidth: false }), 'w-64 pl-10')}
           />
         </div>
-        <button type="button" onClick={search} className="rounded-xl bg-[#27303d] p-3" aria-label="搜尋">
-          <Search className="size-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
+        <IconButton label="搜尋" hierarchy="subordinate" variant="tonal" icon={<Search />} onPress={search} />
+        <Button
+          hierarchy="subordinate"
+          variant="outlined"
+          leadingIcon={<RefreshCw />}
+          onPress={() => {
             setDraft('');
             setKeyword('');
             setPage(1);
             setDirection('asc');
           }}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-zinc-700 px-4 text-zinc-400"
         >
-          <RefreshCw className="size-4" />
           重置
-        </button>
-        <button
-          type="button"
-          onClick={() => auth.require('media.groups.create') && setNameDialog({})}
-          className="ml-auto inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 font-medium hover:bg-blue-500"
-        >
-          <Plus className="size-5" />
+        </Button>
+        <Button className="ml-auto" leadingIcon={<Plus />} onPress={() => auth.require('media.groups.create') && setNameDialog({})}>
           建立分組
-        </button>
+        </Button>
       </div>
 
       <div className="mt-6 min-h-0 flex-1 overflow-auto">
-        <div className="flex items-center border-b border-zinc-800 px-4 py-4 text-zinc-400">
+        <div className="flex items-center border-b border-border-quaternary px-4 py-4 text-text-tertiary">
           <button
             type="button"
             onClick={() => {
@@ -129,7 +123,7 @@ export function MediaGroupsPage() {
             aria-label={`依分組名稱排序（目前${direction === 'asc' ? '遞增' : '遞減'}）`}
           >
             分組名稱
-            <ArrowDownUp className="size-4 text-sky-400" />
+            <ArrowDownUp className="size-4 text-text-theme" />
           </button>
         </div>
         {data?.items.map((group) => (
@@ -201,12 +195,12 @@ export function MediaGroupsPage() {
 
 function State({ text, retry, compact = false }: { text: string; retry?: () => void; compact?: boolean }) {
   return (
-    <div className={`${compact ? 'py-2 text-amber-300' : 'py-16 text-zinc-500'} text-center`}>
+    <div className={`${compact ? 'py-2 text-status-warning' : 'py-16 text-text-quaternary'} text-center`}>
       {text}
       {retry ? (
-        <button type="button" onClick={retry} className="ml-3 text-sky-300 underline">
+        <Button variant="text" className="ml-3" onPress={retry}>
           重試
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -239,38 +233,33 @@ function GroupRow({
 }) {
   const panelId = `media-group-${group.id}`;
   return (
-    <div className="border-b border-zinc-800">
+    <div className="border-b border-border-quaternary">
       <div className="flex items-center gap-4 px-4 py-4">
-        <button
-          type="button"
-          onClick={onToggle}
+        <IconButton
+          size="small"
+          hierarchy="subordinate"
+          variant="tonal"
+          onPress={onToggle}
           aria-expanded={expanded}
           aria-controls={panelId}
-          aria-label={`${expanded ? '收合' : '展開'} ${group.name}`}
-          className="rounded-lg bg-zinc-800 p-1.5 hover:bg-zinc-700"
-        >
-          {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </button>
+          label={`${expanded ? '收合' : '展開'} ${group.name}`}
+          icon={expanded ? <ChevronUp /> : <ChevronDown />}
+        />
         <div className="min-w-0 flex-1">
-          <span className="truncate text-lg">{group.name}</span>
-          <span className="ml-3 text-sm text-zinc-500">{group.member_count} 個媒體</span>
-          {!group.playable ? <span className="ml-3 rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-200">{group.unavailable_label}（不可播放）</span> : null}
+          <span className="truncate text-headline-5">{group.name}</span>
+          <span className="ml-3 text-body-s text-text-quaternary">{group.member_count} 個媒體</span>
+          {!group.playable ? <span className="ml-3 rounded bg-status-warning-light px-2 py-0.5 text-body-xs text-status-warning">{group.unavailable_label}（不可播放）</span> : null}
         </div>
-        <button type="button" onClick={onEdit} aria-label={`編輯分組 ${group.name}`} className="rounded-lg p-2 hover:bg-white/5">
-          <Pencil className="size-5" />
-        </button>
-        <button type="button" onClick={onDelete} aria-label={`刪除分組 ${group.name}`} className="rounded-lg p-2 hover:bg-red-500/10 hover:text-red-400">
-          <Trash2 className="size-5" />
-        </button>
+        <IconButton label={`編輯分組 ${group.name}`} hierarchy="subordinate" variant="standard" icon={<Pencil />} onPress={onEdit} />
+        <IconButton label={`刪除分組 ${group.name}`} hierarchy="danger" variant="standard" icon={<Trash2 />} onPress={onDelete} />
       </div>
       {expanded ? (
-        <div id={panelId} className="bg-[#1c2028]">
+        <div id={panelId} className="bg-surface-primary">
           <MemberList key={`${group.id}:${group.version}`} group={group} canEdit={canEdit} requireEdit={requireEdit} onGroupChanged={onGroupChanged} onStale={onStale} notify={notify} />
           <div className="px-4 py-4 pl-[4.5rem]">
-            <button type="button" onClick={onAdd} className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300">
-              <Plus className="size-4" />
+            <Button variant="text" leadingIcon={<Plus />} onPress={onAdd}>
               加入媒體
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -396,11 +385,11 @@ function MemberList({
   };
 
   if (!order.length) {
-    return <p className="px-4 pt-5 pb-1 pl-[4.5rem] text-zinc-400">尚未加入媒體（空分組不會被當成可播放的資源）</p>;
+    return <p className="px-4 pt-5 pb-1 pl-[4.5rem] text-text-tertiary">尚未加入媒體（空分組不會被當成可播放的資源）</p>;
   }
   return (
     <>
-      <div className="grid grid-cols-[4.5rem_1fr_10rem_4rem] border-b border-zinc-700/60 px-4 py-4 text-zinc-400">
+      <div className="grid grid-cols-[4.5rem_1fr_10rem_4rem] border-b border-border-quaternary px-4 py-4 text-text-tertiary">
         <span className="pl-6">排序</span>
         <span>檔案名稱</span>
         <span>檔案類型</span>
@@ -415,7 +404,7 @@ function MemberList({
             onDragOver={(event) => onDragOver(event, member.id)}
             onDrop={(event) => event.preventDefault()}
             onDragEnd={onDragEnd}
-            className={`grid grid-cols-[4.5rem_1fr_10rem_4rem] items-center border-b border-zinc-700/60 px-4 py-4 last:border-b-0 ${dragging === member.id || grabbed === member.id ? 'bg-blue-500/10 ring-1 ring-blue-500/60 ring-inset' : ''} ${busy ? 'opacity-70' : ''}`}
+            className={`grid grid-cols-[4.5rem_1fr_10rem_4rem] items-center border-b border-border-quaternary px-4 py-4 last:border-b-0 ${dragging === member.id || grabbed === member.id ? 'bg-surface-theme ring-1 ring-border-theme-light ring-inset' : ''} ${busy ? 'opacity-70' : ''}`}
           >
             <button
               type="button"
@@ -432,25 +421,26 @@ function MemberList({
                   setOrder(dragStartOrder.current);
                 }
               }}
-              className="ml-4 w-fit cursor-grab rounded p-1 text-zinc-400 hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:cursor-wait"
+              className="ml-4 w-fit cursor-grab rounded p-1 text-text-tertiary hover:bg-link-standard focus-visible:ring-2 focus-visible:ring-border-theme focus-visible:outline-none disabled:cursor-wait"
             >
               <GripVertical className="size-5" />
             </button>
             <span className="min-w-0 truncate pr-3">
-              {member.missing ? <span className="text-red-300">媒體已不存在（{member.id}）</span> : member.name}
-              {!member.missing && !member.available ? <span className="ml-2 text-xs text-amber-300">無法播放：{member.unavailable_label}</span> : null}
+              {member.missing ? <span className="text-status-error-emphasis">媒體已不存在（{member.id}）</span> : member.name}
+              {!member.missing && !member.available ? <span className="ml-2 text-body-xs text-status-warning">無法播放：{member.unavailable_label}</span> : null}
             </span>
             <span>{member.missing ? '—' : <TypeBadge type={member.media_type} />}</span>
-            <button
-              type="button"
-              onClick={() => void remove(member)}
+            <IconButton
+              size="small"
+              hierarchy="subordinate"
+              variant="standard"
+              className="justify-self-end"
+              onPress={() => void remove(member)}
               disabled={busy}
-              aria-label={`從此分組移除「${member.name ?? member.id}」（不會刪除媒體）`}
+              label={`從此分組移除「${member.name ?? member.id}」（不會刪除媒體）`}
               title="從此分組移除（不會刪除媒體）"
-              className="justify-self-end rounded-lg p-1.5 text-zinc-300 hover:bg-white/10 disabled:opacity-40"
-            >
-              <X className="size-5" />
-            </button>
+              icon={<X />}
+            />
           </li>
         ))}
       </ul>

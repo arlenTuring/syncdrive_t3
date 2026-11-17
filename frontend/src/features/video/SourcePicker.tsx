@@ -4,12 +4,13 @@ import { AnchoredPopover } from '../../lib/AnchoredPopover';
 import type { SourceOption } from './api';
 import { groupSources } from './layout';
 import { OPTION_STATE_LABEL } from './status';
+import { MENU_PANEL_CLASS, cn, fieldClass } from '../../components/ui';
 
 const STATE_TONE: Partial<Record<SourceOption['state'], string>> = {
-  online: 'text-emerald-300',
-  offline: 'text-red-300',
-  error: 'text-red-300',
-  disabled: 'text-zinc-500',
+  online: 'text-status-success',
+  offline: 'text-status-error-emphasis',
+  error: 'text-status-error-emphasis',
+  disabled: 'text-text-quaternary',
 };
 
 /**
@@ -54,10 +55,10 @@ export function SourcePicker({
           setPanelWidth(Math.max(anchorRef.current?.getBoundingClientRect().width ?? 0, 280));
           setOpen((v) => !v);
         }}
-        className={`flex h-10 min-w-0 items-center justify-between gap-2 rounded-lg bg-[#262a33] px-3 text-left text-sm text-zinc-100 outline-none hover:bg-[#2d323d] focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={cn(fieldClass({ fullWidth: false }), 'flex items-center justify-between gap-2 text-left', className)}
       >
-        <span className={`min-w-0 flex-1 truncate ${selected ? '' : 'text-zinc-400'}`}>{selected?.name ?? placeholder}</span>
-        <ChevronDown className={`size-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        <span className={`min-w-0 flex-1 truncate ${selected ? '' : 'text-text-tertiary'}`}>{selected?.name ?? placeholder}</span>
+        <ChevronDown className={`size-4 shrink-0 text-text-quaternary transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
       <AnchoredPopover
         open={open}
@@ -66,23 +67,23 @@ export function SourcePicker({
         role="dialog"
         ariaLabel={ariaLabel}
         align="start"
-        className="flex max-h-96 flex-col overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] shadow-xl shadow-black/50"
+        className={cn(MENU_PANEL_CLASS, 'flex max-h-96 flex-col overflow-hidden py-0')}
         style={{ width: panelWidth }}
       >
-        <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
-          <Search className="size-4 shrink-0 text-zinc-500" aria-hidden />
+        <div className="flex items-center gap-2 border-b border-border-quaternary px-3 py-2">
+          <Search className="size-4 shrink-0 text-text-quaternary" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜尋名稱、標籤、載具、位置"
             aria-label="搜尋影像來源"
-            className="h-7 min-w-0 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+            className="h-7 min-w-0 flex-1 bg-transparent text-body-s text-text-primary outline-none placeholder:text-text-quaternary"
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto py-1 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]" role="listbox" aria-label={ariaLabel}>
+        <div className="min-h-0 flex-1 overflow-y-auto py-1" role="listbox" aria-label={ariaLabel}>
           {groups.map((group) => (
             <div key={group.label} role="group" aria-label={group.label}>
-              <div className="px-3 py-1.5 text-xs font-medium text-zinc-500">{group.label}</div>
+              <div className="px-3 py-1.5 text-body-xs-bold text-text-quaternary">{group.label}</div>
               {group.items.map((o) => {
                 const active = o.id === value;
                 const blocked = !o.enabled;
@@ -99,24 +100,24 @@ export function SourcePicker({
                       setQuery('');
                       onPick(o.id);
                     }}
-                    className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed ${active ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-100 hover:bg-white/5'} ${blocked ? 'opacity-50' : ''}`}
+                    className={`flex w-full items-start gap-2 px-3 py-2 text-left text-body-s transition-colors disabled:cursor-not-allowed ${active ? 'bg-surface-theme text-text-theme' : 'text-text-primary hover:bg-link-standard'} ${blocked ? 'opacity-50' : ''}`}
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{o.name}</span>
-                      <span className="mt-0.5 flex flex-wrap gap-1 text-[11px] text-zinc-400">
+                      <span className="mt-0.5 flex flex-wrap gap-1 text-body-xs text-text-tertiary">
                         {o.vehicleCode ? <span>{o.vehicleCode}</span> : null}
                         {o.location ? <span>・{o.location}</span> : null}
-                        {o.tags.slice(1).map((t) => <span key={t} className="rounded bg-zinc-800 px-1">{t}</span>)}
+                        {o.tags.slice(1).map((t) => <span key={t} className="rounded bg-surface-secondary px-1">{t}</span>)}
                       </span>
                     </span>
-                    <span className={`shrink-0 text-xs ${STATE_TONE[o.state] ?? 'text-zinc-400'}`}>{OPTION_STATE_LABEL[o.state]}</span>
-                    {active ? <Check className="size-4 shrink-0 text-sky-400" aria-hidden /> : null}
+                    <span className={`shrink-0 text-body-xs ${STATE_TONE[o.state] ?? 'text-text-tertiary'}`}>{OPTION_STATE_LABEL[o.state]}</span>
+                    {active ? <Check className="size-4 shrink-0 text-text-theme" aria-hidden /> : null}
                   </button>
                 );
               })}
             </div>
           ))}
-          {groups.length === 0 ? <div className="px-3 py-3 text-sm text-zinc-500">{selectable.length ? '找不到符合的來源' : '還沒有影像來源，請先到「影像資源管理」新增'}</div> : null}
+          {groups.length === 0 ? <div className="px-3 py-3 text-body-s text-text-quaternary">{selectable.length ? '找不到符合的來源' : '還沒有影像來源，請先到「影像資源管理」新增'}</div> : null}
         </div>
       </AnchoredPopover>
     </>

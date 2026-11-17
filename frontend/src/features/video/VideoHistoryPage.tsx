@@ -9,6 +9,7 @@ import { formatBytes, mediaUrl, videoApi, type Availability, type Job, type Mani
 import { SegmentFollower } from './SegmentFollower';
 import type { HistoryRequest } from './history-link';
 import { OPTION_STATE_LABEL } from './status';
+import { Button, IconButton, cn, fieldClass } from '../../components/ui';
 
 /** 歷史多畫面：依路數決定欄數（歷史回放的格子大小不需保存） */
 function historyGrid(count: number) {
@@ -22,11 +23,11 @@ const DEFAULT_TZ = 'Asia/Taipei';
 const HOUR = 3_600_000;
 const SPEEDS = [0.5, 1, 2, 4, 8];
 const KIND_STYLE: Record<TimelineItem['kind'], string> = {
-  available: 'bg-emerald-500/70',
-  gap: 'bg-zinc-700/60',
-  expired: 'bg-zinc-500/40 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,.35)_4px,rgba(0,0,0,.35)_8px)]',
-  failed: 'bg-red-500/60',
-  recording: 'bg-sky-500/60 animate-pulse',
+  available: 'bg-status-success-light',
+  gap: 'bg-link-standard-hover',
+  expired: 'bg-link-standard-hover bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,var(--color-black-30)_4px,var(--color-black-30)_8px)]',
+  failed: 'bg-status-error-light',
+  recording: 'bg-link-tonal-pressed animate-pulse',
 };
 const KIND_LABEL: Record<TimelineItem['kind'], string> = { available: '有錄影', gap: '缺段', expired: '已到期', failed: '損壞', recording: '錄製中' };
 
@@ -93,15 +94,15 @@ function Timeline({ items, from, to, cursor, timeZone, onSeek }: { items: Timeli
         if (e.key === 'ArrowRight') onSeek(cursor + 10_000);
         if (e.key === 'ArrowLeft') onSeek(cursor - 10_000);
       }}
-      className="relative h-5 w-full cursor-pointer overflow-hidden rounded bg-zinc-800 focus:ring-1 focus:ring-sky-500"
+      className="relative h-5 w-full cursor-pointer overflow-hidden rounded bg-surface-secondary focus:ring-1 focus:ring-border-theme"
     >
       {items.map((item, i) => (
         <div key={i} title={`${KIND_LABEL[item.kind]}${item.protected ? '（受保護）' : ''}：${formatDateTime(item.from, timeZone)}–${formatDateTime(item.to, timeZone)}${item.reason ? `・${item.reason}` : ''}`}
-          className={`absolute inset-y-0 ${KIND_STYLE[item.kind]} ${item.protected ? 'border-y-2 border-amber-300' : ''}`}
+          className={`absolute inset-y-0 ${KIND_STYLE[item.kind]} ${item.protected ? 'border-y-2 border-status-warning' : ''}`}
           style={{ left: `${((item.from - from) / span) * 100}%`, width: `${Math.max(0.2, ((item.to - item.from) / span) * 100)}%` }} />
       ))}
-      <div className="absolute inset-y-0 w-0.5 bg-white" style={{ left: `${((cursor - from) / span) * 100}%` }} />
-      {hover !== null ? <div className="pointer-events-none absolute -top-0.5 rounded bg-black/80 px-1 text-[10px] text-white" style={{ left: `calc(${((hover - from) / span) * 100}% + 4px)` }}>{formatDateTime(hover, timeZone).slice(11)}</div> : null}
+      <div className="absolute inset-y-0 w-0.5 bg-text-primary" style={{ left: `${((cursor - from) / span) * 100}%` }} />
+      {hover !== null ? <div className="pointer-events-none absolute -top-0.5 rounded bg-black-50 px-1 text-caption-2 text-text-primary" style={{ left: `calc(${((hover - from) / span) * 100}% + 4px)` }}>{formatDateTime(hover, timeZone).slice(11)}</div> : null}
     </div>
   );
 }
@@ -309,12 +310,12 @@ export function VideoHistoryPage({ request }: { request?: HistoryRequest | null 
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4 text-text-primary">
       <div className="flex flex-wrap items-end gap-3">
         <RangeFilter compact value={range} onChange={setRange} timeZone={timeZone} error={rangeError} />
         <label className="flex min-w-[15rem] flex-col gap-1.5">
-          <span className="text-xs text-zinc-400">影像來源</span>
-          <button type="button" onClick={() => { setTempSelected(selected); setSourceDialogOpen(true); }} className="flex h-10 max-w-80 items-center justify-between gap-2 rounded-xl bg-[#222831] px-3 text-left text-sm hover:bg-[#2b313b]" aria-label="選擇影像來源"><span className="truncate">{selectedNames.length ? selectedNames.join('、') : '選擇影像來源'}</span><span className="shrink-0 text-xs text-zinc-400">{selected.length}/12</span></button>
+          <span className="text-body-xs text-text-tertiary">影像來源</span>
+          <button type="button" onClick={() => { setTempSelected(selected); setSourceDialogOpen(true); }} className={cn(fieldClass({ fullWidth: false }), 'flex max-w-80 items-center justify-between gap-2 text-left')} aria-label="選擇影像來源"><span className="truncate">{selectedNames.length ? selectedNames.join('、') : '選擇影像來源'}</span><span className="shrink-0 text-body-xs text-text-tertiary">{selected.length}/12</span></button>
         </label>
         <QueryActions onSearch={search} onReset={reset} />
       </div>
@@ -322,48 +323,46 @@ export function VideoHistoryPage({ request }: { request?: HistoryRequest | null 
 
       {availability && playing.length ? (
         <>
-          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[#16181d] px-3 py-2 text-sm">
-            <button type="button" onClick={() => clock.setPlaying(!clock.playing)} aria-label={clock.playing ? '暫停' : '播放'} className="rounded-lg bg-blue-600 p-1.5 hover:bg-blue-500">
-              {clock.playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </button>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface-primary px-3 py-2 text-body-s">
+            <IconButton size="small" label={clock.playing ? '暫停' : '播放'} icon={clock.playing ? <Pause /> : <Play />} onPress={() => clock.setPlaying(!clock.playing)} />
             <span className="tabular-nums">{formatDateTime(clock.t, timeZone)}</span>
-            <SiteSelect aria-label="倍速" value={String(clock.speed)} options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))} onChange={(e) => clock.setSpeed(Number(e.target.value))} className="h-8 w-20 rounded-lg bg-[#222831] px-2 text-sm" />
-            <button type="button" disabled title="來源沒有提供逐幀所需的影格時間資訊，暫不提供逐幀" className="rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-500">逐幀（不支援）</button>
-            <button type="button" onClick={() => void stageRef.current?.requestFullscreen?.()} aria-label="全螢幕" className="rounded-lg p-1.5 text-zinc-300 hover:bg-white/5"><Maximize2 className="size-4" /></button>
-            <span className="text-xs text-zinc-500">同步誤差：{Object.values(drifts).filter((d): d is number => d !== null).map((d) => `${d} ms`).join('、') || '—'}</span>
+            <SiteSelect aria-label="倍速" value={String(clock.speed)} options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))} onChange={(e) => clock.setSpeed(Number(e.target.value))} size="sm" className="w-20" />
+            <Button hierarchy="subordinate" variant="outlined" disabled title="來源沒有提供逐幀所需的影格時間資訊，暫不提供逐幀">逐幀（不支援）</Button>
+            <IconButton size="small" hierarchy="subordinate" variant="standard" label="全螢幕" icon={<Maximize2 />} onPress={() => void stageRef.current?.requestFullscreen?.()} />
+            <span className="text-body-xs text-text-quaternary">同步誤差：{Object.values(drifts).filter((d): d is number => d !== null).map((d) => `${d} ms`).join('、') || '—'}</span>
             <div className="ml-auto flex items-center gap-2">
-              <SiteSelect aria-label="下載長度" value={exportMinutes} options={['1', '5', '10', '30'].map((m) => ({ value: m, label: `${m} 分鐘` }))} onChange={(e) => setExportMinutes(e.target.value)} className="h-8 w-24 rounded-lg bg-[#222831] px-2 text-xs" />
-              <button type="button" onClick={() => void startExport()} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs hover:bg-white/5"><Download className="size-3.5" />下載目前起</button>
-              <button type="button" onClick={() => void protect()} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs hover:bg-white/5"><Shield className="size-3.5" />保護此區間</button>
-              <button type="button" onClick={() => void previewDelete()} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10"><Trash2 className="size-3.5" />刪除此區間</button>
+              <SiteSelect aria-label="下載長度" value={exportMinutes} options={['1', '5', '10', '30'].map((m) => ({ value: m, label: `${m} 分鐘` }))} onChange={(e) => setExportMinutes(e.target.value)} size="sm" className="w-24" />
+              <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Download />} onPress={() => void startExport()}>下載目前起</Button>
+              <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Shield />} onPress={() => void protect()}>保護此區間</Button>
+              <Button hierarchy="danger" variant="outlined" leadingIcon={<Trash2 />} onPress={() => void previewDelete()}>刪除此區間</Button>
             </div>
           </div>
           {job ? (
-            <p className="text-xs text-zinc-300" role="status">
-              下載：{job.status === 'succeeded' && job.downloadUrl ? <a href={mediaUrl(job.downloadUrl)} className="text-sky-300 underline">下載檔案（{formatBytes(Number(job.result?.bytes ?? 0))}）</a> : job.status === 'failed' ? `失敗：${job.error}` : '準備中…'}
-              {job.note ? <span className="ml-2 text-zinc-500">{job.note}</span> : null}
+            <p className="text-body-xs text-text-secondary" role="status">
+              下載：{job.status === 'succeeded' && job.downloadUrl ? <a href={mediaUrl(job.downloadUrl)} className="text-text-theme underline">下載檔案（{formatBytes(Number(job.result?.bytes ?? 0))}）</a> : job.status === 'failed' ? `失敗：${job.error}` : '準備中…'}
+              {job.note ? <span className="ml-2 text-text-quaternary">{job.note}</span> : null}
             </p>
           ) : null}
 
           <div className="space-y-1.5">
             {availability.sources.filter((s) => playing.includes(s.sourceId)).map((s) => (
-              <div key={s.sourceId} className="grid grid-cols-[10rem_minmax(0,1fr)] items-center gap-2 text-xs">
-                <span className="truncate text-zinc-300" title={s.revisions.map((r) => `版本 ${r.revisionNo}${r.vehicleCode ? `・${r.vehicleCode}` : ''}`).join('；')}>{s.name}{s.removed ? '［已移除］' : ''}</span>
+              <div key={s.sourceId} className="grid grid-cols-[10rem_minmax(0,1fr)] items-center gap-2 text-body-xs">
+                <span className="truncate text-text-secondary" title={s.revisions.map((r) => `版本 ${r.revisionNo}${r.vehicleCode ? `・${r.vehicleCode}` : ''}`).join('；')}>{s.name}{s.removed ? '［已移除］' : ''}</span>
                 <Timeline items={s.timeline} from={window_.from} to={window_.to} cursor={clock.t} timeZone={timeZone} onSeek={clock.seek} />
               </div>
             ))}
-            <div className="flex flex-wrap gap-3 pl-[10.5rem] text-[11px] text-zinc-500">
+            <div className="flex flex-wrap gap-3 pl-[10.5rem] text-body-xs text-text-quaternary">
               {(Object.keys(KIND_LABEL) as Array<TimelineItem['kind']>).map((k) => <span key={k} className="inline-flex items-center gap-1"><span className={`inline-block size-2.5 rounded-sm ${KIND_STYLE[k]}`} />{KIND_LABEL[k]}</span>)}
-              <span className="inline-flex items-center gap-1"><span className="inline-block size-2.5 rounded-sm border-2 border-amber-300" />受保護</span>
+              <span className="inline-flex items-center gap-1"><span className="inline-block size-2.5 rounded-sm border-2 border-status-warning" />受保護</span>
             </div>
           </div>
 
           <div ref={stageRef} className={`grid min-h-[20rem] flex-1 gap-2 ${historyGrid(playing.length || 1)}`}>
             {playing.map((id) => (
-              <div key={id} className="flex flex-col overflow-hidden rounded-xl border border-zinc-800">
-                <div className="flex items-center gap-2 bg-[#141416] px-3 py-1 text-xs">
+              <div key={id} className="flex flex-col overflow-hidden rounded-xl border border-border-quaternary">
+                <div className="flex items-center gap-2 bg-surface-popup px-3 py-1 text-body-xs">
                   <span className="truncate">{manifests[id]?.name}</span>
-                  <button type="button" onClick={() => setAudio(audio === id ? null : id)} className="ml-auto text-zinc-400 hover:text-white">{audio === id ? '關閉聲音' : '開啟聲音'}</button>
+                  <Button hierarchy="subordinate" variant="text" className="ml-auto" onPress={() => setAudio(audio === id ? null : id)}>{audio === id ? '關閉聲音' : '開啟聲音'}</Button>
                 </div>
                 <div className="aspect-video">
                   <SegmentFollower manifest={manifests[id]} cursor={clock.t} playing={clock.playing} speed={clock.speed} muted={audio !== id}
@@ -374,32 +373,32 @@ export function VideoHistoryPage({ request }: { request?: HistoryRequest | null 
           </div>
         </>
       ) : availability ? (
-        <div className="rounded-xl border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-400">
+        <div className="rounded-xl border border-dashed border-border-quaternary p-8 text-center text-body-s text-text-tertiary">
           這段時間沒有可播放片段。沒有建立播放工作階段，也沒有自動播放。
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-500">
+        <div className="rounded-xl border border-dashed border-border-quaternary p-8 text-center text-body-s text-text-quaternary">
           選擇影像來源與時間後按「搜尋」。進入本頁不會自動查詢或播放。
           {days.length ? <div className="mt-2">本月有錄影的日期：{days.join('、')}</div> : null}
         </div>
       )}
       {availability && days.length ? (
-        <div className="text-xs text-zinc-500">本月有錄影的日期：{days.map((d) => (
-          <button key={d} type="button" onClick={() => { const parsed = rangeToQuery({ from: `${d}T00:00:00`, to: `${d}T23:59:59` }, timeZone); if (!('error' in parsed)) setRange({ from: toLocalInput(parsed.from, timeZone), to: toLocalInput(parsed.to - 1000, timeZone) }); }} className="mr-1 text-sky-300 underline">{d.slice(5)}</button>
+        <div className="text-body-xs text-text-quaternary">本月有錄影的日期：{days.map((d) => (
+          <button key={d} type="button" onClick={() => { const parsed = rangeToQuery({ from: `${d}T00:00:00`, to: `${d}T23:59:59` }, timeZone); if (!('error' in parsed)) setRange({ from: toLocalInput(parsed.from, timeZone), to: toLocalInput(parsed.to - 1000, timeZone) }); }} className="mr-1 text-text-theme underline">{d.slice(5)}</button>
         ))}</div>
       ) : null}
 
       {deletePreview ? (
         <Dialog title="刪除錄影" onClose={() => setDeletePreview(null)} footer={<><GhostButton onClick={() => setDeletePreview(null)}>取消</GhostButton><PrimaryButton danger disabled={!deletePreview.segments} onClick={() => { setDeletePreview(null); void videoApi.deleteRecordings({ sourceIds: playing, from: window_.from, to: window_.to, confirm: true }).then((j) => { setJob(null); notify(`已建立刪除工作（${j.status}）`, 'success'); setTimeout(() => void query(playing, window_, clock.t), 3000); }, (e: Error) => notify(e.message, 'error')); }}>刪除 {deletePreview.segments} 個片段</PrimaryButton></>}>
-          <p className="text-sm text-zinc-300">{formatDateTime(window_.from, timeZone)} 至 {formatDateTime(window_.to, timeZone)}：將刪除 {deletePreview.segments} 個片段（{formatBytes(deletePreview.bytes)}）。{deletePreview.protectedSegments ? `受保護的 ${deletePreview.protectedSegments} 個片段不會刪除。` : ''}</p>
-          <p className="mt-2 text-xs text-zinc-500">{deletePreview.note}</p>
+          <p className="text-body-s text-text-secondary">{formatDateTime(window_.from, timeZone)} 至 {formatDateTime(window_.to, timeZone)}：將刪除 {deletePreview.segments} 個片段（{formatBytes(deletePreview.bytes)}）。{deletePreview.protectedSegments ? `受保護的 ${deletePreview.protectedSegments} 個片段不會刪除。` : ''}</p>
+          <p className="mt-2 text-body-xs text-text-quaternary">{deletePreview.note}</p>
         </Dialog>
       ) : null}
       {sourceDialogOpen ? <Dialog title="選擇影像來源" width="max-w-2xl" onClose={() => setSourceDialogOpen(false)} footer={<><GhostButton onClick={() => setSourceDialogOpen(false)}>取消</GhostButton><PrimaryButton disabled={tempSelected.length === 0} onClick={() => { setSelected([...new Set(tempSelected)].slice(0, 12)); setPrefillVehicleCode(''); setSourceDialogOpen(false); }}>確定（{tempSelected.length}/12）</PrimaryButton></>}>
-        <p className="mb-3 text-sm text-zinc-400">可選 1–12 個來源；確認只套用選擇，不會自動查詢或播放。</p>
+        <p className="mb-3 text-body-s text-text-tertiary">可選 1–12 個來源；確認只套用選擇，不會自動查詢或播放。</p>
         <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-          {sourceGroups.map(([label, group]) => <section key={label} className="overflow-hidden rounded-xl border border-zinc-700"><h3 className="bg-[#232730] px-4 py-2 text-sm font-medium">{label}</h3>{group.map((source) => { const active = tempSelected.includes(source.id); const limit = !active && tempSelected.length >= 12; return <button key={`${label}:${source.id}`} type="button" disabled={limit} aria-pressed={active} onClick={() => setTempSelected((current) => active ? current.filter((id) => id !== source.id) : [...current, source.id])} className="flex w-full items-center gap-3 border-t border-zinc-800 px-4 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-40"><span className={`flex size-5 shrink-0 items-center justify-center rounded border ${active ? 'border-blue-500 bg-blue-600' : 'border-zinc-600'}`}>{active ? <Check className="size-3.5" /> : null}</span><span className="min-w-0 flex-1"><span className="block truncate">{source.name}</span><span className="text-xs text-zinc-500">{[source.vehicleCode, source.location].filter(Boolean).join('・') || '未綁定載具／位置'}</span></span><span className="text-xs text-zinc-400">{source.deleted ? '已刪除' : !source.enabled ? '已停用' : OPTION_STATE_LABEL[source.state]}</span></button>; })}</section>)}
-          {!sourceGroups.length ? <p className="py-8 text-center text-sm text-zinc-500">沒有可查詢的影像來源</p> : null}
+          {sourceGroups.map(([label, group]) => <section key={label} className="overflow-hidden rounded-xl border border-border-quaternary"><h3 className="bg-surface-secondary px-4 py-2 text-body-s-bold">{label}</h3>{group.map((source) => { const active = tempSelected.includes(source.id); const limit = !active && tempSelected.length >= 12; return <button key={`${label}:${source.id}`} type="button" disabled={limit} aria-pressed={active} onClick={() => setTempSelected((current) => active ? current.filter((id) => id !== source.id) : [...current, source.id])} className="flex w-full items-center gap-3 border-t border-border-quaternary px-4 py-3 text-left text-body-s hover:bg-link-standard disabled:opacity-40"><span className={`flex size-5 shrink-0 items-center justify-center rounded border ${active ? 'border-border-theme bg-blue-600' : 'border-border-tertiary'}`}>{active ? <Check className="size-3.5" /> : null}</span><span className="min-w-0 flex-1"><span className="block truncate">{source.name}</span><span className="text-body-xs text-text-quaternary">{[source.vehicleCode, source.location].filter(Boolean).join('・') || '未綁定載具／位置'}</span></span><span className="text-body-xs text-text-tertiary">{source.deleted ? '已刪除' : !source.enabled ? '已停用' : OPTION_STATE_LABEL[source.state]}</span></button>; })}</section>)}
+          {!sourceGroups.length ? <p className="py-8 text-center text-body-s text-text-quaternary">沒有可查詢的影像來源</p> : null}
         </div>
       </Dialog> : null}
       {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}

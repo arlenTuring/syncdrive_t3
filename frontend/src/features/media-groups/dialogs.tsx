@@ -114,8 +114,8 @@ export function GroupNameDialog({ groupId, onClose, onSaved }: { groupId?: strin
         </>
       }
     >
-      <label htmlFor={fieldId} className="mb-2 block text-lg text-zinc-300">
-        <span className="text-red-400">*</span>分組名稱
+      <label htmlFor={fieldId} className="mb-2 block text-headline-5 text-text-secondary">
+        <span className="text-status-error-emphasis">*</span>分組名稱
       </label>
       <input
         id={fieldId}
@@ -126,10 +126,10 @@ export function GroupNameDialog({ groupId, onClose, onSaved }: { groupId?: strin
         onKeyDown={(event) => event.key === 'Enter' && void submit()}
         placeholder={loading ? '載入中…' : '請輸入'}
         aria-invalid={Boolean(name) && Boolean(invalid)}
-        className="w-full rounded-xl bg-[#262a33] px-5 py-4 text-lg text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-blue-500"
+        className="w-full rounded-xl bg-surface-secondary px-5 py-4 text-headline-5 text-text-primary outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
       />
-      <div className="mt-1 flex justify-between text-xs text-zinc-500">
-        <span className="text-amber-300">{name && invalid ? invalid : ''}</span>
+      <div className="mt-1 flex justify-between text-body-xs text-text-quaternary">
+        <span className="text-status-warning">{name && invalid ? invalid : ''}</span>
         <span>{trimmed.length}/{GROUP_NAME_MAX}</span>
       </div>
       {error ? <ErrorLine text={error} /> : null}
@@ -162,7 +162,7 @@ export function DeleteGroupDialog({ groupId, onClose, onDeleted }: { groupId: st
   return (
     <Dialog
       title="確定刪除此分組？"
-      icon={<Trash2 className="mb-4 size-10 text-red-500" aria-hidden />}
+      icon={<Trash2 className="mb-4 size-10 text-status-error" aria-hidden />}
       onClose={busy ? undefined : onClose}
       footer={
         <>
@@ -171,10 +171,10 @@ export function DeleteGroupDialog({ groupId, onClose, onDeleted }: { groupId: st
         </>
       }
     >
-      {impact ? <p className="mb-2 text-lg text-zinc-100">「{impact.name}」{impact.member_count ? `（${impact.member_count} 個媒體）` : '（空分組）'}</p> : <p className="text-zinc-400">正在檢查引用…</p>}
-      <p className="text-lg text-zinc-400">刪除後無法復原，但不會影響原始媒體檔案。</p>
+      {impact ? <p className="mb-2 text-headline-5 text-text-primary">「{impact.name}」{impact.member_count ? `（${impact.member_count} 個媒體）` : '（空分組）'}</p> : <p className="text-text-tertiary">正在檢查引用…</p>}
+      <p className="text-headline-5 text-text-tertiary">刪除後無法復原，但不會影響原始媒體檔案。</p>
       {impact && impact.references.length ? (
-        <div className="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-200" role="alert">
+        <div className="mt-4 rounded-xl bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis" role="alert">
           <p className="mb-1">此分組仍被以下設定引用，請先解除引用再刪除：</p>
           <ul className="list-disc space-y-0.5 pl-5">
             {impact.references.map((ref) => (

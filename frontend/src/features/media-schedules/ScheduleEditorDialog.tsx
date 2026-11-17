@@ -22,6 +22,7 @@ import {
 import { draftFromDetail, emptyDraft, MODE_LABEL, PLAYLIST_MAX, timeZoneLabel, toInput, validateDraft, WEEKDAYS, weekdayLabel, type Draft } from './draft';
 import { GroupPickerDialog } from './GroupPickerDialog';
 import { WeeklyTimesDialog } from './WeeklyTimesDialog';
+import { Button, IconButton, Radio } from '../../components/ui';
 
 type Sub = 'weekly' | 'group' | 'media' | { replaceWith: MediaGroup } | null;
 
@@ -110,7 +111,7 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
       onClose={saving ? undefined : onClose}
       footer={
         <>
-          {submitted && Object.keys(errors).length ? <span className="mr-auto self-center text-sm text-red-400">尚有 {Object.keys(errors).length} 個欄位需要修正</span> : null}
+          {submitted && Object.keys(errors).length ? <span className="mr-auto self-center text-body-s text-status-error-emphasis">尚有 {Object.keys(errors).length} 個欄位需要修正</span> : null}
           <GhostButton onClick={onClose} disabled={saving}>取消</GhostButton>
           <PrimaryButton disabled={!draft || saving || stale} onClick={() => void save()}>{saving ? '儲存中…' : scheduleId ? '儲存' : '建立'}</PrimaryButton>
         </>
@@ -119,7 +120,7 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
       {loadError ? (
         <ErrorLine text={`載入失敗：${loadError}`} />
       ) : !draft || !vehicles ? (
-        <p className="py-16 text-center text-zinc-500">載入中…</p>
+        <p className="py-16 text-center text-text-quaternary">載入中…</p>
       ) : (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
           <div className="space-y-6">
@@ -130,14 +131,14 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
                 maxLength={SCHEDULE_NAME_MAX}
                 onChange={(event) => update('name', event.target.value)}
                 placeholder="請輸入排程名稱"
-                className="h-12 w-full rounded-xl bg-[#262a33] px-4 outline-none focus:ring-1 focus:ring-blue-500"
+                className="h-12 w-full rounded-xl bg-surface-secondary px-4 outline-none focus:ring-1 focus:ring-border-theme"
               />
             </Field>
             <Field label="播放模式" required>
               <div role="radiogroup" aria-label="播放模式" className="flex gap-3">
                 {(['reserved', 'timed'] as const).map((mode) => (
-                  <label key={mode} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${draft.mode === mode ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700'}`}>
-                    <input type="radio" name="media-schedule-mode" checked={draft.mode === mode} onChange={() => update('mode', mode)} className="size-4 accent-blue-600" />
+                  <label key={mode} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${draft.mode === mode ? 'border-border-theme bg-surface-theme' : 'border-border-quaternary'}`}>
+                    <Radio name="media-schedule-mode" checked={draft.mode === mode} onChange={() => update('mode', mode)} />
                     {MODE_LABEL[mode]}
                   </label>
                 ))}
@@ -150,46 +151,43 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
                   value={draft.runLocal}
                   aria-label="預約播放開始時間"
                   onChange={(event) => update('runLocal', event.target.value.slice(0, 16))}
-                  className="h-12 w-full rounded-xl bg-[#262a33] px-4"
+                  size="md" className="w-full"
                 />
               </Field>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="開始日期" required error={shown.startDate}>
-                    <SiteDateTimeInput type="date" value={draft.startDate} aria-label="定時播放開始日期" onChange={(event) => update('startDate', event.target.value)} className="h-12 w-full rounded-xl bg-[#262a33] px-4" />
+                    <SiteDateTimeInput type="date" value={draft.startDate} aria-label="定時播放開始日期" onChange={(event) => update('startDate', event.target.value)} size="md" className="w-full" />
                   </Field>
                   <Field label="結束日期" error={shown.endDate} hint="空白＝無結束日期（含當天）">
                     <div className="flex items-center gap-2">
-                      <SiteDateTimeInput type="date" value={draft.endDate} min={draft.startDate || undefined} aria-label="定時播放結束日期" onChange={(event) => update('endDate', event.target.value)} className="h-12 w-full rounded-xl bg-[#262a33] px-4" />
+                      <SiteDateTimeInput type="date" value={draft.endDate} min={draft.startDate || undefined} aria-label="定時播放結束日期" onChange={(event) => update('endDate', event.target.value)} size="md" className="w-full" />
                       {draft.endDate ? (
-                        <button type="button" onClick={() => update('endDate', '')} aria-label="清除結束日期" className="rounded p-1 text-zinc-400 hover:text-zinc-100">
-                          <X className="size-4" />
-                        </button>
+                        <IconButton size="small" hierarchy="subordinate" variant="standard" label="清除結束日期" icon={<X />} onPress={() => update('endDate', '')} />
                       ) : null}
                     </div>
                   </Field>
                 </div>
                 <Field label="播放時間" required error={shown.weekly} hint={`時區：${timeZoneLabel(draft.timeZone, now())}`}>
-                  <div className="rounded-xl bg-[#262a33] p-4">
+                  <div className="rounded-xl bg-surface-secondary p-4">
                     {WEEKDAYS.some((day) => draft.weekly[day]?.length) ? (
                       <ul className="mb-3 space-y-2" aria-label="已設定的播放時間">
                         {WEEKDAYS.filter((day) => draft.weekly[day]?.length).map((day) => (
                           <li key={day} className="flex flex-wrap items-center gap-2">
-                            <span className="w-10 text-zinc-300">{weekdayLabel(day)}</span>
+                            <span className="w-10 text-text-secondary">{weekdayLabel(day)}</span>
                             {draft.weekly[day].map((time) => (
-                              <span key={time} className="rounded-md bg-blue-500/15 px-2 py-0.5 text-sm text-blue-200">{time}</span>
+                              <span key={time} className="rounded-md bg-surface-theme px-2 py-0.5 text-body-s text-text-theme">{time}</span>
                             ))}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="mb-3 text-sm text-zinc-500">尚未設定星期與時間</p>
+                      <p className="mb-3 text-body-s text-text-quaternary">尚未設定星期與時間</p>
                     )}
-                    <button type="button" onClick={() => setSub('weekly')} className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300">
-                      <CalendarClock className="size-4" />
+                    <Button variant="text" leadingIcon={<CalendarClock />} onPress={() => setSub('weekly')}>
                       設定時間
-                    </button>
+                    </Button>
                   </div>
                 </Field>
               </>
@@ -199,30 +197,23 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
 
           <div className="flex min-h-0 flex-col">
             <div className="mb-3 flex items-center gap-3">
-              <h3 className="text-lg font-medium text-zinc-100">排程清單</h3>
-              <span className="text-sm text-zinc-500">{draft.items.length} / {PLAYLIST_MAX}</span>
-              <button type="button" onClick={() => setSub('group')} className="ml-auto inline-flex items-center gap-2 rounded-xl border border-zinc-600 px-3 py-2 text-sm hover:bg-white/5">
-                <Layers className="size-4" />
+              <h3 className="text-headline-5 text-text-primary">排程清單</h3>
+              <span className="text-body-s text-text-quaternary">{draft.items.length} / {PLAYLIST_MAX}</span>
+              <Button hierarchy="subordinate" variant="outlined" className="ml-auto" leadingIcon={<Layers />} onPress={() => setSub('group')}>
                 套用媒體分組
-              </button>
+              </Button>
             </div>
-            {draft.sourceGroup ? <p className="mb-2 text-xs text-zinc-500">曾套用分組「{draft.sourceGroup.name}」（版本 {draft.sourceGroup.version}，僅供追溯，不會跟隨分組變動）</p> : null}
+            {draft.sourceGroup ? <p className="mb-2 text-body-xs text-text-quaternary">曾套用分組「{draft.sourceGroup.name}」（版本 {draft.sourceGroup.version}，僅供追溯，不會跟隨分組變動）</p> : null}
             <Playlist items={draft.items} onChange={(items) => update('items', items)} />
-            <button
-              type="button"
-              disabled={draft.items.length >= PLAYLIST_MAX}
-              onClick={() => setSub('media')}
-              className="mt-3 inline-flex items-center gap-2 self-start text-blue-400 hover:text-blue-300 disabled:text-zinc-600"
-            >
-              <Plus className="size-4" />
+            <Button variant="text" className="mt-3 self-start" disabled={draft.items.length >= PLAYLIST_MAX} leadingIcon={<Plus />} onPress={() => setSub('media')}>
               加入媒體
-            </button>
+            </Button>
             {shown.items ? <ErrorLine text={shown.items} /> : null}
           </div>
         </div>
       )}
       {error ? <ErrorLine text={error} /> : null}
-      {stale ? <p className="mt-2 text-sm text-amber-300">排程已被其他使用者修改。請關閉後重新開啟以取得最新內容（目前的修改不會儲存）。</p> : null}
+      {stale ? <p className="mt-2 text-body-s text-status-warning">排程已被其他使用者修改。請關閉後重新開啟以取得最新內容（目前的修改不會儲存）。</p> : null}
 
       {sub === 'weekly' && draft ? (
         <WeeklyTimesDialog
@@ -248,7 +239,7 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
             </>
           }
         >
-          <p className="text-zinc-300">
+          <p className="text-text-secondary">
             目前播放清單已有 {draft?.items.length ?? 0} 個媒體。套用「{sub.replaceWith.name}」會以該分組的 {sub.replaceWith.member_count} 個媒體取代目前清單（尚未儲存前都可以取消整個編輯）。
           </p>
         </Dialog>
@@ -278,14 +269,14 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
 function Field({ label, required, error, hint, htmlFor, children }: { label: string; required?: boolean; error?: string; hint?: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-2 block text-zinc-300">
-        {required ? <span className="mr-1 text-red-400">*</span> : null}
+      <label htmlFor={htmlFor} className="mb-2 block text-text-secondary">
+        {required ? <span className="mr-1 text-status-error-emphasis">*</span> : null}
         {label}
       </label>
       {children}
-      {hint ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-body-xs text-text-quaternary">{hint}</p> : null}
       {error ? (
-        <p role="alert" className="mt-1 text-sm text-red-400">
+        <p role="alert" className="mt-1 text-body-s text-status-error-emphasis">
           {error}
         </p>
       ) : null}
@@ -305,38 +296,38 @@ function VehicleField({ draft, vehicles, error, onScope, onIds }: { draft: Draft
     <Field label="指派載具" required error={error ?? (removed.length && draft.targetScope === 'vehicles' ? `有 ${removed.length} 台載具已移除，請取消勾選後再儲存` : undefined)}>
       <div role="radiogroup" aria-label="指派載具範圍" className="flex gap-3">
         {(['all', 'vehicles'] as const).map((scope) => (
-          <label key={scope} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${draft.targetScope === scope ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700'}`}>
-            <input type="radio" name="media-schedule-target" checked={draft.targetScope === scope} onChange={() => onScope(scope)} className="size-4 accent-blue-600" />
+          <label key={scope} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${draft.targetScope === scope ? 'border-border-theme bg-surface-theme' : 'border-border-quaternary'}`}>
+            <Radio name="media-schedule-target" checked={draft.targetScope === scope} onChange={() => onScope(scope)} />
             {scope === 'all' ? '全部載具' : '指定載具'}
           </label>
         ))}
       </div>
       {draft.targetScope === 'all' ? (
-        <p className="mt-2 text-xs text-zinc-500">每次到期時依當下的註冊載具決定名單；離線載具記錄為未下發，上線後不補播。</p>
+        <p className="mt-2 text-body-xs text-text-quaternary">每次到期時依當下的註冊載具決定名單；離線載具記錄為未下發，上線後不補播。</p>
       ) : (
-        <div className="mt-3 rounded-xl bg-[#262a33] p-3">
+        <div className="mt-3 rounded-xl bg-surface-secondary p-3">
           <div className="relative mb-2">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-500" />
-            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜尋載具名稱或代號" aria-label="搜尋載具" className="h-10 w-full rounded-lg bg-[#1b1d23] pr-3 pl-9 text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-quaternary" />
+            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜尋載具名稱或代號" aria-label="搜尋載具" className="h-10 w-full rounded-lg bg-surface-primary pr-3 pl-9 text-body-s outline-none focus:ring-1 focus:ring-border-theme" />
           </div>
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {removed.map((id) => (
               <div key={id} className="flex items-center gap-3 px-1 py-1">
                 <Checkbox checked onChange={() => toggle(id)} label={`取消已移除的載具 ${id}`} />
-                <span className="text-zinc-500 line-through">{id}</span>
-                <span className="text-xs text-amber-300">已移除</span>
+                <span className="text-text-quaternary line-through">{id}</span>
+                <span className="text-body-xs text-status-warning">已移除</span>
               </div>
             ))}
             {visible.map((vehicle) => (
               <div key={vehicle.id} className="flex items-center gap-3 px-1 py-1">
                 <Checkbox checked={draft.vehicleIds.includes(vehicle.id)} onChange={() => toggle(vehicle.id)} label={`指定載具 ${vehicle.display_name}`} />
-                <span className="text-zinc-100">{vehicle.display_name}</span>
-                {vehicle.display_name !== vehicle.vehicle_code ? <span className="text-xs text-zinc-500">{vehicle.vehicle_code}</span> : null}
+                <span className="text-text-primary">{vehicle.display_name}</span>
+                {vehicle.display_name !== vehicle.vehicle_code ? <span className="text-body-xs text-text-quaternary">{vehicle.vehicle_code}</span> : null}
               </div>
             ))}
-            {!vehicles.length ? <p className="py-4 text-center text-sm text-zinc-500">尚無註冊載具</p> : !visible.length && !removed.length ? <p className="py-4 text-center text-sm text-zinc-500">沒有符合的載具</p> : null}
+            {!vehicles.length ? <p className="py-4 text-center text-body-s text-text-quaternary">尚無註冊載具</p> : !visible.length && !removed.length ? <p className="py-4 text-center text-body-s text-text-quaternary">沒有符合的載具</p> : null}
           </div>
-          <p className="mt-2 text-xs text-zinc-500">已指定 {draft.vehicleIds.length} 台</p>
+          <p className="mt-2 text-body-xs text-text-quaternary">已指定 {draft.vehicleIds.length} 台</p>
         </div>
       )}
     </Field>
@@ -391,8 +382,8 @@ function Playlist({ items, onChange }: { items: PlaylistItem[]; onChange: (items
   };
 
   return (
-    <div className="min-h-[16rem] rounded-xl border border-zinc-700/70">
-      <div className="grid grid-cols-[2.5rem_2rem_minmax(0,1.2fr)_6.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-zinc-700/70 px-2 py-3 text-sm text-zinc-400">
+    <div className="min-h-[16rem] rounded-xl border border-border-quaternary">
+      <div className="grid grid-cols-[2.5rem_2rem_minmax(0,1.2fr)_6.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-border-quaternary px-2 py-3 text-body-s text-text-tertiary">
         <span />
         <span>#</span>
         <span>媒體名稱</span>
@@ -412,7 +403,7 @@ function Playlist({ items, onChange }: { items: PlaylistItem[]; onChange: (items
                 setDragging(null);
                 armed.current = null;
               }}
-              className={`grid grid-cols-[2.5rem_2rem_minmax(0,1.2fr)_6.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-zinc-800 px-2 py-2.5 ${dragging === item.id || grabbed?.id === item.id ? 'bg-blue-500/10' : ''}`}
+              className={`grid grid-cols-[2.5rem_2rem_minmax(0,1.2fr)_6.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-border-quaternary px-2 py-2.5 ${dragging === item.id || grabbed?.id === item.id ? 'bg-surface-theme' : ''}`}
             >
               <button
                 type="button"
@@ -422,27 +413,25 @@ function Playlist({ items, onChange }: { items: PlaylistItem[]; onChange: (items
                 aria-label={`調整 ${item.name ?? item.id} 的順序`}
                 aria-pressed={grabbed?.id === item.id}
                 data-captures-escape={grabbed?.id === item.id}
-                className="cursor-grab rounded p-1 text-zinc-500 hover:text-zinc-200"
+                className="cursor-grab rounded p-1 text-text-quaternary hover:text-text-primary"
               >
                 <GripVertical className="size-4" />
               </button>
-              <span className="text-zinc-500">{index + 1}</span>
+              <span className="text-text-quaternary">{index + 1}</span>
               <span className="min-w-0">
-                <span className={`block truncate ${item.missing ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>{item.name ?? '（已刪除的媒體）'}</span>
-                {!item.available ? <span className="text-xs text-amber-300">{item.unavailable_label ?? '無法播放'}</span> : null}
+                <span className={`block truncate ${item.missing ? 'text-text-quaternary line-through' : 'text-text-primary'}`}>{item.name ?? '（已刪除的媒體）'}</span>
+                {!item.available ? <span className="text-body-xs text-status-warning">{item.unavailable_label ?? '無法播放'}</span> : null}
               </span>
               <span>
                 <TypeBadge type={item.media_type} />
               </span>
-              <span className="truncate text-sm text-zinc-300" title={item.description}>{item.description || '—'}</span>
-              <button type="button" onClick={() => onChange(items.filter((other) => other.id !== item.id))} aria-label={`從播放清單移除 ${item.name ?? item.id}`} className="rounded p-1 text-zinc-400 hover:text-red-400">
-                <X className="size-4" />
-              </button>
+              <span className="truncate text-body-s text-text-secondary" title={item.description}>{item.description || '—'}</span>
+              <IconButton size="small" hierarchy="subordinate" variant="standard" label={`從播放清單移除 ${item.name ?? item.id}`} icon={<X />} onPress={() => onChange(items.filter((other) => other.id !== item.id))} />
             </li>
           ))}
         </ol>
       ) : (
-        <p className="py-14 text-center text-zinc-500">尚未加入媒體，請「加入媒體」或「套用媒體分組」</p>
+        <p className="py-14 text-center text-text-quaternary">尚未加入媒體，請「加入媒體」或「套用媒體分組」</p>
       )}
       <p className="sr-only" aria-live="assertive">{announce}</p>
     </div>

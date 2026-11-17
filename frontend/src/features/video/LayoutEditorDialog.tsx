@@ -5,8 +5,12 @@ import { SiteSelect } from '../../components/SiteSelect';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/dialogs';
 import { videoApi, type SourceOption, type Tab } from './api';
 import { ASPECT_PRESETS, CANVAS, MIN_TILE, TILE_MAX, addTile, evenLayout, snapMove, snapRect, validLayout, validRect, type DraftTile, type Rect } from './layout';
+import { Button, fieldClass } from '../../components/ui';
+import { tokenVar } from '../../styles/tokens';
 
-const field = 'h-10 w-full rounded-lg bg-[#262a33] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500';
+const field = fieldClass({ size: 'md' });
+/** 版面編輯畫布的格線 */
+const GRID_LINE = tokenVar('border-disabled');
 let keySeq = 0;
 const nextKey = () => `draft-${(keySeq += 1)}`;
 
@@ -119,7 +123,7 @@ export function LayoutEditorDialog({
       onClose={saving ? undefined : onClose}
       footer={
         <>
-          <span className="mr-auto text-xs text-zinc-500">{tiles.length} / {TILE_MAX} 格・刪除格子不會刪來源或停止錄影</span>
+          <span className="mr-auto text-body-xs text-text-quaternary">{tiles.length} / {TILE_MAX} 格・刪除格子不會刪來源或停止錄影</span>
           <GhostButton onClick={onClose} disabled={saving}>取消</GhostButton>
           <PrimaryButton onClick={() => void save()} disabled={saving}>{saving ? '儲存中…' : '儲存版面'}</PrimaryButton>
         </>
@@ -127,42 +131,37 @@ export function LayoutEditorDialog({
     >
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-400">標籤頁名稱</span>
+          <span className="text-body-xs text-text-tertiary">標籤頁名稱</span>
           <input className={field} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="例如：北側月台" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-400">畫布比例</span>
+          <span className="text-body-xs text-text-tertiary">畫布比例</span>
           <SiteSelect
             aria-label="畫布比例"
             value={String(aspect)}
             options={aspectOptions.map((p) => ({ value: String(p.value), label: p.label }))}
             onChange={(e) => setAspect(Number(e.target.value))}
-            className={field}
+            size="md"
+            className="w-full"
           />
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={add} disabled={tiles.length >= TILE_MAX} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-50">
-          <Plus className="size-4" />加入影像格
-        </button>
-        <button type="button" onClick={() => setTiles((list) => evenLayout(list, aspect))} disabled={tiles.length < 2} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
-          <LayoutGrid className="size-4" />平均重排
-        </button>
-        <button type="button" onClick={remove} disabled={!selected} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/5 hover:text-red-300 disabled:opacity-50">
-          <Trash2 className="size-4" />刪除選取格
-        </button>
-        <span className="text-xs text-zinc-500">{selected ? '新增會分割選取的格子' : '沒有選取時，新增會分割最大的一格'}・拖曳標題列移動，拉邊或角調整大小</span>
+        <Button onPress={add} disabled={tiles.length >= TILE_MAX} leadingIcon={<Plus />}>加入影像格</Button>
+        <Button hierarchy="subordinate" variant="outlined" onPress={() => setTiles((list) => evenLayout(list, aspect))} disabled={tiles.length < 2} leadingIcon={<LayoutGrid />}>平均重排</Button>
+        <Button hierarchy="danger" variant="outlined" onPress={remove} disabled={!selected} leadingIcon={<Trash2 />}>刪除選取格</Button>
+        <span className="text-body-xs text-text-quaternary">{selected ? '新增會分割選取的格子' : '沒有選取時，新增會分割最大的一格'}・拖曳標題列移動，拉邊或角調整大小</span>
       </div>
       <div ref={areaRef} className="mt-3 flex w-full justify-center">
         <div
-          className="relative rounded-lg border border-dashed border-zinc-600 bg-[#101114]"
-          style={{ width: W, height: H, backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: `${W / 10}px ${H / 10}px` }}
+          className="relative rounded-lg border border-dashed border-border-tertiary bg-surface-sub-background"
+          style={{ width: W, height: H, backgroundImage: `linear-gradient(to right, ${GRID_LINE} 1px, transparent 1px), linear-gradient(to bottom, ${GRID_LINE} 1px, transparent 1px)`, backgroundSize: `${W / 10}px ${H / 10}px` }}
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) setSelected(null);
           }}
         >
           {tiles.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">按「加入影像格」建立第一格（會占滿畫布）</div>
+            <div className="absolute inset-0 flex items-center justify-center text-body-s text-text-quaternary">按「加入影像格」建立第一格（會占滿畫布）</div>
           ) : null}
           {tiles.map((t, index) => {
             const src = t.sourceId ? sourceName.get(t.sourceId) : undefined;
@@ -181,17 +180,17 @@ export function LayoutEditorDialog({
                 onDragStop={(_e, d) => commit(t.key, { x: norm(d.x, W), y: norm(d.y, H), w: t.w, h: t.h }, 'move')}
                 onResizeStop={(_e, _dir, ref, _delta, pos) => commit(t.key, { x: norm(pos.x, W), y: norm(pos.y, H), w: norm(ref.offsetWidth, W), h: norm(ref.offsetHeight, H) }, 'resize')}
                 className="p-0.5"
-                resizeHandleStyles={isSel ? { bottomRight: { width: 12, height: 12, right: -4, bottom: -4, background: '#3b82f6', borderRadius: 999, border: '2px solid #fff' } } : undefined}
+                resizeHandleStyles={isSel ? { bottomRight: { width: 12, height: 12, right: -4, bottom: -4, background: tokenVar('link-theme-filled'), borderRadius: 999, border: `2px solid ${tokenVar('color-white-100')}` } } : undefined}
               >
                 <div
                   onPointerDown={() => setSelected(t.key)}
-                  className={`flex h-full w-full flex-col overflow-hidden rounded-md border text-xs ${isSel ? 'border-blue-500 bg-blue-500/15' : 'border-zinc-600 bg-[#1b1e25]'}`}
+                  className={`flex h-full w-full flex-col overflow-hidden rounded-md border text-body-xs ${isSel ? 'border-border-theme bg-surface-theme' : 'border-border-tertiary bg-surface-primary'}`}
                 >
-                  <div className="layout-tile-handle flex h-7 shrink-0 cursor-move items-center gap-1.5 bg-black/30 px-2 text-zinc-200">
-                    <GripHorizontal className="size-3.5 shrink-0 text-zinc-500" aria-hidden />
+                  <div className="layout-tile-handle flex h-7 shrink-0 cursor-move items-center gap-1.5 bg-black-30 px-2 text-text-primary">
+                    <GripHorizontal className="size-3.5 shrink-0 text-text-quaternary" aria-hidden />
                     <span className="truncate">第 {index + 1} 格</span>
                   </div>
-                  <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-zinc-400">
+                  <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-text-tertiary">
                     <span className="truncate">{src ? src.name : t.sourceId ? '來源已刪除' : '尚未選來源'}</span>
                   </div>
                 </div>
@@ -200,7 +199,7 @@ export function LayoutEditorDialog({
           })}
         </div>
       </div>
-      {notice ? <p className="mt-2 text-center text-xs text-amber-200" role="status">{notice}</p> : null}
+      {notice ? <p className="mt-2 text-center text-body-xs text-status-warning" role="status">{notice}</p> : null}
       {error ? <ErrorLine text={error} /> : null}
     </Dialog>
   );

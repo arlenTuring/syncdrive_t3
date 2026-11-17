@@ -9,6 +9,7 @@ import { CANVAS } from './layout';
 import { LayoutEditorDialog } from './LayoutEditorDialog';
 import { SourcePicker } from './SourcePicker';
 import { TileView } from './TileView';
+import { Button, MENU_PANEL_CLASS, cn, fieldClass, menuItemClass } from '../../components/ui';
 
 const PREF_KEY = 'vtms.video.monitor';
 /** 標籤頁整體全螢幕容器的標記（判斷目前的原生全螢幕是不是這一頁的） */
@@ -195,7 +196,7 @@ export function VideoMonitorPage() {
   const storage = data?.storage;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-text-primary">
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-1" role="tablist" aria-label="監控標籤頁">
           {tabs.map((tab, index) => (
@@ -205,7 +206,7 @@ export function VideoMonitorPage() {
               onDragStart={() => (dragging.current = tab.id)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDrop(e, tab.id)}
-              className={`relative flex shrink-0 items-center rounded-lg ${tab.id === current?.id ? 'bg-[#2a3445] text-white' : 'text-zinc-400 hover:bg-white/5'}`}
+              className={`relative flex shrink-0 items-center rounded-lg ${tab.id === current?.id ? 'bg-surface-secondary text-text-primary' : 'text-text-tertiary hover:bg-link-standard'}`}
             >
               {renaming === tab.id ? (
                 <input
@@ -222,19 +223,19 @@ export function VideoMonitorPage() {
                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                     if (e.key === 'Escape') setRenaming(null);
                   }}
-                  className="h-8 w-36 rounded bg-[#1b1d23] px-2 text-sm outline-none"
+                  className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-36')}
                 />
               ) : (
-                <button type="button" role="tab" aria-selected={tab.id === current?.id} onClick={() => setTabId(tab.id)} onDoubleClick={() => requireConfigure() && setRenaming(tab.id)} className="h-8 px-3 text-sm">
+                <button type="button" role="tab" aria-selected={tab.id === current?.id} onClick={() => setTabId(tab.id)} onDoubleClick={() => requireConfigure() && setRenaming(tab.id)} className="h-8 px-3 text-body-s">
                   {tab.name}
-                  <span className="ml-1.5 text-xs text-zinc-500">{tab.tileCount} 格</span>
+                  <span className="ml-1.5 text-body-xs text-text-quaternary">{tab.tileCount} 格</span>
                 </button>
               )}
-              <button type="button" aria-label={`${tab.name} 更多操作`} onClick={() => setMenu(menu === tab.id ? null : tab.id)} className="rounded p-1 text-zinc-500 hover:text-white">
+              <button type="button" aria-label={`${tab.name} 更多操作`} onClick={() => setMenu(menu === tab.id ? null : tab.id)} className="rounded p-1 text-text-quaternary hover:text-text-primary">
                 <MoreHorizontal className="size-3.5" />
               </button>
               {menu === tab.id ? (
-                <div role="menu" className="absolute top-full left-0 z-30 mt-1 w-40 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] py-1 text-sm shadow-xl">
+                <div role="menu" className={cn(MENU_PANEL_CLASS, 'absolute top-full left-0 z-30 mt-1 w-40')}>
                   {[
                     ['此標籤頁全螢幕', () => enterFull(tab)],
                     ['編輯版面', () => requireConfigure() && setEditor({ tab })],
@@ -244,7 +245,7 @@ export function VideoMonitorPage() {
                     ['往右移', () => move(tab, 1), index === tabs.length - 1],
                     ['刪除', () => requireConfigure() && setDeleting(tab)],
                   ].map(([label, fn, disabled]) => (
-                    <button key={label as string} type="button" role="menuitem" disabled={Boolean(disabled)} onClick={() => { setMenu(null); (fn as () => void)(); }} className={`block w-full px-3 py-1.5 text-left hover:bg-white/5 disabled:opacity-40 ${label === '刪除' ? 'text-red-300' : ''}`}>
+                    <button key={label as string} type="button" role="menuitem" disabled={Boolean(disabled)} onClick={() => { setMenu(null); (fn as () => void)(); }} className={cn(menuItemClass(), 'min-h-8', label === '刪除' && 'text-status-error-emphasis')}>
                       {label as string}
                     </button>
                   ))}
@@ -252,38 +253,32 @@ export function VideoMonitorPage() {
               ) : null}
             </div>
           ))}
-          <button type="button" onClick={() => requireConfigure() && setEditor({ tab: null })} aria-label="新增監控標籤頁" className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-white">
-            <Plus className="size-4" />新增標籤頁
-          </button>
+          <Button hierarchy="subordinate" variant="standard" aria-label="新增監控標籤頁" leadingIcon={<Plus />} onPress={() => requireConfigure() && setEditor({ tab: null })}>新增標籤頁</Button>
         </div>
         {current ? (
-          <button type="button" onClick={() => enterFull(current)} aria-label="標籤頁全螢幕" title="標籤頁全螢幕" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-500/10">
-            <Maximize2 className="size-3.5" />全螢幕
-          </button>
+          <Button variant="outlined" aria-label="標籤頁全螢幕" title="標籤頁全螢幕" leadingIcon={<Maximize2 />} onPress={() => enterFull(current)}>全螢幕</Button>
         ) : null}
         {current ? (
-          <button type="button" onClick={() => requireConfigure() && setEditor({ tab: current })} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5">
-            <LayoutDashboard className="size-3.5" />編輯版面
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<LayoutDashboard />} onPress={() => requireConfigure() && setEditor({ tab: current })}>編輯版面</Button>
         ) : null}
         {storage ? (
-          <button
-            type="button"
-            onClick={() => openVideoResources()}
+          <Button
+            hierarchy={storage.paused ? 'danger' : 'subordinate'}
+            variant="outlined"
+            onPress={() => openVideoResources()}
             title="錄影儲存設定在「影像資源管理」"
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${storage.paused ? 'border-amber-500/40 text-amber-200' : 'border-zinc-700 text-zinc-300'} hover:bg-white/5`}
+            leadingIcon={<HardDrive />}
           >
-            <HardDrive className="size-3.5" />
             {storage.paused ? `錄影暫停：${storage.paused.reason}` : `錄影用量 ${storage.usagePct}%`}
-          </button>
+          </Button>
         ) : null}
-        <span className="shrink-0 text-xs text-zinc-500" aria-live="polite">{saving ? '儲存中…' : ''}</span>
+        <span className="shrink-0 text-body-xs text-text-quaternary" aria-live="polite">{saving ? '儲存中…' : ''}</span>
       </div>
 
       {error ? <ErrorLine text={`載入失敗：${error}`} /> : null}
-      {!data && !error ? <p className="py-16 text-center text-zinc-500">載入中…</p> : null}
+      {!data && !error ? <p className="py-16 text-center text-text-quaternary">載入中…</p> : null}
       {data && !current ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-400">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-tertiary">
           <p>還沒有監控標籤頁</p>
           <PrimaryButton onClick={() => requireConfigure() && setEditor({ tab: null })}>新增標籤頁</PrimaryButton>
         </div>
@@ -291,20 +286,18 @@ export function VideoMonitorPage() {
       {current ? (
         <div
           {...{ [ROOT_ATTR]: 'true' }}
-          className={full ? `flex flex-col bg-[#0b0c0f] ${full === 'web' ? 'fixed inset-0 z-[200]' : 'h-full w-full'}` : 'flex min-h-0 flex-1 flex-col'}
+          className={full ? `flex flex-col bg-surface-sub-background ${full === 'web' ? 'fixed inset-0 z-[200]' : 'h-full w-full'}` : 'flex min-h-0 flex-1 flex-col'}
         >
           {full ? (
-            <div className="flex h-10 shrink-0 items-center gap-3 px-3 text-sm text-zinc-100">
+            <div className="flex h-10 shrink-0 items-center gap-3 px-3 text-body-s text-text-primary">
               <span className="truncate font-medium">{current.name}</span>
-              <span className="shrink-0 text-xs text-zinc-500">
+              <span className="shrink-0 text-body-xs text-text-quaternary">
                 {full === 'web' ? '網頁滿版（瀏覽器工具列仍會顯示）' : '標籤頁全螢幕'}・{current.tileCount} 格{zoomTile ? '・單格放大中' : ''}
               </span>
               {zoomTile ? (
-                <button type="button" onClick={() => setZoomTile(null)} className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs hover:bg-white/5">返回整頁</button>
+                <Button hierarchy="subordinate" variant="outlined" onPress={() => setZoomTile(null)}>返回整頁</Button>
               ) : null}
-              <button type="button" onClick={exitFull} className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1 text-xs hover:bg-white/20">
-                <Minimize2 className="size-3.5" />離開全螢幕
-              </button>
+              <Button hierarchy="subordinate" variant="tonal" className="ml-auto" leadingIcon={<Minimize2 />} onPress={exitFull}>離開全螢幕</Button>
             </div>
           ) : null}
           <div ref={stageRef} className={full ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1' : 'min-h-0 flex-1 overflow-auto'}>
@@ -373,7 +366,7 @@ export function VideoMonitorPage() {
       ) : null}
       {deleting ? (
         <Dialog title="刪除監控標籤頁" onClose={() => setDeleting(null)} footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => { const t = deleting; setDeleting(null); void mutate(() => videoApi.deleteTab(t.id, t.version), '已刪除標籤頁'); }}>刪除</PrimaryButton></>}>
-          <p className="text-sm text-zinc-300">確定刪除「{deleting.name}」？只移除這個版面，不刪影像來源，也不影響任何來源的錄影。</p>
+          <p className="text-body-s text-text-secondary">確定刪除「{deleting.name}」？只移除這個版面，不刪影像來源，也不影響任何來源的錄影。</p>
         </Dialog>
       ) : null}
       {notice && !current ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
@@ -391,13 +384,13 @@ function RebindDialog({ tile, options, onClose, onPick }: { tile: Tile; options:
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={() => onPick(null)} className="mr-auto text-sm text-zinc-400 hover:text-red-300">清除綁定</button>
+          <Button hierarchy="danger" variant="text" className="mr-auto" onPress={() => onPick(null)}>清除綁定</Button>
           <GhostButton onClick={onClose}>取消</GhostButton>
           <PrimaryButton onClick={() => (picked && picked !== tile.sourceId ? onPick(picked) : onClose())} disabled={!picked}>套用</PrimaryButton>
         </>
       }
     >
-      <p className="mb-2 text-xs text-zinc-400">目前：{current ? current.name : tile.sourceId ? '來源已刪除' : '未設定'}。換來源不改版面，也不影響任何來源的錄影；連線與錄影請到「影像資源管理」設定。</p>
+      <p className="mb-2 text-body-xs text-text-tertiary">目前：{current ? current.name : tile.sourceId ? '來源已刪除' : '未設定'}。換來源不改版面，也不影響任何來源的錄影；連線與錄影請到「影像資源管理」設定。</p>
       <SourcePicker options={options} value={picked} onPick={setPicked} className="w-full" />
     </Dialog>
   );

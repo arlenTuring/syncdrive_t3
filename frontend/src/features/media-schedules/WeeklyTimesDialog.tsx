@@ -5,6 +5,7 @@ import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/d
 import { Checkbox } from '../media-groups/widgets';
 import type { Weekly } from './api';
 import { dayTimeErrors, sortWeekly, WEEKDAYS, weekdayLabel } from './draft';
+import { Button, IconButton } from '../../components/ui';
 
 type Row = { key: number; value: string };
 let nextKey = 1;
@@ -42,20 +43,19 @@ export function WeeklyTimesDialog({ value, onClose, onConfirm }: { value: Weekly
         </>
       }
     >
-      <p className="mb-4 text-sm text-zinc-400">勾選播放的星期，每天至少一個時間；同一天的時間不可重複，確定後依時間排序。</p>
+      <p className="mb-4 text-body-s text-text-tertiary">勾選播放的星期，每天至少一個時間；同一天的時間不可重複，確定後依時間排序。</p>
       <div className="space-y-3">
         {WEEKDAYS.map((day) => {
           const rows = days[day];
           return (
-            <div key={day} className="rounded-xl bg-[#232730] px-4 py-3">
+            <div key={day} className="rounded-xl bg-surface-secondary px-4 py-3">
               <div className="flex items-center gap-3">
                 <Checkbox checked={Boolean(rows)} onChange={() => setDay(day, rows ? undefined : [{ key: nextKey++, value: '' }])} label={`${weekdayLabel(day)}播放`} />
-                <span className="w-12 text-zinc-100">{weekdayLabel(day)}</span>
+                <span className="w-12 text-text-primary">{weekdayLabel(day)}</span>
                 {rows ? (
-                  <button type="button" onClick={() => setDay(day, [...rows, { key: nextKey++, value: '' }])} className="ml-auto inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300" aria-label={`${weekdayLabel(day)}新增時間`}>
-                    <Plus className="size-4" />
+                  <Button variant="text" className="ml-auto" aria-label={`${weekdayLabel(day)}新增時間`} leadingIcon={<Plus />} onPress={() => setDay(day, [...rows, { key: nextKey++, value: '' }])}>
                     新增時間
-                  </button>
+                  </Button>
                 ) : null}
               </div>
               {rows ? (
@@ -65,24 +65,22 @@ export function WeeklyTimesDialog({ value, onClose, onConfirm }: { value: Weekly
                     const show = error && (touched || row.value);
                     return (
                       <div key={row.key} className="flex flex-col">
-                        <div className={`flex items-center gap-1 rounded-lg border px-2 ${show ? 'border-red-500' : 'border-zinc-600'}`}>
+                        <div className={`flex items-center gap-1 rounded-lg border px-2 ${show ? 'border-status-error' : 'border-border-tertiary'}`}>
                           <SiteDateTimeInput
                             type="time"
                             step={60}
                             value={row.value}
                             aria-label={`${weekdayLabel(day)}第 ${index + 1} 個時間`}
                             onChange={(event) => setDay(day, rows.map((item) => (item.key === row.key ? { ...item, value: event.target.value.slice(0, 5) } : item)))}
-                            className="h-9 w-24 text-zinc-100"
+                            className="h-9 w-24 text-text-primary"
                           />
-                          <button type="button" onClick={() => setDay(day, rows.filter((item) => item.key !== row.key))} aria-label={`刪除${weekdayLabel(day)}第 ${index + 1} 個時間`} className="rounded p-1 text-zinc-400 hover:text-red-400">
-                            <X className="size-4" />
-                          </button>
+                          <IconButton size="small" hierarchy="subordinate" variant="standard" label={`刪除${weekdayLabel(day)}第 ${index + 1} 個時間`} icon={<X />} onPress={() => setDay(day, rows.filter((item) => item.key !== row.key))} />
                         </div>
-                        {show ? <span className="mt-1 text-xs text-red-400" role="alert">{error}</span> : null}
+                        {show ? <span className="mt-1 text-body-xs text-status-error-emphasis" role="alert">{error}</span> : null}
                       </div>
                     );
                   })}
-                  {!rows.length ? <span className="text-sm text-red-400">{touched ? '這天至少要有一個時間' : '尚未新增時間'}</span> : null}
+                  {!rows.length ? <span className="text-body-s text-status-error-emphasis">{touched ? '這天至少要有一個時間' : '尚未新增時間'}</span> : null}
                 </div>
               ) : null}
             </div>

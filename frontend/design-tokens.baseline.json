@@ -970,64 +970,16 @@
     "rgb": 1
   },
   "features/media-content/MediaContentPage.tsx": {
-    "hex": 10,
-    "arbitrary": 10,
-    "palette": 54,
-    "button": 16,
-    "selection": 1
-  },
-  "features/media-groups/dialogs.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 13
-  },
-  "features/media-groups/MediaGroupsPage.tsx": {
-    "hex": 3,
-    "arbitrary": 3,
-    "palette": 37,
-    "button": 11
-  },
-  "features/media-groups/MediaPickerDialog.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 16,
     "button": 1
   },
-  "features/media-groups/widgets.tsx": {
-    "palette": 12,
-    "button": 3,
-    "selection": 1
-  },
-  "features/media-schedules/dialogs.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 13
-  },
-  "features/media-schedules/GroupPickerDialog.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 20,
-    "button": 1,
-    "selection": 1
+  "features/media-groups/MediaGroupsPage.tsx": {
+    "button": 2
   },
   "features/media-schedules/MediaSchedulesPage.tsx": {
-    "hex": 2,
-    "arbitrary": 2,
-    "palette": 21,
-    "button": 10
+    "button": 2
   },
   "features/media-schedules/ScheduleEditorDialog.tsx": {
-    "hex": 7,
-    "arbitrary": 7,
-    "palette": 58,
-    "button": 6,
-    "selection": 2
-  },
-  "features/media-schedules/WeeklyTimesDialog.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
-    "palette": 11,
-    "button": 2
+    "button": 1
   },
   "features/order-records/index.tsx": {
     "palette": 5
@@ -1636,67 +1588,26 @@
     "palette": 13
   },
   "features/video/LayoutEditorDialog.tsx": {
-    "hex": 5,
-    "arbitrary": 3,
-    "rgb": 2,
-    "palette": 27,
-    "button": 3
-  },
-  "features/video/LivePlayer.tsx": {
     "palette": 1
   },
-  "features/video/SegmentFollower.tsx": {
-    "palette": 8,
-    "button": 1
-  },
-  "features/video/SourceDialog.tsx": {
-    "hex": 3,
-    "arbitrary": 4,
-    "palette": 39,
-    "button": 3,
-    "selection": 3
-  },
   "features/video/SourcePicker.tsx": {
-    "hex": 3,
-    "arbitrary": 4,
-    "rgb": 1,
-    "palette": 24,
     "button": 2
   },
   "features/video/status.ts": {
     "palette": 10
   },
-  "features/video/StorageDialog.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 38,
-    "selection": 6
-  },
   "features/video/TileView.tsx": {
-    "hex": 1,
-    "arbitrary": 3,
-    "palette": 14,
-    "button": 4
+    "button": 3
   },
   "features/video/VideoHistoryPage.tsx": {
-    "hex": 7,
-    "arbitrary": 9,
-    "rgb": 2,
-    "palette": 55,
-    "button": 10
+    "palette": 2,
+    "button": 3
   },
   "features/video/VideoMonitorPage.tsx": {
-    "hex": 4,
-    "arbitrary": 4,
-    "palette": 37,
-    "button": 10
+    "button": 3
   },
   "features/video/VideoResourcesPage.tsx": {
-    "hex": 2,
-    "arbitrary": 3,
-    "palette": 39,
-    "button": 9,
-    "selection": 1
+    "button": 4
   },
   "features/virtual-fence-management/components/FenceFormPanel.tsx": {
     "hex": 12,

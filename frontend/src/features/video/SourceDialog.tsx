@@ -6,8 +6,9 @@ import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/d
 import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { videoApi, type ConnectionInput, type Protocol, type SourceTest, type VideoSourceItem } from './api';
 import { tagKey } from './layout';
+import { Button, Checkbox, IconButton, SegmentedControl, fieldClass } from '../../components/ui';
 
-const field = 'h-10 w-full rounded-lg bg-[#262a33] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-sky-500';
+const field = fieldClass({ size: 'md' });
 const PROTOCOLS: Array<{ value: Protocol; label: string }> = [
   { value: 'rtsp', label: 'RTSP' },
   { value: 'rtsps', label: 'RTSPS' },
@@ -23,9 +24,9 @@ const TAG_LENGTH_MAX = 30;
 function Labeled({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-400">{label}</span>
+      <span className="text-body-xs text-text-tertiary">{label}</span>
       {children}
-      {hint ? <span className="text-[11px] text-zinc-500">{hint}</span> : null}
+      {hint ? <span className="text-body-xs text-text-quaternary">{hint}</span> : null}
     </label>
   );
 }
@@ -42,13 +43,11 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
     onChange([...value, tag]);
   };
   return (
-    <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-lg bg-[#262a33] px-2 py-1.5 focus-within:ring-1 focus-within:ring-sky-500">
+    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-lg border border-border-quaternary bg-surface-secondary px-2 py-1 focus-within:border-border-theme">
       {value.map((t) => (
-        <span key={t} className="inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-xs text-sky-100">
+        <span key={t} className="inline-flex items-center gap-1 rounded-md bg-surface-theme px-2 py-0.5 text-body-xs text-text-theme">
           {t}
-          <button type="button" aria-label={`移除標籤 ${t}`} onClick={() => onChange(value.filter((x) => x !== t))} className="text-sky-300 hover:text-white">
-            <X className="size-3" />
-          </button>
+          <IconButton size="small" hierarchy="superior" variant="icon" className="-my-2 -mr-2" label={`移除標籤 ${t}`} icon={<X />} onPress={() => onChange(value.filter((x) => x !== t))} />
         </span>
       ))}
       <input
@@ -74,7 +73,7 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
         }}
         placeholder={value.length ? '' : '例如：前門、PMS01、月台（Enter 加入）'}
         aria-label="來源標籤"
-        className="h-7 min-w-[8rem] flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+        className="h-7 min-w-[8rem] flex-1 bg-transparent text-body-s text-text-primary outline-none placeholder:text-text-quaternary"
         maxLength={TAG_LENGTH_MAX}
       />
       <datalist id={listId}>{suggestions.filter((s) => !value.some((v) => tagKey(v) === tagKey(s))).map((s) => <option key={s} value={s} />)}</datalist>
@@ -194,16 +193,15 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
             <input className={field} value={form.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} placeholder="例如：一號車前鏡頭" />
           </Labeled>
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-400">來源標籤（分類用，最多 10 個；與監控標籤頁無關）</span>
+            <span className="text-body-xs text-text-tertiary">來源標籤（分類用，最多 10 個；與監控標籤頁無關）</span>
             <TagInput value={form.tags} onChange={(tags) => set({ tags })} suggestions={tagSuggestions} />
           </div>
-          <div className="flex gap-2 text-xs">
-            {(['fields', 'url'] as const).map((m) => (
-              <button key={m} type="button" onClick={() => setConnMode(m)} aria-pressed={connMode === m} className={`rounded-md px-2.5 py-1 ${connMode === m ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}>
-                {m === 'fields' ? '分欄輸入' : '完整網址'}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="連線設定方式"
+            value={connMode}
+            onChange={setConnMode}
+            options={[{ id: 'fields' as const, label: '分欄輸入' }, { id: 'url' as const, label: '完整網址' }]}
+          />
           {connMode === 'url' ? (
             <Labeled label="完整網址" hint="例如 rtsp://帳號:密碼@10.20.0.10:554/cameras/front01/main；儲存後只顯示遮蔽後的網址">
               <input className={field} value={form.url} onChange={(e) => set({ url: e.target.value })} placeholder={editing?.connection?.maskedUrl ?? 'rtsp://…'} autoComplete="off" />
@@ -211,7 +209,7 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
           ) : (
             <div className="grid grid-cols-[8rem_minmax(0,1fr)_6rem] gap-2">
               <Labeled label="協定">
-                <SiteSelect aria-label="協定" value={form.protocol} options={PROTOCOLS} onChange={(e) => set({ protocol: e.target.value as Protocol })} className={field} />
+                <SiteSelect aria-label="協定" value={form.protocol} options={PROTOCOLS} onChange={(e) => set({ protocol: e.target.value as Protocol })} size="md" className="w-full" />
               </Labeled>
               <Labeled label="主機">
                 <input className={field} value={form.host} onChange={(e) => set({ host: e.target.value })} placeholder="10.20.0.10" />
@@ -232,8 +230,8 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
                   <input className={field} type="password" value={form.password} disabled={form.clearPassword} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" placeholder={editing?.connection?.hasPassword && !form.clearPassword ? '••••••（保留）' : ''} />
                 </Labeled>
                 {editing?.connection?.hasPassword ? (
-                  <label className="col-span-2 flex items-center gap-2 text-xs text-zinc-400">
-                    <input type="checkbox" checked={form.clearPassword} onChange={(e) => set({ clearPassword: e.target.checked, password: '' })} className="accent-blue-600" />
+                  <label className="col-span-2 flex items-center gap-2 text-body-xs text-text-tertiary">
+                    <Checkbox size="small" checked={form.clearPassword} onCheckedChange={(clearPassword) => set({ clearPassword, password: '' })} />
                     移除已存的密碼（攝影機改成不需密碼時勾選；清空帳號也會一併移除）
                   </label>
                 ) : null}
@@ -251,54 +249,54 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
               <input className={field} value={form.location} onChange={(e) => set({ location: e.target.value })} placeholder="車頭" />
             </Labeled>
           </div>
-          <div className="space-y-2 rounded-lg bg-[#232730] px-3 py-2.5 text-sm">
+          <div className="space-y-2 rounded-lg bg-surface-secondary px-3 py-2.5 text-body-s">
             <label className="flex items-start gap-2">
-              <input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} className="mt-0.5 accent-blue-600" />
+              <Checkbox checked={form.enabled} onCheckedChange={(enabled) => set({ enabled })} />
               <span>
                 啟用來源
-                <span className="block text-xs text-zinc-400">停用會停止本站接入、即時播放與新錄影（不是關掉攝影機電源），已錄的影片保留。</span>
+                <span className="block text-body-xs text-text-tertiary">停用會停止本站接入、即時播放與新錄影（不是關掉攝影機電源），已錄的影片保留。</span>
               </span>
             </label>
             <label className="flex items-start gap-2">
-              <input type="checkbox" checked={form.recordingEnabled} onChange={(e) => set({ recordingEnabled: e.target.checked })} className="mt-0.5 accent-blue-600" />
+              <Checkbox checked={form.recordingEnabled} onCheckedChange={(recordingEnabled) => set({ recordingEnabled })} />
               <span>
                 儲存錄影
-                <span className="block text-xs text-zinc-400">
+                <span className="block text-body-xs text-text-tertiary">
                   來源啟用時由伺服器持續錄影，與是否放進監控畫面、是否開著網頁無關；取消只停止新的錄影，不刪除已錄的影片。
                   {!canRecord ? ' 變更這個設定需要錄影管理權限。' : ''}
                 </span>
               </span>
             </label>
-            <p className="text-xs text-zinc-500">錄影品質：原始（保留來源碼流，不重新壓縮）。</p>
+            <p className="text-body-xs text-text-quaternary">錄影品質：原始（保留來源碼流，不重新壓縮）。</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => void runTest()} disabled={testing} className="rounded-lg border border-zinc-600 px-3 py-1.5 text-sm hover:bg-white/5 disabled:opacity-50">
+            <Button hierarchy="subordinate" variant="outlined" onPress={() => void runTest()} disabled={testing}>
               {testing ? '測試中…' : '測試連線並預覽'}
-            </button>
-            <span className="text-xs text-zinc-500">預覽是暫時的，不會錄影</span>
+            </Button>
+            <span className="text-body-xs text-text-quaternary">預覽是暫時的，不會錄影</span>
           </div>
-          <div className="aspect-video overflow-hidden rounded-lg border border-zinc-800 bg-black">
+          <div className="aspect-video overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background">
             {test?.status === 'ready' && test.hlsUrl ? (
               <LivePlayer hlsUrl={test.hlsUrl} whepUrl={test.whepUrl} onStats={setPreviewStats} />
             ) : (
-              <div className="flex h-full items-center justify-center px-4 text-center text-sm text-zinc-500">
-                {test?.status === 'failed' ? <span className="text-red-300">{test.error}</span> : testing ? '連線中…' : '按「測試連線並預覽」查看畫面'}
+              <div className="flex h-full items-center justify-center px-4 text-center text-body-s text-text-quaternary">
+                {test?.status === 'failed' ? <span className="text-status-error-emphasis">{test.error}</span> : testing ? '連線中…' : '按「測試連線並預覽」查看畫面'}
               </div>
             )}
           </div>
           {test ? (
-            <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-y-1 text-xs">
-              <dt className="text-zinc-500">位址</dt>
-              <dd className="truncate text-zinc-300">{test.maskedUrl}</dd>
-              <dt className="text-zinc-500">編碼</dt>
-              <dd className="text-zinc-300">{test.tracks.length ? test.tracks.join('、') : '未知'}</dd>
-              <dt className="text-zinc-500">解析度</dt>
-              <dd className="text-zinc-300">{previewStats?.width ? `${previewStats.width}×${previewStats.height}` : '未知'}</dd>
-              <dt className="text-zinc-500">fps</dt>
-              <dd className="text-zinc-300">{previewStats?.fps ?? '未知'}</dd>
+            <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-y-1 text-body-xs">
+              <dt className="text-text-quaternary">位址</dt>
+              <dd className="truncate text-text-secondary">{test.maskedUrl}</dd>
+              <dt className="text-text-quaternary">編碼</dt>
+              <dd className="text-text-secondary">{test.tracks.length ? test.tracks.join('、') : '未知'}</dd>
+              <dt className="text-text-quaternary">解析度</dt>
+              <dd className="text-text-secondary">{previewStats?.width ? `${previewStats.width}×${previewStats.height}` : '未知'}</dd>
+              <dt className="text-text-quaternary">fps</dt>
+              <dd className="text-text-secondary">{previewStats?.fps ?? '未知'}</dd>
             </dl>
           ) : null}
         </div>
