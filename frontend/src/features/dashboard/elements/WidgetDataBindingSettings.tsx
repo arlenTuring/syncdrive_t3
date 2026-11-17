@@ -9,6 +9,7 @@ import { getDataSourceById } from '../store/useDataSourceStore';
 import { dataSourceSelectionPatch, describeWidgetDataLineage } from '../utils/widgetDataLineage';
 import { getRowSourceMetadata } from '../utils/rowRules';
 import { getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
+import { SegmentedControl } from '../../../components/ui';
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-cyan-500/20 transition-colors`;
@@ -147,12 +148,16 @@ export function WidgetDataBindingSettings({ w, onUpdate }: { w: WidgetDataBindin
         {context.error ? `${context.stale ? '本次更新失敗，保留上次資料' : '連線失敗'}：${context.error}` : context.loading ? '正在讀取群組資料…' : !context.previewRow ? '目前無資料（已保留綁定設定）' : '已自動使用目前樣板的真實資料列'}
       </div>}
 
-      <div className="flex gap-1 bg-surface-secondary p-0.5 rounded-md">
-        {(['sql', 'mqtt', 'rest'] as const).map((item) => {
+      <SegmentedControl
+        label="資料綁定方式"
+        className="flex w-full bg-surface-secondary [&>button]:flex-1 [&>button]:uppercase"
+        value={mode}
+        onChange={(item) => setModeChoice({ key: bindingKey, mode: item })}
+        options={(['sql', 'mqtt', 'rest'] as const).map((item) => {
           const active = item === 'sql' ? ownSql || inheritedByMode.sql.length > 0 : item === 'mqtt' ? ownMqtt || inheritedByMode.mqtt.length > 0 || postProcessSources.length > 0 : ownRest || inheritedByMode.rest.length > 0;
-          return <button key={item} type="button" onClick={() => setModeChoice({ key: bindingKey, mode: item })} className={`flex-1 py-1 text-caption-2 rounded uppercase transition-all ${mode === item ? 'bg-cyan-600 text-text-primary' : 'text-text-quaternary hover:text-text-secondary'}`}>{item}{active ? ' •' : ''}</button>;
+          return { id: item, label: `${item}${active ? ' •' : ''}` };
         })}
-      </div>
+      />
 
       {mode === 'sql' && <div className="space-y-2.5">
         {showOwnEditor && <div className="space-y-2">{ownSql && <div className="text-caption-2 text-status-success">元件自身綁定</div>}<DataSourcePicker dataSourceId={w.dataSourceId ?? ''} sqlQuery={w.sqlQuery ?? ''} onChangeDataSource={(id) => onUpdate(dataSourceSelectionPatch('sql', id))} onChangeSqlQuery={(sqlQuery) => onUpdate({ sqlQuery })} /></div>}

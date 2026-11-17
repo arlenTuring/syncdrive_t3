@@ -1,14 +1,11 @@
 import { SiteSelect } from '../../../components/SiteSelect';
 import {
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Download,
   Loader2,
   MoreHorizontal,
   RotateCcw,
-  Search,
-} from 'lucide-react';
+  Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCoalescedQuery } from '../../../lib/useCoalescedQuery';
 import { useTranslation } from 'react-i18next';
@@ -35,7 +32,7 @@ import {
   type ExecutionStatusKey,
   type ShiftTab,
 } from '../types';
-import { Button, Checkbox, IconButton } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Pagination, Tabs } from '../../../components/ui';
 
 type ShiftRecordsListPageProps = {
   onBackToHome?: () => void;
@@ -107,7 +104,6 @@ export function ShiftRecordsListPage({
   const loading = list.initialLoading;
   const error = actionError ?? (list.initialError || list.backgroundError || null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   /**
    * 勾選跟著查詢條件走：換條件就清空；同條件背景更新只保留還在這頁的列
@@ -138,11 +134,6 @@ export function ShiftRecordsListPage({
     });
   }, [refreshList]);
 
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(5, totalPages);
-    const start = Math.max(1, Math.min(page - 2, totalPages - max + 1));
-    return Array.from({ length: max }, (_, i) => start + i);
-  }, [page, totalPages]);
 
   const toggleRow = (orderId: string) => {
     setSelected((prev) => {
@@ -215,30 +206,18 @@ export function ShiftRecordsListPage({
       ) : null}
 
       <div className="border-b border-border-quaternary px-6">
-        <div className="flex gap-8">
-          {(['mainline', 'maintenance'] as const).map((key) => {
-            const label =
-              key === 'mainline' ? t('shiftRecords.tabMainline') : t('shiftRecords.tabMaintenance');
-            const active = tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => {
-                  setTab(key);
-                  setPage(1);
-                }}
-                className={`border-b-2 py-3 text-body-s font-medium transition ${
-                  active
-                    ? 'border-border-theme text-text-theme'
-                    : 'border-transparent text-text-quaternary hover:text-text-secondary'
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <Tabs
+          label="班次類別"
+          value={tab}
+          onChange={(key) => {
+            setTab(key);
+            setPage(1);
+          }}
+          items={[
+            { id: 'mainline', label: t('shiftRecords.tabMainline') },
+            { id: 'maintenance', label: t('shiftRecords.tabMaintenance') },
+          ]}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
@@ -360,37 +339,8 @@ export function ShiftRecordsListPage({
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronLeft className="size-4" />
-        </button>
-        {pageNumbers.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
-              n === page
-                ? 'bg-sky-500/20 text-text-theme ring-1 ring-sky-500/40'
-                : 'text-text-quaternary hover:bg-link-standard-hover'
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronRight className="size-4" />
-        </button>
+      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
     </div>
   );

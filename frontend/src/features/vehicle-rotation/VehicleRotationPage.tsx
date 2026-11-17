@@ -54,10 +54,6 @@ const STATUS_STYLE: Record<ItemStatus, { label: string; className: string }> = {
 const PANEL = 'rounded-lg border border-border-quaternary bg-[#111114]';
 const FIELD =
   'h-8 rounded-md border border-border-quaternary bg-surface-popup px-2 text-body-s text-text-primary outline-none focus:border-border-theme';
-const SECONDARY_BUTTON =
-  'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-quaternary px-3 text-body-s text-text-secondary hover:bg-link-standard-hover';
-const PRIMARY_BUTTON =
-  'inline-flex h-8 items-center gap-1.5 rounded-lg bg-link-theme-filled px-3 text-body-s text-text-primary hover:bg-[#1f6fe8] disabled:opacity-50';
 
 /** 規則視窗的輸入框：跟格位下拉同高同色 */
 const DIALOG_FIELD =
@@ -407,8 +403,8 @@ function ReportCard(props: { item: RotationItem; now: number; busy: boolean; onC
         </span>
         {item.status === 'pending' ? (
           <span className="ml-auto flex gap-2">
-            <button type="button" disabled={props.busy} onClick={props.onSkip} className={`${SECONDARY_BUTTON} disabled:opacity-50`}>今天略過</button>
-            <button type="button" disabled={props.busy} onClick={props.onConfirm} className={PRIMARY_BUTTON}>確認輪替</button>
+            <Button hierarchy="subordinate" variant="outlined" disabled={props.busy} onPress={props.onSkip}>今天略過</Button>
+            <Button disabled={props.busy} onPress={props.onConfirm}>確認輪替</Button>
           </span>
         ) : null}
       </div>
@@ -440,10 +436,7 @@ function TodayTab(props: {
             ? `今天的報告還沒產出，每日 ${today.rules.reportBy} 前產出`
             : '今天沒有車到達輪替里程，不需要輪替'}
           {today.report_generated_at == null ? (
-            <button type="button" disabled={props.busy} onClick={props.onGenerate} className={SECONDARY_BUTTON}>
-              <FileText className="size-3.5" aria-hidden />
-              立刻產出報告
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={<FileText />} disabled={props.busy} onPress={props.onGenerate}>立刻產出報告</Button>
           ) : null}
         </div>
       ) : null}

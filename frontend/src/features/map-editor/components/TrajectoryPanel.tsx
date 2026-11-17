@@ -127,19 +127,7 @@ export function TrajectoryPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={!hasTrajectory}
-              onClick={replayPlaying ? onPause : onPlay}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {replayPlaying ? (
-                <Pause className="size-4 shrink-0" aria-hidden />
-              ) : (
-                <Play className="size-4 shrink-0" aria-hidden />
-              )}
-              {replayPlaying ? t('mapEditor.trajectory.pause') : t('mapEditor.trajectory.play')}
-            </button>
+            <Button className="flex-1" leadingIcon={replayPlaying ? <Pause /> : <Play />} disabled={!hasTrajectory} onPress={replayPlaying ? onPause : onPlay}>{replayPlaying ? t('mapEditor.trajectory.pause') : t('mapEditor.trajectory.play')}</Button>
             <Button hierarchy="subordinate" variant="outlined" className="flex-1" leadingIcon={<RotateCcw />} disabled={!hasTrajectory} onPress={onRewind}>{t('mapEditor.trajectory.rewind')}</Button>
           </div>
 

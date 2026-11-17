@@ -244,48 +244,17 @@ export function SimulationTransportToolbar() {
 
             {managed && (
               <>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void setTransportPaused(!transportPaused)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-body-xs font-medium transition disabled:opacity-50 ${
-                    transportPaused
-                      ? 'border-status-success-light bg-emerald-950/40 text-status-success hover:bg-emerald-900/40'
-                      : 'border-status-warning-light bg-amber-950/40 text-status-warning hover:bg-amber-900/40'
-                  }`}
-                  title={
+                <Button hierarchy="subordinate" variant="outlined" leadingIcon={transportPaused ? <Play /> : <Pause />} disabled={loading} onPress={() => void setTransportPaused(!transportPaused)} title={
                     transportPaused
                       ? t('dashboard.simulation.resumeTitle')
                       : t('dashboard.simulation.pauseTitle')
-                  }
-                >
-                  {transportPaused ? <Play size={14} /> : <Pause size={14} />}
-                  {transportPaused
+                  }>{transportPaused
                     ? t('dashboard.simulation.resume')
-                    : t('dashboard.simulation.pause')}
-                </button>
+                    : t('dashboard.simulation.pause')}</Button>
 
-                <button
-                  type="button"
-                  disabled={loading}
-                  {...holdPrev}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:border-cyan-600 enabled:hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
-                  title={t('dashboard.simulation.prevFrameTitle')}
-                >
-                  <SkipBack size={14} />
-                  {t('dashboard.simulation.prevFrame')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" leadingIcon={<SkipBack />} disabled={loading} {...holdPrev} title={t('dashboard.simulation.prevFrameTitle')}>{t('dashboard.simulation.prevFrame')}</Button>
 
-                <button
-                  type="button"
-                  disabled={loading}
-                  {...holdNext}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-xs-bold text-text-primary transition enabled:hover:border-cyan-600 enabled:hover:text-text-theme disabled:cursor-not-allowed disabled:opacity-40 select-none touch-none"
-                  title={t('dashboard.simulation.nextFrameTitle')}
-                >
-                  <SkipForward size={14} />
-                  {t('dashboard.simulation.nextFrame')}
-                </button>
+                <Button hierarchy="subordinate" variant="outlined" leadingIcon={<SkipForward />} disabled={loading} {...holdNext} title={t('dashboard.simulation.nextFrameTitle')}>{t('dashboard.simulation.nextFrame')}</Button>
               </>
             )}
           </div>

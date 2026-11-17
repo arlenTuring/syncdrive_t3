@@ -254,12 +254,6 @@ export function FenceMapPanel({
     setZoomLevel((prev) => clampMapPixelZoomLevel(Math.round(prev) + delta));
   };
 
-  const toolBtn = (active: boolean) =>
-    `inline-flex size-8 items-center justify-center rounded-md border transition ${
-      active
-        ? 'border-border-theme bg-[#2B7FFF]/20 text-text-theme'
-        : 'border-border-quaternary bg-[#18181b]/90 text-text-secondary hover:border-border-primary hover:text-text-primary'
-    }`;
 
   const displayZoom = Math.round(zoomLevel);
   const showDrawOverlay =
@@ -281,22 +275,8 @@ export function FenceMapPanel({
     >
       {editing ? (
         <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm">
-          <button
-            type="button"
-            className={toolBtn(drawTool === 'rect')}
-            title={t('virtualFence.map.toolRect')}
-            onClick={() => setDrawTool('rect')}
-          >
-            <Square className="size-4" strokeWidth={1.75} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={toolBtn(drawTool === 'polygon')}
-            title={t('virtualFence.map.toolPolygon')}
-            onClick={() => setDrawTool('polygon')}
-          >
-            <Pentagon className="size-4" strokeWidth={1.75} aria-hidden />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="outlined" pressed={drawTool === 'rect'} onPress={() => setDrawTool('rect')} title={t('virtualFence.map.toolRect')} label={t('virtualFence.map.toolRect')} icon={<Square />} />
+          <IconButton size="small" hierarchy="subordinate" variant="outlined" pressed={drawTool === 'polygon'} onPress={() => setDrawTool('polygon')} title={t('virtualFence.map.toolPolygon')} label={t('virtualFence.map.toolPolygon')} icon={<Pentagon />} />
         </div>
       ) : null}
 
@@ -304,49 +284,17 @@ export function FenceMapPanel({
         className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm"
         title={t('virtualFence.map.panZoomHint')}
       >
-        <button
-          type="button"
-          className={toolBtn(false)}
-          title={t('virtualFence.map.zoomIn')}
-          disabled={displayZoom <= 1}
-          onClick={() => zoomBy(-1)}
-        >
-          <ZoomIn className="size-4" aria-hidden />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="outlined" title={t('virtualFence.map.zoomIn')} disabled={displayZoom <= 1} onPress={() => zoomBy(-1)} label={t('virtualFence.map.zoomIn')} icon={<ZoomIn />} />
         <span className="min-w-[2.5rem] text-center font-mono text-body-xs text-text-tertiary">
           {displayZoom}/{MAP_PIXEL_ZOOM_LEVEL_COUNT}
         </span>
-        <button
-          type="button"
-          className={toolBtn(false)}
-          title={t('virtualFence.map.zoomOut')}
-          disabled={displayZoom >= MAP_PIXEL_ZOOM_LEVEL_COUNT}
-          onClick={() => zoomBy(1)}
-        >
-          <ZoomOut className="size-4" aria-hidden />
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="outlined" title={t('virtualFence.map.zoomOut')} disabled={displayZoom >= MAP_PIXEL_ZOOM_LEVEL_COUNT} onPress={() => zoomBy(1)} label={t('virtualFence.map.zoomOut')} icon={<ZoomOut />} />
       </div>
 
       {editing ? (
         <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-lg border border-border-quaternary bg-surface-popup p-1 shadow-lg backdrop-blur-sm">
-          <button
-            type="button"
-            className={toolBtn(false)}
-            title={t('virtualFence.map.undo')}
-            disabled={historyIndex <= 0}
-            onClick={undo}
-          >
-            <Undo2 className="size-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={toolBtn(false)}
-            title={t('virtualFence.map.redo')}
-            disabled={historyIndex >= history.length - 1}
-            onClick={redo}
-          >
-            <Redo2 className="size-4" aria-hidden />
-          </button>
+          <IconButton size="small" hierarchy="subordinate" variant="outlined" title={t('virtualFence.map.undo')} disabled={historyIndex <= 0} onPress={undo} label={t('virtualFence.map.undo')} icon={<Undo2 />} />
+          <IconButton size="small" hierarchy="subordinate" variant="outlined" title={t('virtualFence.map.redo')} disabled={historyIndex >= history.length - 1} onPress={redo} label={t('virtualFence.map.redo')} icon={<Redo2 />} />
           <span className="mx-0.5 h-5 w-px bg-link-standard-hover" aria-hidden />
           <IconButton hierarchy="danger" variant="standard" title={t('virtualFence.map.clearShape')} disabled={vertices.length === 0 && coverage.length === 0} onPress={() => pushShape({ coverage: [], vertices: [] })} label={t('virtualFence.map.clearShape')} icon={<Trash2 />} />
         </div>

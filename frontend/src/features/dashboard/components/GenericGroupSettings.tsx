@@ -17,7 +17,7 @@ import type {
 import { createGroupTemplate, duplicateGroupTemplate } from '../utils/groupTemplateEdit';
 import { DataSourceIdSelect } from '../elements/DataSourceIdSelect';
 import { POST_PROCESSOR_DEFINITIONS, getPostProcessorDefinition } from '../hooks/useShiftSourcePostProcessors';
-import { Checkbox, IconButton, Radio } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Radio } from '../../../components/ui';
 
 /**
  * 泛用群組的設定介面：資料來源、有效性、優先程度、排序、樣板、容量、轉場。
@@ -31,7 +31,6 @@ const inputCls = `w-full bg-surface-secondary border border-border-quaternary ro
   focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-colors`;
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-1.5 py-1 text-text-primary text-body-xs
   focus:outline-none focus:border-purple-500 transition-colors cursor-pointer`;
-const smallBtn = `flex items-center gap-1 px-2 py-1 rounded-md text-caption-2 transition-colors`;
 
 const OPERATORS: GroupConditionOperator[] = [
   'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'not_contains', 'empty', 'not_empty', 'before_now', 'after_now',
@@ -101,9 +100,7 @@ function SourceEditor({
   return (
     <div className="rounded-lg border border-border-quaternary bg-zinc-800/40 p-2 space-y-2">
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => setOpen(v => !v)} className="text-text-quaternary">
-          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
+        <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => setOpen(v => !v)} label={open ? "收合" : "展開"} icon={open ? <ChevronUp /> : <ChevronDown />} aria-expanded={open} />
         <input
           value={source.label ?? source.id}
           onChange={e => onUpdate({ label: e.target.value })}
@@ -279,13 +276,7 @@ function PriorityRuleRow({
             onRemove={() => onUpdate({ conditions: conditions.filter((_, ii) => ii !== i) })}
           />
         ))}
-        <button
-          type="button"
-          onClick={() => onUpdate({ conditions: [...conditions, { field: '', operator: 'eq', value: '' }] })}
-          className={`${smallBtn} text-purple-400 hover:text-purple-300`}
-        >
-          <Plus size={11} /> 加條件（符合全部才命中）
-        </button>
+        <Button hierarchy="subordinate" variant="text" leadingIcon={<Plus />} onPress={() => onUpdate({ conditions: [...conditions, { field: '', operator: 'eq', value: '' }] })}>加條件（符合全部才命中）</Button>
       </div>
     </div>
   );
@@ -324,13 +315,7 @@ function TemplateRow({
             onRemove={() => onUpdate({ conditions: conditions.filter((_, ii) => ii !== i) })}
           />
         ))}
-        <button
-          type="button"
-          onClick={() => onUpdate({ conditions: [...conditions, { field: '', operator: 'eq', value: '' }] })}
-          className={`${smallBtn} text-purple-400 hover:text-purple-300`}
-        >
-          <Plus size={11} /> 加條件
-        </button>
+        <Button hierarchy="subordinate" variant="text" leadingIcon={<Plus />} onPress={() => onUpdate({ conditions: [...conditions, { field: '', operator: 'eq', value: '' }] })}>加條件</Button>
       </div>
     </div>
   );
@@ -378,13 +363,7 @@ export function GenericGroupSettings({
                 onRemove={() => patch({ sources: sources.filter((_, ii) => ii !== i) })}
               />
             ))}
-            <button
-              type="button"
-              onClick={() => patch({ sources: [...sources, { id: `source-${Date.now()}`, label: '新來源' }] })}
-              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
-            >
-              <Plus size={12} /> 新增資料來源
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={() => patch({ sources: [...sources, { id: `source-${Date.now()}`, label: '新來源' }] })}>新增資料來源</Button>
           </Section>
 
           <Section title="項目識別" hint="不同來源預設不互相覆蓋（唯一鍵＝來源＋項目 ID）。只有明確設定合併欄位才會跨來源合併成同一筆。">
@@ -418,13 +397,7 @@ export function GenericGroupSettings({
                 />
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => patch({ validityRules: [...validityRules, { id: `vr-${Date.now()}`, field: '', operator: 'eq', value: '', effect: 'invalid' }] })}
-              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
-            >
-              <Plus size={12} /> 新增有效性規則
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={() => patch({ validityRules: [...validityRules, { id: `vr-${Date.now()}`, field: '', operator: 'eq', value: '', effect: 'invalid' }] })}>新增有效性規則</Button>
           </Section>
 
           <Section title={`優先程度規則（${priorityRules.length}）`} hint="由上而下第一條命中的規則決定；都沒命中用來源或群組的預設優先程度。">
@@ -445,13 +418,7 @@ export function GenericGroupSettings({
               />
             ))}
             <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => patch({ priorityRules: [...priorityRules, { id: `pr-${Date.now()}`, priority: 0, conditions: [] }] })}
-                className={`${smallBtn} justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
-              >
-                <Plus size={12} /> 新增優先程度規則
-              </button>
+              <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<Plus />} onPress={() => patch({ priorityRules: [...priorityRules, { id: `pr-${Date.now()}`, priority: 0, conditions: [] }] })}>新增優先程度規則</Button>
               <div>
                 <label className="block text-caption-2 text-text-quaternary mb-0.5">沒有規則命中時的預設優先程度</label>
                 <input type="number" value={config.defaultPriority ?? 0} onChange={e => patch({ defaultPriority: Number(e.target.value) || 0 })} className={inputCls} />
@@ -514,16 +481,10 @@ export function GenericGroupSettings({
                 onSetDefault={() => patch({ templates: templates.map((tt, ii) => ({ ...tt, isDefault: ii === i })) })}
               />
             ))}
-            <button
-              type="button"
-              onClick={() => {
+            <Button hierarchy="subordinate" variant="tonal" className="w-full" leadingIcon={<Plus />} onPress={() => {
                 const created = createGroupTemplate(`樣板 ${templates.length + 1}`);
                 patch({ templates: [...templates, { ...created, isDefault: templates.length === 0 }] });
-              }}
-              className={`${smallBtn} w-full justify-center bg-surface-secondary hover:bg-link-standard-hover text-text-secondary py-1.5`}
-            >
-              <Plus size={12} /> 新增樣板
-            </button>
+              }}>新增樣板</Button>
           </Section>
 
           <Section title="容量與溢出">

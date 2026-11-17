@@ -111,17 +111,15 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
     const active = sort?.key === key;
     const Icon = !active ? ChevronsUpDown : sort.dir === 'asc' ? ChevronUp : ChevronDown;
     return (
-      <button
-        type="button"
-        onClick={() => toggleSort(key)}
-        className={`inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 transition hover:bg-[rgba(209,213,220,0.08)] ${
-          active ? 'text-text-theme' : 'text-text-tertiary'
-        }`}
+      <IconButton
+        size="small"
+        hierarchy={active ? 'superior' : 'subordinate'}
+        variant="standard"
+        onPress={() => toggleSort(key)}
         title={t('mapLibrary.sortTitle')}
-        aria-label={t('mapLibrary.sortTitle')}
-      >
-        <Icon className="size-[18px]" aria-hidden />
-      </button>
+        label={t('mapLibrary.sortTitle')}
+        icon={<Icon />}
+      />
     );
   };
 
@@ -151,35 +149,12 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
               className="min-w-0 flex-1 bg-transparent py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary placeholder:text-text-tertiary focus:outline-none"
             />
           </div>
-          <button
-            type="button"
-            onClick={() => setKeyword(keywordDraft)}
-            disabled={!canSearch}
-            className={`inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 transition ${
-              canSearch
-                ? 'bg-[rgba(43,127,255,0.2)] text-text-theme hover:bg-[rgba(43,127,255,0.3)]'
-                : 'cursor-not-allowed bg-[rgba(98,116,142,0.2)] text-[#4A5565]'
-            }`}
-            title={t('common.search')}
-            aria-label={t('common.search')}
-          >
-            <Search className="size-6" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
+          <IconButton hierarchy="subordinate" variant="tonal" onPress={() => setKeyword(keywordDraft)} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RotateCw />} onPress={() => {
               setKeywordDraft('');
               setKeyword('');
               setSort(null);
-            }}
-            disabled={!canReset}
-            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-body-s font-medium leading-[18px] tracking-[0.5px] transition ${
-              canReset ? 'text-text-secondary hover:bg-[rgba(209,213,220,0.08)]' : 'cursor-not-allowed text-[#4A5565]'
-            }`}
-          >
-            <RotateCw className="size-[18px]" aria-hidden />
-            {t('mapLibrary.reset')}
-          </button>
+            }} disabled={!canReset}>{t('mapLibrary.reset')}</Button>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <Button variant="outlined" leadingIcon={<CloudDownload />} onPress={() => setImportOpen(true)}>匯入儀表板</Button>

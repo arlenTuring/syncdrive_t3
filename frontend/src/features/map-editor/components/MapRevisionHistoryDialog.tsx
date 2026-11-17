@@ -162,19 +162,7 @@ export function MapRevisionHistoryDialog({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-quaternary px-5 py-3">
-          <button
-            type="button"
-            onClick={() => void handleBookmark()}
-            disabled={bookmarking}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/70 bg-cyan-950/50 px-3 py-1.5 text-body-xs-bold text-cyan-100 hover:bg-cyan-900/60 disabled:opacity-50"
-          >
-            {bookmarking ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            ) : (
-              <BookmarkPlus className="size-3.5" aria-hidden />
-            )}
-            {t('mapEditor.revision.bookmark')}
-          </button>
+          <Button variant="outlined" leadingIcon={bookmarking ? <Loader2 className="animate-spin" /> : <BookmarkPlus />} onPress={() => void handleBookmark()} disabled={bookmarking}>{t('mapEditor.revision.bookmark')}</Button>
           <Button hierarchy="subordinate" variant="outlined" onPress={() => void handleClearAll()} disabled={items.length === 0 || loading}>{t('mapEditor.revision.clearAll')}</Button>
           <span className="ml-auto text-body-xs text-text-quaternary">
             {items.length} / {MAX_REVISIONS_PER_MAP}
@@ -221,23 +209,7 @@ export function MapRevisionHistoryDialog({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={busyId === item.id}
-                        onClick={() => void handleRestore(item.id)}
-                        className="inline-flex items-center gap-1 rounded-md border border-cyan-700/60 bg-cyan-950/40 px-2 py-1 text-body-xs text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
-                        title={t('mapEditor.revision.restoreTitle')}
-                      >
-                        {busyId === item.id ? (
-                          <Loader2
-                            className="size-3 animate-spin"
-                            aria-hidden
-                          />
-                        ) : (
-                          <RotateCcw className="size-3" aria-hidden />
-                        )}
-                        {t('mapEditor.revision.restore')}
-                      </button>
+                      <Button hierarchy="subordinate" variant="outlined" leadingIcon={busyId === item.id ? <Loader2 className="animate-spin" /> : <RotateCcw />} disabled={busyId === item.id} onPress={() => void handleRestore(item.id)} title={t('mapEditor.revision.restoreTitle')}>{t('mapEditor.revision.restore')}</Button>
                       <IconButton size="small" hierarchy="subordinate" variant="tonal" disabled={busyId === item.id} onPress={() => void handleDelete(item.id)} title={t('mapEditor.revision.deleteTitle')} label={t('mapEditor.revision.deleteTitle')} icon={<Trash2 />} />
                     </div>
                   </div>

@@ -135,22 +135,17 @@ function ScheduleToolbarIconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <IconButton
+      size="small"
+      hierarchy="subordinate"
+      variant="standard"
+      className={[flash ? 'schedule-history-flash' : '', active ? 'text-text-primary' : ''].filter(Boolean).join(' ') || undefined}
+      onPress={onClick}
       disabled={disabled}
-      className={`inline-flex size-8 items-center justify-center rounded-lg transition ${
-        flash ? 'schedule-history-flash' : ''
-      } ${
-        active
-          ? 'text-text-primary hover:bg-surface-secondary'
-          : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
-      } disabled:cursor-not-allowed disabled:opacity-35`}
-      aria-label={label}
+      label={label}
       title={label}
-    >
-      {children}
-    </button>
+      icon={children}
+    />
   );
 }
 
@@ -263,20 +258,16 @@ function ScheduleViewModeButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex size-8 items-center justify-center rounded-lg transition ${
-        active
-          ? 'bg-[rgba(43,127,255,0.24)] text-text-theme'
-          : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
-      }`}
-      aria-label={label}
+    <IconButton
+      size="small"
+      hierarchy="subordinate"
+      variant="standard"
+      pressed={active}
+      onPress={onClick}
+      label={label}
       title={label}
-    >
-      {children}
-    </button>
+      icon={children}
+    />
   );
 }
 
@@ -564,29 +555,16 @@ function ScheduleGapCheckButton({
   const { t } = useTranslation();
   const hasGaps = gaps.length > 0;
   return (
-    <button
-      type="button"
-      disabled={!hasGaps}
-      onClick={onJump}
-      className={`mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-body-xs font-medium transition ${
-        hasGaps
-          ? 'border border-status-warning-light bg-status-warning-light text-status-warning hover:bg-amber-500/25'
-          : 'cursor-not-allowed border border-border-quaternary bg-surface-primary text-text-disabled'
-      }`}
-      title={
+    <Button hierarchy="subordinate" variant="outlined" className="mt-2 w-full" leadingIcon={<ScanSearch />} disabled={!hasGaps} onPress={onJump} title={
         hasGaps
           ? t('timeTemplates.scheduling.gapCheckFound', { count: gaps.length })
           : t('timeTemplates.scheduling.gapCheckOk')
-      }
-    >
-      <ScanSearch className="size-3.5 shrink-0" aria-hidden />
-      {t('timeTemplates.scheduling.gapCheck')}
+      }>{t('timeTemplates.scheduling.gapCheck')}
       {hasGaps ? (
         <span className="rounded-full bg-amber-500/25 px-1.5 py-0.5 text-caption-2 tabular-nums text-status-warning">
           {gaps.length}
         </span>
-      ) : null}
-    </button>
+      ) : null}</Button>
   );
 }
 

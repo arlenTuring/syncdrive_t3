@@ -384,20 +384,7 @@ export default function VehicleEditor({
                 <IconButton hierarchy="subordinate" variant="outlined" onPress={redo} disabled={!canRedo} title={t('vehicleEditor.editor.redoTitle')} label={t('vehicleEditor.editor.redoTitle')} icon={<Redo2 />} />
               </>
             )}
-            <button
-              type="button"
-              disabled={readOnly || syncState[activeVehicle.id]?.status === 'conflict'}
-              title={readOnly ? '後端模型還沒讀到，不能修改' : undefined}
-              onClick={toggleEditMode}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-body-xs font-medium transition-colors ${
-                isEditMode
-                  ? 'bg-amber-600 text-text-primary'
-                  : 'border border-border-quaternary text-text-secondary hover:border-border-primary'
-              }`}
-            >
-              <Pencil size={14} />
-              {isEditMode ? t('vehicleEditor.editor.editing') : t('vehicleEditor.editor.edit')}
-            </button>
+            <Button hierarchy={isEditMode ? 'superior' : 'subordinate'} variant={isEditMode ? 'filled' : 'outlined'} leadingIcon={<Pencil />} disabled={readOnly || syncState[activeVehicle.id]?.status === 'conflict'} title={readOnly ? '後端模型還沒讀到，不能修改' : undefined} onPress={toggleEditMode}>{isEditMode ? t('vehicleEditor.editor.editing') : t('vehicleEditor.editor.edit')}</Button>
             <Button hierarchy="subordinate" variant="outlined" onPress={handleSaveFeedback} leadingIcon={<Save />}>{saveStatus === 'ok' ? t('vehicleEditor.editor.autoSaved') : t('vehicleEditor.editor.save')}</Button>
           </div>
         </header>

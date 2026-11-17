@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button, SegmentedControl } from '../../../components/ui';
 
 type MapEditorToolbarProps = {
   mapEditorMode: 'view' | 'edit'
@@ -224,15 +225,7 @@ export function MapEditorToolbar({
     <div className="shrink-0" role="toolbar" aria-label={t('mapEditor.toolbar.aria')}>
       {/* 第一列 */}
       <div className="flex h-[60px] items-center gap-3 p-3">
-        <button
-          type="button"
-          onClick={onBackToLibrary}
-          className={BTN_OUTLINE}
-          title={t('mapEditor.toolbar.backToList')}
-        >
-          <ArrowLeft className="size-[18px] shrink-0" aria-hidden />
-          {t('mapEditor.toolbar.list')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<ArrowLeft />} onPress={onBackToLibrary} title={t('mapEditor.toolbar.backToList')}>{t('mapEditor.toolbar.list')}</Button>
 
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
           <input
@@ -289,53 +282,22 @@ export function MapEditorToolbar({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={onCenterMap}
-          className={BTN_OUTLINE}
-          title={t('mapEditor.toolbar.centerTitle')}
-        >
-          <Crosshair className="size-[18px] shrink-0" aria-hidden />
-          {t('mapEditor.toolbar.center')}
-        </button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Crosshair />} onPress={onCenterMap} title={t('mapEditor.toolbar.centerTitle')}>{t('mapEditor.toolbar.center')}</Button>
 
         {/* 檢視／編輯：切到檢視＝離開編輯（有變更會先詢問） */}
-        <div
-          className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] p-1"
-          role="radiogroup"
-          aria-label={t('mapEditor.toolbar.modeAria')}
-        >
-          <button
-            type="button"
-            role="radio"
-            aria-checked={!isEdit}
-            onClick={() => {
-              if (isEdit) onLeaveEdit()
-            }}
-            title={isEdit ? t('mapEditor.toolbar.leaveEditTitle') : undefined}
-            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-body-s leading-[18px] tracking-[0.5px] transition ${
-              !isEdit ? 'bg-link-theme-filled font-medium text-text-primary' : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            <Eye className="size-4 shrink-0" aria-hidden />
-            {t('mapEditor.toolbar.view')}
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={isEdit}
-            onClick={() => {
-              if (!isEdit) onEnterEdit()
-            }}
-            title={isEdit ? undefined : t('mapEditor.toolbar.enterEditTitle')}
-            className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-body-s leading-[18px] tracking-[0.5px] transition ${
-              isEdit ? 'bg-link-theme-filled font-medium text-text-primary' : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            <Pencil className="size-4 shrink-0" aria-hidden />
-            {t('mapEditor.toolbar.edit')}
-          </button>
-        </div>
+        <SegmentedControl
+          label={t('mapEditor.toolbar.modeAria')}
+          className="shrink-0"
+          value={isEdit ? 'edit' : 'view'}
+          onChange={(next) => {
+            if (next === 'edit' && !isEdit) onEnterEdit()
+            if (next === 'view' && isEdit) onLeaveEdit()
+          }}
+          options={[
+            { id: 'view', label: <span className="inline-flex items-center gap-1" title={isEdit ? t('mapEditor.toolbar.leaveEditTitle') : undefined}><Eye className="size-4 shrink-0" aria-hidden />{t('mapEditor.toolbar.view')}</span> },
+            { id: 'edit', label: <span className="inline-flex items-center gap-1" title={isEdit ? undefined : t('mapEditor.toolbar.enterEditTitle')}><Pencil className="size-4 shrink-0" aria-hidden />{t('mapEditor.toolbar.edit')}</span> },
+          ]}
+        />
       </div>
 
       {/* 第二列：編輯工具（只有編輯模式） */}
@@ -410,24 +372,10 @@ export function MapEditorToolbar({
                 tone="amber"
               />
               {mapCanvasResizeActive && onApplyMapCrop ? (
-                <button
-                  type="button"
-                  onClick={onApplyMapCrop}
-                  className={`${BTN_BASE} border border-amber-600/70 bg-amber-950/70 text-status-warning hover:bg-amber-900/60`}
-                  title={t('mapEditor.toolbar.applyCropTitle')}
-                >
-                  {t('mapEditor.toolbar.applyCrop')}
-                </button>
+                <Button onPress={onApplyMapCrop} title={t('mapEditor.toolbar.applyCropTitle')}>{t('mapEditor.toolbar.applyCrop')}</Button>
               ) : null}
               {mapCanvasResizeActive && onCancelMapCrop ? (
-                <button
-                  type="button"
-                  onClick={onCancelMapCrop}
-                  className={`${BTN_BASE} text-text-tertiary hover:bg-[rgba(209,213,220,0.08)] hover:text-text-secondary`}
-                  title={t('mapEditor.toolbar.cancelCropTitle')}
-                >
-                  {t('mapEditor.toolbar.cancel')}
-                </button>
+                <Button hierarchy="subordinate" variant="standard" onPress={onCancelMapCrop} title={t('mapEditor.toolbar.cancelCropTitle')}>{t('mapEditor.toolbar.cancel')}</Button>
               ) : null}
             </>
           )}
@@ -459,15 +407,8 @@ export function MapEditorToolbar({
               <>
                 <span className="text-status-warning">{t('mapEditor.chrome.syncFailed')}</span>
                 {onRetrySync && (
-                  <button
-                    type="button"
-                    onClick={onRetrySync}
-                    disabled={retryingSync}
-                    className={`${BTN_BASE} border border-status-warning-light text-status-warning enabled:hover:bg-amber-950/60`}
-                  >
-                    {retryingSync && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
-                    {t('mapEditor.chrome.retrySync')}
-                  </button>
+                  <Button hierarchy="subordinate" variant="outlined" leadingIcon={retryingSync ? <Loader2 className="animate-spin" /> : undefined} onPress={onRetrySync} disabled={retryingSync}>
+                    {t('mapEditor.chrome.retrySync')}</Button>
                 )}
               </>
             ) : (

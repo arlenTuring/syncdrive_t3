@@ -24,7 +24,7 @@ import {
   type ShiftRouteRelationGraph,
   type ShiftRouteRelationLink,
 } from '../utils/routeRelationGraph';
-import { Button } from '../../../components/ui';
+import { Button, SegmentedControl } from '../../../components/ui';
 
 type AnchorKey = 'n' | 'e' | 's' | 'w';
 
@@ -749,40 +749,15 @@ export function RouteRelationGraphEditor({
         </div>
         {selectedLinkId ? (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-md border border-border-quaternary">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(updateRouteRelationLinkNextKind(synced, selectedLinkId, 'priority'));
-                }}
-                className={[
-                  'px-2.5 py-1 text-body-xs',
-                  resolveRouteRelationNextKind(
-                    synced.links.find((link) => link.id === selectedLinkId),
-                  ) === 'priority'
-                    ? 'bg-[#2B7FFF]/25 text-[#9ec5ff]'
-                    : 'text-text-tertiary hover:bg-sky-950/60 hover:text-text-theme',
-                ].join(' ')}
-              >
-                {t('shiftList.routeRelation.primaryRoute')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(updateRouteRelationLinkNextKind(synced, selectedLinkId, 'secondary'));
-                }}
-                className={[
-                  'border-l border-border-quaternary px-2.5 py-1 text-body-xs',
-                  resolveRouteRelationNextKind(
-                    synced.links.find((link) => link.id === selectedLinkId),
-                  ) === 'secondary'
-                    ? 'bg-violet-500/25 text-violet-100'
-                    : 'text-text-tertiary hover:bg-violet-950/60 hover:text-violet-200',
-                ].join(' ')}
-              >
-                {t('shiftList.routeRelation.secondaryRoute')}
-              </button>
-            </div>
+            <SegmentedControl
+              label={t('shiftList.routeRelation.title')}
+              value={resolveRouteRelationNextKind(synced.links.find((link) => link.id === selectedLinkId))}
+              onChange={(kind) => onChange(updateRouteRelationLinkNextKind(synced, selectedLinkId, kind))}
+              options={[
+                { id: 'priority', label: t('shiftList.routeRelation.primaryRoute') },
+                { id: 'secondary', label: t('shiftList.routeRelation.secondaryRoute') },
+              ]}
+            />
             <Button hierarchy="subordinate" variant="outlined" onPress={() => {
                 onChange(reverseRouteRelationLink(synced, selectedLinkId));
                 setSelectedLinkId(null);

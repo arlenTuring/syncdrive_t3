@@ -1137,14 +1137,7 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           </>
         ) : (
           <>
-            <button 
-              onClick={() => setView('list')}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-text-tertiary hover:bg-link-standard-hover hover:text-text-theme transition-all mr-2"
-              title={t('dashboard.backToList')}
-            >
-              <ArrowLeft size={16} />
-              <span className="text-body-xs-bold uppercase">{t('dashboard.list')}</span>
-            </button>
+            <Button hierarchy="subordinate" variant="standard" leadingIcon={<ArrowLeft />} onPress={() => setView('list')} title={t('dashboard.backToList')} type="submit">{t('dashboard.list')}</Button>
 
             <div className="flex items-center gap-1.5 text-text-theme text-body-s-bold pr-3 border-r border-border-quaternary">
               <LayoutGrid size={15} />
@@ -1182,26 +1175,8 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
 
             {isEditMode && (
               <div className="flex items-center gap-0.5 rounded-lg border border-border-quaternary bg-surface-secondary p-0.5">
-                <button
-                  type="button"
-                  disabled={!canUndo}
-                  onClick={undo}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-                  title={t('dashboard.undoTitle')}
-                >
-                  <Undo2 size={14} />
-                  <span className="hidden sm:inline">{t('dashboard.undo')}</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!canRedo}
-                  onClick={redo}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-body-xs-bold text-text-primary transition enabled:hover:bg-link-standard-hover disabled:cursor-not-allowed disabled:opacity-40"
-                  title={t('dashboard.redoTitle')}
-                >
-                  <Redo2 size={14} />
-                  <span className="hidden sm:inline">{t('dashboard.redo')}</span>
-                </button>
+                <Button hierarchy="subordinate" variant="standard" leadingIcon={<Undo2 />} disabled={!canUndo} onPress={undo} title={t('dashboard.undoTitle')}>{t('dashboard.undo')}</Button>
+                <Button hierarchy="subordinate" variant="standard" leadingIcon={<Redo2 />} disabled={!canRedo} onPress={redo} title={t('dashboard.redoTitle')}>{t('dashboard.redo')}</Button>
               </div>
             )}
           </>

@@ -70,7 +70,7 @@ const notify = (tags = ['table:operation_orders']) => {
 };
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const clickTab = async (index: number) => {
-  const tabs = host!.querySelectorAll('div.flex.gap-8 > button');
+  const tabs = host!.querySelectorAll('[role="tab"]');
   await act(async () => (tabs[index] as HTMLButtonElement).click());
 };
 

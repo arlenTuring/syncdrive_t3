@@ -639,22 +639,11 @@ export function CreateTimeTemplateModal({
           )}
           <div className="flex items-center justify-end gap-4">
             <Button variant="text" onPress={handlePrevious} disabled={step <= 1 || loading || Boolean(loadError)}>{t('timeTemplates.createWizard.previous')}</Button>
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={!canGoNext || saving || loading || Boolean(loadError)}
-              className={`rounded-lg px-4 py-2 text-body-s font-medium transition ${
-                canGoNext && !saving && !loading && !loadError
-                  ? 'bg-link-theme-filled text-text-primary hover:bg-link-theme-filled-hover'
-                  : 'cursor-not-allowed bg-surface-secondary text-text-disabled'
-              }`}
-            >
-              {saving
+            <Button onPress={handleNext} disabled={!canGoNext || saving || loading || Boolean(loadError)}>{saving
                 ? t('common.saving')
                 : step < 3
                   ? t('timeTemplates.createWizard.next')
-                  : t('timeTemplates.createWizard.confirmSave')}
-            </button>
+                  : t('timeTemplates.createWizard.confirmSave')}</Button>
           </div>
         </footer>
         )}

@@ -249,14 +249,7 @@ export function MapVehicleSettingsPanel({
               </>
             ) : null}
             <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                disabled={!draft?.definitionKey || saving}
-                onClick={() => void save()}
-                className="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-text-primary disabled:opacity-40"
-              >
-                儲存
-              </button>
+              <Button disabled={!draft?.definitionKey || saving} onPress={() => void save()}>儲存</Button>
               {saved ? (
                 <Button hierarchy="subordinate" variant="outlined" disabled={saving} onPress={() => void clear()}>{target === DEFAULT_TARGET ? '清除預設' : '移除（改用系統預設）'}</Button>
               ) : null}

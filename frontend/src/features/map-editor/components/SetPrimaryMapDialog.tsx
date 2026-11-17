@@ -151,15 +151,7 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
 
         <div className="mt-6 flex justify-end gap-3">
           <Button hierarchy="subordinate" variant="tonal" onPress={onClose} disabled={activating}>{t('common.cancel')}</Button>
-          <button
-            type="button"
-            onClick={() => void confirm()}
-            disabled={!canConfirm}
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-lg bg-link-theme-filled px-3.5 text-body-s-bold tracking-[0.5px] text-text-primary enabled:hover:bg-[#2569e6] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {activating && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {t('mapLibrary.primary.confirm')}
-          </button>
+          <Button leadingIcon={activating ? <Loader2 className="animate-spin" /> : undefined} onPress={() => void confirm()} disabled={!canConfirm}>{t('mapLibrary.primary.confirm')}</Button>
         </div>
       </div>
     </div>

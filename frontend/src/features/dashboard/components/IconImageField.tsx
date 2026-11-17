@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ImageIcon, Link2, Upload } from 'lucide-react';
 import { DashboardIconPicker } from './DashboardIconPicker';
 import { isPresetDashboardIcon } from '../constants/iconLibrary';
+import { SegmentedControl } from '../../../components/ui';
 
 type Tab = 'preset' | 'custom';
 
@@ -23,32 +24,16 @@ export function IconImageField({
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={() => setTab('preset')}
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-caption-2 font-semibold border transition-colors ${
-            tab === 'preset'
-              ? 'bg-cyan-600/20 text-text-theme border-cyan-500/40'
-              : 'bg-surface-secondary text-text-quaternary border-border-quaternary hover:text-text-secondary'
-          }`}
-        >
-          <ImageIcon size={11} />
-          預設圖示
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('custom')}
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-caption-2 font-semibold border transition-colors ${
-            tab === 'custom'
-              ? 'bg-cyan-600/20 text-text-theme border-cyan-500/40'
-              : 'bg-surface-secondary text-text-quaternary border-border-quaternary hover:text-text-secondary'
-          }`}
-        >
-          <Link2 size={11} />
-          自訂 URL
-        </button>
-      </div>
+      <SegmentedControl
+        label="圖示來源"
+        className="flex w-full [&>button]:flex-1"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: 'preset', label: <span className="inline-flex items-center gap-1"><ImageIcon size={12} aria-hidden />預設圖示</span> },
+          { id: 'custom', label: <span className="inline-flex items-center gap-1"><Link2 size={12} aria-hidden />自訂 URL</span> },
+        ]}
+      />
 
       {tab === 'preset' ? (
         <DashboardIconPicker

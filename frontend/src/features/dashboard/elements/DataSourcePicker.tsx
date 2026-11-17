@@ -182,18 +182,7 @@ export function DataSourcePicker({ dataSourceId: boundSourceId, sqlQuery, onChan
 
       {/* 預覽按鈕 */}
       {dataSourceId && sqlQuery.trim() && (
-        <button
-          onClick={handlePreview}
-          disabled={previewLoading}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
-                     bg-cyan-700/25 border border-cyan-700/50 text-text-theme text-body-xs
-                     hover:bg-cyan-700/40 disabled:opacity-50 transition-colors"
-        >
-          {previewLoading
-            ? <><RefreshCw size={12} className="animate-spin" /> {t('dashboard.dataSourcePicker.querying')}</>
-            : <><Play size={12} /> {t('dashboard.dataSourcePicker.preview')}</>
-          }
-        </button>
+        <Button variant="tonal" className="w-full" leadingIcon={previewLoading ? <RefreshCw className="animate-spin" /> : <Play />} onPress={handlePreview} disabled={previewLoading} type="submit">{previewLoading ? t('dashboard.dataSourcePicker.querying') : t('dashboard.dataSourcePicker.preview')}</Button>
       )}
 
       {/* 預覽結果 */}

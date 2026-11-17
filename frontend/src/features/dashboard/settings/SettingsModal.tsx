@@ -13,7 +13,7 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, Tabs } from '../../../components/ui';
 
 interface Props {
   onClose: () => void;
@@ -82,11 +82,17 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
                 資料設定 · {plane.name}
               </span>
             )}
-            {plane && onChangePlaneDataSettings && (
-              <button onClick={() => setActiveTab('plane')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'plane' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>本儀表板</button>
-            )}
-            <button onClick={() => setActiveTab('datasource')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'datasource' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabDatasource')}</button>
-            <button onClick={() => setActiveTab('general')} className={`text-body-s-bold transition-colors pb-4 border-b-2 -mb-4 ${activeTab === 'general' ? 'border-cyan-500 text-text-theme' : 'border-transparent text-text-quaternary hover:text-text-secondary'}`}>{t('dashboard.settings.tabGeneral')}</button>
+            <Tabs
+              label="資料設定分類"
+              className="-mb-4"
+              value={activeTab}
+              onChange={setActiveTab}
+              items={[
+                ...(plane && onChangePlaneDataSettings ? [{ id: 'plane' as const, label: '本儀表板' }] : []),
+                { id: 'datasource' as const, label: t('dashboard.settings.tabDatasource') },
+                { id: 'general' as const, label: t('dashboard.settings.tabGeneral') },
+              ]}
+            />
           </div>
           <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} type="submit" label="關閉" icon={<X />} />
         </div>
@@ -284,11 +290,7 @@ function DataSourceCard({ ds, pingState, isEditing, onEdit, onSave, onDelete, on
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {ds.type === 'internal' && (
-            <button onClick={onPing}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-body-xs border border-border-tertiary
-                         text-text-tertiary hover:border-border-primary hover:text-text-primary transition-colors">
-              {pingIcon ?? <CheckCircle size={12} />} {pingLabel}
-            </button>
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={pingIcon ?? <CheckCircle />} onPress={onPing} type="submit">{pingLabel}</Button>
           )}
           {!isDefault && (
             <>

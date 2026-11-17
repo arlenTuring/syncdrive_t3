@@ -16,7 +16,7 @@ import {
   type TimelineEvent,
   type TimelineEventKind,
 } from '../utils/buildDrivingCapabilityModel';
-import { Dialog } from '../../../components/ui';
+import { Dialog, SegmentedControl } from '../../../components/ui';
 
 /** 圖例順序對齊設計稿：線型 → 常用動作 → 號誌／告警 → 整備類 */
 const LEGEND_ITEMS: Array<{ kind: TimelineEventKind; channel?: 'action' | 'event' }> = [
@@ -710,26 +710,13 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
 
           {model && !loading ? (
             <>
-              {/* 設計稿：連段式 segmented control */}
-              <div className="inline-flex w-fit rounded-lg bg-surface-secondary p-0.5">
-                {CHANNEL_FILTERS.map((value) => {
-                  const active = filter === value;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setFilter(value)}
-                      className={`rounded-md px-4 py-1.5 text-body-s transition-colors ${
-                        active
-                          ? 'bg-[#3f3f46] text-text-primary shadow-sm'
-                          : 'text-text-quaternary hover:text-text-secondary'
-                      }`}
-                    >
-                      {filterLabels[value]}
-                    </button>
-                  );
-                })}
-              </div>
+              <SegmentedControl
+                label={t('shiftRecords.capabilityModal.title')}
+                className="w-fit bg-surface-secondary"
+                value={filter}
+                onChange={setFilter}
+                options={CHANNEL_FILTERS.map((value) => ({ id: value, label: filterLabels[value] }))}
+              />
 
               <TimelinePanel
                 model={model}

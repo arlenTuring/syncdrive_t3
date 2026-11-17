@@ -1,7 +1,5 @@
 import { SiteSelect } from '../../../components/SiteSelect';
 import {
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Download,
   FileText,
@@ -11,9 +9,8 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Trash2,
-} from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+  Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackToHomeButton } from '../../../components/BackToHomeButton';
 import {
@@ -21,8 +18,7 @@ import {
   deleteTimeTemplate,
   duplicateTimeTemplateDraft,
   exportTimeTemplates,
-  fetchTimeTemplateList,
-} from '../api/timeTemplatesApi';
+  fetchTimeTemplateList } from '../api/timeTemplatesApi';
 import { StatusTag } from '../../../components/StatusTag';
 import { CreateTimeTemplateModal } from './CreateTimeTemplateModal';
 import { TimeTemplatePreviewModal } from './TimeTemplatePreviewModal';
@@ -34,7 +30,7 @@ import {
   type TimeTemplateListItem,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, Checkbox, IconButton } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Pagination } from '../../../components/ui';
 
 type TimeTemplateListPageProps = {
   onBackToHome?: () => void;
@@ -62,7 +58,6 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canSearch = keywordDraft.trim().length > 0;
   const hasSelection = selected.size > 0;
 
@@ -103,11 +98,6 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [openMenuId]);
 
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(5, totalPages);
-    const start = Math.max(1, Math.min(page - 2, totalPages - max + 1));
-    return Array.from({ length: max }, (_, i) => start + i);
-  }, [page, totalPages]);
 
   const toggleRow = (templateId: string) => {
     setSelected((prev) => {
@@ -359,37 +349,8 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         </table>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t border-border-quaternary px-6 py-4">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronLeft className="size-4" />
-        </button>
-        {pageNumbers.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setPage(n)}
-            className={`inline-flex size-8 items-center justify-center rounded-full text-body-s ${
-              n === page
-                ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40'
-                : 'text-text-quaternary hover:bg-link-standard-hover'
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="inline-flex size-8 items-center justify-center rounded-full text-text-quaternary hover:bg-link-standard-hover disabled:opacity-30"
-        >
-          <ChevronRight className="size-4" />
-        </button>
+      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
 
       {(createOpen || editTemplateId) && (

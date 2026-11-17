@@ -1,7 +1,5 @@
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ChevronsUpDown,
   CloudDownload,
@@ -17,8 +15,7 @@ import {
   RotateCw,
   Search,
   Server,
-  Trash2,
-} from 'lucide-react'
+  Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MapPixelSize } from '../types/area'
@@ -58,7 +55,7 @@ import {
   type PublishedMapSummary,
 } from '../api/mapLibraryApi'
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog'
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, Pagination } from '../../../components/ui';
 
 type MapLibraryPageProps = {
   onOpenMap: (libraryId: string) => void
@@ -503,11 +500,6 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(5, totalPages)
-    const start = Math.max(1, Math.min(currentPage - 2, totalPages - max + 1))
-    return Array.from({ length: max }, (_, i) => start + i)
-  }, [currentPage, totalPages])
 
   const applySearch = () => {
     setPage(1)
@@ -542,17 +534,15 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
     const active = sort?.key === key
     const Icon = !active ? ChevronsUpDown : sort.dir === 'asc' ? ChevronUp : ChevronDown
     return (
-      <button
-        type="button"
-        onClick={() => toggleSort(key)}
-        className={`inline-flex size-[34px] shrink-0 items-center justify-center rounded-lg p-0.5 transition hover:bg-[rgba(209,213,220,0.08)] ${
-          active ? 'text-text-theme' : 'text-text-tertiary'
-        }`}
+      <IconButton
+        size="small"
+        hierarchy={active ? 'superior' : 'subordinate'}
+        variant="standard"
+        onPress={() => toggleSort(key)}
         title={t('mapLibrary.sortTitle')}
-        aria-label={t('mapLibrary.sortTitle')}
-      >
-        <Icon className="size-[18px]" aria-hidden />
-      </button>
+        label={t('mapLibrary.sortTitle')}
+        icon={<Icon />}
+      />
     )
   }
 
@@ -587,34 +577,8 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               className="min-w-0 flex-1 bg-transparent py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary placeholder:text-text-tertiary focus:outline-none"
             />
           </div>
-          <button
-            type="button"
-            onClick={applySearch}
-            disabled={!canSearch}
-            className={`inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 transition ${
-              canSearch
-                ? 'bg-[rgba(43,127,255,0.2)] text-text-theme hover:bg-[rgba(43,127,255,0.3)]'
-                : 'cursor-not-allowed bg-[rgba(98,116,142,0.2)] text-[#4A5565]'
-            }`}
-            title={t('common.search')}
-            aria-label={t('common.search')}
-          >
-            <Search className="size-6" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={resetFilters}
-            disabled={!canReset}
-            className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[rgba(212,212,212,0.1)] px-3.5 py-2 text-body-s font-medium leading-[18px] tracking-[0.5px] transition ${
-              canReset
-                ? 'text-text-secondary hover:bg-[rgba(209,213,220,0.08)]'
-                : 'cursor-not-allowed text-[#4A5565]'
-            }`}
-            title={t('common.resetFiltersTitle')}
-          >
-            <RotateCw className="size-[18px]" aria-hidden />
-            {t('mapLibrary.reset')}
-          </button>
+          <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RotateCw />} onPress={resetFilters} disabled={!canReset} title={t('common.resetFiltersTitle')}>{t('mapLibrary.reset')}</Button>
           {offline && (
             <span
               title={t('mapLibrary.offlineTitle')}
@@ -728,19 +692,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                         : ''}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={serverLoadingId != null}
-                    onClick={() => void handleLoadFromServer(m)}
-                    className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(81,162,255,0.5)] px-3.5 text-body-s-bold text-text-theme hover:bg-[rgba(81,162,255,0.08)] disabled:opacity-40"
-                  >
-                    {serverLoadingId === m.mapId ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <CloudDownload className="size-4" aria-hidden />
-                    )}
-                    {t('mapLibrary.load')}
-                  </button>
+                  <Button hierarchy="subordinate" variant="outlined" leadingIcon={serverLoadingId === m.mapId ? <Loader2 className="animate-spin" /> : <CloudDownload />} disabled={serverLoadingId != null} onPress={() => void handleLoadFromServer(m)}>{t('mapLibrary.load')}</Button>
                 </li>
               ))}
             </ul>
@@ -972,25 +924,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
         </div>
 
         {!loading && !error && visibleEntries.length > 0 && (
-          <nav className="flex h-6 shrink-0 items-center justify-center gap-2">
-            <IconButton hierarchy="subordinate" variant="standard" disabled={currentPage <= 1} onPress={() => setPage(Math.max(1, currentPage - 1))} label={t('mapLibrary.prevPage')} icon={<ChevronLeft />} />
-            {pageNumbers.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                aria-current={n === currentPage ? 'page' : undefined}
-                className={`inline-flex size-6 items-center justify-center rounded-lg text-body-s leading-[18px] tracking-[0.5px] ${
-                  n === currentPage
-                    ? 'border border-[#51A2FF] text-text-theme'
-                    : 'text-text-primary hover:bg-[rgba(209,213,220,0.08)]'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <IconButton hierarchy="subordinate" variant="standard" disabled={currentPage >= totalPages} onPress={() => setPage(Math.min(totalPages, currentPage + 1))} label={t('mapLibrary.nextPage')} icon={<ChevronRight />} />
-          </nav>
+          <Pagination className="shrink-0" page={currentPage} total={visibleEntries.length} pageSize={PAGE_SIZE} onChange={setPage} />
         )}
       </div>
 

@@ -2558,19 +2558,12 @@ function VehicleContainerSettings({
               ? `（${mapModel.resolution.setting.displayWidthPx}×${mapModel.resolution.setting.displayHeightPx}）`
               : ''}
           </p>
-          <button
-            type="button"
-            onClick={() =>
+          <Button className="w-full" leadingIcon={<ExternalLink />} onPress={() =>
               requestOpenVehicleModels({
                 definitionKey: mapModel.resolution?.setting?.definitionKey ?? null,
                 mapId,
               })
-            }
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-2 text-body-xs-bold text-text-primary hover:bg-sky-500"
-          >
-            <ExternalLink size={13} />
-            前往圖資管理編輯
-          </button>
+            }>前往圖資管理編輯</Button>
         </div>
       ) : (
         <>
@@ -2597,14 +2590,7 @@ function VehicleContainerSettings({
               這張地圖還沒在圖資管理設定車輛模型，暫用這個容器的模型與尺寸。可到圖資管理 → 車輛模型 → 遷移，把它搬成地圖設定。
             </p>
           ) : null}
-          <button
-            type="button"
-            onClick={() => requestOpenVehicleModels({ definitionKey: w.vehicleDefinitionId ?? null, mapId })}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-border-tertiary py-2 text-body-xs text-text-primary hover:border-border-secondary"
-          >
-            <ExternalLink size={13} />
-            前往圖資管理編輯
-          </button>
+          <Button hierarchy="subordinate" variant="outlined" className="w-full" leadingIcon={<ExternalLink />} onPress={() => requestOpenVehicleModels({ definitionKey: w.vehicleDefinitionId ?? null, mapId })}>前往圖資管理編輯</Button>
         </>
       )}
 
@@ -3106,43 +3092,10 @@ function TabListSettings({
           {/* {t('dashboard.properties.widgets.tabList.tableAlign')} */}
           <div>
             <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tableAlign')}</label>
-            <div className="flex items-center bg-surface-secondary border border-border-quaternary rounded p-0.5 gap-0.5">
-              <button
-                type="button"
-                onClick={() => setGlobalAlign('left')}
-                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
-                  (w.align ?? 'left') === 'left'
-                    ? 'bg-blue-600 text-text-primary shadow-sm'
-                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
-                }`}
-                title={t('dashboard.properties.widgets.tabList.alignLeftTitle')}
-              >
-                <AlignLeft size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setGlobalAlign('center')}
-                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
-                  w.align === 'center'
-                    ? 'bg-blue-600 text-text-primary shadow-sm'
-                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
-                }`}
-                title={t('dashboard.properties.widgets.tabList.alignCenterTitle')}
-              >
-                <AlignCenter size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setGlobalAlign('right')}
-                className={`flex-1 py-1.5 flex items-center justify-center rounded transition-colors ${
-                  w.align === 'right'
-                    ? 'bg-blue-600 text-text-primary shadow-sm'
-                    : 'text-text-tertiary hover:text-text-primary hover:bg-link-standard-hover'
-                }`}
-                title={t('dashboard.properties.widgets.tabList.alignRightTitle')}
-              >
-                <AlignRight size={13} />
-              </button>
+            <div className="flex items-center gap-1">
+              <IconButton size="small" hierarchy="subordinate" variant="outlined" pressed={(w.align ?? 'left') === 'left'} onPress={() => setGlobalAlign('left')} title={t('dashboard.properties.widgets.tabList.alignLeftTitle')} label={t('dashboard.properties.widgets.tabList.alignLeftTitle')} icon={<AlignLeft />} />
+              <IconButton size="small" hierarchy="subordinate" variant="outlined" pressed={w.align === 'center'} onPress={() => setGlobalAlign('center')} title={t('dashboard.properties.widgets.tabList.alignCenterTitle')} label={t('dashboard.properties.widgets.tabList.alignCenterTitle')} icon={<AlignCenter />} />
+              <IconButton size="small" hierarchy="subordinate" variant="outlined" pressed={w.align === 'right'} onPress={() => setGlobalAlign('right')} title={t('dashboard.properties.widgets.tabList.alignRightTitle')} label={t('dashboard.properties.widgets.tabList.alignRightTitle')} icon={<AlignRight />} />
             </div>
           </div>
 
