@@ -77,7 +77,7 @@ export function SetPrimaryMapDialog({ entry, onClose, onActivated }: Props) {
 
         {check ? (
           <div className="mt-4 space-y-3">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-xl bg-[rgba(142,197,255,0.04)] px-4 py-3 text-body-s">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-xl bg-surface-theme-light px-4 py-3 text-body-s">
               <dt className="text-text-tertiary">{t('mapLibrary.primary.current')}</dt>
               <dd>{check.currentActive.displayName ?? check.currentActive.mapId}</dd>
               <dt className="text-text-tertiary">{t('mapLibrary.primary.next')}</dt>

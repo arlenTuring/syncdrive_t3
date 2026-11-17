@@ -61,7 +61,7 @@ export function TimeSlotAttributesPanel({
 
   return (
     <section
-      className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-[rgba(142,197,255,0.08)] pb-1.5"
+      className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-surface-theme pb-1.5"
       style={{ paddingTop: ATTRIBUTES_PANEL_PADDING_TOP_PX }}
     >
       {/* Top row: title · optional slider · add button */}

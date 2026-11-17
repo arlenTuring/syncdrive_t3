@@ -312,7 +312,7 @@ export function clampGridZoom(zoom: number): number {
 /** 班表時軸刻度文字色（00:00、00:30…） */
 export const SCHEDULE_TIME_AXIS_TEXT_CLASS = 'text-text-primary';
 /** 無營運時段上的時軸刻度 */
-export const SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS = 'text-[#9CA3AF]';
+export const SCHEDULE_TIME_AXIS_TEXT_INACTIVE_CLASS = 'text-text-tertiary';
 
 export function hexToRgba(hex: string, alpha: number): string {
   const normalized = hex.replace('#', '');

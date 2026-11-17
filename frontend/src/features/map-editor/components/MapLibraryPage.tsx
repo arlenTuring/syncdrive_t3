@@ -73,8 +73,8 @@ const NOT_IN_USE_TAG_STYLE: StatusTagStyle = {
 }
 
 const IN_USE_TAG_STYLE: StatusTagStyle = {
-  container: 'bg-[rgba(0,212,146,0.2)]',
-  dot: 'bg-[#00D492]',
+  container: 'bg-status-success-light',
+  dot: 'bg-status-success',
 }
 
 /** 清單上的時間：YYYY-MM-DD HH:mm（本地時間） */
@@ -547,11 +547,11 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
   }
 
   const menuItemClass =
-    'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-[rgba(209,213,220,0.08)]'
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-link-standard'
   const headCellClass =
-    'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary'
+    'h-12 border-b-[0.5px] border-border-quaternary px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary'
   const bodyCellClass =
-    'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary'
+    'h-[52px] border-b-[0.5px] border-border-quaternary px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary'
   /** 固定左欄／右欄：底色蓋住捲過去的內容，陰影標出固定邊 */
   const fixedLeftClass =
     'sticky left-0 z-10 w-[200px] min-w-[200px] bg-surface-primary shadow-[12px_6px_16px_rgba(2,9,19,0.2)]'
@@ -564,7 +564,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-2xl p-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <div className="flex h-[34px] w-[180px] items-center rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5">
+          <div className="flex h-[34px] w-[180px] items-center rounded-lg bg-surface-theme px-3 py-1.5">
             <Search className="mr-1 size-5 shrink-0 text-text-tertiary" aria-hidden />
             <input
               type="search"
@@ -610,7 +610,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
               onClose={() => setImportMenuOpen(false)}
               role="menu"
               ariaLabel={t('mapLibrary.importFile')}
-              className="min-w-[180px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl"
+              className="min-w-[180px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
             >
                 <button
                   type="button"
@@ -655,7 +655,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       </div>
 
       {serverOpen && (
-        <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
+        <div className="shrink-0 rounded-2xl border border-border-quaternary p-3">
           <p className="text-body-xs text-text-tertiary">
             {t('mapLibrary.serverHintBefore')}
             <span className="text-text-secondary">{t('mapLibrary.serverHintEmphasis')}</span>
@@ -674,7 +674,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
           ) : serverMaps.length === 0 ? (
             <p className="mt-2 text-body-xs text-text-tertiary">{t('mapLibrary.serverEmpty')}</p>
           ) : (
-            <ul className="mt-2 divide-y divide-[rgba(212,212,212,0.15)]">
+            <ul className="mt-2 divide-y divide-border-quaternary">
               {serverMaps.map((m) => (
                 <li key={m.mapId} className="flex items-center gap-3 py-2">
                   <div className="min-w-0 flex-1">
@@ -701,7 +701,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
       )}
 
       {pasteOpen && (
-        <div className="shrink-0 rounded-2xl border border-[rgba(212,212,212,0.15)] p-3">
+        <div className="shrink-0 rounded-2xl border border-border-quaternary p-3">
           <label htmlFor={pasteAreaId} className="text-body-xs text-text-tertiary">
             {t('mapLibrary.pasteLabel')}
           </label>
@@ -710,7 +710,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             rows={6}
-            className="mt-1 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-2 font-mono text-body-xs text-text-primary outline-none focus:ring-1 focus:ring-[#51A2FF]"
+            className="mt-1 w-full rounded-lg bg-surface-theme px-3 py-2 font-mono text-body-xs text-text-primary outline-none focus:ring-1 focus:ring-border-theme"
             placeholder='{"schemaVersion":2,"mapId":"...", ...}'
           />
           <div className="mt-2 flex justify-end gap-3">
@@ -771,7 +771,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                       const isActive = isMapLibraryEntryActive(entry, activeMapId, activeLibraryId)
                         return (
                         <tr key={entry.libraryId} className="group">
-                          <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-surface-primary`}>
                             {renamingId === entry.libraryId ? (
                               <input
                                 value={renameDraft}
@@ -785,30 +785,30 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                   }
                                 }}
                                 autoFocus
-                                className="h-[34px] w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s text-text-primary outline-none focus:ring-1 focus:ring-[#51A2FF]"
+                                className="h-[34px] w-full rounded-lg bg-surface-theme px-3 text-body-s text-text-primary outline-none focus:ring-1 focus:ring-border-theme"
                               />
                             ) : (
                               <Button variant="text" className="w-full" onPress={() => onOpenMap(entry.libraryId)} title={t('mapLibrary.openTitle')}>{entry.displayName}</Button>
                             )}
                           </td>
-                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>
                             {isActive ? (
                               <StatusTag label={t('mapLibrary.inUse')} style={IN_USE_TAG_STYLE} />
                             ) : (
                               <StatusTag label={t('mapLibrary.notInUse')} style={NOT_IN_USE_TAG_STYLE} />
                             )}
                           </td>
-                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{entry.version}</td>
-                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>{entry.version}</td>
+                          <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>
                             {entry.pixelSize.width} x {entry.pixelSize.height}
                           </td>
-                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>
                             {formatMapListDate(entry.createdAt)}
                           </td>
-                          <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>
                             {formatMapListDate(entry.updatedAt)}
                           </td>
-                          <td className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-[#1f1f23]`}>
+                          <td className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-surface-primary`}>
                             <div className="flex justify-center">
                               <button
                                 ref={openMenuId === entry.libraryId ? rowMenuButtonRef : undefined}
@@ -820,7 +820,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                     prev === entry.libraryId ? null : entry.libraryId,
                                   )
                                 }
-                                className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-text-secondary hover:bg-[rgba(209,213,220,0.08)]"
+                                className="inline-flex size-[34px] items-center justify-center rounded-lg p-0.5 text-text-secondary hover:bg-link-standard"
                                 title={t('common.moreActions')}
                                 aria-label={t('common.moreActions')}
                               >
@@ -833,7 +833,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
                                 onClose={() => setOpenMenuId(null)}
                                 role="menu"
                                 ariaLabel={t('common.moreActions')}
-                                className="min-w-[160px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl"
+                                className="min-w-[160px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
                               >
                                   <button
                                     type="button"

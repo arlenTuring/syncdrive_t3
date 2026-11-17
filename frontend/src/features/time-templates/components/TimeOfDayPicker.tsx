@@ -9,7 +9,7 @@ import {
 import { Button } from '../../../components/ui';
 
 const FIELD_CLASS =
-  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-left text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none';
+  'w-full rounded-lg bg-surface-theme px-3 text-left text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none';
 
 const FIELD_STYLE = { height: INTERVAL_TABLE_FIELD_HEIGHT_PX };
 
@@ -74,7 +74,7 @@ function TimeColumn({
             <span
               className={`flex h-8 w-12 items-center justify-center rounded-lg text-body-s tracking-[0.5px] ${
                 selected
-                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-text-secondary'
+                  ? 'bg-link-tonal font-medium text-text-secondary'
                   : 'font-normal text-text-secondary hover:bg-link-standard'
               }`}
             >
@@ -119,17 +119,17 @@ export function TimePickerPanel({
       }`}
     >
       <div
-        className="absolute -top-2 left-6 size-0 border-x-8 border-b-8 border-x-transparent border-b-[#27272A]"
+        className="absolute -top-2 left-6 size-0 border-x-8 border-b-8 border-x-transparent border-b-border-quaternary"
         aria-hidden
       />
       <div className="p-1">
         <div className="flex rounded-lg p-1">
           <TimeColumn max={23} value={hour} onChange={onHourChange} />
-          <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
+          <div className="w-px self-stretch bg-surface-secondary" />
           <TimeColumn max={59} value={minute} onChange={onMinuteChange} />
           {showSeconds && onSecondChange ? (
             <>
-              <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
+              <div className="w-px self-stretch bg-surface-secondary" />
               <TimeColumn
                 max={50}
                 value={second}
@@ -140,7 +140,7 @@ export function TimePickerPanel({
           ) : null}
         </div>
       </div>
-      <div className="h-px w-full bg-[rgba(212,212,212,0.15)]" />
+      <div className="h-px w-full bg-surface-secondary" />
       <div className={`flex items-center px-2 py-2 ${onNow ? 'justify-between' : 'justify-end'}`}>
         {onNow ? (
           <Button variant="text" onPress={onNow}>此刻</Button>

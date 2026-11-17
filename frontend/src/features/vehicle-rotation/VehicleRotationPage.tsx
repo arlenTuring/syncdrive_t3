@@ -209,7 +209,7 @@ function BigStat({ label, value, unit }: { label: string; value: string; unit?: 
 /** 確認報告最重要的一塊：人靠這裡判斷這台車能不能上場 */
 function TakeoverStatus({ car, now }: { car: CarView; now: number }) {
   return (
-    <div className="rounded-lg border border-[#2B7FFF]/40 bg-[#2B7FFF]/5 px-5 py-4">
+    <div className="rounded-lg border border-link-theme-filled/40 bg-link-theme-filled/5 px-5 py-4">
       <div className="flex items-baseline gap-3">
         <span className="text-body-xs text-text-tertiary">接替車輛目前狀態</span>
         <span className="text-headline-4 text-text-theme">{car.code}</span>

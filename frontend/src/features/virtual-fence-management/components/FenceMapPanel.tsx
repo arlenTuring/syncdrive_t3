@@ -372,7 +372,7 @@ export function FenceMapPanel({
 
       {marqueeScreen ? (
         <div
-          className="pointer-events-none absolute z-30 border-2 border-border-theme bg-[#2B7FFF]/25"
+          className="pointer-events-none absolute z-30 border-2 border-border-theme bg-link-theme-filled/25"
           style={{
             left: marqueeScreen.left,
             top: marqueeScreen.top,

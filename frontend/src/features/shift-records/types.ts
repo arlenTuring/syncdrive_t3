@@ -60,24 +60,24 @@ export const EXECUTION_TAG_STYLE: Record<ExecutionDisplayKey, StatusTagStyle> = 
     dot: 'bg-[#99A1AF]',
   },
   running: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
+    container: 'bg-status-success-light',
+    dot: 'bg-status-success',
   },
   delayed: {
-    container: 'bg-[rgba(251,146,60,0.2)]',
-    dot: 'bg-[#FB923C]',
+    container: 'bg-status-warning-light',
+    dot: 'bg-status-warning',
   },
   faulted: {
-    container: 'bg-[rgba(239,68,68,0.2)]',
-    dot: 'bg-[#EF4444]',
+    container: 'bg-status-error-light',
+    dot: 'bg-status-error',
   },
   completed: {
     container: 'bg-[rgba(153,161,175,0.2)]',
     dot: 'bg-[#99A1AF]',
   },
   fault_pending: {
-    container: 'bg-[rgba(239,68,68,0.2)]',
-    dot: 'bg-[#EF4444]',
+    container: 'bg-status-error-light',
+    dot: 'bg-status-error',
   },
   cancelled: {
     container: 'bg-[rgba(153,161,175,0.2)]',

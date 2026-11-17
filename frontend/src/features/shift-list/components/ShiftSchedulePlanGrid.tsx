@@ -1532,7 +1532,7 @@ function ShiftScheduleBlockBar({
       className={`absolute isolate flex flex-col justify-center overflow-hidden ${wizard ? 'rounded-md px-1.5' : 'rounded-[4px] px-1'} ${
         isIdleLike ? `schedule-task-inactive-overlay ${hoverOnly ? '' : 'pointer-events-none'}` : ''
       } ${
-        selected ? 'ring-2 ring-[#2B7FFF] ring-offset-1 ring-offset-zinc-950' : ''
+        selected ? 'ring-2 ring-link-theme-filled ring-offset-1 ring-offset-zinc-950' : ''
       } ${selectable ? (interactiveOnSegments ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : hoverOnly ? 'cursor-help' : 'pointer-events-none'} ${
         // 虛線邊框＝這張卡不佔時間（同區域 0 秒示意轉移），
         // 跟一般有長度的轉場卡一眼分得出來

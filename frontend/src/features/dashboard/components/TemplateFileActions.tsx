@@ -88,7 +88,7 @@ export function ImportTemplateDialog({ onImported, onClose }: { onImported: (res
           選擇 <code className="text-text-secondary">.json</code> 樣板檔，會建立一個新的儀表板。檔案開頭的{' '}
           <code className="text-text-secondary">dataSources</code> 會合併到本機連線設定。
         </p>
-        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-[rgba(212,212,212,0.1)] p-3 text-body-s text-text-secondary">
+        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-border-quaternary p-3 text-body-s text-text-secondary">
           <Checkbox checked={applyConnections} onCheckedChange={e => setApplyConnections(e)} />
           <span>
             以樣板覆寫同 ID 的連線 URL（資料庫／MQTT 位址）

@@ -194,7 +194,7 @@ const SECTION_ORDER: Array<{ key: SectionKey; step: number }> = [
 function WizardBulletCard({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <div className="rounded-lg bg-[#1b1b1f] px-4 py-3">
+    <div className="rounded-lg bg-surface-primary px-4 py-3">
       <h4 className="mb-2 text-body-s-bold text-text-primary">{title}</h4>
       <ul className="space-y-1.5">
         {items.map((item, index) => (
@@ -235,12 +235,12 @@ export function MaintenanceTaskPreviewContent({
   if (appearance === 'wizard') {
     return (
       <div className="space-y-4">
-        <section className="rounded-xl bg-[#232329] px-5 py-5">
+        <section className="rounded-xl bg-surface-secondary px-5 py-5">
           <h3 className="mb-4 text-body-m-bold text-text-primary">{stepLabels[1]}</h3>
           {basicRows}
         </section>
         {SECTION_ORDER.filter(({ key }) => lines[key].enabled).map(({ key, step }) => (
-          <section key={key} className="space-y-4 rounded-xl bg-[#232329] px-5 py-5">
+          <section key={key} className="space-y-4 rounded-xl bg-surface-secondary px-5 py-5">
             <h3 className="text-body-m-bold text-text-primary">{stepLabels[step]}</h3>
             {sectionExtras?.[key]}
             <WizardBulletCard title="條件設定" items={lines[key].conditions} />

@@ -640,7 +640,7 @@ function RoutePickerBar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#2B7FFF]/35 bg-[rgba(43,127,255,0.06)] px-4 py-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-link-theme-filled/35 bg-[rgba(43,127,255,0.06)] px-4 py-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <span className="inline-flex shrink-0 items-center gap-1.5 text-body-s-bold text-text-primary">
             <Plus className="size-4 text-text-theme" />

@@ -75,14 +75,14 @@ export const FENCE_ENABLE_STATUS = {
   enabled: {
     label: '啟用',
     style: {
-      container: 'bg-[rgba(43,127,255,0.2)]',
-      dot: 'bg-[#2B7FFF]',
+      container: 'bg-link-tonal',
+      dot: 'bg-link-theme-filled',
     },
   },
   disabled: {
     label: '未啟用',
     style: {
-      container: 'bg-transparent border border-zinc-600',
+      container: 'bg-transparent border border-border-tertiary',
       dot: 'bg-[#99A1AF]',
     },
   },

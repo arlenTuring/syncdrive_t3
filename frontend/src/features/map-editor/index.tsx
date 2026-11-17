@@ -4816,7 +4816,7 @@ export default function MapEditorApp({
             <button
               type="button"
               onClick={() => setInspectorCollapsed(false)}
-              className="pointer-events-auto absolute right-2 top-2 z-40 flex h-12 items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[rgba(212,212,216,0.1)] px-2 py-3 text-body-s leading-[18px] tracking-[0.5px] text-text-primary backdrop-blur-md transition hover:bg-[rgba(212,212,216,0.16)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60"
+              className="pointer-events-auto absolute right-2 top-2 z-40 flex h-12 items-center gap-1 rounded-xl border border-border-quaternary bg-surface-secondary px-2 py-3 text-body-s leading-[18px] tracking-[0.5px] text-text-primary backdrop-blur-md transition hover:bg-[rgba(212,212,216,0.16)] focus:outline-none focus-visible:ring-2 focus-visible:ring-border-theme/60"
               title={t('mapEditor.chrome.expandInspector')}
               aria-label={t('mapEditor.chrome.expandInspector')}
             >

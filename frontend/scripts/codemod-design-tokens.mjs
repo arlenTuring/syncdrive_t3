@@ -386,6 +386,48 @@ export function familyToken(cls) {
   return null;
 }
 
+/**
+ * 寫死色值 → 語意 token（--families 才啟用）。只收設計稿裡有對應的值；
+ * 自訂深色底（#151516、#252b34…）、分類色不在這裡。key 是去掉空白的色值，value 依 class 種類給 token。
+ */
+const ARBITRARY = {
+  'rgba(212,212,212,0.15)': { border: 'border-quaternary', divide: 'border-quaternary', bg: 'surface-secondary' },
+  'rgba(212,212,212,0.1)': { border: 'border-quaternary', bg: 'surface-secondary' },
+  'rgba(212,212,212,0.25)': { border: 'border-tertiary' },
+  'rgba(212,212,216,0.1)': { bg: 'surface-secondary', border: 'border-quaternary' },
+  'rgba(209,213,220,0.08)': { bg: 'link-standard' },
+  'rgba(209,213,220,0.12)': { bg: 'link-standard' },
+  'rgba(142,197,255,0.08)': { bg: 'surface-theme' },
+  'rgba(142,197,255,0.04)': { bg: 'surface-theme-light' },
+  'rgba(81,162,255,0.24)': { bg: 'link-tonal' },
+  'rgba(81,162,255,0.32)': { bg: 'link-tonal-hover' },
+  'rgba(81,162,255,0.5)': { border: 'border-theme-light' },
+  'rgba(43,127,255,0.2)': { bg: 'link-tonal' },
+  'rgba(43,127,255,0.12)': { bg: 'link-tonal' },
+  'rgba(43,127,255,0.24)': { bg: 'link-tonal' },
+  'rgba(0,212,146,0.2)': { bg: 'status-success-light' },
+  'rgba(239,68,68,0.2)': { bg: 'status-error-light' },
+  'rgba(251,146,60,0.2)': { bg: 'status-warning-light' },
+  '#2b7fff': { bg: 'link-theme-filled', border: 'link-theme-filled', ring: 'link-theme-filled', text: 'text-theme-light' },
+  '#51a2ff': { ring: 'border-theme', border: 'border-theme', text: 'text-theme', bg: 'link-theme-filled-hover' },
+  '#7cb8ff': { border: 'border-theme' },
+  '#00d492': { bg: 'status-success', text: 'status-success' },
+  '#ef4444': { bg: 'status-error', text: 'status-error-emphasis' },
+  '#fb923c': { bg: 'status-warning', text: 'status-warning' },
+  '#9ca3af': { text: 'text-tertiary' },
+  '#99a1af': { text: 'text-tertiary' },
+  '#27272a': { border: 'border-quaternary' },
+  '#1f1f23': { bg: 'surface-primary' },
+};
+export function arbitraryToken(cls) {
+  const m = cls.match(/^(bg|text|border|ring|divide)(-[trblxy])?-\[([^\]]+)\](\/\d+)?$/);
+  if (!m) return null;
+  const [, kind, side = '', raw, alpha = ''] = m;
+  const entry = ARBITRARY[raw.replace(/\s+/g, '').toLowerCase()];
+  const token = entry?.[kind];
+  return token ? `${kind}${side}-${token}${alpha}` : null;
+}
+
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\/#]/g, '\\$&');
 // 前面不能是 class 字元（避免吃到 hover:text-zinc-100 以外的長名稱），後面不能接 class 字元或 /透明度
 const PATTERNS = Object.entries(CLASS_MAP)
@@ -421,6 +463,12 @@ export function migrate(text, { families = false } = {}) {
     return `${quote}${next.trimStart() === next ? next : next.trimStart()}${quote}`;
   });
   if (families) {
+    out = out.replace(/(?<![\w\-[#/:])((?:[a-z0-9-]+:)*)((?:bg|text|border|ring|divide)(?:-[trblxy])?-\[[^\]\s'"`]+\](?:\/\d+)?)/g, (whole, prefix, cls) => {
+      const token = arbitraryToken(cls);
+      if (!token) return whole;
+      hits[`${prefix}${cls}`] = (hits[`${prefix}${cls}`] ?? 0) + 1;
+      return `${prefix}${token}`;
+    });
     out = out.replace(/(?<![\w\-[#/:])((?:[a-z0-9-]+:)*)((?:text|bg|border|ring|accent|fill|stroke|outline|divide|shadow)(?:-[trblxy])?-[a-z]+(?:-\d{2,3})?(?:\/\d+)?)(?![\w\-/\]])/g, (whole, prefix, cls) => {
       const token = familyToken(cls);
       if (!token) return whole;

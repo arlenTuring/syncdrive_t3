@@ -27,7 +27,7 @@ import {
 } from './TimeTemplatePanelHeader';
 
 const FIELD_CLASS =
-  'w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
+  'w-full rounded-lg bg-surface-theme px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const FIELD_STYLE = { height: INTERVAL_TABLE_FIELD_HEIGHT_PX };
 
@@ -150,14 +150,14 @@ function DayTimeline({
                   </div>
                 );
               })}
-              <div className="absolute bottom-0 left-0 right-0 h-px border-t border-[rgba(212,212,212,0.15)]" />
+              <div className="absolute bottom-0 left-0 right-0 h-px border-t border-border-quaternary" />
             </div>
             <div className="relative min-h-0 flex-1">
               <div className="absolute inset-0 flex">
                 {HOUR_TICKS.slice(0, -1).map((h) => (
                   <div
                     key={h}
-                    className="flex-1 border-r border-[rgba(212,212,212,0.15)] last:border-r-0"
+                    className="flex-1 border-r border-border-quaternary last:border-r-0"
                   />
                 ))}
               </div>
@@ -309,7 +309,7 @@ export function TimeSlotIntervalsPanel({
       <>
       <tr
         key={slot.id}
-        className={`border-b border-[rgba(212,212,212,0.15)] ${draft && overlaps ? 'bg-status-error-light' : ''}`}
+        className={`border-b border-border-quaternary ${draft && overlaps ? 'bg-status-error-light' : ''}`}
       >
         <td className={TABLE_CELL_CLASS} style={TABLE_CELL_STYLE}>
           {draft ? (
@@ -409,7 +409,7 @@ export function TimeSlotIntervalsPanel({
         </td>
       </tr>
       {draft && overlaps && (
-        <tr key={`${slot.id}-overlap-warning`} className="border-b border-[rgba(212,212,212,0.15)] bg-status-error-light">
+        <tr key={`${slot.id}-overlap-warning`} className="border-b border-border-quaternary bg-status-error-light">
           <td colSpan={5} className="px-4 py-2">
             <div className="flex items-center gap-2 text-body-xs text-status-error-emphasis">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 shrink-0">
@@ -425,7 +425,7 @@ export function TimeSlotIntervalsPanel({
   };
 
   return (
-    <section className="flex shrink-0 flex-col gap-2 overflow-hidden rounded-xl bg-[rgba(142,197,255,0.08)] py-3">
+    <section className="flex shrink-0 flex-col gap-2 overflow-hidden rounded-xl bg-surface-theme py-3">
       <div className={TIME_TEMPLATE_PANEL_HEADER_ROW_CLASS}>
         <div className="flex min-w-0 flex-1 items-center">
           <TimeTemplatePanelTitle
@@ -449,7 +449,7 @@ export function TimeSlotIntervalsPanel({
         >
           <DayTimeline intervals={intervals} attributes={attributes} />
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[rgba(212,212,212,0.1)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border-quaternary">
           <table className="w-full shrink-0 table-fixed text-left text-body-s">
             <colgroup>
               <col style={{ width: 400 }} />
@@ -458,8 +458,8 @@ export function TimeSlotIntervalsPanel({
               <col style={{ width: 212 }} />
               <col style={{ width: 100 }} />
             </colgroup>
-            <thead className="bg-[rgba(142,197,255,0.08)]">
-              <tr className="border-b border-[rgba(212,212,212,0.15)] text-text-tertiary">
+            <thead className="bg-surface-theme">
+              <tr className="border-b border-border-quaternary text-text-tertiary">
                 <th
                   className="px-3 py-0.5 text-body-s font-normal leading-[18px] tracking-[0.5px]"
                   style={{ height: INTERVAL_TABLE_HEADER_HEIGHT_PX }}

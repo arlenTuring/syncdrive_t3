@@ -26,22 +26,22 @@ export type StatusTagStyle = {
 
 export const USAGE_TAG_STYLE: Record<UsageStatusKey, StatusTagStyle> = {
   in_use: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
+    container: 'bg-status-success-light',
+    dot: 'bg-status-success',
   },
   idle: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
+    container: 'bg-surface-secondary',
+    dot: 'bg-status-inactive',
   },
 };
 
 export const PUBLISH_TAG_STYLE: Record<PublishStatusKey, StatusTagStyle> = {
   published: {
-    container: 'bg-[rgba(43,127,255,0.2)]',
-    dot: 'bg-[#2B7FFF]',
+    container: 'bg-link-tonal',
+    dot: 'bg-link-theme-filled',
   },
   draft: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
+    container: 'bg-surface-secondary',
+    dot: 'bg-status-inactive',
   },
 };

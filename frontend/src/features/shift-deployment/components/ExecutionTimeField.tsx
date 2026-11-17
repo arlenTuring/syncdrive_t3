@@ -81,7 +81,7 @@ function WheelColumn<T extends string | number>({
             <span
               className={`flex h-8 w-12 items-center justify-center rounded-lg text-body-s tracking-[0.5px] ${
                 selected
-                  ? 'bg-[rgba(81,162,255,0.24)] font-medium text-text-secondary'
+                  ? 'bg-link-tonal font-medium text-text-secondary'
                   : 'font-normal text-text-secondary hover:bg-link-standard'
               }`}
             >
@@ -184,7 +184,7 @@ export function ExecutionTimeField({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`${INPUT} truncate ${open ? 'border-border-theme ring-1 ring-[#2B7FFF]/30' : ''} ${
+        className={`${INPUT} truncate ${open ? 'border-border-theme ring-1 ring-link-theme-filled/30' : ''} ${
           value ? 'text-text-primary' : 'text-text-quaternary'
         }`}
         aria-haspopup="dialog"
@@ -209,18 +209,18 @@ export function ExecutionTimeField({
                     onChange={setPeriod}
                     format={(item) => (item === 'am' ? '上午' : '下午')}
                   />
-                  <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
+                  <div className="w-px self-stretch bg-surface-secondary" />
                   <WheelColumn
                     items={HOURS_12}
                     value={hour12}
                     onChange={setHour12}
                     format={pad2}
                   />
-                  <div className="w-px self-stretch bg-[rgba(212,212,212,0.15)]" />
+                  <div className="w-px self-stretch bg-surface-secondary" />
                   <WheelColumn items={MINUTES} value={minute} onChange={setMinute} format={pad2} />
                 </div>
               </div>
-              <div className="h-px w-full bg-[rgba(212,212,212,0.15)]" />
+              <div className="h-px w-full bg-surface-secondary" />
               <div className="flex items-center justify-between px-2 py-2">
                 <Button variant="text" onPress={handleNow}>此刻</Button>
                 <Button onPress={handleConfirm}>確定</Button>

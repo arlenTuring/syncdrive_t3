@@ -10,7 +10,7 @@ export const TIME_TEMPLATE_PANEL_TITLE_CLASS =
   'whitespace-nowrap text-[16px] font-medium leading-[20px] text-text-primary';
 
 export const TIME_TEMPLATE_PANEL_ADD_BUTTON_CLASS =
-  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[rgba(81,162,255,0.24)] px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme hover:bg-[rgba(81,162,255,0.32)] disabled:cursor-not-allowed disabled:opacity-40';
+  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-link-tonal px-3.5 py-2 text-body-s-bold leading-[18px] tracking-[0.5px] text-text-theme hover:bg-link-tonal-hover disabled:cursor-not-allowed disabled:opacity-40';
 
 type TimeTemplatePanelTitleProps = {
   icon: ReactNode;

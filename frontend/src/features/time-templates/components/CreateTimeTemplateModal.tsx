@@ -38,7 +38,7 @@ type CreateTimeTemplateModalProps = {
 
 
 const BASIC_INFO_FIELD_CLASS =
-  'h-9 w-full rounded-lg bg-[rgba(142,197,255,0.08)] px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
+  'h-9 w-full rounded-lg bg-surface-theme px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 
@@ -124,7 +124,7 @@ function CreateStepSidebar({
                 onClick={() => unlocked && onStepClick(item.step)}
                 className={`relative flex size-9 shrink-0 items-center justify-center rounded-full text-body-xs font-medium transition ${
                   active
-                    ? 'bg-link-theme-filled text-text-primary ring-2 ring-[#2B7FFF]/30'
+                    ? 'bg-link-theme-filled text-text-primary ring-2 ring-link-theme-filled/30'
                     : completed
                       ? 'bg-status-success-light text-status-success'
                       : unlocked
@@ -168,7 +168,7 @@ function CreateStepSidebar({
                   onClick={() => unlocked && onStepClick(item.step)}
                   className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
                     active
-                      ? 'bg-[rgba(43,127,255,0.12)]'
+                      ? 'bg-link-tonal'
                       : unlocked
                         ? 'hover:bg-surface-primary'
                         : 'cursor-not-allowed opacity-50'
@@ -230,8 +230,8 @@ function StepBasicInfoCard({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-[rgba(142,197,255,0.08)]">
-      <div className="flex items-center gap-2 border-b border-[rgba(212,212,212,0.1)] px-4 py-2">
+    <section className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-surface-theme">
+      <div className="flex items-center gap-2 border-b border-border-quaternary px-4 py-2">
         <Info className="size-5 text-text-tertiary" strokeWidth={1.75} />
         <h3 className="text-body-m-bold text-text-primary">{t('timeTemplates.createWizard.basicInfo')}</h3>
       </div>

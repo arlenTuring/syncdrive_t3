@@ -35,11 +35,11 @@ type SortKey = 'name' | 'resolution' | 'viewportMode' | 'createdAt' | 'updatedAt
  * class 常數。欄位都取自實際保存的版面資料（名稱、寬高、顯示模式、建立／修改時間），沒有的不補。
  */
 const menuItemClass =
-  'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-[rgba(209,213,220,0.08)]';
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-body-s text-text-secondary hover:bg-link-standard';
 const headCellClass =
-  'h-12 border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary';
+  'h-12 border-b-[0.5px] border-border-quaternary px-3 py-0.5 text-left text-body-s font-normal leading-[18px] tracking-[0.5px] text-text-tertiary';
 const bodyCellClass =
-  'h-[52px] border-b-[0.5px] border-[rgba(212,212,212,0.15)] px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary';
+  'h-[52px] border-b-[0.5px] border-border-quaternary px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary';
 const fixedLeftClass =
   'sticky left-0 z-10 w-[240px] min-w-[240px] bg-surface-primary shadow-[12px_6px_16px_rgba(2,9,19,0.2)]';
 const fixedRightClass =
@@ -135,7 +135,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
       {/* 工具列 */}
       <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-2xl p-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <div className="flex h-[34px] w-[200px] items-center rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5">
+          <div className="flex h-[34px] w-[200px] items-center rounded-lg bg-surface-theme px-3 py-1.5">
             <Search className="mr-1 size-5 shrink-0 text-text-tertiary" aria-hidden />
             <input
               type="search"
@@ -197,22 +197,22 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
                   const fitWidth = p.viewportMode === 'fit-width';
                   return (
                     <tr key={p.id} className="group">
-                      <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-[#1f1f23]`}>
+                      <td className={`${bodyCellClass} ${fixedLeftClass} group-hover:bg-surface-primary`}>
                         <Button variant="text" className="w-full" onPress={() => onSelect(p.id)} title="開啟編輯器">{p.name}</Button>
                       </td>
-                      <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{p.width} x {p.height}</td>
-                      <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{viewportLabel(p)}</td>
-                      <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{formatDate(p.createdAt)}</td>
-                      <td className={`${bodyCellClass} group-hover:bg-[#1f1f23]`}>{formatDate(p.updatedAt)}</td>
+                      <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>{p.width} x {p.height}</td>
+                      <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>{viewportLabel(p)}</td>
+                      <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>{formatDate(p.createdAt)}</td>
+                      <td className={`${bodyCellClass} group-hover:bg-surface-primary`}>{formatDate(p.updatedAt)}</td>
                       <td
-                        className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-[#1f1f23] ${
+                        className={`${bodyCellClass} ${fixedRightClass} group-hover:bg-surface-primary ${
                           openMenuId === p.id ? '!z-[25]' : ''
                         }`}
                       >
                         <div ref={openMenuId === p.id ? rowMenuRef : undefined} className="relative flex justify-center">
                           <IconButton hierarchy="subordinate" variant="standard" onPress={() => setOpenMenuId((prev) => (prev === p.id ? null : p.id))} title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
                           {openMenuId === p.id && (
-                            <div className="absolute right-0 top-full z-40 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-[rgba(212,212,212,0.15)] bg-surface-primary py-1 shadow-xl">
+                            <div className="absolute right-0 top-full z-40 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl">
                               <button
                                 type="button"
                                 onClick={() => {

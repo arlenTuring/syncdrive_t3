@@ -41,14 +41,14 @@ const TASK_LABEL: Partial<Record<ScheduleEngineTaskType, string>> = {
 };
 
 const TASK_TAG_STYLE: Partial<Record<ScheduleEngineTaskType, StatusTagStyle>> = {
-  passenger: { container: 'bg-[rgba(43,127,255,0.2)]', dot: 'bg-[#2B7FFF]' },
+  passenger: { container: 'bg-link-tonal', dot: 'bg-link-theme-filled' },
   charging: { container: 'bg-[rgba(0,201,81,0.2)]', dot: 'bg-[#00C951]' },
   inspection: { container: 'bg-[rgba(239,177,0,0.2)]', dot: 'bg-[#EFB100]' },
   servicing: { container: 'bg-[rgba(173,70,255,0.2)]', dot: 'bg-[#AD46FF]' },
   washing: { container: 'bg-[rgba(0,184,219,0.2)]', dot: 'bg-[#00B8DB]' },
-  standby: { container: 'bg-zinc-800/80', dot: 'bg-[#D4D4D8]' },
+  standby: { container: 'bg-surface-secondary', dot: 'bg-[#D4D4D8]' },
   dispatch: { container: 'bg-[rgba(56,189,248,0.2)]', dot: 'bg-[#38BDF8]' },
-  idle: { container: 'bg-zinc-800/80', dot: 'bg-zinc-500' },
+  idle: { container: 'bg-surface-secondary', dot: 'bg-status-inactive' },
 };
 
 function diffReason(kind: ScheduleDiffKind, taskType: ScheduleEngineTaskType): string {
@@ -99,7 +99,7 @@ export function taskTypeLabel(taskType: ScheduleEngineTaskType): string {
 }
 
 export function taskTypeTagStyle(taskType: ScheduleEngineTaskType): StatusTagStyle {
-  return TASK_TAG_STYLE[taskType] ?? { container: 'bg-zinc-800/80', dot: 'bg-zinc-500' };
+  return TASK_TAG_STYLE[taskType] ?? { container: 'bg-surface-secondary', dot: 'bg-status-inactive' };
 }
 
 export function diffSchedulePlans(

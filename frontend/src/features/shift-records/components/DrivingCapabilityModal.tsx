@@ -171,7 +171,7 @@ function nodeTone(kind: TimelineEventKind, channel: 'action' | 'event') {
   const alarm = kind === 'alert' || kind === 'signal' || channel === 'event';
   return {
     alarm,
-    ring: alarm ? 'ring-zinc-400/65' : 'ring-[#51A2FF]/75',
+    ring: alarm ? 'ring-zinc-400/65' : 'ring-border-theme/75',
     glow: alarm
       ? 'shadow-[0_0_0_7px_rgba(161,161,170,0.14)]'
       : 'shadow-[0_0_0_7px_rgba(43,127,255,0.18)]',
@@ -483,7 +483,7 @@ function TimelinePanel({
         >
           {showAction ? (
             <div
-              className="flex items-start justify-end border-b border-[#51A2FF]/40 pr-2 font-medium text-text-theme"
+              className="flex items-start justify-end border-b border-border-theme/40 pr-2 font-medium text-text-theme"
               style={{ height: LANE_H, paddingTop: LINE_Y - 8 }}
             >
               {t('shiftRecords.capabilityModal.laneAction')}
@@ -594,7 +594,7 @@ function LegendLine({
 function TimelineLegend() {
   const { t } = useTranslation();
   return (
-    <div className="rounded-xl border border-[#2B7FFF]/35 bg-[#0c0c0e]/60 px-4 py-3.5">
+    <div className="rounded-xl border border-link-theme-filled/35 bg-[#0c0c0e]/60 px-4 py-3.5">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 text-body-xs text-text-secondary">
         <div className="flex items-center gap-2">
           <LegendLine color="#3b82f6" />

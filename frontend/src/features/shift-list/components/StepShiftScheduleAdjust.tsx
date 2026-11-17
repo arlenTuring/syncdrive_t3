@@ -634,7 +634,7 @@ function CheckGroupCard({
               return (
                 <li key={`${group.key}-${index}-${issue.message}`}>
                   <div className="flex items-start gap-4 py-2">
-                    <span className="mt-0.5 inline-flex min-w-[6.5rem] shrink-0 justify-center rounded-lg border border-[#2B7FFF]/80 px-2.5 py-1 font-mono text-body-s tabular-nums text-text-theme">
+                    <span className="mt-0.5 inline-flex min-w-[6.5rem] shrink-0 justify-center rounded-lg border border-link-theme-filled/80 px-2.5 py-1 font-mono text-body-s tabular-nums text-text-theme">
                       {tripCode === '----' ? '--' : tripCode}
                     </span>
                     <span className="min-w-0 flex-1 text-body-s text-text-primary">{issue.message}</span>

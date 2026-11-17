@@ -27,16 +27,16 @@ export type PublishCheckStateKey = 'unchecked' | 'blocked' | 'ready';
 /** 檢查狀態標籤樣式：不建議發布用紅、可發布用綠、未檢查用灰 */
 export const PUBLISH_CHECK_TAG_STYLE: Record<PublishCheckStateKey, StatusTagStyle> = {
   unchecked: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
+    container: 'bg-surface-secondary',
+    dot: 'bg-status-inactive',
   },
   blocked: {
-    container: 'bg-[rgba(239,68,68,0.2)]',
-    dot: 'bg-[#EF4444]',
+    container: 'bg-status-error-light',
+    dot: 'bg-status-error',
   },
   ready: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
+    container: 'bg-status-success-light',
+    dot: 'bg-status-success',
   },
 };
 
@@ -70,30 +70,30 @@ export type StatusTagStyle = {
 
 export const USAGE_TAG_STYLE: Record<UsageStatusKey, StatusTagStyle> = {
   in_use: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
+    container: 'bg-status-success-light',
+    dot: 'bg-status-success',
   },
   idle: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
+    container: 'bg-surface-secondary',
+    dot: 'bg-status-inactive',
   },
 };
 
 export const PUBLISH_TAG_STYLE: Record<PublishStatusKey, StatusTagStyle> = {
   published: {
-    container: 'bg-[rgba(43,127,255,0.2)]',
-    dot: 'bg-[#2B7FFF]',
+    container: 'bg-link-tonal',
+    dot: 'bg-link-theme-filled',
   },
   draft: {
-    container: 'bg-zinc-800/80',
-    dot: 'bg-zinc-500',
+    container: 'bg-surface-secondary',
+    dot: 'bg-status-inactive',
   },
 };
 
 export const CREATION_MODE_TAG_STYLE: Record<CreationModeKey, StatusTagStyle> = {
   parametric: {
-    container: 'bg-[rgba(43,127,255,0.2)]',
-    dot: 'bg-[#2B7FFF]',
+    container: 'bg-link-tonal',
+    dot: 'bg-link-theme-filled',
   },
   manual: {
     container: 'bg-[rgba(245,158,11,0.2)]',

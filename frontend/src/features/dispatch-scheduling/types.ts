@@ -77,24 +77,24 @@ export const STATUS_OPTIONS: Array<{ value: DispatchStatusKey | 'all'; label: st
 
 export const DISPATCH_STATUS_TAG_STYLE: Record<DispatchStatusKey, StatusTagStyle> = {
   running: {
-    container: 'bg-[rgba(43,127,255,0.2)]',
-    dot: 'bg-[#2B7FFF]',
+    container: 'bg-link-tonal',
+    dot: 'bg-link-theme-filled',
   },
   pending: {
     container: 'bg-[rgba(153,161,175,0.2)]',
     dot: 'bg-[#99A1AF]',
   },
   pending_approval: {
-    container: 'bg-[rgba(251,146,60,0.2)]',
-    dot: 'bg-[#FB923C]',
+    container: 'bg-status-warning-light',
+    dot: 'bg-status-warning',
   },
   completed: {
-    container: 'bg-[rgba(0,212,146,0.2)]',
-    dot: 'bg-[#00D492]',
+    container: 'bg-status-success-light',
+    dot: 'bg-status-success',
   },
   rejected: {
-    container: 'bg-[rgba(239,68,68,0.2)]',
-    dot: 'bg-[#EF4444]',
+    container: 'bg-status-error-light',
+    dot: 'bg-status-error',
   },
   withdrawn: {
     container: 'bg-[rgba(153,161,175,0.2)]',

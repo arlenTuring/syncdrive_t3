@@ -102,8 +102,8 @@ function ListRow({
       className={[
         'flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors',
         selected
-          ? 'border-[#51A2FF]/70 bg-[rgba(43,127,255,0.12)]'
-          : 'border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.04)] hover:border-[rgba(212,212,212,0.3)] hover:bg-[rgba(142,197,255,0.08)]',
+          ? 'border-border-theme/70 bg-link-tonal'
+          : 'border-border-quaternary bg-surface-theme-light hover:border-[rgba(212,212,212,0.3)] hover:bg-surface-theme',
       ].join(' ')}
     >
       <p className="w-full truncate text-body-s-bold leading-[18px] tracking-[0.5px] text-text-primary">
@@ -140,7 +140,7 @@ function SectionBlock({
   const { t } = useTranslation()
   if (entries.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-[rgba(212,212,212,0.15)] px-2 py-3 text-center text-body-xs text-text-quaternary">
+      <p className="rounded-xl border border-dashed border-border-quaternary px-2 py-3 text-center text-body-xs text-text-quaternary">
         {t('mapEditor.listDrawer.emptySection', { title })}
       </p>
     )
@@ -345,7 +345,7 @@ export function MapListDrawer({
           ].join(' ')}
         >
           {/* 設計稿 rgba(212,212,216,0.1) 是放在黑底上（≈#151516）；這裡疊在地圖上，用等值實色才不會透出軌道 */}
-          <div className="pointer-events-auto flex w-12 min-h-0 flex-1 flex-col items-center gap-1 rounded-xl border border-[rgba(212,212,212,0.15)] bg-[#151516] px-1.5 py-2">
+          <div className="pointer-events-auto flex w-12 min-h-0 flex-1 flex-col items-center gap-1 rounded-xl border border-border-quaternary bg-[#151516] px-1.5 py-2">
             <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" title={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')} label={panelOpen ? t('mapEditor.listDrawer.collapse') : t('mapEditor.listDrawer.expand')} onPress={() => onOpenTab(panelOpen ? null : lastTab.current)} icon={panelOpen ? <KeyboardArrowLeft /> : <KeyboardArrowRight />} />
             <div className="flex min-h-0 w-7 flex-1 flex-col gap-1 overflow-y-auto [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
               <TabUnit
@@ -396,7 +396,7 @@ export function MapListDrawer({
               type="button"
               title={t('mapEditor.listDrawer.palette')}
               onClick={() => onOpenTab('palette')}
-              className="pointer-events-auto flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-[rgba(212,212,212,0.15)] bg-[#151516] px-1.5 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary transition-colors hover:text-text-secondary"
+              className="pointer-events-auto flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-border-quaternary bg-[#151516] px-1.5 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary transition-colors hover:text-text-secondary"
             >
               <KeyboardArrowRight className="size-4 shrink-0" />
               <span style={TAB_TEXT_STYLE}>{t('mapEditor.listDrawer.palette')}</span>
@@ -405,7 +405,7 @@ export function MapListDrawer({
         </div>
 
         {panelOpen ? (
-          <div className={`pointer-events-auto my-2 mr-2 flex w-60 flex-col ${paletteOpen ? '!mb-[113px]' : ''} gap-3 overflow-hidden rounded-xl border border-[rgba(212,212,212,0.15)] bg-[#151516] px-2 py-3 shadow-2xl`}>
+          <div className={`pointer-events-auto my-2 mr-2 flex w-60 flex-col ${paletteOpen ? '!mb-[113px]' : ''} gap-3 overflow-hidden rounded-xl border border-border-quaternary bg-[#151516] px-2 py-3 shadow-2xl`}>
             <div className="flex shrink-0 items-center gap-1 px-2">
               <PanelIcon className="size-4 shrink-0 text-text-tertiary" aria-hidden />
               <p className="truncate text-body-s leading-[18px] tracking-[0.5px] text-text-primary">

@@ -120,7 +120,7 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
 
   return (
     <div
-      className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex ${PALETTE_DRAWER_HEIGHT_CLASS} items-center border-t border-[rgba(212,212,212,0.15)] bg-surface-sub-background p-2`}
+      className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex ${PALETTE_DRAWER_HEIGHT_CLASS} items-center border-t border-border-quaternary bg-surface-sub-background p-2`}
       role="toolbar"
       aria-label={t('mapEditor.palette.library')}
     >
@@ -140,12 +140,12 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
         {PALETTE_GROUPS.map((group, groupIndex) => (
           <div key={group.key} className="flex h-full shrink-0 flex-row items-center gap-3">
             {groupIndex > 0 ? (
-              <span className="h-16 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+              <span className="h-16 w-px shrink-0 bg-surface-secondary" aria-hidden />
             ) : null}
             <span className="shrink-0 text-body-s leading-[18px] tracking-[0.5px] text-text-quaternary">
               {t(group.labelKey)}
             </span>
-            <span className="h-4 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+            <span className="h-4 w-px shrink-0 bg-surface-secondary" aria-hidden />
             {group.items.map((item) => {
               const icon = iconFor(item)
               const clickEnabled =
@@ -172,12 +172,12 @@ export function AssetPaletteBar({ onPick, onToggle }: AssetPaletteBarProps) {
                         : `${itemHint}\n${t('mapEditor.palette.dragIntoAreaOnly')}`
                     }
                     aria-label={t('mapEditor.palette.addAria', { label: itemLabel, hint: itemHint })}
-                    className="group flex size-12 cursor-grab items-center justify-center rounded-full transition hover:brightness-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60 active:cursor-grabbing"
+                    className="group flex size-12 cursor-grab items-center justify-center rounded-full transition hover:brightness-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-border-theme/60 active:cursor-grabbing"
                   >
                     {'src' in icon ? (
                       <img src={icon.src} alt="" draggable={false} className="size-12" />
                     ) : (
-                      <span className="flex size-12 items-center justify-center rounded-full border border-[rgba(212,212,212,0.15)] bg-[rgba(142,197,255,0.08)] text-text-tertiary">
+                      <span className="flex size-12 items-center justify-center rounded-full border border-border-quaternary bg-surface-theme text-text-tertiary">
                         <icon.Symbol className="size-7" />
                       </span>
                     )}

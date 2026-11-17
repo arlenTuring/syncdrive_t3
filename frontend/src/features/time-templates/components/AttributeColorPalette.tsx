@@ -33,7 +33,7 @@ export function AttributeColorPalette({ value, onChange }: AttributeColorPalette
                 key={color}
                 type="button"
                 onClick={() => onChange(color)}
-                className="flex size-[18px] items-center justify-center rounded bg-[rgba(212,212,216,0.1)] p-0.5"
+                className="flex size-[18px] items-center justify-center rounded bg-surface-secondary p-0.5"
                 aria-label={`選擇顏色 ${color}`}
                 aria-pressed={selected}
               >

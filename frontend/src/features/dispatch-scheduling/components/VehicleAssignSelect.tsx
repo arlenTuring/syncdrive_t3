@@ -77,7 +77,7 @@ export function VehicleAssignSelect({
         onClick={() => setOpen((prev) => !prev)}
         className={`flex h-10 w-full items-center gap-2 rounded-lg border bg-surface-primary px-3 text-left text-body-s focus:outline-none ${
           open
-            ? 'border-[#7CB8FF] ring-1 ring-border-theme-light'
+            ? 'border-border-theme ring-1 ring-border-theme-light'
             : 'border-border-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn'
         }`}
       >
@@ -87,7 +87,7 @@ export function VehicleAssignSelect({
             {selectedStatus ? <VehicleStatusPill status={selectedStatus} /> : null}
           </>
         ) : (
-          <span className="min-w-0 flex-1 truncate tracking-[0.5px] text-[#99A1AF]">請選擇</span>
+          <span className="min-w-0 flex-1 truncate tracking-[0.5px] text-text-tertiary">請選擇</span>
         )}
         <ChevronDown
           className={`size-3.5 shrink-0 text-text-quaternary transition-transform ${open ? 'rotate-180' : ''}`}

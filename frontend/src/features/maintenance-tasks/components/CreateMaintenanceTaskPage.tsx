@@ -133,7 +133,7 @@ function CreateStepSidebar({
                   onClick={() => unlocked && onStepClick(item.step)}
                   className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
                     active
-                      ? 'bg-[rgba(43,127,255,0.12)]'
+                      ? 'bg-link-tonal'
                       : unlocked
                         ? 'hover:bg-surface-primary'
                         : 'cursor-not-allowed opacity-50'

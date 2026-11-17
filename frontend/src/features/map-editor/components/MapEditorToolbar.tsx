@@ -81,15 +81,15 @@ type MapEditorToolbarProps = {
  * outline＝1px 半透明框（清單、置中）；ghost＝無框（編輯工具列裡的工具）。
  */
 const BTN_BASE =
-  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-body-s-bold leading-[18px] tracking-[0.5px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#51A2FF]/60 disabled:cursor-not-allowed disabled:opacity-40'
-const BTN_OUTLINE = `${BTN_BASE} border border-[rgba(212,212,212,0.25)] text-text-secondary enabled:hover:bg-[rgba(209,213,220,0.08)]`
+  'inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-body-s-bold leading-[18px] tracking-[0.5px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-border-theme/60 disabled:cursor-not-allowed disabled:opacity-40'
+const BTN_OUTLINE = `${BTN_BASE} border border-border-tertiary text-text-secondary enabled:hover:bg-link-standard`
 const INPUT_CLASS =
-  'h-[34px] w-[120px] shrink-0 rounded-lg bg-[rgba(142,197,255,0.08)] px-3 py-1.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary outline-none placeholder:text-text-tertiary focus:ring-1 focus:ring-[#51A2FF]'
+  'h-[34px] w-[120px] shrink-0 rounded-lg bg-surface-theme px-3 py-1.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary outline-none placeholder:text-text-tertiary focus:ring-1 focus:ring-border-theme'
 
 type ToolTone = 'blue' | 'amber' | 'emerald'
 
 const ACTIVE_TONE: Record<ToolTone, string> = {
-  blue: 'bg-[rgba(43,127,255,0.2)] text-text-theme',
+  blue: 'bg-link-tonal text-text-theme',
   amber: 'bg-status-warning-light text-status-warning',
   emerald: 'bg-status-success-light text-status-success',
 }
@@ -131,7 +131,7 @@ function ToolButton({
       className={[
         BTN_BASE,
         'px-2.5',
-        active ? ACTIVE_TONE[tone] : 'text-text-secondary enabled:hover:bg-[rgba(209,213,220,0.08)]',
+        active ? ACTIVE_TONE[tone] : 'text-text-secondary enabled:hover:bg-link-standard',
       ].join(' ')}
     >
       <Icon className="size-[18px] shrink-0" aria-hidden />
@@ -141,7 +141,7 @@ function ToolButton({
 }
 
 function Divider() {
-  return <span className="mx-1 h-5 w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+  return <span className="mx-1 h-5 w-px shrink-0 bg-surface-secondary" aria-hidden />
 }
 
 /**
@@ -246,13 +246,13 @@ export function MapEditorToolbar({
           />
 
           <div
-            className="ml-auto hidden h-[34px] min-w-0 items-center gap-3 rounded-lg xl:flex bg-[rgba(142,197,255,0.04)] px-4 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-tertiary"
+            className="ml-auto hidden h-[34px] min-w-0 items-center gap-3 rounded-lg xl:flex bg-surface-theme-light px-4 py-2 text-body-s leading-[18px] tracking-[0.5px] text-text-tertiary"
             role="status"
             aria-live="polite"
             title={infoTitle}
           >
             <span className="min-w-0 truncate">{coordsText}</span>
-            <span className="h-[18px] w-px shrink-0 bg-[rgba(212,212,212,0.15)]" aria-hidden />
+            <span className="h-[18px] w-px shrink-0 bg-surface-secondary" aria-hidden />
             <span className="hidden shrink-0 whitespace-nowrap md:inline">{canvasText}</span>
           </div>
         </div>
@@ -264,7 +264,7 @@ export function MapEditorToolbar({
             aria-pressed={trackIssuesOpen}
             data-testid="track-check-button"
             className={`${BTN_OUTLINE} ${
-              trackIssuesOpen ? 'border-[rgba(81,162,255,0.5)] text-text-theme' : ''
+              trackIssuesOpen ? 'border-border-theme-light text-text-theme' : ''
             }`}
             title={t('mapEditor.toolbar.trackCheckTitle')}
           >
@@ -396,10 +396,10 @@ export function MapEditorToolbar({
             )}
             {isPrimaryMap && (
               <span
-                className="inline-flex h-[26px] items-center gap-1 rounded-lg bg-[rgba(0,212,146,0.2)] px-3 text-body-s-bold text-text-primary"
+                className="inline-flex h-[26px] items-center gap-1 rounded-lg bg-status-success-light px-3 text-body-s-bold text-text-primary"
                 title={t('mapEditor.chrome.primaryMapLiveTitle')}
               >
-                <span className="size-2 rounded-full bg-[#00D492]" aria-hidden />
+                <span className="size-2 rounded-full bg-status-success" aria-hidden />
                 {t('mapEditor.chrome.primaryMapLive')}
               </span>
             )}

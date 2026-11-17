@@ -954,7 +954,7 @@ export function RouteRelationGraphEditor({
                     ? 'border-status-warning-light bg-status-warning-light'
                     : 'border-border-quaternary bg-zinc-900/95',
                   hovered
-                    ? 'ring-2 ring-[#2B7FFF]/50'
+                    ? 'ring-2 ring-link-theme-filled/50'
                     : isSelected
                       ? 'ring-1 ring-status-warning-light'
                       : '',

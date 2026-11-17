@@ -241,7 +241,7 @@ function FacilityTargetPicker({
         className={[
           'flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-surface-primary px-3 text-left text-body-s focus:outline-none',
           open
-            ? 'border-[#7CB8FF] text-text-primary'
+            ? 'border-border-theme text-text-primary'
             : 'border-border-quaternary text-text-primary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn',
         ].join(' ')}
         aria-label={t('shiftList.actionSettings.facilityTargetAria')}

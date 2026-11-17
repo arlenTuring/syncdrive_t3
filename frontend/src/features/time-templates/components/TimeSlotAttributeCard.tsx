@@ -15,10 +15,10 @@ import { AttributeColorPalette } from './AttributeColorPalette';
 import { Button } from '../../../components/ui';
 
 const EDIT_FIELD_CLASS =
-  'w-full rounded-md bg-[rgba(142,197,255,0.08)] px-2 py-0 text-body-xs text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
+  'w-full rounded-md bg-surface-theme px-2 py-0 text-body-xs text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
 
 const CARD_CLASS =
-  'relative flex shrink-0 flex-col gap-0.5 rounded-lg bg-[rgba(142,197,255,0.08)] px-2.5 pb-1 pt-0.5';
+  'relative flex shrink-0 flex-col gap-0.5 rounded-lg bg-surface-theme px-2.5 pb-1 pt-0.5';
 
 const CARD_STYLE = {
   width: ATTRIBUTE_CARD_WIDTH_PX,
@@ -64,7 +64,7 @@ function ColorSwatch({
       ref={buttonRef}
       type="button"
       onClick={onClick}
-      className="flex size-4 shrink-0 items-center justify-center rounded bg-[rgba(212,212,216,0.1)] p-0.5"
+      className="flex size-4 shrink-0 items-center justify-center rounded bg-surface-secondary p-0.5"
       aria-label={ariaLabel}
     >
       <span
