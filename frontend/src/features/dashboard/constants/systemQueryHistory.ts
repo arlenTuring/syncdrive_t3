@@ -185,6 +185,12 @@ export const SYSTEM_QUERY_HISTORY: ReadonlyArray<{ family: string; fingerprint: 
     "commit": "4420d42"
   },
   {
+    "family": "mainline-shifts",
+    "fingerprint": "01df823823d66e",
+    "firstSeen": "2026-11-18",
+    "commit": "968306c"
+  },
+  {
     "family": "maintenance-shifts",
     "fingerprint": "08882334305f5d",
     "firstSeen": "2026-06-25",
