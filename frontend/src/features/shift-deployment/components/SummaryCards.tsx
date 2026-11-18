@@ -208,16 +208,34 @@ function DispatchControlPanel({
       ? 'bg-status-success'
       : 'bg-status-warning';
 
+  /*
+   * 一顆按鈕切換部署與暫停：暫停中時「開始部署」是這張卡唯一要做的事（主要、藍色實心）；
+   * 調度中時「暫停部署」是次要動作（灰色淡底）。狀態讀不到時不給按，免得按了不知道結果。
+   * 先前兩顆按鈕並排塞在窄卡裡，字被擠成直排。
+   */
+  const toggle = dispatchEnabled === true
+    ? (
+      <Button hierarchy="subordinate" variant="tonal" leadingIcon={<Pause />} className="shrink-0 whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-pause' })}>
+        {t('shiftDeployment.dispatch.pause')}
+      </Button>
+    )
+    : (
+      <Button hierarchy="superior" variant="filled" leadingIcon={<Play />} className="shrink-0 whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-start' })} disabled={dispatchEnabled === null}>
+        {t('shiftDeployment.dispatch.start')}
+      </Button>
+    );
+
   return (
-    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-surface-primary px-3 py-2">
-      <div className="flex items-center gap-1.5 text-body-xs text-text-secondary">
-        <span className={`size-1.5 rounded-full ${dotColor}`} />
-        {t('shiftDeployment.dispatch.label')}：{statusLabel}
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-surface-primary px-3 py-2">
+      {/* 狀態要看得到：卡片窄時名稱可以換行，不截掉後面的「已暫停／調度中」 */}
+      <div className="min-w-0">
+        <p className="text-caption-1 text-text-tertiary">{t('shiftDeployment.dispatch.label')}</p>
+        <p className="flex items-center gap-1.5 text-body-s text-text-primary">
+          <span className={`size-1.5 shrink-0 rounded-full ${dotColor}`} />
+          {statusLabel}
+        </p>
       </div>
-      <div className="flex gap-1.5">
-        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Pause />} onPress={() => onAction({ kind: 'dispatch-pause' })} disabled={dispatchEnabled === false}>{t('shiftDeployment.dispatch.pause')}</Button>
-        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Play />} onPress={() => onAction({ kind: 'dispatch-start' })} disabled={dispatchEnabled === true}>{t('shiftDeployment.dispatch.start')}</Button>
-      </div>
+      {toggle}
     </div>
   );
 }

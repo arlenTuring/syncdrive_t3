@@ -25,8 +25,9 @@ export function VehicleControlSection({
           className={`size-4 text-text-tertiary transition ${open ? 'rotate-0' : 'rotate-180'}`}
         />
       </button>
+      {/* 欄數跟著寬度走：固定 6 欄時每張卡太窄，「自駕停駛」被擠成兩行 */}
       {open ? (
-        <div className="grid grid-cols-6 gap-3 px-4 pb-4">
+        <div className="grid grid-cols-2 gap-3 px-4 pb-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
           {vehicles.map((code) => (
             <article
               key={code}
@@ -37,10 +38,10 @@ export function VehicleControlSection({
                 <span className="truncate">{code}</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
-                <Button block hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}>自駕停駛</Button>
-                <Button block hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}>自駕啟動</Button>
+                <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}>自駕停駛</Button>
+                <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}>自駕啟動</Button>
               </div>
-              <Button block hierarchy="danger" variant="outlined" onPress={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}>系統重置</Button>
+              <Button block className="whitespace-nowrap" hierarchy="danger" variant="outlined" onPress={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}>系統重置</Button>
             </article>
           ))}
         </div>
