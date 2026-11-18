@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { PointTopology } from '../../map-editor/types/pointTopology';
 import type { GeneratedScheduleBlock, GeneratedScheduleTimeline } from './schedule-engine/types';
 import { collectMoveJunctionPasses, findJunctionConflictsForBlocks } from './moveJunctionPasses';
+import { moveOwnVisits, stampMoveViaNodeIds } from './pathOccupancy';
 import { moveCardFacilityIsFree } from './moveCardShared';
 
 const topology = {
@@ -89,5 +90,33 @@ describe('moveCardFacilityIsFree：交接間隔', () => {
     assert.equal(moveCardFacilityIsFree(bookings, 'E2', 86401, 91800, 7), true);
     assert.equal(moveCardFacilityIsFree(bookings, 'E2', 86401, 91800, 7, 60), false);
     assert.equal(moveCardFacilityIsFree(bookings, 'E2', 86460, 91800, 7, 60), true);
+  });
+
+  it('地圖改名後：排班時記下的節點 id 照樣對回路網，經過時刻與名稱都用路網現在的', () => {
+    const timelines: GeneratedScheduleTimeline[] = [
+      { row: 1, blocks: [move('in-1', 1, 1000, ['N2W', '入口點', 'E1'])] },
+    ];
+    stampMoveViaNodeIds(timelines, topology);
+    assert.deepEqual(timelines[0]!.blocks[0]!.yardMoveViaNodeIds, ['st', 'gate', 'e1']);
+    // 入口點改名叫 CHG：卡上還是舊名
+    const renamed = {
+      ...topology,
+      nodes: topology.nodes.map((node) => (node.id === 'gate' ? { ...node, label: 'CHG' } : node)),
+    } as PointTopology;
+    const gaps: string[] = [];
+    const passes = collectMoveJunctionPasses(timelines, renamed, (gap) => gaps.push(gap.reason));
+    assert.deepEqual(gaps, [], '不會因為改名被判成缺行駛時間');
+    assert.deepEqual(passes.map((pass) => [pass.nodeId, pass.nodeLabel, pass.instant]), [['st', 'N2W', 1000], ['gate', 'CHG', 1020]]);
+    assert.deepEqual(moveOwnVisits(timelines[0]!.blocks[0]!, renamed)?.map((visit) => visit.nodeLabel), ['N2W', 'CHG', 'E1']);
+  });
+
+  it('舊班表沒有節點 id、地圖又改了名：對不到就回報，不當成沒問題', () => {
+    const renamed = {
+      ...topology,
+      nodes: topology.nodes.map((node) => (node.id === 'gate' ? { ...node, label: 'CHG' } : node)),
+    } as PointTopology;
+    const gaps: string[] = [];
+    collectMoveJunctionPasses([{ row: 1, blocks: [move('in-1', 1, 1000, ['N2W', '入口點', 'E1'])] }], renamed, (gap) => gaps.push(gap.reason));
+    assert.deepEqual(gaps, ['unknown-node']);
   });
 });

@@ -190,6 +190,14 @@ export type GeneratedScheduleBlock = {
    */
   yardMoveViaLabels?: string[];
   /**
+   * 跟 yardMoveViaLabels 一一對應的路網節點 id（排班結束時依當時的路網記下）。
+   *
+   * 檢查、佔用、訂單途經點都用這一份對回路網；名稱只拿來顯示。地圖改名（2026-11-18 充電洗車入口點
+   * 改叫 CHG）之後名稱對不到，只存名稱的班表 104 張移動卡被判成缺行駛時間、整份不能發布。
+   * 舊班表沒有這個欄位：照舊用名稱對。
+   */
+  yardMoveViaNodeIds?: string[];
+  /**
    * 這張移動卡用哪一種行駛時間排的。沒寫＝均（平均行駛時間）；'min'＝快（最短行駛時間）。
    *
    * 出廠卡緊貼下一班發車，用均排的話經過沿途各點的時刻是固定的，剛好有車就過不去。
@@ -632,7 +640,8 @@ export type ShiftScheduleMaintenanceTaskBinding = {
 
 /** 寫入 operation_shifts.body 的班表產出（Step 5 生成、Step 6 確認） */
 /** 排班產出儲存版本號：引擎邏輯／代號規則變更時遞增，自動作廢舊版快取 */
-export const CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION = 6;
+// 7：移動卡途經點記下節點 id（yardMoveViaNodeIds），地圖改名不再讓班表過不了檢查（2026-11-18）
+export const CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION = 7;
 
 export type ShiftScheduleStoredOutput = {
   outputVersion: number;

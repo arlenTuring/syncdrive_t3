@@ -1733,20 +1733,10 @@ function moveOwnVisits(block, topology, startSecondOverride, aliases) {
   let labels = block.yardMoveViaLabels ?? [];
   if (labels.length < 2) return null;
   const index = indexTopology(topology);
-  const ids = [];
-  for (const [position, raw] of labels.entries()) {
-    const label = raw.trim();
-    let id = index.ambiguousLabels.has(label) ? void 0 : index.nodeIdByLabel.get(label);
-    if (!id && position === 0 && block.yardExitFacilityNodeId && index.labelById.has(block.yardExitFacilityNodeId)) {
-      id = block.yardExitFacilityNodeId;
-    }
-    if (!id) {
-      const aliasId = aliases?.get(label);
-      if (aliasId && index.labelById.has(aliasId)) id = aliasId;
-    }
-    if (!id) return null;
-    ids.push(id);
-  }
+  const resolved = resolveMoveViaNodeIds(block, topology, aliases);
+  if (resolved.some((id) => id == null)) return null;
+  const ids = resolved;
+  labels = ids.map((id) => index.labelById.get(id) ?? id);
   {
     const [from, to] = moveCardOwnSegment(block, ids, topology);
     if (from > 0 || to < ids.length - 1) {
@@ -1996,6 +1986,27 @@ function describePathConflict(conflict, formatSecond) {
   }
   return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u5728\u300C${conflict.nodeLabel}\u300D\u2014\u300C${conflict.toNodeLabel}\u300D\u5C0D\u5411\u540C\u6642\u901A\u904E`;
 }
+function resolveMoveViaNodeIds(block, topology, aliases) {
+  const labels = block.yardMoveViaLabels ?? [];
+  const index = indexTopology(topology);
+  const stored = block.yardMoveViaNodeIds;
+  if (stored && stored.length === labels.length && stored.every((id) => index.labelById.has(id))) return [...stored];
+  return labels.map((raw, position) => {
+    const label = raw.trim();
+    let id = index.ambiguousLabels.has(label) ? void 0 : index.nodeIdByLabel.get(label);
+    if (!id && position === 0 && block.yardExitFacilityNodeId && index.labelById.has(block.yardExitFacilityNodeId)) {
+      id = block.yardExitFacilityNodeId;
+    }
+    if (!id) {
+      const aliasId = aliases?.get(label);
+      if (aliasId && index.labelById.has(aliasId)) id = aliasId;
+    }
+    return id ?? null;
+  });
+}
+function topologyLabelOf(topology, nodeId) {
+  return indexTopology(topology).labelById.get(nodeId) ?? nodeId;
+}
 
 // src/features/shift-list/utils/moveJunctionPasses.ts
 var DAY_SECONDS4 = 24 * 60 * 60;
@@ -2005,14 +2016,15 @@ function cyclicGapSeconds(a, b) {
 }
 function collectMoveJunctionPasses(timelines, topology, onMissingTravelTime) {
   if (!topology) return [];
-  const nodeIdByLabel = /* @__PURE__ */ new Map();
   const ambiguousLabels = /* @__PURE__ */ new Set();
+  const seenLabels = /* @__PURE__ */ new Set();
   for (const node of topology.nodes) {
     const label = (node.label ?? "").trim();
     if (!label) continue;
-    if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
-    else nodeIdByLabel.set(label, node.id);
+    if (seenLabels.has(label)) ambiguousLabels.add(label);
+    else seenLabels.add(label);
   }
+  const aliases = facilityAliases(timelines);
   const kindById = new Map(topology.nodes.map((node) => [node.id, node.kind]));
   const edgeByPair = /* @__PURE__ */ new Map();
   for (const edge of topology.edges) {
@@ -2026,9 +2038,10 @@ function collectMoveJunctionPasses(timelines, topology, onMissingTravelTime) {
     for (const block of timeline.blocks) {
       if (block.taskType !== "dispatch") continue;
       if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
-      const labels = block.yardMoveViaLabels ?? [];
-      if (labels.length < 2) continue;
-      const ids = labels.map((label) => ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
+      const rawLabels = block.yardMoveViaLabels ?? [];
+      if (rawLabels.length < 2) continue;
+      const ids = resolveMoveViaNodeIds(block, topology, aliases);
+      const labels = ids.map((id, i) => id != null ? topologyLabelOf(topology, id) : rawLabels[i]);
       const unresolved = ids.findIndex((id) => id == null);
       if (unresolved >= 0) {
         onMissingTravelTime?.({

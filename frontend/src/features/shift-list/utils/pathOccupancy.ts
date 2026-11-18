@@ -241,22 +241,11 @@ export function moveOwnVisits(
   let labels = block.yardMoveViaLabels ?? [];
   if (labels.length < 2) return null;
   const index = indexTopology(topology);
-  const ids: string[] = [];
-  for (const [position, raw] of labels.entries()) {
-    const label = raw.trim();
-    let id = index.ambiguousLabels.has(label) ? undefined : index.nodeIdByLabel.get(label);
-    if (!id && position === 0 && block.yardExitFacilityNodeId && index.labelById.has(block.yardExitFacilityNodeId)) {
-      id = block.yardExitFacilityNodeId;
-    }
-    if (!id) {
-      // 名稱對不到：地圖改過名（例：設施 132 從 D1 改叫 H1），卡片上記的名稱是舊的。
-      // 用班表裡同名設施記下的節點 id 對回去——節點 id 不會跟著改名變。
-      const aliasId = aliases?.get(label);
-      if (aliasId && index.labelById.has(aliasId)) id = aliasId;
-    }
-    if (!id) return null;
-    ids.push(id);
-  }
+  const resolved = resolveMoveViaNodeIds(block, topology, aliases);
+  if (resolved.some((id) => id == null)) return null;
+  const ids = resolved as string[];
+  // 經過的點用路網現在的名字（地圖改過名，卡上記的是舊名）
+  labels = ids.map((id) => index.labelById.get(id) ?? id);
   {
     const [from, to] = moveCardOwnSegment(block, ids, topology);
     if (from > 0 || to < ids.length - 1) {
@@ -609,4 +598,63 @@ export function describePathConflict(conflict: PathConflict, formatSecond: (seco
       + '後進的車要先出，等於要穿過前車';
   }
   return `${who(conflict.mine)} 與 ${who(conflict.other)} 在「${conflict.nodeLabel}」—「${conflict.toNodeLabel}」對向同時通過`;
+}
+
+/**
+ * 移動卡途經點對回路網節點 id，跟 yardMoveViaLabels 一一對應；對不到的位置是 null。
+ *
+ * 有 yardMoveViaNodeIds（新班表）而且每個 id 都還在路網上就直接用——地圖改名不影響。
+ * 舊班表只有名稱：照名稱對；名稱對不到時，起點用卡上記的設施節點，再用班表裡同名設施記下的節點 id
+ * （見 {@link facilityAliases}）。同名的節點不只一個時不挑，回 null。
+ */
+export function resolveMoveViaNodeIds(
+  block: GeneratedScheduleBlock,
+  topology: PointTopology,
+  aliases?: ReadonlyMap<string, string>,
+): Array<string | null> {
+  const labels = block.yardMoveViaLabels ?? [];
+  const index = indexTopology(topology);
+  const stored = block.yardMoveViaNodeIds;
+  if (stored && stored.length === labels.length && stored.every((id) => index.labelById.has(id))) return [...stored];
+  return labels.map((raw, position) => {
+    const label = raw.trim();
+    let id = index.ambiguousLabels.has(label) ? undefined : index.nodeIdByLabel.get(label);
+    if (!id && position === 0 && block.yardExitFacilityNodeId && index.labelById.has(block.yardExitFacilityNodeId)) {
+      id = block.yardExitFacilityNodeId;
+    }
+    if (!id) {
+      // 名稱對不到：地圖改過名（例：設施 132 從 D1 改叫 H1），卡片上記的名稱是舊的。
+      // 用班表裡同名設施記下的節點 id 對回去——節點 id 不會跟著改名變。
+      const aliasId = aliases?.get(label);
+      if (aliasId && index.labelById.has(aliasId)) id = aliasId;
+    }
+    return id ?? null;
+  });
+}
+
+/** 節點 id 在路網上現在叫什麼（改過名就是新名字） */
+export function topologyLabelOf(topology: PointTopology, nodeId: string): string {
+  return indexTopology(topology).labelById.get(nodeId) ?? nodeId;
+}
+
+/**
+ * 排班結束時把每張移動卡的途經點名稱換成節點 id 記下（yardMoveViaNodeIds）。
+ * 要在所有會改途經點的步驟之後做；名稱對不到唯一節點的卡不記，之後照名稱對（驗證會擋下）。
+ */
+export function stampMoveViaNodeIds(
+  timelines: GeneratedScheduleTimeline[],
+  topology: PointTopology | null | undefined,
+): void {
+  if (!topology) return;
+  const aliases = facilityAliases(timelines);
+  for (const timeline of timelines) {
+    for (const block of timeline.blocks) {
+      const labels = block.yardMoveViaLabels;
+      if (block.taskType !== 'dispatch' || !labels || labels.length === 0) continue;
+      const { yardMoveViaNodeIds: _stale, ...rest } = block;
+      const ids = resolveMoveViaNodeIds(rest as GeneratedScheduleBlock, topology, aliases);
+      if (ids.every((id) => id != null)) block.yardMoveViaNodeIds = ids as string[];
+      else delete block.yardMoveViaNodeIds;
+    }
+  }
 }

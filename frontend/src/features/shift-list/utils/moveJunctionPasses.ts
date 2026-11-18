@@ -2,7 +2,7 @@ import type { PointTopology } from '../../map-editor/types/pointTopology';
 import { edgeHasTravelTime, edgeSeconds } from './findTopologyPath';
 import type { GeneratedScheduleTimeline } from './schedule-engine/types';
 import { minuteToSecond } from './schedule-engine/types';
-import { moveCardOwnSegment } from './pathOccupancy';
+import { facilityAliases, moveCardOwnSegment, resolveMoveViaNodeIds, topologyLabelOf } from './pathOccupancy';
 
 /**
  * 移動卡經過的轉折點
@@ -52,15 +52,16 @@ export function collectMoveJunctionPasses(
   onMissingTravelTime?: (gap: MoveJunctionGap) => void,
 ): MoveJunctionPass[] {
   if (!topology) return [];
-  const nodeIdByLabel = new Map<string, string>();
   // 同一個名稱對到兩個節點：路徑對不回路網，不能挑第一個將就
   const ambiguousLabels = new Set<string>();
+  const seenLabels = new Set<string>();
   for (const node of topology.nodes) {
     const label = (node.label ?? '').trim();
     if (!label) continue;
-    if (nodeIdByLabel.has(label)) ambiguousLabels.add(label);
-    else nodeIdByLabel.set(label, node.id);
+    if (seenLabels.has(label)) ambiguousLabels.add(label);
+    else seenLabels.add(label);
   }
+  const aliases = facilityAliases(timelines);
   const kindById = new Map(topology.nodes.map((node) => [node.id, node.kind] as const));
   const edgeByPair = new Map<string, (typeof topology.edges)[number]>();
   for (const edge of topology.edges) {
@@ -75,10 +76,12 @@ export function collectMoveJunctionPasses(
     for (const block of timeline.blocks) {
       if (block.taskType !== 'dispatch') continue;
       if (block.plannedEndMinute - block.plannedStartMinute <= 1e-9) continue;
-      const labels = block.yardMoveViaLabels ?? [];
-      if (labels.length < 2) continue;
-      const ids = labels.map((label) =>
-        ambiguousLabels.has(label.trim()) ? null : nodeIdByLabel.get(label.trim()) ?? null);
+      const rawLabels = block.yardMoveViaLabels ?? [];
+      if (rawLabels.length < 2) continue;
+      // 先用卡上記的節點 id 對回路網（地圖改名不影響），舊班表才照名稱對
+      const ids = resolveMoveViaNodeIds(block, topology, aliases);
+      // 訊息裡的名稱用路網現在的名字
+      const labels = ids.map((id, i) => (id != null ? topologyLabelOf(topology, id) : rawLabels[i]!));
       // 經過的點對不回路網：經過時刻算不出來，跟缺行駛時間一樣要回報，不能整張略過
       const unresolved = ids.findIndex((id) => id == null);
       if (unresolved >= 0) {

@@ -106,6 +106,7 @@ import {
   holdTripAtStationInCopy,
   terminalHoldOfTrip,
 } from './resolveResidualConflicts';
+import { stampMoveViaNodeIds } from '../pathOccupancy';
 import { collectPlanViolations, compareViolations, violationFromIssue, type PlanViolation } from './evaluatePlan';
 import { snapUpToClockAlignSeconds } from './physics';
 import {
@@ -378,6 +379,8 @@ export function generateShiftScheduleVariant(
     exhaustedBy: budget.exhaustedBy,
     limits: { ...budget.limits },
   };
+  // 途經點記下節點 id（之後地圖改名也對得回路網）；要在所有會改途經點的步驟之後
+  if (result.plan) stampMoveViaNodeIds(result.plan.timelines, input.pointTopology);
   return {
     ...result,
     report: {
