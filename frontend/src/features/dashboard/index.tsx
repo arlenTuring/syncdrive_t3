@@ -1231,9 +1231,9 @@ export default function DashboardEditor({ onBackToHome }: { onBackToHome?: () =>
           onClick={handleSave}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-body-xs transition-all duration-200"
           style={{
-            background: saveStatus === 'ok' ? 'rgba(16,185,129,0.1)' : saveStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(39,39,42,1)',
-            borderColor: saveStatus === 'ok' ? '#10b981' : saveStatus === 'error' ? '#ef4444' : '#52525b',
-            color: saveStatus === 'ok' ? '#10b981' : saveStatus === 'error' ? '#ef4444' : '#d4d4d8',
+            background: saveStatus === 'ok' ? 'rgba(0, 188, 125, 0.1)' : saveStatus === 'error' ? 'rgba(251, 44, 54, 0.1)' : 'rgb(39, 39, 42)',
+            borderColor: saveStatus === 'ok' ? '#00BC7D' : saveStatus === 'error' ? '#FB2C36' : '#52525C',
+            color: saveStatus === 'ok' ? '#00BC7D' : saveStatus === 'error' ? '#FB2C36' : '#d4d4d8',
           }}
         >
           <Save size={13} />

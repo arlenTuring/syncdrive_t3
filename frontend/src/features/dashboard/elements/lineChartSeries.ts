@@ -1,6 +1,6 @@
 import type { ChartAxisTimeWindowConfig, LineChartSeriesConfig, LineChartWidget } from '../types';
 
-const DEFAULT_COLORS = ['#38bdf8', '#22c55e', '#f97316', '#a78bfa', '#f472b6'];
+const DEFAULT_COLORS = ['#00BCFF', '#00C951', '#FF6900', '#A684FF', '#FB64B6'];
 
 export function newSeriesId(): string {
   return `series-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -64,6 +64,6 @@ export function syncSeriesToLegacyFields(series: LineChartSeriesConfig[]): {
 } {
   return {
     yFields: series.map(s => s.yField),
-    strokeColors: series.map(s => s.color ?? '#06b6d4'),
+    strokeColors: series.map(s => s.color ?? '#00B8DB'),
   };
 }

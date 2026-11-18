@@ -11,6 +11,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 function isVehicleMonitorBadgeWidget(widget: StatusBadgeWidget): boolean {
   const field = widget.valueField?.trim() ?? '';
@@ -160,7 +161,7 @@ export function StatusBadgeWidgetView({ widget }: { widget: StatusBadgeWidget })
             ? ((widget.fontSize ?? 12) >= 14 ? '4px 8px' : '1px 6px')
             : '3px 10px',
           fontSize: widget.fontSize,
-          fontFamily: compact ? 'system-ui, sans-serif' : 'monospace',
+          fontFamily: compact ? FONT_FAMILY_PRIMARY : FONT_FAMILY_PRIMARY,
           fontWeight: 500,
           letterSpacing: compact ? '0.02em' : '0.05em',
           whiteSpace: 'nowrap',

@@ -86,3 +86,9 @@ export function readToken(name: DesignToken, element?: Element | null): string {
 
 /** 狀態語意：故障／錯誤、警告、正常、資訊、離線或未啟用 */
 export type StatusTone = 'error' | 'warning' | 'success' | 'info' | 'inactive';
+
+/**
+ * 規格字型（與 design-tokens.css 的 --font-primary 相同）。
+ * 給 inline style 與 SVG 的 font-family 屬性用：SVG 屬性不吃 var()，所以這裡是字面值。
+ */
+export const FONT_FAMILY_PRIMARY = "'Noto Sans TC Variable', 'Noto Sans TC', sans-serif";

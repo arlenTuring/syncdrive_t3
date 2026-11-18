@@ -7,7 +7,7 @@ export function SnapGuideLines({
   guides,
   originX = 0,
   originY = 0,
-  color = '#f472b6',
+  color = '#FB64B6',
 }: {
   guides: AlignGuideLine[];
   originX?: number;

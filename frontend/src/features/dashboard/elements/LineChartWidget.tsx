@@ -31,9 +31,10 @@ import {
 } from './lineChartSeries';
 import { clockMinutes, useChartNow } from './useChartNow';
 import { chartNowToleranceMs, resolveChartNowAnchor } from './chartNowAnchor';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 const HEADER_H = 28;
-const FONT = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT = FONT_FAMILY_PRIMARY;
 
 function isTruthy(v: unknown): boolean {
   if (v === true || v === 1 || v === '1') return true;
@@ -63,7 +64,7 @@ function eventLabelSvgStyle(
 ) {
   const fs = style?.fontSize ?? defaultFs;
   const fw = style?.fontWeight ?? 'normal';
-  const fill = style?.fill ?? '#fca5a5';
+  const fill = style?.fill ?? '#FFA2A2';
   const stroke = style?.stroke;
   const sw = style?.strokeWidth ?? (stroke ? 1 : 0);
   return {
@@ -111,7 +112,7 @@ function UnifiedLineChart({
   const xPix = (i: number) => xScale(scales.xs[i] ?? i);
 
   const primary = seriesList[0];
-  const primaryColor = primary?.color ?? '#38bdf8';
+  const primaryColor = primary?.color ?? '#00BCFF';
   const anchorNow = scales.clockNow ?? nowMin;
   const nowMinute = liveTime ? 0 : (scales.xView.now ?? nowMin);
   const nowX = xScale(nowMinute);
@@ -196,8 +197,8 @@ function UnifiedLineChart({
   const gridStroke = widget.chartGridColor ?? 'rgba(255,255,255,0.06)';
   const axisLabelFill = widget.chartAxisLabelColor ?? 'rgba(255,255,255,0.32)';
   const axisStroke = widget.chartAxisLineColor ?? 'rgba(255,255,255,0.12)';
-  const calloutFill = widget.chartCalloutFill ?? '#0ea5e9';
-  const calloutText = widget.chartCalloutTextColor ?? '#fff';
+  const calloutFill = widget.chartCalloutFill ?? '#00A6F4';
+  const calloutText = widget.chartCalloutTextColor ?? '#FFFFFF';
   const gridProps = { stroke: gridStroke, strokeWidth: 1 };
   const axisLabelProps = {
     fill: axisLabelFill,
@@ -214,7 +215,7 @@ function UnifiedLineChart({
         </clipPath>
         <linearGradient id="capacity-area-fill" x1="0" y1="1" x2="0" y2="0">
           <stop offset="28.36%" stopColor="rgba(43, 127, 255, 0)" />
-          <stop offset="78.36%" stopColor="rgba(43, 127, 255, 0.127404)" />
+          <stop offset="78.36%" stopColor="rgba(43, 127, 255, 0.127)" />
           <stop offset="100%" stopColor="rgba(81, 162, 255, 0.25)" />
         </linearGradient>
       </defs>
@@ -293,7 +294,7 @@ function UnifiedLineChart({
         {/* 線畫在可視區裁切範圍內：視窗邊界外的點保留（線段跟邊界相交處照樣畫到邊緣），不丟端點 */}
         <g clipPath={`url(#${clipId})`}>
         {seriesList.map(series => {
-          const color = series.color ?? '#06b6d4';
+          const color = series.color ?? '#00B8DB';
           const sw = series.strokeWidth ?? 2;
           // 缺值（null）把線斷開：不跨缺段連成完整線，也不補 0
           const runs: Array<Array<{ x: number; y: number }>> = [];
@@ -345,7 +346,7 @@ function UnifiedLineChart({
             x2={nowX}
             y1={0}
             y2={ch}
-            stroke="rgba(148,163,184,0.45)"
+            stroke="rgba(144, 161, 185, 0.45)"
             strokeWidth={1}
             strokeDasharray="4 3"
           />
@@ -354,7 +355,7 @@ function UnifiedLineChart({
           <text
             x={nowX + 4}
             y={ch - 6}
-            fill="#FDC700"
+            fill="#FCC800"
             fontSize={axisFs}
             fontFamily={FONT}
             data-chart-now-status={nowAnchor.status}
@@ -383,7 +384,7 @@ function UnifiedLineChart({
         )}
 
         {dataIssue && (
-          <text x={6} y={14} fill="#FDC700" fontSize={calloutFs} fontFamily={FONT} data-chart-data-issue>
+          <text x={6} y={14} fill="#FCC800" fontSize={calloutFs} fontFamily={FONT} data-chart-data-issue>
             ⚠ {dataIssue}
           </text>
         )}
@@ -395,7 +396,7 @@ function UnifiedLineChart({
               x2={xPix(highlightIdx)}
               y1={0}
               y2={ch}
-              stroke="rgba(148,163,184,0.45)"
+              stroke="rgba(144, 161, 185, 0.45)"
               strokeWidth={1}
               strokeDasharray="4 3"
             />
@@ -411,13 +412,13 @@ function UnifiedLineChart({
               width={56}
               height={22}
               rx={4}
-              fill="#0ea5e9"
+              fill="#00A6F4"
             />
             <text
               x={xPix(highlightIdx)}
               y={yPix(parseYDataValue(data[highlightIdx][primary.yField], scales.yUnit) ?? 0) - 17}
               textAnchor="middle"
-              fill="#fff"
+              fill="#FFFFFF"
               fontSize={calloutFs}
               fontWeight="700"
               fontFamily={FONT}
@@ -441,12 +442,12 @@ function UnifiedLineChart({
             const boxW = Math.max(88, label.length * 11 + 16);
             const ls = series.eventLabelStyle;
             const textStyle = eventLabelSvgStyle(ls, calloutFs);
-            const boxStroke = ls?.stroke ?? '#ef4444';
+            const boxStroke = ls?.stroke ?? '#FB2C36';
             const boxSw = ls?.strokeWidth ?? 1.5;
             const boxFill = ls?.backgroundFill ?? 'none';
             return (
               <g key={`evt-${series.id}-${i}`}>
-                <circle cx={cx} cy={cy} r={4} fill="#ef4444" stroke="#fff" strokeWidth={1} />
+                <circle cx={cx} cy={cy} r={4} fill="#FB2C36" stroke="#FFFFFF" strokeWidth={1} />
                 <rect
                   x={cx - boxW / 2}
                   y={cy - 36}
@@ -473,15 +474,15 @@ function UnifiedLineChart({
               x2={12}
               y1={0}
               y2={0}
-              stroke={series.color ?? '#06b6d4'}
+              stroke={series.color ?? '#00B8DB'}
               strokeWidth={series.strokeWidth ?? 2}
             />
             <text
               x={16}
               y={4}
-              fill={series.color ?? '#06b6d4'}
+              fill={series.color ?? '#00B8DB'}
               fontSize={9}
-              fontFamily="monospace"
+              fontFamily={FONT_FAMILY_PRIMARY}
             >
               {series.label ?? series.yField}
             </text>
@@ -539,13 +540,13 @@ export function LineChartWidgetView({ widget }: { widget: LineChartWidget }) {
             boxSizing: 'border-box',
           }}
         >
-          <TrendingUp size={11} color="#06b6d4" />
+          <TrendingUp size={11} color="#00B8DB" />
           {widget.title?.trim() && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>{widget.title}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONT_FAMILY_PRIMARY }}>{widget.title}</span>
           )}
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: widget.title?.trim() ? 4 : 0 }}>{modeLabel}</span>
-          {loading && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 'auto' }}>載入中…</span>}
-          {error && <span style={{ fontSize: 9, color: '#ef4444', marginLeft: 'auto' }} title={error}>錯誤</span>}
+          {loading && <span style={{ fontSize: 9, color: '#FD9A00', marginLeft: 'auto' }}>載入中…</span>}
+          {error && <span style={{ fontSize: 9, color: '#FB2C36', marginLeft: 'auto' }} title={error}>錯誤</span>}
           {!hasSource && (
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>未設定資料來源</span>
           )}

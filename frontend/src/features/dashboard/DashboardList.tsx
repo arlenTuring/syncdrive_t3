@@ -41,9 +41,9 @@ const headCellClass =
 const bodyCellClass =
   'h-[52px] border-b-[0.5px] border-border-quaternary px-3 py-0.5 text-body-s leading-[18px] tracking-[0.5px] text-text-primary';
 const fixedLeftClass =
-  'sticky left-0 z-10 w-[240px] min-w-[240px] bg-surface-primary shadow-[12px_6px_16px_rgba(2,9,19,0.2)]';
+  'sticky left-0 z-10 w-[240px] min-w-[240px] bg-surface-primary shadow-[12px_6px_16px_rgba(3, 7, 18, 0.2)]';
 const fixedRightClass =
-  'sticky right-0 z-10 w-[58px] min-w-[58px] bg-surface-primary shadow-[-12px_6px_16px_rgba(2,9,19,0.2)]';
+  'sticky right-0 z-10 w-[58px] min-w-[58px] bg-surface-primary shadow-[-12px_6px_16px_rgba(3, 7, 18, 0.2)]';
 
 export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTemplate, onUpdatePlane }: Props) {
   const { t, i18n } = useTranslation();

@@ -17,11 +17,12 @@ import {
   writePlaneScaleLock,
   writeZoomToolbarCollapsed,
 } from './utils/planeViewScaleLock';
+import { FONT_FAMILY_PRIMARY } from '../../styles/tokens';
 const zoomBtnStyle: CSSProperties = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  color: '#94a3b8',
+  color: '#99A1AF',
   padding: '4px 6px',
   borderRadius: 6,
   display: 'flex',
@@ -494,7 +495,7 @@ export function PlaneWorkspace({
       ref={containerRef}
       className={`flex-1 relative workspace-bg ${isRuntimeFitWidth ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden flex items-center justify-center'}`}
       style={{ 
-        background: '#0a0f1a',
+        background: '#030712',
         cursor: painterActive
           ? 'crosshair'
           : isPanning
@@ -511,7 +512,7 @@ export function PlaneWorkspace({
         aria-hidden={zoomToolsCollapsed}
         style={{ position: isRuntimeFitWidth ? 'fixed' : 'absolute', bottom: 16, right: 16, zIndex: 200,
                  display: 'flex', alignItems: 'center', gap: 6,
-                 background: 'rgba(15,22,35,0.9)', border: '1px solid rgba(255,255,255,0.1)',
+                 background: 'rgba(16, 24, 40, 0.9)', border: '1px solid rgba(255,255,255,0.1)',
                  borderRadius: 10, padding: '6px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                  opacity: zoomToolsCollapsed ? 0 : 1,
                  transform: zoomToolsCollapsed ? 'translateY(18px) scale(0.9)' : 'none',
@@ -532,7 +533,7 @@ export function PlaneWorkspace({
         </button>
         <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
         <button onClick={zoomReset}
-          style={{ ...zoomBtnStyle, gap: 6, padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', color: '#94a3b8' }}
+          style={{ ...zoomBtnStyle, gap: 6, padding: '2px 8px', fontSize: 11, fontFamily: FONT_FAMILY_PRIMARY, color: '#99A1AF' }}
           title={scaleLocked ? t('dashboard.planeWorkspace.resetLocked') : t('dashboard.planeWorkspace.reset')}>
           <Crosshair size={14} className="text-text-theme" />
           {Math.round(userZoom * 100)}%
@@ -555,7 +556,7 @@ export function PlaneWorkspace({
           onClick={toggleScaleLock}
           style={{
             ...zoomBtnStyle,
-            color: scaleLocked ? '#38bdf8' : '#94a3b8',
+            color: scaleLocked ? '#00BCFF' : '#99A1AF',
           }}
           title={scaleLocked ? t('dashboard.planeWorkspace.unlockScale') : t('dashboard.planeWorkspace.lockScale')}
           aria-pressed={scaleLocked}
@@ -579,7 +580,7 @@ export function PlaneWorkspace({
           className="transition-all duration-200 motion-reduce:transition-none"
           onClick={(e) => { e.stopPropagation(); setZoomToolsCollapsed(false); writeZoomToolbarCollapsed(false); }}
           style={{ ...zoomBtnStyle, position: isRuntimeFitWidth ? 'fixed' : 'absolute', bottom: 16, right: 16, zIndex: 201,
-            width: 34, height: 28, background: 'rgba(15,22,35,0.94)', border: '1px solid rgba(255,255,255,0.14)',
+            width: 34, height: 28, background: 'rgba(16, 24, 40, 0.94)', border: '1px solid rgba(255,255,255,0.14)',
             borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
           title="展開縮放工具"
           aria-label="展開縮放工具"
@@ -624,7 +625,7 @@ export function PlaneWorkspace({
                 return (
                   <div key={i} style={{
                     position: 'absolute', left: x, bottom: 0,
-                    borderLeft: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`,
+                    borderLeft: `1px solid ${is50 ? '#6A7282' : 'rgba(98, 116, 142, 0.3)'}`,
                     height: is50 ? 12 : 5,
                   }}>
                     {is50 && (
@@ -632,8 +633,8 @@ export function PlaneWorkspace({
                         position: 'absolute', left: 4, bottom: 4,
                         fontSize: is100 ? 12 : 10,
                         fontWeight: is100 ? 'bold' : 'normal',
-                        color: is100 ? '#cbd5e1' : '#94a3b8',
-                        fontFamily: 'monospace',
+                        color: is100 ? '#D1D5DC' : '#99A1AF',
+                        fontFamily: FONT_FAMILY_PRIMARY,
                       }}>{x}</span>
                     )}
                   </div>
@@ -649,7 +650,7 @@ export function PlaneWorkspace({
                 return (
                   <div key={i} style={{
                     position: 'absolute', top: y, right: 0,
-                    borderTop: `1px solid ${is50 ? '#64748b' : 'rgba(100,116,139,0.3)'}`,
+                    borderTop: `1px solid ${is50 ? '#6A7282' : 'rgba(98, 116, 142, 0.3)'}`,
                     width: is50 ? 12 : 5,
                   }}>
                     {is50 && (
@@ -657,8 +658,8 @@ export function PlaneWorkspace({
                         position: 'absolute', right: 4, top: 2,
                         fontSize: is100 ? 12 : 10,
                         fontWeight: is100 ? 'bold' : 'normal',
-                        color: is100 ? '#cbd5e1' : '#94a3b8',
-                        fontFamily: 'monospace',
+                        color: is100 ? '#D1D5DC' : '#99A1AF',
+                        fontFamily: FONT_FAMILY_PRIMARY,
                         textAlign: 'right', width: 30,
                       }}>{y}</span>
                     )}
@@ -675,11 +676,11 @@ export function PlaneWorkspace({
           top: isEditMode ? 30 : 0,
           left: isEditMode ? 30 : 0,
           width: plane.width, height: plane.height,
-          backgroundColor: '#0c1222',
+          backgroundColor: '#101828',
           backgroundImage: isEditMode
             ? `
-                linear-gradient(rgba(6,182,212,0.12) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6,182,212,0.12) 1px, transparent 1px),
+                linear-gradient(rgba(0, 184, 219, 0.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 184, 219, 0.12) 1px, transparent 1px),
                 linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
               `
@@ -688,8 +689,8 @@ export function PlaneWorkspace({
             ? '100px 100px, 100px 100px, 5px 5px, 5px 5px'
             : undefined,
           border: isCanvasDragOver
-            ? '2px solid rgba(34,197,94,0.7)'
-            : isEditMode ? '1px solid rgba(6,182,212,0.35)' : 'none',
+            ? '2px solid rgba(0, 201, 81, 0.7)'
+            : isEditMode ? '1px solid rgba(0, 184, 219, 0.35)' : 'none',
           borderRadius: isEditMode ? 2 : 0,
           overflow: 'hidden',
           transition: isPanning ? 'none' : 'border-color 0.2s ease',
@@ -713,9 +714,9 @@ export function PlaneWorkspace({
                   top: 0,
                   width: dualCanvasEdit.designW,
                   height: dualCanvasEdit.designH,
-                  border: '2px dashed rgba(168,85,247,0.55)',
+                  border: '2px dashed rgba(173, 70, 255, 0.55)',
                   borderRadius: 4,
-                  background: 'rgba(139,92,246,0.04)',
+                  background: 'rgba(142, 81, 255, 0.04)',
                   pointerEvents: 'none',
                   zIndex: 2,
                   boxSizing: 'border-box',
@@ -727,9 +728,9 @@ export function PlaneWorkspace({
                     top: 4,
                     left: 6,
                     fontSize: 9,
-                    fontFamily: 'monospace',
+                    fontFamily: FONT_FAMILY_PRIMARY,
                     fontWeight: 700,
-                    color: 'rgba(168,85,247,0.85)',
+                    color: 'rgba(173, 70, 255, 0.85)',
                   }}
                 >
                   {i === 0 ? t('dashboard.planeWorkspace.defaultTemplate') : t('dashboard.planeWorkspace.normalTemplate')} {dualCanvasEdit.designW}×{dualCanvasEdit.designH}
@@ -750,12 +751,12 @@ export function PlaneWorkspace({
                 height: dualCanvasEdit.laneH,
                 zIndex: 15,
                 border: dualCanvasEdit.gateSelected
-                  ? '2px solid rgba(34,211,238,0.7)'
-                  : '1px dashed rgba(100,116,139,0.45)',
+                  ? '2px solid rgba(0, 211, 242, 0.7)'
+                  : '1px dashed rgba(98, 116, 142, 0.45)',
                 borderRadius: 6,
                 background: dualCanvasEdit.gateSelected
-                  ? 'rgba(6,182,212,0.12)'
-                  : 'rgba(15,23,42,0.65)',
+                  ? 'rgba(0, 184, 219, 0.12)'
+                  : 'rgba(15, 23, 43, 0.65)',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
@@ -770,9 +771,9 @@ export function PlaneWorkspace({
                 style={{
                   writingMode: 'vertical-rl',
                   fontSize: 9,
-                  fontFamily: 'monospace',
+                  fontFamily: FONT_FAMILY_PRIMARY,
                   fontWeight: 700,
-                  color: dualCanvasEdit.gateSelected ? '#22d3ee' : '#94a3b8',
+                  color: dualCanvasEdit.gateSelected ? '#00D3F2' : '#99A1AF',
                   letterSpacing: '0.08em',
                 }}
               >
@@ -789,9 +790,9 @@ export function PlaneWorkspace({
               top: 0,
               width: subcanvasDesignBounds.width,
               height: subcanvasDesignBounds.height,
-              border: '2px dashed rgba(168,85,247,0.55)',
+              border: '2px dashed rgba(173, 70, 255, 0.55)',
               borderRadius: 4,
-              background: 'rgba(139,92,246,0.04)',
+              background: 'rgba(142, 81, 255, 0.04)',
               pointerEvents: 'none',
               zIndex: 2,
               boxSizing: 'border-box',
@@ -803,9 +804,9 @@ export function PlaneWorkspace({
                 top: 4,
                 left: 6,
                 fontSize: 9,
-                fontFamily: 'monospace',
+                fontFamily: FONT_FAMILY_PRIMARY,
                 fontWeight: 700,
-                color: 'rgba(168,85,247,0.85)',
+                color: 'rgba(173, 70, 255, 0.85)',
                 letterSpacing: '0.04em',
               }}
             >
@@ -827,15 +828,15 @@ export function PlaneWorkspace({
         {isCanvasDragOver && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 95,
-            background: 'rgba(34,197,94,0.04)',
+            background: 'rgba(0, 201, 81, 0.04)',
             pointerEvents: 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{
-              background: 'rgba(15,22,35,0.9)', color: '#22c55e',
-              border: '1px solid rgba(34,197,94,0.4)',
+              background: 'rgba(16, 24, 40, 0.9)', color: '#00C951',
+              border: '1px solid rgba(0, 201, 81, 0.4)',
               borderRadius: 8, padding: '8px 20px',
-              fontSize: 13, fontFamily: 'monospace', fontWeight: 'bold',
+              fontSize: 13, fontFamily: FONT_FAMILY_PRIMARY, fontWeight: 'bold',
               boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
             }}>
               {t('dashboard.planeWorkspace.releaseToAdd')}
@@ -846,7 +847,7 @@ export function PlaneWorkspace({
         {/* 平面名稱浮水印 */}
         <div style={{
           position: 'absolute', top: 8, left: 12, fontSize: 11,
-          fontFamily: 'monospace', color: 'rgba(6,182,212,0.25)', pointerEvents: 'none', zIndex: 0,
+          fontFamily: FONT_FAMILY_PRIMARY, color: 'rgba(0, 184, 219, 0.25)', pointerEvents: 'none', zIndex: 0,
         }}>
           {plane.name} — {plane.width} × {plane.height}
         </div>
@@ -856,12 +857,12 @@ export function PlaneWorkspace({
           <div style={{
             position: 'absolute', top: 8, right: 10, zIndex: 320,
             display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold',
-            color: '#f0abfc',
-            background: 'rgba(217,70,239,0.12)',
-            border: '1px solid rgba(217,70,239,0.45)',
+            fontSize: 10, fontFamily: FONT_FAMILY_PRIMARY, fontWeight: 'bold',
+            color: '#F4A8FF',
+            background: 'rgba(225, 42, 251, 0.12)',
+            border: '1px solid rgba(225, 42, 251, 0.45)',
             padding: '4px 10px', borderRadius: 6, pointerEvents: 'none',
-            boxShadow: '0 4px 12px rgba(217,70,239,0.2)',
+            boxShadow: '0 4px 12px rgba(225, 42, 251, 0.2)',
           }}>
             <Paintbrush size={12} />
             {t('dashboard.planeWorkspace.formatPainter', { type: fp.armed.sourceType })}
@@ -870,10 +871,10 @@ export function PlaneWorkspace({
         {isEditMode && !painterActive && (
           <div style={{
             position: 'absolute', top: 8, right: 10, zIndex: 300,
-            fontSize: 9, fontFamily: 'monospace',
-            color: 'rgba(6,182,212,0.5)',
-            background: 'rgba(6,182,212,0.08)',
-            border: '1px solid rgba(6,182,212,0.2)',
+            fontSize: 9, fontFamily: FONT_FAMILY_PRIMARY,
+            color: 'rgba(0, 184, 219, 0.5)',
+            background: 'rgba(0, 184, 219, 0.08)',
+            border: '1px solid rgba(0, 184, 219, 0.2)',
             padding: '2px 6px', borderRadius: 4, pointerEvents: 'none',
           }}>
             {t('dashboard.planeWorkspace.editHint')}
@@ -901,8 +902,8 @@ export function PlaneWorkspace({
               top: planeMarquee.y,
               width: planeMarquee.width,
               height: planeMarquee.height,
-              border: '1px dashed rgba(34,211,238,0.9)',
-              background: 'rgba(34,211,238,0.12)',
+              border: '1px dashed rgba(0, 211, 242, 0.9)',
+              background: 'rgba(0, 211, 242, 0.12)',
               pointerEvents: 'none',
               zIndex: 4000,
             }}

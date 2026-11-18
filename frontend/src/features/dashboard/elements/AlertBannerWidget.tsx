@@ -12,6 +12,7 @@ import {
   getEditorAlertRules,
   pickPrimaryAlertRules,
 } from '../utils/alertTrigger';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 const BLINK_STYLE_ID = 'syncdrive-alert-blink-keyframes';
 const ROW_GAP = 2;
@@ -172,7 +173,7 @@ export function AlertBannerWidgetView({ widget }: { widget: AlertBannerWidget })
 
   const baseFontSize = widget.fontSize ?? 11;
   const fontWeight = widget.fontWeight ?? 'bold';
-  const fontFamily = widget.fontFamily ?? 'system-ui, sans-serif';
+  const fontFamily = widget.fontFamily ?? FONT_FAMILY_PRIMARY;
   const borderRadius = widget.borderRadius ?? 4;
   const nowrap = widget.textWrap !== 'wrap';
   const carouselMs = Math.max(1200, widget.carouselIntervalMs ?? DEFAULT_CAROUSEL_MS);

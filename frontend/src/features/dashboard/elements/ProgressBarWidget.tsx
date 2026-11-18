@@ -11,6 +11,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget }) {
   const isEditMode = useIsEditMode();
@@ -63,7 +64,7 @@ export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget })
   // 根據 ratio 計算顏色（colorStops 插值）
   const fillColor = useMemo(() => {
     const stops = [...(widget.colorStops || [])].sort((a, b) => a.at - b.at);
-    if (!stops.length) return '#3b82f6';
+    if (!stops.length) return '#2B7FFF';
     if (ratio <= stops[0].at) return stops[0].color;
     if (ratio >= stops[stops.length - 1].at) return stops[stops.length - 1].color;
     for (let i = 0; i < stops.length - 1; i++) {
@@ -71,7 +72,7 @@ export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget })
         return stops[i + 1].color; // 簡化：取上一個節點顏色
       }
     }
-    return '#3b82f6';
+    return '#2B7FFF';
   }, [ratio, widget.colorStops]);
 
   const label = interpolateVariables(widget.label, variables);
@@ -96,7 +97,7 @@ export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget })
       {widget.showLabel && (
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: labelFs, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace',
+          fontSize: labelFs, color: 'rgba(255,255,255,0.45)', fontFamily: FONT_FAMILY_PRIMARY,
         }}>
           <span>{label}</span>
           {widget.showValue && <span style={{ color: fillColor, fontWeight: 700 }}>{pct}</span>}
@@ -129,7 +130,7 @@ export function ProgressBarWidgetView({ widget }: { widget: ProgressBarWidget })
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: valueFs, color: 'rgba(255,255,255,0.8)', fontFamily: 'monospace', fontWeight: 700,
+            fontSize: valueFs, color: 'rgba(255,255,255,0.8)', fontFamily: FONT_FAMILY_PRIMARY, fontWeight: 700,
           }}>
             {pct}
           </div>

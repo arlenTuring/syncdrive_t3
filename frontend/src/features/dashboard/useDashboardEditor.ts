@@ -501,7 +501,7 @@ export function useDashboardEditor() {
       width: defaultW,
       height: defaultH,
       label: isMap ? '圖台' : isTabList ? 'Tab 清單表格' : isGroup ? '新畫布群組' : '新畫布',
-      backgroundColor: isMap ? '#020617' : isTabList ? 'transparent' : '#0f172a',
+      backgroundColor: isMap ? '#030712' : isTabList ? 'transparent' : '#0F172B',
       backgroundImage: '',
       opacity: 100,
       children: initialChildren,

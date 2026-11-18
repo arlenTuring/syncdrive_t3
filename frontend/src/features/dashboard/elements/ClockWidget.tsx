@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ClockWidget } from '../types';
 import { clockStatusLabel, useOperatingClock } from '../utils/operatingClock';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 function formatDate(date: Date, fmt: string): string {
   const y = date.getFullYear();
@@ -58,7 +59,7 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
       <div style={{
         fontSize: widget.fontSize,
         color: widget.color,
-        fontFamily: widget.fontFamily || 'monospace',
+        fontFamily: widget.fontFamily || FONT_FAMILY_PRIMARY,
         fontWeight: 700,
         letterSpacing: '0.02em',
         lineHeight: 1.1,
@@ -70,12 +71,12 @@ export function ClockWidgetView({ widget }: { widget: ClockWidget }) {
         <div style={{
           fontSize: widget.dateFontSize,
           color: widget.dateColor,
-          fontFamily: widget.fontFamily || 'monospace',
+          fontFamily: widget.fontFamily || FONT_FAMILY_PRIMARY,
           letterSpacing: '0.05em',
         }}>
           {dateStr}
           {status ? (
-            <span style={{ marginLeft: '0.6em', color: '#fb923c' }} data-clock-status={status.tone}>{status.text}</span>
+            <span style={{ marginLeft: '0.6em', color: '#FF8904' }} data-clock-status={status.tone}>{status.text}</span>
           ) : null}
         </div>
       )}

@@ -63,7 +63,7 @@ const selectCls = `w-full bg-surface-secondary border border-border-quaternary r
 function SH({ icon, label, color }: { icon: React.ReactNode; label: string; color?: string }) {
   return (
     <div className="flex items-center gap-1.5 text-body-xs-bold uppercase pb-1 border-b border-border-quaternary"
-         style={{ color: color ?? '#71717a' }}>
+         style={{ color: color ?? '#71717B' }}>
       {icon} {label}
     </div>
   );
@@ -245,7 +245,7 @@ function AlertRulesEditor({
 function hexFromRgba(color: string): string {
   if (color.startsWith('#')) return color.slice(0, 7);
   const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!m) return '#c2410c';
+  if (!m) return '#CA3500';
   const hex = (n: string) => Number(n).toString(16).padStart(2, '0');
   return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
 }
@@ -261,7 +261,7 @@ function ColorRulesEditor({
   onToggleEnabled: (e: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const addRule = () => onUpdate([...rules, { condition: 'gt', threshold: '0', textColor: '#ffffff', bgColor: '#ef4444', borderColor: '#ef4444' }]);
+  const addRule = () => onUpdate([...rules, { condition: 'gt', threshold: '0', textColor: '#ffffff', bgColor: '#FB2C36', borderColor: '#FB2C36' }]);
   const removeRule = (idx: number) => onUpdate(rules.filter((_, i) => i !== idx));
   const updateRule = (idx: number, patch: Partial<ColorRule>) => onUpdate(rules.map((r, i) => i === idx ? { ...r, ...patch } : r));
 
@@ -270,7 +270,7 @@ function ColorRulesEditor({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Checkbox checked={enabled} onCheckedChange={e => onToggleEnabled(e)} />
-          <SH icon={<Palette size={12} />} label={t('dashboard.properties.colorRules.title')} color="#ec4899" />
+          <SH icon={<Palette size={12} />} label={t('dashboard.properties.colorRules.title')} color="#F6339A" />
         </div>
         {enabled && (
           <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addRule} type="submit" label="新增" icon={<Plus />} />
@@ -335,7 +335,7 @@ function TextSettings({
       {editingGroup && (
         <GroupInheritedVariablesSection group={editingGroup} onInsertToken={insertIntoSql} />
       )}
-      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.text.title')} color="#f59e0b" />
+      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.text.title')} color="#FD9A00" />
       
       <div className="space-y-3">
         <Field label={t('dashboard.properties.widgets.text.defaultContent')}>
@@ -390,7 +390,7 @@ function TextSettings({
       </div>
 
       <div className="space-y-4 pt-4 border-t border-border-quaternary">
-        <SH icon={<Palette size={13} />} label={t('dashboard.properties.appearanceDefault')} color="#ec4899" />
+        <SH icon={<Palette size={13} />} label={t('dashboard.properties.appearanceDefault')} color="#F6339A" />
         
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('dashboard.properties.textColor')}>
@@ -439,7 +439,7 @@ function TextSettings({
       </div>
 
       <div className="pt-4 border-t border-border-quaternary">
-        <SH icon={<Database size={13} />} label={t('dashboard.properties.dataBinding')} color="#a78bfa" />
+        <SH icon={<Database size={13} />} label={t('dashboard.properties.dataBinding')} color="#A684FF" />
         <div className="mt-3 space-y-3">
           <DataBindingSettings w={w} onUpdate={onUpdate} />
         </div>
@@ -472,11 +472,11 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
 
   return (
     <div className="space-y-5">
-      <SH icon={<Database size={13} />} label={t('dashboard.properties.dataSource')} color="#a78bfa" />
+      <SH icon={<Database size={13} />} label={t('dashboard.properties.dataSource')} color="#A684FF" />
       <DataBindingSettings w={w} onUpdate={onUpdate} />
 
       <div className="pt-2 border-t border-border-quaternary space-y-3">
-        <SH icon={<AlertTriangle size={13} />} label={t('dashboard.properties.alertRules.title')} color="#f97316" />
+        <SH icon={<AlertTriangle size={13} />} label={t('dashboard.properties.alertRules.title')} color="#FF6900" />
         <div className="p-2.5 rounded-lg bg-status-warning-light border border-status-warning-light text-caption-2 text-status-warning">
           {t('dashboard.properties.alertRules.previewHint')}
           {(w.alertPresentation ?? 'stack') === 'carousel'
@@ -487,7 +487,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       </div>
 
       <div className="pt-2 border-t border-border-quaternary space-y-3">
-        <SH icon={<Type size={13} />} label={t('dashboard.properties.displayModeSection')} color="#38bdf8" />
+        <SH icon={<Type size={13} />} label={t('dashboard.properties.displayModeSection')} color="#00BCFF" />
         <Field label={t('dashboard.properties.alertRules.multiHit')}>
           <SiteSelect
             value={w.alertPresentation ?? 'stack'}
@@ -512,7 +512,7 @@ function AlertBannerSettings({ w, onUpdate, onDelete }: { w: AlertBannerWidget; 
       </div>
 
       <div className="pt-2 border-t border-border-quaternary space-y-3">
-        <SH icon={<Type size={13} />} label={t('dashboard.properties.sharedStyle')} color="#94a3b8" />
+        <SH icon={<Type size={13} />} label={t('dashboard.properties.sharedStyle')} color="#99A1AF" />
         <Field label={t('dashboard.properties.alertRules.fontSize')}>
           <NumberInput min={8} value={w.fontSize ?? 10} onChange={n => onUpdate({ fontSize: n })} className={inputCls} />
         </Field>
@@ -531,7 +531,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Gauge size={13} />} label={t('dashboard.properties.widgets.gauge.title')} color="#ec4899" />
+      <SH icon={<Gauge size={13} />} label={t('dashboard.properties.widgets.gauge.title')} color="#F6339A" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       
       <DataBindingSettings w={w} onUpdate={onUpdate} />
@@ -669,7 +669,7 @@ function GaugeSettings({ w, onUpdate, onDelete }: { w: GaugeWidget; onUpdate: (p
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.gauge.panelBg')}>
           <SiteColorInput
-            value={w.panelBackgroundColor?.startsWith('#') ? w.panelBackgroundColor : '#1a2332'}
+            value={w.panelBackgroundColor?.startsWith('#') ? w.panelBackgroundColor : '#1F262F'}
             onChange={e => onUpdate({ panelBackgroundColor: e.target.value })}
             className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
            />
@@ -700,7 +700,7 @@ function SegmentBarSettings({ w, onUpdate, onDelete }: { w: SegmentBarWidget; on
   };
   return (
     <div className="space-y-4">
-      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.segmentBar.title')} color="#22c55e" />
+      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.segmentBar.title')} color="#00C951" />
       <Field label={t('dashboard.properties.title')}><input value={w.title ?? ''} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <Field label={t('dashboard.properties.widgets.segmentBar.titleIcon')}>
         <IconImageField
@@ -741,7 +741,7 @@ function SlotGridSettings({ w, onUpdate, onDelete }: { w: SlotGridWidget; onUpda
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.slotGrid.title')} color="#f43f5e" />
+      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.slotGrid.title')} color="#FF2056" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       
       <DataBindingSettings w={w} onUpdate={onUpdate} />
@@ -780,7 +780,7 @@ function MaintenanceDistributionSettings({ w, onUpdate, onDelete }: { w: Mainten
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.maintenanceDistribution.title')} color="#f43f5e" />
+      <SH icon={<LayoutGrid size={13} />} label={t('dashboard.properties.widgets.maintenanceDistribution.title')} color="#FF2056" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <Field label={t('dashboard.properties.widgets.maintenanceDistribution.dataUrl')}>
         <input value={w.dataUrl ?? ''} onChange={e => onUpdate({ dataUrl: e.target.value })} className={inputCls} placeholder="/syncdrive-api/facility/maintenance-distribution" />
@@ -807,7 +807,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
   const { t } = useTranslation();
   return (
     <div className="space-y-3">
-      <SH icon={<Image size={13} />} label={t('dashboard.properties.widgets.image.title')} color="#10b981" />
+      <SH icon={<Image size={13} />} label={t('dashboard.properties.widgets.image.title')} color="#00BC7D" />
 
       {/* 圖片 URL */}
       <Field label={t('dashboard.properties.widgets.image.url')}>
@@ -905,7 +905,7 @@ function ImageSettings({ w, onUpdate, onDelete }: { w: ImageWidget; onUpdate: (p
       </div>
 
       {/* ── 疊加文字 ── */}
-      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.image.overlay')} color="#a78bfa" />
+      <SH icon={<Type size={13} />} label={t('dashboard.properties.widgets.image.overlay')} color="#A684FF" />
 
       <Field label={t('dashboard.properties.widgets.image.overlayContent')}>
         <textarea
@@ -1137,7 +1137,7 @@ function LineChartSeriesFields({
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.lineColor')}>
           <SiteColorInput
-            value={series.color?.startsWith('#') ? series.color : '#38bdf8'}
+            value={series.color?.startsWith('#') ? series.color : '#00BCFF'}
             onChange={e => patch({ color: e.target.value })}
             className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
            />
@@ -1216,14 +1216,14 @@ function LineChartSeriesFields({
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.textColorShort')}>
               <SiteColorInput
-                value={series.eventLabelStyle?.fill?.startsWith('#') ? series.eventLabelStyle.fill : '#fca5a5'}
+                value={series.eventLabelStyle?.fill?.startsWith('#') ? series.eventLabelStyle.fill : '#FFA2A2'}
                 onChange={e => patchLabelStyle({ fill: e.target.value })}
                 className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
                />
             </Field>
             <Field label={t('dashboard.properties.widgets.chart.borderColorShort')}>
               <SiteColorInput
-                value={series.eventLabelStyle?.stroke?.startsWith('#') ? series.eventLabelStyle.stroke : '#ef4444'}
+                value={series.eventLabelStyle?.stroke?.startsWith('#') ? series.eventLabelStyle.stroke : '#FB2C36'}
                 onChange={e => patchLabelStyle({ stroke: e.target.value })}
                 className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"
                />
@@ -1261,7 +1261,7 @@ function AxisBandFields({
   const { t } = useTranslation();
   const patch = (p: Partial<ChartAxisBandConfig>) => onChange({ ...band, ...p });
   const rules = band.colorRules ?? [];
-  const addRule = () => patch({ colorRules: [...rules, { value: '', color: '#64748b' }] });
+  const addRule = () => patch({ colorRules: [...rules, { value: '', color: '#6A7282' }] });
   const removeRule = (idx: number) => patch({ colorRules: rules.filter((_, i) => i !== idx) });
   const updateRule = (idx: number, p: Partial<ChartAxisBandColorRule>) =>
     patch({ colorRules: rules.map((r, i) => (i === idx ? { ...r, ...p } : r)) });
@@ -1283,7 +1283,7 @@ function AxisBandFields({
           <input value={band.segmentField} onChange={e => patch({ segmentField: e.target.value })} className={inputCls} placeholder="segment_code" />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.defaultColor')}>
-          <SiteColorInput value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#64748b'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
+          <SiteColorInput value={band.defaultColor?.startsWith('#') ? band.defaultColor : '#6A7282'} onChange={e => patch({ defaultColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
         </Field>
         <Field label={t('dashboard.properties.widgets.chart.thickness')}>
           <NumberInput min={1} max={20} value={band.thickness ?? 4} onChange={n => patch({ thickness: n })} className={inputCls} />
@@ -1301,7 +1301,7 @@ function AxisBandFields({
           <div key={i} className="flex items-center gap-1.5 p-1.5 bg-zinc-800/40 rounded border border-border-quaternary relative group">
             <IconButton size="small" hierarchy="subordinate" variant="tonal" className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100" onPress={() => removeRule(i)} label="移除" icon={<X />} />
             <input value={rule.value} onChange={e => updateRule(i, { value: e.target.value })} className={`${inputCls} flex-1 font-mono`} placeholder="IN_SERVICE" />
-            <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#64748b'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer shrink-0"  />
+            <SiteColorInput value={rule.color.startsWith('#') ? rule.color : '#6A7282'} onChange={e => updateRule(i, { color: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer shrink-0"  />
           </div>
         ))}
         {rules.length === 0 && <p className="text-caption-2 text-text-disabled italic text-center py-1">{t('dashboard.properties.widgets.chart.noMapping')}</p>}
@@ -1329,10 +1329,10 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
       axis,
       segmentField: axis === 'x' ? 'segment_code' : 'range_code',
       colorRules: [
-        { value: 'IN_SERVICE', color: '#f97316' },
-        { value: 'SCHEDULED', color: '#22c55e' },
+        { value: 'IN_SERVICE', color: '#FF6900' },
+        { value: 'SCHEDULED', color: '#00C951' },
       ],
-      defaultColor: '#64748b',
+      defaultColor: '#6A7282',
       thickness: 4,
       opacity: 1,
     };
@@ -1344,11 +1344,11 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
   };
   return (
     <div className="space-y-4">
-      <SH icon={<TrendingUp size={13} />} label={t('dashboard.properties.widgets.chart.lineChartTitle')} color="#06b6d4" />
+      <SH icon={<TrendingUp size={13} />} label={t('dashboard.properties.widgets.chart.lineChartTitle')} color="#00B8DB" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
-        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.paddingTitle')} color="#64748b" />
+        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.paddingTitle')} color="#6A7282" />
         <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.chart.paddingHint')}
         </p>
@@ -1362,11 +1362,11 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
       <Field label={t('dashboard.properties.widgets.chart.xField')}><input value={w.xField} onChange={e => onUpdate({ xField: e.target.value })} className={inputCls} /></Field>
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <div className="flex items-center justify-between">
-          <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.seriesSection')} color="#06b6d4" />
+          <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.seriesSection')} color="#00B8DB" />
           <Button variant="outlined" leadingIcon={<Plus />} onPress={() =>
               setSeriesList([
                 ...seriesList,
-                { id: newSeriesId(), yField: 'value', color: '#22c55e', strokeWidth: 2 },
+                { id: newSeriesId(), yField: 'value', color: '#00C951', strokeWidth: 2 },
               ])
             }>{t('dashboard.properties.add')}</Button>
         </div>
@@ -1380,7 +1380,7 @@ function LineChartSettings({ w, onUpdate, onDelete }: { w: LineChartWidget; onUp
         ))}
       </div>
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
-        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.axesSection')} color="#22d3ee" />
+        <SH icon={<TrendingUp size={12} />} label={t('dashboard.properties.widgets.chart.axesSection')} color="#00D3F2" />
         <Field label={t('dashboard.properties.widgets.chart.viewportMode')}>
           <SiteSelect
             value={w.viewportMode ?? 'fixed-axis'}
@@ -1433,7 +1433,7 @@ function DatabaseSettings({ w, onUpdate, onDelete }: { w: DatabaseWidget; onUpda
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.database.title')} color="#a78bfa" />
+      <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.database.title')} color="#A684FF" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w} onUpdate={onUpdate} />
       <Field label={t('dashboard.properties.widgets.database.maxRows')}><NumberInput value={w.maxRows} onChange={n => onUpdate({ maxRows: n })} className={inputCls} /></Field>
@@ -1456,7 +1456,7 @@ function PlaneSettings({ plane, onUpdate, onDelete }: {
   return (
     <div className="space-y-6">
       <div className="bg-surface-theme border border-border-theme-light rounded-xl p-4 mb-2">
-        <SH icon={<Settings size={14} className="text-text-theme" />} label={t('dashboard.properties.plane.title')} color="#22d3ee" />
+        <SH icon={<Settings size={14} className="text-text-theme" />} label={t('dashboard.properties.plane.title')} color="#00D3F2" />
         <p className="text-caption-2 text-text-quaternary mt-1 uppercase">{t('dashboard.properties.plane.subtitle')}</p>
       </div>
 
@@ -1559,7 +1559,7 @@ function ObstacleRingSettings({
     });
   return (
     <div className="space-y-4">
-      <SH icon={<AlertTriangle size={13} />} label="八方向障礙指示" color="#fb7185" />
+      <SH icon={<AlertTriangle size={13} />} label="八方向障礙指示" color="#FF637E" />
       <p className="text-caption-2 text-text-quaternary">
         方向以卡片上的車頭（朝上）為準。只有資料明確表示偵測到才變紅；沒填路徑、沒資料、斷線、過期或值看不懂都顯示為半透明（未知），不當成安全。
         字串 "false" 視為沒有偵測到。
@@ -1701,7 +1701,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
       : t('dashboard.properties.canvas.canvasTitle');
   return (
     <div className="space-y-4">
-      <SH icon={<Layers size={13} />} label={sectionTitle} color={isMap ? '#0ea5e9' : el.isGroup ? '#a855f7' : '#06b6d4'} />
+      <SH icon={<Layers size={13} />} label={sectionTitle} color={isMap ? '#00A6F4' : el.isGroup ? '#AD46FF' : '#00B8DB'} />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.label')}><input value={el.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} /></Field>
         <Field label={t('dashboard.properties.headerTitle')}><input value={el.headerTitle ?? ''} onChange={e => onUpdate({ headerTitle: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.headerTitlePlaceholder')} /></Field>
@@ -2038,7 +2038,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Square size={13} />} label={t('dashboard.properties.widgets.colorBlock.title')} color="#64748b" />
+      <SH icon={<Square size={13} />} label={t('dashboard.properties.widgets.colorBlock.title')} color="#6A7282" />
       
       {/* 快捷線條預設 */}
       <div className="space-y-1.5 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/40">
@@ -2053,7 +2053,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.backgroundColor')}>
           <div className="flex gap-2">
-            <SiteColorInput value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1e293b'}
+            <SiteColorInput value={w.backgroundColor.startsWith('#') ? w.backgroundColor : '#1D293D'}
               onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-8 h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  />
             <input value={w.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className={`${inputCls} font-mono`} />
           </div>
@@ -2073,7 +2073,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
       </label>
       {w.severityStripColor && (
         <div className="pt-2 border-t border-border-quaternary">
-          <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.colorBlock.mqttData')} color="#a78bfa" />
+          <SH icon={<Database size={13} />} label={t('dashboard.properties.widgets.colorBlock.mqttData')} color="#A684FF" />
           <div className="mt-2">
             <DataBindingSettings w={w} onUpdate={onUpdate} />
           </div>
@@ -2102,13 +2102,13 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
 
 function StatusBadgeSettings({ w, onUpdate, onDelete }: { w: StatusBadgeWidget; onUpdate: (p: Partial<StatusBadgeWidget>) => void; onDelete: () => void }) {
   const { t } = useTranslation();
-  const addRule = () => onUpdate({ rules: [...w.rules, { value: 'NEW', label: 'NEW', bgColor: '#1e3a5f', textColor: '#60a5fa' }] });
+  const addRule = () => onUpdate({ rules: [...w.rules, { value: 'NEW', label: 'NEW', bgColor: '#314158', textColor: '#51A2FF' }] });
   const removeRule = (i: number) => onUpdate({ rules: w.rules.filter((_, j) => j !== i) });
   const updateRule = (i: number, p: Partial<StatusBadgeRule>) => onUpdate({ rules: w.rules.map((r, j) => j === i ? { ...r, ...p } : r) });
 
   return (
     <div className="space-y-4">
-      <SH icon={<Tag size={13} />} label={t('dashboard.properties.widgets.statusBadge.title')} color="#22c55e" />
+      <SH icon={<Tag size={13} />} label={t('dashboard.properties.widgets.statusBadge.title')} color="#00C951" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="status" /></Field>
@@ -2151,7 +2151,7 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Hash size={13} />} label={t('dashboard.properties.widgets.statCard.title')} color="#e879f9" />
+      <SH icon={<Hash size={13} />} label={t('dashboard.properties.widgets.statCard.title')} color="#ED6BFF" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.statCard.labelText')}><input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.statCard.labelPlaceholder')} /></Field>
@@ -2199,7 +2199,7 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
       </label>
       <ColorRulesEditor rules={w.colorRules} enabled={w.colorRulesEnabled} onToggleEnabled={e => onUpdate({ colorRulesEnabled: e })} onUpdate={rules => onUpdate({ colorRules: rules })} />
       <div className="pt-2 border-t border-border-quaternary space-y-2">
-        <SH icon={<Hash size={12} />} label={t('dashboard.properties.widgets.statCard.compareTitle')} color="#38bdf8" />
+        <SH icon={<Hash size={12} />} label={t('dashboard.properties.widgets.statCard.compareTitle')} color="#00BCFF" />
         <p className="text-caption-2 text-text-quaternary">
           {t('dashboard.properties.widgets.statCard.compareHint')}
         </p>
@@ -2213,8 +2213,8 @@ function StatCardSettings({ w, onUpdate, onDelete }: { w: StatCardWidget; onUpda
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.properties.widgets.statCard.tolerance')}><NumberInput min={0} max={50} value={w.tolerancePct ?? 5} onChange={n => onUpdate({ tolerancePct: n })} className={inputCls} /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><SiteColorInput value={w.inBandColor ?? '#38bdf8'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
-          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><SiteColorInput value={w.outOfBandColor ?? '#f87171'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.inBand')}><SiteColorInput value={w.inBandColor ?? '#00BCFF'} onChange={e => onUpdate({ inBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
+          <Field label={t('dashboard.properties.widgets.statCard.outOfBand')}><SiteColorInput value={w.outOfBandColor ?? '#FF6467'} onChange={e => onUpdate({ outOfBandColor: e.target.value })} className="w-full h-8 rounded border border-border-quaternary bg-transparent cursor-pointer"  /></Field>
           <Field label={t('dashboard.properties.widgets.statCard.hintField')}><input value={w.hintField ?? ''} onChange={e => onUpdate({ hintField: e.target.value })} className={inputCls} placeholder="avail_hint" /></Field>
         </div>
         <Field label={t('dashboard.properties.widgets.statCard.hintIcon')}>
@@ -2234,7 +2234,7 @@ function ProgressBarSettings({ w, onUpdate, onDelete }: { w: ProgressBarWidget; 
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<AlignJustify size={13} />} label={t('dashboard.properties.widgets.progressBar.title')} color="#38bdf8" />
+      <SH icon={<AlignJustify size={13} />} label={t('dashboard.properties.widgets.progressBar.title')} color="#00BCFF" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.dataField')}><input value={w.valueField} onChange={e => onUpdate({ valueField: e.target.value })} className={inputCls} placeholder="value" /></Field>
@@ -2267,7 +2267,7 @@ function EmptyStateSettings({ w, onUpdate, onDelete }: { w: EmptyStateWidget; on
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<CircleOff size={13} />} label={t('dashboard.properties.widgets.emptyState.title')} color="#94a3b8" />
+      <SH icon={<CircleOff size={13} />} label={t('dashboard.properties.widgets.emptyState.title')} color="#99A1AF" />
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <Field label={t('dashboard.properties.widgets.emptyState.mainLabel')}>
         <input value={w.label} onChange={e => onUpdate({ label: e.target.value })} className={inputCls} placeholder={t('dashboard.properties.widgets.emptyState.mainPlaceholder')} />
@@ -2311,7 +2311,7 @@ function ClockSettings({ w, onUpdate, onDelete }: { w: ClockWidget; onUpdate: (p
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Clock size={13} />} label={t('dashboard.properties.widgets.clock.title')} color="#a3e635" />
+      <SH icon={<Clock size={13} />} label={t('dashboard.properties.widgets.clock.title')} color="#9AE600" />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t('dashboard.properties.widgets.clock.timeFormat')}>
           <SiteSelect value={w.format} onChange={e => onUpdate({ format: e.target.value as any })} className={selectCls}>
@@ -2373,7 +2373,7 @@ function StationEtaSettings({ w, onUpdate, onDelete }: { w: StationEtaWidget; on
   };
   return (
     <div className="space-y-4">
-      <SH icon={<Clock size={13} />} label="到站動態卡片" color="#34d399" />
+      <SH icon={<Clock size={13} />} label="到站動態卡片" color="#00D492" />
       <Field label="標題（站名 進站動態；站名放大顯示）"><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <Field label="停靠點（每行：站點ID=方向／停靠點名稱=到站、出發或到站出發；名稱與 ID 相同時顯示圖資站名）">
         <textarea
@@ -2405,7 +2405,7 @@ function BarChartSettings({ w, onUpdate, onDelete }: { w: BarChartWidget; onUpda
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.barChart.title')} color="#f97316" />
+      <SH icon={<BarChart2 size={13} />} label={t('dashboard.properties.widgets.barChart.title')} color="#FF6900" />
       <Field label={t('dashboard.properties.title')}><input value={w.title} onChange={e => onUpdate({ title: e.target.value })} className={inputCls} /></Field>
       <DataBindingSettings w={w as any} onUpdate={onUpdate as any} />
       <div className="grid grid-cols-2 gap-2">
@@ -2440,7 +2440,7 @@ function UnitTelemetrySettings({
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <SH icon={<Monitor size={13} />} label={t('dashboard.properties.widgets.unitTelemetry.title')} color="#2dd4bf" />
+      <SH icon={<Monitor size={13} />} label={t('dashboard.properties.widgets.unitTelemetry.title')} color="#00D5BE" />
       <Field label={t('dashboard.properties.widgets.unitTelemetry.vehicleLabel')}>
         <input value={w.unitLabel} onChange={e => onUpdate({ unitLabel: e.target.value })} className={inputCls} placeholder="UNIT-03" />
       </Field>
@@ -2478,7 +2478,7 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
   }, []);
   return (
     <div className="space-y-3">
-      <SH icon={<Map size={13} />} label={t('dashboard.properties.widgets.mapCanvas.title')} color="#0ea5e9" />
+      <SH icon={<Map size={13} />} label={t('dashboard.properties.widgets.mapCanvas.title')} color="#00A6F4" />
       <Field label={t('dashboard.properties.widgets.mapCanvas.mapSource')}>
         <SiteSelect
           value={w.mapId}
@@ -2594,7 +2594,7 @@ function VehicleContainerSettings({
         </>
       )}
 
-      <SH icon={<Zap size={14} className="text-violet-400" />} label={t('dashboard.properties.widgets.vehicleContainer.actions')} color="#a78bfa" />
+      <SH icon={<Zap size={14} className="text-violet-400" />} label={t('dashboard.properties.widgets.vehicleContainer.actions')} color="#A684FF" />
       <WidgetDataBindingSettings w={w} onUpdate={onUpdate} />
       {managedByMap ? null : (
         <VehicleBehaviorSettingsFields value={w} onChange={onUpdate} header={<></>} />
@@ -2837,7 +2837,7 @@ function TabListSettings({
 
   return (
     <div className="space-y-4 text-body-xs">
-      <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#38bdf8" />
+      <SH icon={<List size={14} />} label={t('dashboard.properties.widgets.tabList.title')} color="#00BCFF" />
 
       <label className="flex items-center justify-between gap-2 text-text-secondary">
         <span>顯示欄位名稱</span>
@@ -3007,7 +3007,7 @@ function TabListSettings({
                   {/* Column text color (content font size is table-wide below) */}
                   {(() => {
                     const firstText = (col.children ?? []).find(ch => ch.type === 'text') as TextWidget | undefined;
-                    const colTextColor = col.textColor ?? firstText?.color ?? w.textColor ?? '#cbd5e1';
+                    const colTextColor = col.textColor ?? firstText?.color ?? w.textColor ?? '#D1D5DC';
                     return (
                       <div className="space-y-1">
                         <label className="text-text-tertiary text-caption-2">{t('dashboard.properties.widgets.tabList.columnTextColor')}</label>
@@ -3016,7 +3016,7 @@ function TabListSettings({
                           style={{ backgroundColor: colTextColor }}
                         >
                           <SiteColorInput
-                            value={colTextColor.startsWith('#') ? colTextColor : '#cbd5e1'}
+                            value={colTextColor.startsWith('#') ? colTextColor : '#D1D5DC'}
                             onChange={e => patchColumnTextStyle(col.id, { color: e.target.value })}
                             className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                             title={t('dashboard.properties.widgets.tabList.pickColumnColor')}
@@ -3058,10 +3058,10 @@ function TabListSettings({
               <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabActiveColor')}</label>
               <div
                 className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
-                style={{ backgroundColor: w.tabActiveColor ?? '#3b82f6' }}
+                style={{ backgroundColor: w.tabActiveColor ?? '#2B7FFF' }}
               >
                 <SiteColorInput
-                  value={w.tabActiveColor ?? '#3b82f6'}
+                  value={w.tabActiveColor ?? '#2B7FFF'}
                   onChange={e => onUpdate({ tabActiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickActive')}
@@ -3072,10 +3072,10 @@ function TabListSettings({
               <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.tabInactiveColor')}</label>
               <div
                 className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
-                style={{ backgroundColor: w.tabInactiveColor ?? '#64748b' }}
+                style={{ backgroundColor: w.tabInactiveColor ?? '#6A7282' }}
               >
                 <SiteColorInput
-                  value={w.tabInactiveColor ?? '#64748b'}
+                  value={w.tabInactiveColor ?? '#6A7282'}
                   onChange={e => onUpdate({ tabInactiveColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickInactive')}
@@ -3112,10 +3112,10 @@ function TabListSettings({
               <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.headerTextColor')}</label>
               <div
                 className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
-                style={{ backgroundColor: w.headerTextColor ?? '#94a3b8' }}
+                style={{ backgroundColor: w.headerTextColor ?? '#99A1AF' }}
               >
                 <SiteColorInput
-                  value={w.headerTextColor ?? '#94a3b8'}
+                  value={w.headerTextColor ?? '#99A1AF'}
                   onChange={e => onUpdate({ headerTextColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickHeaderColor')}
@@ -3137,10 +3137,10 @@ function TabListSettings({
               <label className="text-text-quaternary text-caption-2 block mb-1">{t('dashboard.properties.widgets.tabList.contentTextColor')}</label>
               <div
                 className="w-full h-8 rounded border border-border-quaternary relative overflow-hidden cursor-pointer hover:border-border-primary transition-colors shadow-inner flex items-center justify-center"
-                style={{ backgroundColor: w.textColor ?? '#cbd5e1' }}
+                style={{ backgroundColor: w.textColor ?? '#D1D5DC' }}
               >
                 <SiteColorInput
-                  value={w.textColor ?? '#cbd5e1'}
+                  value={w.textColor ?? '#D1D5DC'}
                   onChange={e => onUpdate({ textColor: e.target.value })}
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                   title={t('dashboard.properties.widgets.tabList.pickContentColor')}

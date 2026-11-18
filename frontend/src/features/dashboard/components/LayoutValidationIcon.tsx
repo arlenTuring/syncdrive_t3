@@ -42,8 +42,8 @@ export function LayoutValidationIcon({
         width: size + 6,
         height: size + 6,
         borderRadius: '50%',
-        background: 'rgba(239,68,68,0.95)',
-        color: '#fff',
+        background: 'rgba(251, 44, 54, 0.95)',
+        color: '#FFFFFF',
         boxShadow: '0 0 0 2px rgba(0,0,0,0.5)',
         pointerEvents: 'auto',
         cursor: 'help',
@@ -52,7 +52,7 @@ export function LayoutValidationIcon({
       onClick={e => e.stopPropagation()}
       onMouseDown={e => e.stopPropagation()}
     >
-      <AlertTriangle size={size} strokeWidth={2.5} fill="#fff" color="#dc2626" />
+      <AlertTriangle size={size} strokeWidth={2.5} fill="#FFFFFF" color="#E7000B" />
     </span>
   );
 }

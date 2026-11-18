@@ -10,18 +10,19 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 /** @deprecated 請在元件 colorRules 或範例平面設定 */
 export const DEFAULT_VEHICLE_SEGMENT_RULES: SegmentBarColorRule[] = [];
 
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 export function resolveSegmentRule(
   status: string,
   rules: SegmentBarColorRule[],
 ): SegmentBarColorRule {
   return rules.find(r => r.status === status)
-    ?? { status, label: status, color: '#64748b' };
+    ?? { status, label: status, color: '#6A7282' };
 }
 
 export function SegmentBarWidgetView({ widget }: { widget: SegmentBarType }) {
@@ -170,7 +171,7 @@ export function SegmentBarWidgetView({ widget }: { widget: SegmentBarType }) {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: emptyFs,
-              color: '#64748b',
+              color: '#6A7282',
             }}
           >
             尚無資料

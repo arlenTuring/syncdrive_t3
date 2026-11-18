@@ -9,6 +9,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, barPadding, width, height }: {
   data: Record<string, unknown>[];
@@ -47,7 +48,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
           return (
             <g key={i}>
               <line x1={0} x2={cw} y1={y} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-              <text x={-5} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize={9} fontFamily="monospace">
+              <text x={-5} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize={9} fontFamily={FONT_FAMILY_PRIMARY}>
                 {v % 1 === 0 ? v : v.toFixed(1)}
               </text>
             </g>
@@ -71,7 +72,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                   const val = Number(d[f]) || 0;
                   const barH = Math.abs(((val - minY) / yRange) * ch);
                   const barY = ch - ((Math.max(val, minY) - minY) / yRange) * ch;
-                  const color = colors[fi] || '#06b6d4';
+                  const color = colors[fi] || '#00B8DB';
                   const bx = groupX + fi * barW;
                   return (
                     <g key={f}>
@@ -79,7 +80,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                             fill={color} fillOpacity={0.85} rx={2} />
                       {showValues && (
                         <text x={bx + barW / 2} y={barY - 3} textAnchor="middle"
-                              fill={color} fontSize={8} fontFamily="monospace">
+                              fill={color} fontSize={8} fontFamily={FONT_FAMILY_PRIMARY}>
                           {val}
                         </text>
                       )}
@@ -87,7 +88,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                   );
                 })}
                 <text x={xCenter} y={ch + 14} textAnchor="middle"
-                      fill="rgba(255,255,255,0.35)" fontSize={9} fontFamily="monospace">
+                      fill="rgba(255,255,255,0.35)" fontSize={9} fontFamily={FONT_FAMILY_PRIMARY}>
                   {xLabel}
                 </text>
               </g>
@@ -100,7 +101,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                 {yFields.map((f, fi) => {
                   const val = Number(d[f]) || 0;
                   const barLen = ((val - minY) / yRange) * cw;
-                  const color = colors[fi] || '#06b6d4';
+                  const color = colors[fi] || '#00B8DB';
                   const by = groupY + fi * barW;
                   return (
                     <g key={f}>
@@ -108,7 +109,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                             fill={color} fillOpacity={0.85} rx={2} />
                       {showValues && (
                         <text x={barLen + 4} y={by + barW / 2 + 3}
-                              fill={color} fontSize={8} fontFamily="monospace">
+                              fill={color} fontSize={8} fontFamily={FONT_FAMILY_PRIMARY}>
                           {val}
                         </text>
                       )}
@@ -116,7 +117,7 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
                   );
                 })}
                 <text x={-6} y={groupY + barW * yFields.length / 2 + 4} textAnchor="end"
-                      fill="rgba(255,255,255,0.35)" fontSize={9} fontFamily="monospace">
+                      fill="rgba(255,255,255,0.35)" fontSize={9} fontFamily={FONT_FAMILY_PRIMARY}>
                   {xLabel}
                 </text>
               </g>
@@ -127,8 +128,8 @@ function SvgBarChart({ data, xField, yFields, colors, orientation, showValues, b
         {/* Legend */}
         {yFields.map((f, fi) => (
           <g key={f} transform={`translate(${fi * 80}, -12)`}>
-            <rect x={0} y={-6} width={10} height={10} fill={colors[fi] || '#06b6d4'} rx={2} />
-            <text x={14} y={4} fill={colors[fi] || '#06b6d4'} fontSize={9} fontFamily="monospace">{f}</text>
+            <rect x={0} y={-6} width={10} height={10} fill={colors[fi] || '#00B8DB'} rx={2} />
+            <text x={14} y={4} fill={colors[fi] || '#00B8DB'} fontSize={9} fontFamily={FONT_FAMILY_PRIMARY}>{f}</text>
           </g>
         ))}
       </g>
@@ -167,10 +168,10 @@ export function BarChartWidgetView({ widget }: { widget: BarChartWidget }) {
                   background: 'transparent', borderRadius: 4, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
                     borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <BarChart2 size={11} color="#f59e0b" />
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>{widget.title}</span>
-        {loading && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 'auto' }}>載入中…</span>}
-        {error   && <span style={{ fontSize: 9, color: '#ef4444', marginLeft: 'auto' }}>錯誤</span>}
+        <BarChart2 size={11} color="#FD9A00" />
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONT_FAMILY_PRIMARY }}>{widget.title}</span>
+        {loading && <span style={{ fontSize: 9, color: '#FD9A00', marginLeft: 'auto' }}>載入中…</span>}
+        {error   && <span style={{ fontSize: 9, color: '#FB2C36', marginLeft: 'auto' }}>錯誤</span>}
         {!hasSource && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>未設定資料來源</span>}
       </div>
       <div ref={ref} style={{ flex: 1, overflow: 'hidden' }}>
@@ -187,7 +188,7 @@ export function BarChartWidgetView({ widget }: { widget: BarChartWidget }) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                         justifyContent: 'center', color: 'rgba(255,255,255,0.1)', gap: 4 }}>
             <BarChart2 size={28} strokeWidth={1} />
-            <span style={{ fontSize: 10, fontFamily: 'monospace' }}>無資料</span>
+            <span style={{ fontSize: 10, fontFamily: FONT_FAMILY_PRIMARY }}>無資料</span>
           </div>
         )}
       </div>

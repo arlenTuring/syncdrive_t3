@@ -1,8 +1,9 @@
 import type { EmptyStateWidget } from '../types';
 import { useWidgetData } from './useWidgetData';
 import { useIsEditMode, shouldShowEditPreview } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 export function EmptyStateWidgetView({ widget }: { widget: EmptyStateWidget }) {
   const isEditMode = useIsEditMode();
@@ -36,7 +37,7 @@ export function EmptyStateWidgetView({ widget }: { widget: EmptyStateWidget }) {
   const markFs = widget.markFontSize ?? (isMinimalCenter ? 24 : 22);
   const subFs = widget.subLabelFontSize ?? 10;
 
-  const ghostStyle = editGhost ? { opacity: 0.45, outline: '1px dashed rgba(168,85,247,0.4)' } : {};
+  const ghostStyle = editGhost ? { opacity: 0.45, outline: '1px dashed rgba(173, 70, 255, 0.4)' } : {};
 
   if (isMinimalCenter) {
     return (
@@ -61,19 +62,19 @@ export function EmptyStateWidgetView({ widget }: { widget: EmptyStateWidget }) {
             width: 44,
             height: 44,
             borderRadius: '50%',
-            border: '2px solid rgba(148,163,184,0.4)',
+            border: '2px solid rgba(144, 161, 185, 0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: markFs,
-            color: '#94a3b8',
+            color: '#99A1AF',
             lineHeight: 1,
           }}
           aria-hidden
         >
           ◡
         </div>
-        <div style={{ fontSize: labelFs, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.02em' }}>
+        <div style={{ fontSize: labelFs, fontWeight: 600, color: '#99A1AF', letterSpacing: '0.02em' }}>
           {widget.label}
         </div>
       </div>
@@ -87,8 +88,8 @@ export function EmptyStateWidgetView({ widget }: { widget: EmptyStateWidget }) {
         height: '100%',
         margin: '0 auto',
         borderRadius: radius,
-        border: '1px dashed rgba(100,116,139,0.45)',
-        background: 'rgba(15,23,42,0.55)',
+        border: '1px dashed rgba(98, 116, 142, 0.45)',
+        background: 'rgba(15, 23, 43, 0.55)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -104,21 +105,21 @@ export function EmptyStateWidgetView({ widget }: { widget: EmptyStateWidget }) {
           width: 40,
           height: 40,
           borderRadius: '50%',
-          border: '2px solid rgba(148,163,184,0.35)',
+          border: '2px solid rgba(144, 161, 185, 0.35)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: markFs,
-          color: '#94a3b8',
+          color: '#99A1AF',
           lineHeight: 1,
         }}
         aria-hidden
       >
         ◡
       </div>
-      <div style={{ fontSize: labelFs, fontWeight: 600, color: '#94a3b8' }}>{widget.label}</div>
+      <div style={{ fontSize: labelFs, fontWeight: 600, color: '#99A1AF' }}>{widget.label}</div>
       {widget.subLabel && (
-        <div style={{ fontSize: subFs, color: '#64748b', textAlign: 'center', padding: '0 12px' }}>
+        <div style={{ fontSize: subFs, color: '#6A7282', textAlign: 'center', padding: '0 12px' }}>
           {widget.subLabel}
         </div>
       )}

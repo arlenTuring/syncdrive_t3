@@ -23,6 +23,7 @@ import { AlertBannerWidgetView } from './AlertBannerWidget';
 import { VehicleContainerWidgetView } from './VehicleContainerWidgetView';
 import { ShiftListWidgetView }   from './ShiftListWidget';
 import { TabListWidgetView }     from './TabListWidget';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 export function WidgetRenderer({
   widget,
   isSelected,
@@ -80,7 +81,7 @@ export function WidgetRenderer({
         height: legacy.height,
         content: '{alert_message}',
         fontSize: legacy.fontSize ?? 10,
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONT_FAMILY_PRIMARY,
         fontWeight: 'bold',
         color: '#fafafa',
         textAlign: 'center',
@@ -95,8 +96,8 @@ export function WidgetRenderer({
           id: 'rule-legacy',
           content: '{alert_message}',
           textColor: '#fafafa',
-          backgroundColor: 'rgba(194,65,12,0.55)',
-          borderColor: 'rgba(251,146,60,0.45)',
+          backgroundColor: 'rgba(202, 53, 0, 0.55)',
+          borderColor: 'rgba(255, 137, 4, 0.45)',
           displayMode: 'blink',
           startField: legacy.messageVarKey ?? 'alert_message',
           startMode: 'non-empty',

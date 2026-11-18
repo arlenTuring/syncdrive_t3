@@ -52,9 +52,9 @@ export function ImageWidgetView({ widget }: { widget: ImageWidget }) {
         gap: 6,
         background: widget.backgroundColor ?? 'rgba(255,255,255,0.03)',
         border: widget.borderWidth
-          ? `${widget.borderWidth}px solid ${widget.borderColor ?? 'rgba(168,85,247,0.35)'}`
-          : '1px dashed rgba(168,85,247,0.35)',
-        color: 'rgba(196,181,253,0.75)',
+          ? `${widget.borderWidth}px solid ${widget.borderColor ?? 'rgba(173, 70, 255, 0.35)'}`
+          : '1px dashed rgba(173, 70, 255, 0.35)',
+        color: 'rgba(196, 180, 255, 0.75)',
         fontSize: 11,
         fontStyle: isEditMode ? 'italic' : undefined,
       }}>

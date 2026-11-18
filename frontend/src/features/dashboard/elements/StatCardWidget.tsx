@@ -14,8 +14,9 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 function alignToFlex(align: StatCardWidget['contentAlign']): CSSProperties['justifyContent'] {
   if (align === 'left') return 'flex-start';
@@ -125,8 +126,8 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
       const tol = (widget.tolerancePct ?? 5) / 100;
       const inBand = Math.abs(live - targetRaw) / Math.abs(targetRaw) <= tol;
       valueColor = inBand
-        ? (widget.inBandColor ?? '#38bdf8')
-        : (widget.outOfBandColor ?? '#f87171');
+        ? (widget.inBandColor ?? '#00BCFF')
+        : (widget.outOfBandColor ?? '#FF6467');
     }
   } else if (widget.colorRulesEnabled && widget.colorRules && rawValue !== null) {
     for (const rule of widget.colorRules) {
@@ -203,7 +204,7 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
         gap: 4,
         marginLeft: 'auto',
         fontSize: widget.labelFontSize,
-        color: widget.hintColor ?? '#94a3b8',
+        color: widget.hintColor ?? '#99A1AF',
         fontFamily: FONT_UI,
         whiteSpace: 'nowrap',
         flexShrink: 0,
@@ -285,7 +286,7 @@ export function StatCardWidgetView({ widget }: { widget: StatCardWidget }) {
             gap: 4,
             marginTop: 4,
             fontSize: widget.labelFontSize,
-            color: widget.hintColor ?? '#94a3b8',
+            color: widget.hintColor ?? '#99A1AF',
             fontFamily: FONT_UI,
           }}
         >

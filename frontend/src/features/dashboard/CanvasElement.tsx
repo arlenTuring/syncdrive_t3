@@ -36,13 +36,14 @@ import { canAddWidgetToCanvas } from './utils/widgetPlacementRules';
 import { useCanvasMapVehicleTemplate } from './utils/resolveMapVehicleTemplate';
 import { canvasBackgroundCss } from './constants/backgroundImages';
 import { isTabCanvas } from './utils/tabCanvas';
+import { FONT_FAMILY_PRIMARY } from '../../styles/tokens';
 
 const DistLabel = ({ val, top, left, right, bottom, horizontal }: { val: number, top?: number | string, left?: number | string, right?: number | string, bottom?: number | string, horizontal?: boolean }) => (
   <div style={{
     position: 'absolute', top, left, right, bottom,
     transform: horizontal ? 'translateX(-50%)' : 'translateY(-50%)',
-    background: 'rgba(15,22,35,0.95)', color: '#22d3ee', fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold',
-    padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(34,211,238,0.5)', whiteSpace: 'nowrap', zIndex: 2100,
+    background: 'rgba(16, 24, 40, 0.95)', color: '#00D3F2', fontSize: 10, fontFamily: FONT_FAMILY_PRIMARY, fontWeight: 'bold',
+    padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(0, 211, 242, 0.5)', whiteSpace: 'nowrap', zIndex: 2100,
     pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
   }}>
     {Math.round(val)}
@@ -53,7 +54,7 @@ const DistLabelChild = ({ val, top, left, right, bottom, horizontal, color }: { 
   <div style={{
     position: 'absolute', top, left, right, bottom,
     transform: horizontal ? 'translateX(-50%)' : 'translateY(-50%)',
-    background: 'rgba(15,22,35,0.95)', color, fontSize: 8, fontFamily: 'monospace', fontWeight: 'bold',
+    background: 'rgba(16, 24, 40, 0.95)', color, fontSize: 8, fontFamily: FONT_FAMILY_PRIMARY, fontWeight: 'bold',
     padding: '1px 4px', borderRadius: 2, border: `1px solid ${color}80`, whiteSpace: 'nowrap', zIndex: 1100,
     pointerEvents: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.4)'
   }}>
@@ -368,9 +369,9 @@ export function CanvasElement({
   // 才退回這個圖台元件上舊的載具容器樣板，再沒有才用系統預設模型
   const vehicleTemplate = useCanvasMapVehicleTemplate(element, isMapPlatform);
   const boxShadow = isEditMode && isSelected
-    ? (canDropCanvas ? '0 0 0 2px #06b6d4, 0 0 12px rgba(6,182,212,0.25)' : '0 0 0 4px #ef4444, 0 0 20px rgba(239,68,68,0.5)')
+    ? (canDropCanvas ? '0 0 0 2px #00B8DB, 0 0 12px rgba(0, 184, 219, 0.25)' : '0 0 0 4px #FB2C36, 0 0 20px rgba(251, 44, 54, 0.5)')
     : isMapPlatform
-      ? '0 0 0 1px rgba(14,165,233,0.35)'
+      ? '0 0 0 1px rgba(0, 166, 244, 0.35)'
       : '0 0 0 1px rgba(255,255,255,0.08)';
 
   const dimOpacity = isDimmed && !isDraggingCanvas ? 0.6 : 1;
@@ -459,10 +460,10 @@ export function CanvasElement({
       disableDragging={!isEditMode || (hasChildSelection && isSelected) || modifierHeld}
       enableResizing={isEditMode && isSelected && !hasChildSelection && element.id !== 'template-canvas'}
       resizeHandleStyles={isEditMode && isSelected ? {
-        bottomRight: { width: 12, height: 12, bottom: -4, right: -4, background: '#06b6d4', borderRadius: '50%', border: '2px solid #fff', zIndex: 100 },
-        bottomLeft:  { width: 8, height: 8, bottom: -2, left: -2, background: '#06b6d4', borderRadius: '50%', zIndex: 100 },
-        topRight:    { width: 8, height: 8, top: -2, right: -2, background: '#06b6d4', borderRadius: '50%', zIndex: 100 },
-        topLeft:     { width: 8, height: 8, top: -2, left: -2, background: '#06b6d4', borderRadius: '50%', zIndex: 100 },
+        bottomRight: { width: 12, height: 12, bottom: -4, right: -4, background: '#00B8DB', borderRadius: '50%', border: '2px solid #FFFFFF', zIndex: 100 },
+        bottomLeft:  { width: 8, height: 8, bottom: -2, left: -2, background: '#00B8DB', borderRadius: '50%', zIndex: 100 },
+        topRight:    { width: 8, height: 8, top: -2, right: -2, background: '#00B8DB', borderRadius: '50%', zIndex: 100 },
+        topLeft:     { width: 8, height: 8, top: -2, left: -2, background: '#00B8DB', borderRadius: '50%', zIndex: 100 },
       } : {}}
       onDragStart={handleCanvasDragStart}
       onDrag={handleCanvasDrag}
@@ -540,13 +541,13 @@ export function CanvasElement({
                 height: 22,
                 marginRight: 2,
                 border: childListOpen
-                  ? '1px solid rgba(6,182,212,0.7)'
-                  : '1px solid rgba(6,182,212,0.35)',
+                  ? '1px solid rgba(0, 184, 219, 0.7)'
+                  : '1px solid rgba(0, 184, 219, 0.35)',
                 borderRadius: '3px 0 0 3px',
                 background: childListOpen
-                  ? 'rgba(6,182,212,0.35)'
-                  : 'rgba(6,182,212,0.15)',
-                color: '#e0f2fe',
+                  ? 'rgba(0, 184, 219, 0.35)'
+                  : 'rgba(0, 184, 219, 0.15)',
+                color: '#DFF2FE',
                 cursor: 'pointer',
               }}
             >
@@ -561,10 +562,10 @@ export function CanvasElement({
               style={{
                 minWidth: 48,
                 maxWidth: 280,
-                background: isSelected ? '#06b6d4' : 'rgba(6,182,212,0.72)',
+                background: isSelected ? '#00B8DB' : 'rgba(0, 184, 219, 0.72)',
                 color: 'white',
                 fontSize: 10,
-                fontFamily: 'monospace',
+                fontFamily: FONT_FAMILY_PRIMARY,
                 fontWeight: isSelected ? 'bold' : 600,
                 padding: '2px 8px',
                 borderRadius: '0 3px 3px 0',
@@ -575,7 +576,7 @@ export function CanvasElement({
                 userSelect: 'none',
                 cursor: isDraggingCanvas ? 'grabbing' : 'grab',
                 boxShadow: labelHover
-                  ? '0 2px 10px rgba(6,182,212,0.45)'
+                  ? '0 2px 10px rgba(0, 184, 219, 0.45)'
                   : '0 1px 4px rgba(0,0,0,0.35)',
                 opacity: isSelected || labelHover ? 1 : 0.88,
               }}
@@ -629,7 +630,7 @@ export function CanvasElement({
               left: 0,
               right: 0,
               height: element.tabBarHeight ?? 40,
-              backgroundColor: element.tabBarBgColor ?? 'rgba(15,23,42,0.92)',
+              backgroundColor: element.tabBarBgColor ?? 'rgba(15, 23, 43, 0.92)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
               display: 'flex',
               alignItems: 'stretch',
@@ -655,13 +656,13 @@ export function CanvasElement({
                   padding: '0 14px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: `2px solid ${element.tabActiveColor ?? '#3B82F6'}`,
+                  borderBottom: `2px solid ${element.tabActiveColor ?? '#2B7FFF'}`,
                   color: '#e2e8f0',
                   fontSize: 11,
                   fontWeight: 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  fontFamily: FONT_FAMILY_PRIMARY,
                 }}
               >
                 {tab.label}
@@ -671,8 +672,8 @@ export function CanvasElement({
                     alignItems: 'center',
                     padding: '1px 4px',
                     borderRadius: 3,
-                    backgroundColor: 'rgba(59,130,246,0.25)',
-                    color: '#93c5fd',
+                    backgroundColor: 'rgba(43, 127, 255, 0.25)',
+                    color: '#8EC5FF',
                     fontSize: 9,
                     fontWeight: 700,
                     gap: 2,
@@ -687,7 +688,7 @@ export function CanvasElement({
         )}
         {/* Drag-over Highlight */}
         {isDragOver && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 999, background: 'rgba(34,211,238,0.04)', border: '2px dashed rgba(34,211,238,0.4)', borderRadius: 4, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', inset: 0, zIndex: 999, background: 'rgba(0, 211, 242, 0.04)', border: '2px dashed rgba(0, 211, 242, 0.4)', borderRadius: 4, pointerEvents: 'none' }} />
         )}
 
         {!isMapPlatform && element.backgroundImageArea && element.backgroundImage ? (
@@ -870,8 +871,8 @@ export function CanvasElement({
               top: childMarquee.y,
               width: childMarquee.width,
               height: childMarquee.height,
-              border: '1px dashed rgba(34,211,238,0.9)',
-              background: 'rgba(34,211,238,0.12)',
+              border: '1px dashed rgba(0, 211, 242, 0.9)',
+              background: 'rgba(0, 211, 242, 0.12)',
               pointerEvents: 'none',
               zIndex: 3000,
             }}
@@ -879,12 +880,12 @@ export function CanvasElement({
         )}
 
         {isSelected && !hasChildSelection && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: 4, right: 4, zIndex: 100, background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: 4, padding: '3px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'white' }}>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: 4, right: 4, zIndex: 100, background: 'rgba(251, 44, 54, 0.85)', border: 'none', borderRadius: 4, padding: '3px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'white' }}>
             <Trash2 size={11} />
           </button>
         )}
         {isEditMode && (
-          <div style={{ position: 'absolute', bottom: 4, right: 6, fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', bottom: 4, right: 6, fontSize: 9, fontFamily: FONT_FAMILY_PRIMARY, color: 'rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
             {element.width} × {element.height}
           </div>
         )}
@@ -892,7 +893,7 @@ export function CanvasElement({
         {/* 子元件對齊輔助線（畫布座標，避免被元件 overflow 裁切） */}
         {isEditMode && childSnapGuides.length > 0 && (
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1999 }}>
-            <SnapGuideLines guides={childSnapGuides} color="#f472b6" />
+            <SnapGuideLines guides={childSnapGuides} color="#FB64B6" />
           </div>
         )}
       </div>
@@ -908,13 +909,13 @@ export function CanvasElement({
           {/* 中心線與中心座標 */}
           {!isResizingCanvas && (
             <>
-              <div style={{ position: 'absolute', left: '50%', top: -5000, bottom: -5000, width: 0.5, background: 'rgba(34,211,238,0.75)' }} />
-              <div style={{ position: 'absolute', top: '50%', left: -5000, right: -5000, height: 0.5, background: 'rgba(34,211,238,0.75)' }} />
+              <div style={{ position: 'absolute', left: '50%', top: -5000, bottom: -5000, width: 0.5, background: 'rgba(0, 211, 242, 0.75)' }} />
+              <div style={{ position: 'absolute', top: '50%', left: -5000, right: -5000, height: 0.5, background: 'rgba(0, 211, 242, 0.75)' }} />
               <div style={{
                 position: 'absolute', left: '50%', top: '50%', transform: 'translate(10px, 10px)',
-                background: 'rgba(15,22,35,0.95)', color: canDropCanvas ? '#22d3ee' : '#ef4444',
-                padding: '3px 10px', borderRadius: 4, fontSize: 13, fontWeight: 'bold', fontFamily: 'monospace',
-                border: '1px solid rgba(34,211,238,0.4)', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', whiteSpace: 'nowrap'
+                background: 'rgba(16, 24, 40, 0.95)', color: canDropCanvas ? '#00D3F2' : '#FB2C36',
+                padding: '3px 10px', borderRadius: 4, fontSize: 13, fontWeight: 'bold', fontFamily: FONT_FAMILY_PRIMARY,
+                border: '1px solid rgba(0, 211, 242, 0.4)', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', whiteSpace: 'nowrap'
               }}>
                 {Math.round(currentCanvasPos.x + (isResizingCanvas ? currentCanvasSize.width : element.width) / 2)}, 
                 {Math.round(currentCanvasPos.y + (isResizingCanvas ? currentCanvasSize.height : element.height) / 2)}
@@ -923,10 +924,10 @@ export function CanvasElement({
           )}
 
           {/* 頂點延伸引導線 (四個頂點) */}
-          <div style={{ position: 'absolute', left: 0, top: -5000, bottom: -5000, width: 1, borderLeft: '1px dashed rgba(34,211,238,0.4)' }} />
-          <div style={{ position: 'absolute', right: 0, top: -5000, bottom: -5000, width: 1, borderLeft: '1px dashed rgba(34,211,238,0.4)' }} />
-          <div style={{ position: 'absolute', top: 0, left: -5000, right: -5000, height: 1, borderTop: '1px dashed rgba(34,211,238,0.4)' }} />
-          <div style={{ position: 'absolute', bottom: 0, left: -5000, right: -5000, height: 1, borderTop: '1px dashed rgba(34,211,238,0.4)' }} />
+          <div style={{ position: 'absolute', left: 0, top: -5000, bottom: -5000, width: 1, borderLeft: '1px dashed rgba(0, 211, 242, 0.4)' }} />
+          <div style={{ position: 'absolute', right: 0, top: -5000, bottom: -5000, width: 1, borderLeft: '1px dashed rgba(0, 211, 242, 0.4)' }} />
+          <div style={{ position: 'absolute', top: 0, left: -5000, right: -5000, height: 1, borderTop: '1px dashed rgba(0, 211, 242, 0.4)' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: -5000, right: -5000, height: 1, borderTop: '1px dashed rgba(0, 211, 242, 0.4)' }} />
 
           {/* 頂點標籤 - 獨立定位確保顯示 */}
           <DistLabel val={currentCanvasPos.x} left={0} top={-40} horizontal />
@@ -938,8 +939,8 @@ export function CanvasElement({
           {isResizingCanvas && (
             <div style={{
               position: 'absolute', bottom: -30, left: '50%', transform: 'translateX(-50%)',
-              background: '#06b6d4', color: 'white', padding: '3px 12px', borderRadius: 4,
-              fontSize: 12, fontWeight: 'bold', fontFamily: 'monospace', boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+              background: '#00B8DB', color: 'white', padding: '3px 12px', borderRadius: 4,
+              fontSize: 12, fontWeight: 'bold', fontFamily: FONT_FAMILY_PRIMARY, boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
             }}>
               W: {currentCanvasSize.width} H: {currentCanvasSize.height}
             </div>
@@ -985,10 +986,10 @@ const CHILD_RESIZE_HANDLES = {
 } as const;
 
 const childResizeHandleStyle = (color: string) => ({
-  bottomRight: { width: 10, height: 10, bottom: -4, right: -4, background: color, borderRadius: 2, border: '1.5px solid #fff', zIndex: 200 },
-  bottomLeft: { width: 8, height: 8, bottom: -3, left: -3, background: color, borderRadius: 2, border: '1.5px solid #fff', zIndex: 200 },
-  topRight: { width: 8, height: 8, top: -3, right: -3, background: color, borderRadius: 2, border: '1.5px solid #fff', zIndex: 200 },
-  topLeft: { width: 8, height: 8, top: -3, left: -3, background: color, borderRadius: 2, border: '1.5px solid #fff', zIndex: 200 },
+  bottomRight: { width: 10, height: 10, bottom: -4, right: -4, background: color, borderRadius: 2, border: '1.5px solid #FFFFFF', zIndex: 200 },
+  bottomLeft: { width: 8, height: 8, bottom: -3, left: -3, background: color, borderRadius: 2, border: '1.5px solid #FFFFFF', zIndex: 200 },
+  topRight: { width: 8, height: 8, top: -3, right: -3, background: color, borderRadius: 2, border: '1.5px solid #FFFFFF', zIndex: 200 },
+  topLeft: { width: 8, height: 8, top: -3, left: -3, background: color, borderRadius: 2, border: '1.5px solid #FFFFFF', zIndex: 200 },
   right: { width: 6, height: 20, right: -3, top: '50%', marginTop: -10, background: color, borderRadius: 2, zIndex: 200 },
   left: { width: 6, height: 20, left: -3, top: '50%', marginTop: -10, background: color, borderRadius: 2, zIndex: 200 },
   bottom: { height: 6, width: 20, bottom: -3, left: '50%', marginLeft: -10, background: color, borderRadius: 2, zIndex: 200 },
@@ -1063,21 +1064,21 @@ function ChildWidgetRnd({
   );
 
 const color =  {
-    text: '#f59e0b', image: '#10b981', 'line-chart': '#06b6d4', database: '#a78bfa',
-    gauge: '#ec4899', 'slot-grid': '#f43f5e', 'maintenance-distribution': '#f43f5e', 'route-progress': '#3b82f6',
-    'color-block': '#64748b', 'status-badge': '#22c55e', 'stat-card': '#e879f9',
-    'progress-bar': '#38bdf8', clock: '#a3e635',
-    'segment-bar': '#22c55e', 'bar-chart': '#f97316', 'map-canvas': '#0ea5e9',
-    'empty-state': '#94a3b8',
-    'unit-telemetry-card': '#a78bfa',
-    'alert-banner': '#f97316',
-    'vehicle-alert-banner': '#f97316',
-    'vehicle-container': '#f59e0b',
-    'tab-list': '#8b5cf6',
-    'shift-list': '#8b5cf6',
-    'station-eta': '#34d399',
-    'obstacle-ring': '#fb7185',
-  }[child.type] || '#94a3b8';
+    text: '#FD9A00', image: '#00BC7D', 'line-chart': '#00B8DB', database: '#A684FF',
+    gauge: '#F6339A', 'slot-grid': '#FF2056', 'maintenance-distribution': '#FF2056', 'route-progress': '#2B7FFF',
+    'color-block': '#6A7282', 'status-badge': '#00C951', 'stat-card': '#ED6BFF',
+    'progress-bar': '#00BCFF', clock: '#9AE600',
+    'segment-bar': '#00C951', 'bar-chart': '#FF6900', 'map-canvas': '#00A6F4',
+    'empty-state': '#99A1AF',
+    'unit-telemetry-card': '#A684FF',
+    'alert-banner': '#FF6900',
+    'vehicle-alert-banner': '#FF6900',
+    'vehicle-container': '#FD9A00',
+    'tab-list': '#8E51FF',
+    'shift-list': '#8E51FF',
+    'station-eta': '#00D492',
+    'obstacle-ring': '#FF637E',
+  }[child.type] || '#99A1AF';
   const label = {
     text: 'TEXT', image: 'IMG', 'line-chart': 'CHART', database: 'DB',
     gauge: 'GAUGE', 'slot-grid': 'SLOTS', 'maintenance-distribution': 'MAINT', 'route-progress': 'ROUTE',
@@ -1325,8 +1326,8 @@ const color =  {
         {canReceivePaint && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 998,
-            border: '2px dashed #d946ef', borderRadius: 2, pointerEvents: 'none',
-            boxShadow: '0 0 10px rgba(217,70,239,0.35)',
+            border: '2px dashed #E12AFB', borderRadius: 2, pointerEvents: 'none',
+            boxShadow: '0 0 10px rgba(225, 42, 251, 0.35)',
           }} />
         )}
         <BindingWarningIcon issue={bindingIssue} />
@@ -1350,7 +1351,7 @@ const color =  {
           display: 'flex', alignItems: 'stretch', pointerEvents: 'auto',
         }}>
           <span style={{
-            background: color, color: 'white', fontSize: 9, fontFamily: 'monospace',
+            background: color, color: 'white', fontSize: 9, fontFamily: FONT_FAMILY_PRIMARY,
             fontWeight: 'bold', padding: '1px 5px', borderRadius: '2px 0 0 0',
           }}>
             {label}
@@ -1382,7 +1383,7 @@ const color =  {
             top: child.height < 24 ? -18 : 2,
             right: child.height < 24 ? 0 : 2,
             zIndex: 210,
-            background: 'rgba(239,68,68,0.9)',
+            background: 'rgba(251, 44, 54, 0.9)',
             border: 'none',
             borderRadius: 3,
             padding: '2px 4px',
@@ -1406,7 +1407,7 @@ const color =  {
               <div style={{ position: 'absolute', top: '50%', left: -5000, right: -5000, height: 0.5, background: color, opacity: 0.75 }} />
               <div style={{
                 position: 'absolute', left: '50%', top: '50%', transform: 'translate(8px, 8px)',
-                background: 'rgba(15,22,35,0.95)', color, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 'bold', fontFamily: 'monospace',
+                background: 'rgba(16, 24, 40, 0.95)', color, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 'bold', fontFamily: FONT_FAMILY_PRIMARY,
                 border: `1px solid ${color}60`, boxShadow: '0 4px 10px rgba(0,0,0,0.4)', whiteSpace: 'nowrap'
               }}>
                 {Math.round(curX + curW / 2)}, {Math.round(curY + curH / 2)}
@@ -1430,7 +1431,7 @@ const color =  {
             <div style={{
               position: 'absolute', bottom: -20, left: '50%', transform: 'translateX(-50%)',
               background: color, color: 'white', padding: '1px 8px', borderRadius: 3,
-              fontSize: 10, fontWeight: 'bold', fontFamily: 'monospace', boxShadow: '0 4px 10px rgba(0,0,0,0.4)'
+              fontSize: 10, fontWeight: 'bold', fontFamily: FONT_FAMILY_PRIMARY, boxShadow: '0 4px 10px rgba(0,0,0,0.4)'
             }}>
               {curW} x {curH}
             </div>

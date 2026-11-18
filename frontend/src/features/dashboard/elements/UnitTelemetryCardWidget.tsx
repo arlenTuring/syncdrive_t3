@@ -19,10 +19,11 @@ import {
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
 import { WidgetEditPreviewOutline } from '../components/EditPreviewChrome';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
-const VEHICLE_STATUS_BORDER = '#00c897';
-const VEHICLE_STATUS_BG = '#0f1419';
-const GAUGE_PANEL_BG = '#1a2332';
+const VEHICLE_STATUS_BORDER = '#00D492';
+const VEHICLE_STATUS_BG = '#18181B';
+const GAUGE_PANEL_BG = '#1F262F';
 
 function isWrapped(d: Record<string, unknown> | null): boolean {
   return d !== null && 'value' in d && Object.keys(d).length <= 2;
@@ -52,7 +53,7 @@ function VehicleStatusGauge({
   const cx = 38;
   const cy = 34;
   const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
-  const valueColor = showDash ? '#f4f4f5' : '#4ade80';
+  const valueColor = showDash ? '#f4f4f5' : '#05DF72';
   const valueLabel = showDash ? '--' : value.toFixed(1);
 
   return (
@@ -73,17 +74,17 @@ function VehicleStatusGauge({
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
             {arcVariant === 'load' ? (
               <>
-                <stop offset="0%" stopColor="#ef4444" />
-                <stop offset="12%" stopColor="#f97316" />
-                <stop offset="22%" stopColor="#22c55e" />
-                <stop offset="100%" stopColor="#22c55e" />
+                <stop offset="0%" stopColor="#FB2C36" />
+                <stop offset="12%" stopColor="#FF6900" />
+                <stop offset="22%" stopColor="#00C951" />
+                <stop offset="100%" stopColor="#00C951" />
               </>
             ) : (
               <>
-                <stop offset="0%" stopColor="#22c55e" />
-                <stop offset="55%" stopColor="#84cc16" />
-                <stop offset="85%" stopColor="#eab308" />
-                <stop offset="100%" stopColor="#ef4444" />
+                <stop offset="0%" stopColor="#00C951" />
+                <stop offset="55%" stopColor="#7CCF00" />
+                <stop offset="85%" stopColor="#EFB100" />
+                <stop offset="100%" stopColor="#FB2C36" />
               </>
             )}
           </linearGradient>
@@ -109,7 +110,7 @@ function VehicleStatusGauge({
         <text x={cx} y={cy + 12} fill={valueColor} fontSize="11" textAnchor="middle" fontWeight="700">
           {valueLabel}
         </text>
-        <text x={cx} y={cy + 22} fill="#a1a1aa" fontSize="7" textAnchor="middle" fontWeight="500">
+        <text x={cx} y={cy + 22} fill="#99A1AF" fontSize="7" textAnchor="middle" fontWeight="500">
           {unit}
         </text>
       </svg>
@@ -119,10 +120,10 @@ function VehicleStatusGauge({
 
 function subsystemStyle(status: string | undefined): { bg?: string; fg: string } {
   const s = (status ?? 'OK').toUpperCase();
-  if (s === 'ERROR') return { bg: '#b91c1c', fg: '#fff' };
-  if (s === 'WARNING') return { bg: '#c2410c', fg: '#fff' };
-  if (s === 'OFFLINE') return { bg: '#27272a', fg: '#a1a1aa' };
-  return { fg: '#4ade80' };
+  if (s === 'ERROR') return { bg: '#C10007', fg: '#FFFFFF' };
+  if (s === 'WARNING') return { bg: '#CA3500', fg: '#FFFFFF' };
+  if (s === 'OFFLINE') return { bg: '#27272a', fg: '#99A1AF' };
+  return { fg: '#05DF72' };
 }
 
 function VehicleStatusCardView({
@@ -161,7 +162,7 @@ function VehicleStatusCardView({
         height: '100%',
         position: 'relative',
         boxSizing: 'border-box',
-        fontFamily: 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif',
+        fontFamily: FONT_FAMILY_PRIMARY,
       }}
     >
       {/* 主卡（含底部留白給凸出標籤） */}
@@ -231,8 +232,8 @@ function VehicleStatusCardView({
               gap: 6,
               padding: '4px 8px',
               borderRadius: 4,
-              background: overall === 'ERROR' ? 'rgba(185,28,28,0.55)' : 'rgba(194,65,12,0.55)',
-              border: `1px solid ${overall === 'ERROR' ? 'rgba(248,113,113,0.5)' : 'rgba(251,146,60,0.45)'}`,
+              background: overall === 'ERROR' ? 'rgba(193, 0, 7, 0.55)' : 'rgba(202, 53, 0, 0.55)',
+              border: `1px solid ${overall === 'ERROR' ? 'rgba(255, 100, 103, 0.5)' : 'rgba(255, 137, 4, 0.45)'}`,
             }}
           >
             {overall === 'ERROR' ? (
@@ -332,7 +333,7 @@ function VehicleStatusCardView({
           zIndex: 2,
         }}
       >
-        <MapPin size={10} strokeWidth={2.2} color="#a1a1aa" />
+        <MapPin size={10} strokeWidth={2.2} color="#99A1AF" />
         {segment}
       </div>
     </div>
@@ -364,9 +365,9 @@ function CompactGauge({
     <svg width="72" height="44" viewBox="0 0 72 44" className="overflow-visible">
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#22c55e" />
-          <stop offset="50%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#ef4444" />
+          <stop offset="0%" stopColor="#00C951" />
+          <stop offset="50%" stopColor="#EFB100" />
+          <stop offset="100%" stopColor="#FB2C36" />
         </linearGradient>
       </defs>
       <path d={arc} fill="none" stroke="rgba(39,39,42,0.95)" strokeWidth="6" strokeLinecap="round" />
@@ -389,7 +390,7 @@ function CompactGauge({
       />
       <text x={cx} y={cy + 14} fill="#e4e4e7" fontSize="8" textAnchor="middle" fontWeight="600">
         {value.toFixed(1)}
-        <tspan fill="#71717a" fontSize="6">
+        <tspan fill="#71717B" fontSize="6">
           {unit}
         </tspan>
       </text>
@@ -426,9 +427,9 @@ function DefaultTelemetryCardView({
     <div
       className="flex h-full w-full flex-col rounded px-1 py-1"
       style={{
-        background: 'rgba(15,23,42,0.55)',
+        background: 'rgba(15, 23, 43, 0.55)',
         border: `2px solid ${borderColor}`,
-        boxShadow: overall === 'ERROR' ? '0 0 14px rgba(239,68,68,0.25)' : undefined,
+        boxShadow: overall === 'ERROR' ? '0 0 14px rgba(251, 44, 54, 0.25)' : undefined,
       }}
     >
       <div className="flex items-center justify-between gap-1 px-0.5">
@@ -452,7 +453,7 @@ function DefaultTelemetryCardView({
           min={widget.speedMin}
           max={widget.speedMax}
           unit={widget.speedUnit}
-          accent="#38bdf8"
+          accent="#00BCFF"
         />
         <CompactGauge
           gradId={`ld-${widget.id}`}
@@ -460,7 +461,7 @@ function DefaultTelemetryCardView({
           min={widget.loadMin}
           max={widget.loadMax}
           unit={widget.loadUnit}
-          accent="#a78bfa"
+          accent="#A684FF"
         />
       </div>
       <div className="flex justify-center gap-1 border-t border-border-quaternary px-0.5 pt-1">
@@ -575,7 +576,7 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
 
   const badge = resolveVehicleMonitorBadge(variables, { operation: operPayload });
   const tripCode = badge.label;
-  const tripBg = badge.bg || String(variables[widget.badgeBgField ?? 'badge_bg'] ?? '#7e57c2');
+  const tripBg = badge.bg || String(variables[widget.badgeBgField ?? 'badge_bg'] ?? '#8E51FF');
   const tripColor = badge.color || String(variables[widget.badgeColorField ?? 'badge_color'] ?? '#f3e8ff');
 
   const healthField = widget.healthStatusField ?? 'overall_health';
@@ -592,7 +593,7 @@ export function UnitTelemetryCardWidgetView({ widget }: { widget: UnitTelemetryC
   ).trim();
   const speedDash = !speedFound;
   const borderColor =
-    overall === 'ERROR' ? '#ef4444' : overall === 'WARNING' ? '#fb923c' : 'rgba(45,212,191,0.55)';
+    overall === 'ERROR' ? '#FB2C36' : overall === 'WARNING' ? '#FF8904' : 'rgba(0, 213, 190, 0.55)';
 
   const isInstrumentRow = widget.cardVariant === 'instrument-row';
   const hasBinding = widgetHasDataBinding(widget)

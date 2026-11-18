@@ -25,6 +25,7 @@ import {
 } from '../utils/mergeShiftRosterRows';
 import { Edit3, Variable } from 'lucide-react';
 import { Button } from '../../../components/ui';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 function isShiftRosterGroup(label: string | undefined): boolean {
   return label === '正線班次' || label === '整備班表';
@@ -287,12 +288,12 @@ function TemplateInstance({
           background: hideChrome
             ? 'transparent'
             : isPreviewMode
-              ? 'rgba(139,92,246,0.06)'
+              ? 'rgba(142, 81, 255, 0.06)'
               : 'rgba(255,255,255,0.02)',
           border: hideChrome
             ? 'none'
             : isPreviewMode
-              ? '1px dashed rgba(139,92,246,0.4)'
+              ? '1px dashed rgba(142, 81, 255, 0.4)'
               : '1px solid rgba(255,255,255,0.06)',
           borderRadius: hideChrome ? 0 : 6,
         }}
@@ -302,16 +303,16 @@ function TemplateInstance({
             className="absolute top-0 left-0 right-0 z-10 flex items-center gap-1 px-2"
             style={{
               height: previewBarH,
-              background: 'rgba(139,92,246,0.15)',
-              borderBottom: '1px dashed rgba(139,92,246,0.3)',
+              background: 'rgba(142, 81, 255, 0.15)',
+              borderBottom: '1px dashed rgba(142, 81, 255, 0.3)',
               pointerEvents: 'none',
             }}
           >
-            <Variable size={10} color="#a855f7" />
-            <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#a855f7', fontWeight: 'bold' }}>
+            <Variable size={10} color="#AD46FF" />
+            <span style={{ fontSize: 10, fontFamily: FONT_FAMILY_PRIMARY, color: '#AD46FF', fontWeight: 'bold' }}>
               {`{${varName}}`}
             </span>
-            <span style={{ fontSize: 9, color: 'rgba(168,85,247,0.5)', marginLeft: 'auto' }}>預覽範本</span>
+            <span style={{ fontSize: 9, color: 'rgba(173, 70, 255, 0.5)', marginLeft: 'auto' }}>預覽範本</span>
           </div>
         )}
         <div
@@ -516,7 +517,7 @@ function ScrollGroupView({
                 width: 5,
                 height: 5,
                 borderRadius: '50%',
-                background: i === activeIndex % dataRows.length ? '#a855f7' : 'rgba(255,255,255,0.2)',
+                background: i === activeIndex % dataRows.length ? '#AD46FF' : 'rgba(255,255,255,0.2)',
               }}
             />
           ))}
@@ -619,9 +620,9 @@ function SlotsGroupView({
                 boxSizing: 'border-box',
                 borderRadius: 6,
                 border: isEditMode && i > 0
-                  ? '1px dashed rgba(148,163,184,0.35)'
+                  ? '1px dashed rgba(144, 161, 185, 0.35)'
                   : '1px solid transparent',
-                background: isEditMode && i > 0 ? 'rgba(15,23,42,0.35)' : 'transparent',
+                background: isEditMode && i > 0 ? 'rgba(15, 23, 43, 0.35)' : 'transparent',
               }}
             >
               {showTemplate && (isEditMode || row) ? (
@@ -793,7 +794,7 @@ function GenericSlotsGroupView({
         {sourceError && occupiedCount > 0 && (
           <div
             className="absolute top-1 right-1 rounded px-2 py-0.5 text-caption-2 text-status-error-emphasis"
-            style={{ background: 'rgba(15,23,42,0.75)', pointerEvents: 'none' }}
+            style={{ background: 'rgba(15, 23, 43, 0.75)', pointerEvents: 'none' }}
             title={sourceError}
           >
             資料讀取失敗
@@ -802,7 +803,7 @@ function GenericSlotsGroupView({
         {showPendingCount && pendingCount > 0 && (
           <div
             className="absolute bottom-1 right-1 rounded px-2 py-0.5 text-caption-2 text-text-tertiary"
-            style={{ background: 'rgba(15,23,42,0.6)', pointerEvents: 'none' }}
+            style={{ background: 'rgba(15, 23, 43, 0.6)', pointerEvents: 'none' }}
           >
             +{pendingCount} 未顯示
           </div>

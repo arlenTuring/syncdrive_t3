@@ -3464,7 +3464,7 @@ export const FacilityNode = memo(function FacilityNode({
               />
             </div>
             {dockingPointFocused && displayDockingPoint ? (
-              <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-border-theme-light bg-surface-popup px-1.5 py-0.5 font-mono text-caption-2 text-text-theme-light shadow-lg">
+              <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-border-theme-light bg-surface-popup px-1.5 py-0.5 tabular-nums text-caption-2 text-text-theme-light shadow-lg">
                 {displayDockingPoint.xM.toFixed(2)}, {displayDockingPoint.yM.toFixed(2)} m
               </div>
             ) : null}
@@ -3534,7 +3534,7 @@ export const FacilityNode = memo(function FacilityNode({
                   >
                     <RotateCcw className="size-4" aria-hidden />
                   </button>
-                  <span className="mx-0.5 min-w-[2rem] text-center font-mono text-body-xs text-text-theme">
+                  <span className="mx-0.5 min-w-[2rem] text-center tabular-nums text-body-xs text-text-theme">
                     {angleLabel}
                   </span>
                   <button

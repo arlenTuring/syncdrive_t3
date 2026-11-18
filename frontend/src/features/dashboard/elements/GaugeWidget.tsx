@@ -33,7 +33,7 @@ function BandGaugeView({ widget, value }: { widget: GaugeWidgetType; value: numb
   const position = bandPosition(value, widget.min, widget.max);
   const bandH = Math.max(2, widget.gaugeBandHeight ?? 6);
   const dot = bandH + 4;
-  const valueColor = position === null ? '#a1a1aa' : bandColorAt(segments, position);
+  const valueColor = position === null ? '#99A1AF' : bandColorAt(segments, position);
   const stops = segments.flatMap((segment, index) => {
     const from = index === 0 ? 0 : segments[index - 1].end;
     return [`${segment.color} ${from * 100}%`, `${segment.color} ${segment.end * 100}%`];
@@ -152,7 +152,7 @@ function VehicleStatusGaugeView({
   const segments = arcVariant === 'load' ? LOAD_ARC_SEGMENTS : SPEED_ARC_SEGMENTS;
   const panelBg =
     widget.panelBackgroundColor
-    ?? (widget.gaugeVariant === 'semi-arc' ? '#1a2332' : 'transparent');
+    ?? (widget.gaugeVariant === 'semi-arc' ? '#1F262F' : 'transparent');
   const panelRadius = widget.panelBorderRadius ?? (widget.gaugeVariant === 'semi-arc' ? 6 : 0);
   const valueStr = offline
     ? '--'
@@ -237,7 +237,7 @@ function pickColorFromStops(
   percent: number,
 ): string {
   const stops = [...colorStops].sort((a, b) => a.at - b.at);
-  if (stops.length === 0) return '#3B82F6';
+  if (stops.length === 0) return '#2B7FFF';
   if (percent <= stops[0].at) return stops[0].color;
   if (percent >= stops[stops.length - 1].at) return stops[stops.length - 1].color;
   for (let i = 0; i < stops.length - 1; i++) {

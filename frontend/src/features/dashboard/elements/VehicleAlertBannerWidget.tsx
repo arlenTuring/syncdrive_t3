@@ -11,8 +11,8 @@ export function VehicleAlertBannerWidgetView({ widget }: { widget: VehicleAlertB
 
   const overall = String(variables[widget.severityVarKey ?? 'overall_health'] ?? 'WARNING').toUpperCase();
   const isError = overall === 'ERROR';
-  const bg = isError ? 'rgba(185,28,28,0.55)' : 'rgba(194,65,12,0.55)';
-  const border = isError ? 'rgba(248,113,113,0.5)' : 'rgba(251,146,60,0.45)';
+  const bg = isError ? 'rgba(193, 0, 7, 0.55)' : 'rgba(202, 53, 0, 0.55)';
+  const border = isError ? 'rgba(255, 100, 103, 0.5)' : 'rgba(255, 137, 4, 0.45)';
 
   return (
     <div

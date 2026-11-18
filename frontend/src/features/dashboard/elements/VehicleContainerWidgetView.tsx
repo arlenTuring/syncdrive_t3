@@ -34,7 +34,7 @@ export function VehicleContainerWidgetView({
          
         />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-1 rounded bg-[#0a0f1a]/90 text-text-quaternary">
+        <div className="flex h-full flex-col items-center justify-center gap-1 rounded bg-[#030712]/90 text-text-quaternary">
           <Bus size={20} className="text-status-warning" />
           <span className="text-caption-2">請選擇車輛模型</span>
         </div>

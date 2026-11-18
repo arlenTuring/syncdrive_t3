@@ -9,6 +9,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 /**
  * 整備分佈
@@ -30,7 +31,7 @@ type DistributionView = {
   message: string | null;
 };
 
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 /** 各整備區塊預設圖示；可由元件設定 sectionIconImages 覆寫 */
 const MAINTENANCE_SECTION_ICONS: Record<string, string> = {
@@ -119,7 +120,7 @@ function Slot({ slot, fontSize }: { slot: SlotView; fontSize: number }) {
         ...(slot.occupied
           ? {
               // 突起：亮底白字、上緣高光、下方投影
-              background: 'linear-gradient(180deg, #5B5B63 0%, #4A4A52 100%)',
+              background: 'linear-gradient(180deg, #52525C 0%, #52525C 100%)',
               color: '#FFFFFF',
               border: '1px solid rgba(255,255,255,0.14)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 2px 4px rgba(0,0,0,0.45)',
@@ -128,7 +129,7 @@ function Slot({ slot, fontSize }: { slot: SlotView; fontSize: number }) {
               // 空格：凹下去的暗格
               background: 'rgba(24,24,27,0.55)',
               color: '#9F9FA9',
-              border: '1px solid rgba(255,255,255,0.10)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.35)',
             }),
       }}

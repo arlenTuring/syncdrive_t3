@@ -8,6 +8,7 @@ import { ExternalLink } from 'lucide-react';
 import type { ShiftListWidget } from '../types';
 import { useWidgetData } from './useWidgetData';
 import { useIsEditMode } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 // ─── 型別 ─────────────────────────────────────────────────────────────────────
 
@@ -40,9 +41,9 @@ interface ShiftRow {
 // ─── 內聯路線進度軌道 ─────────────────────────────────────────────────────────
 
 function InlineRouteTrack({ row, isMainline }: { row: ShiftRow; isMainline: boolean }) {
-  const ACTIVE_COLOR = '#3B82F6';
+  const ACTIVE_COLOR = '#2B7FFF';
   const INACTIVE_COLOR = '#3f3f46';
-  const DOT_ACTIVE = '#94a3b8';
+  const DOT_ACTIVE = '#99A1AF';
 
   // 計算進度百分比（0-100）
   const segIdx = Number(row.segment_index ?? 0);
@@ -122,7 +123,7 @@ function InlineRouteTrack({ row, isMainline }: { row: ShiftRow; isMainline: bool
             <span
               style={{
                 fontSize: 9,
-                color: passed ? '#94a3b8' : '#52525b',
+                color: passed ? '#99A1AF' : '#52525C',
                 fontWeight: 600,
                 whiteSpace: 'nowrap',
               }}
@@ -181,7 +182,7 @@ function ShiftTableRow({
       }}
     >
       {/* 班次代號 */}
-      <td style={{ padding: '6px 8px', fontSize: fs, color: '#cbd5e1', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '6px 8px', fontSize: fs, color: '#D1D5DC', fontWeight: 600, whiteSpace: 'nowrap' }}>
         {row.trip_code ?? '—'}
       </td>
 
@@ -195,19 +196,19 @@ function ShiftTableRow({
               fontWeight: 600,
               borderRadius: 20,
               padding: '1px 8px',
-              backgroundColor: row.direction_pill_bg ?? '#1e3a8a',
-              color: row.direction_pill_color ?? '#93c5fd',
+              backgroundColor: row.direction_pill_bg ?? '#1C398E',
+              color: row.direction_pill_color ?? '#8EC5FF',
             }}
           >
             {row.direction_label ?? '—'}
           </span>
         ) : (
-          <span style={{ fontSize: fs, color: '#71717a' }}>—</span>
+          <span style={{ fontSize: fs, color: '#71717B' }}>—</span>
         )}
       </td>
 
       {/* 執行載具 */}
-      <td style={{ padding: '6px 8px', fontSize: fs, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '6px 8px', fontSize: fs, color: '#99A1AF', whiteSpace: 'nowrap' }}>
         {row.vehicle_code ?? '—'}
       </td>
 
@@ -229,7 +230,7 @@ function ShiftTableRow({
               borderRadius: 6,
               padding: '2px 8px',
               backgroundColor: row.status_bg ?? '#27272a',
-              color: row.status_color ?? '#a1a1aa',
+              color: row.status_color ?? '#99A1AF',
             }}
           >
             <span
@@ -237,7 +238,7 @@ function ShiftTableRow({
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                backgroundColor: row.status_color ?? '#a1a1aa',
+                backgroundColor: row.status_color ?? '#99A1AF',
                 flexShrink: 0,
               }}
             />
@@ -253,8 +254,8 @@ function ShiftTableRow({
               fontWeight: 600,
               borderRadius: 6,
               padding: '2px 8px',
-              backgroundColor: row.maint_type_bg ?? '#422006',
-              color: row.maint_type_color ?? '#fdba74',
+              backgroundColor: row.maint_type_bg ?? '#432004',
+              color: row.maint_type_color ?? '#FFB86A',
             }}
           >
             {row.maint_type_label ?? row.status_label ?? '—'}
@@ -264,13 +265,13 @@ function ShiftTableRow({
 
       {/* 發車時間（預計/實際） */}
       <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: fs, color: '#94a3b8' }}>
+        <span style={{ fontSize: fs, color: '#99A1AF' }}>
           {row.depart_time ?? '—'}
           {row.end_time ? (
-            <span style={{ color: '#52525b', margin: '0 3px' }}>~</span>
+            <span style={{ color: '#52525C', margin: '0 3px' }}>~</span>
           ) : null}
           {row.end_time ? (
-            <span style={{ color: '#52525b' }}>{row.end_time}</span>
+            <span style={{ color: '#52525C' }}>{row.end_time}</span>
           ) : null}
         </span>
       </td>
@@ -284,7 +285,7 @@ function ShiftTableRow({
             alignItems: 'center',
             gap: 3,
             fontSize: pillFs,
-            color: '#3B82F6',
+            color: '#2B7FFF',
             fontWeight: 600,
             background: 'none',
             border: 'none',
@@ -352,7 +353,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
     ? ['班次代號', '運行方向', '執行載具', '路線進度', '班次狀態', '發車時間（預計/實際）', '']
     : ['班次代號', '整備類型', '執行載具', '路線進度', '班次狀態', '發車時間（預計/實際）', ''];
 
-  const TAB_UNDERLINE = '2px solid #3B82F6';
+  const TAB_UNDERLINE = '2px solid #2B7FFF';
 
   return (
     <div
@@ -364,7 +365,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
         backgroundColor: widget.backgroundColor ?? 'transparent',
         borderRadius: widget.borderRadius ?? 8,
         overflow: 'hidden',
-        fontFamily: 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif',
+        fontFamily: FONT_FAMILY_PRIMARY,
       }}
     >
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
@@ -393,7 +394,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
                   padding: '10px 16px',
                   fontSize: fs + 1,
                   fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#3B82F6' : '#71717a',
+                  color: isActive ? '#2B7FFF' : '#71717B',
                   background: 'none',
                   border: 'none',
                   borderBottom: isActive ? TAB_UNDERLINE : '2px solid transparent',
@@ -411,12 +412,12 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
 
         {/* 右側：目前班表 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 4 }}>
-          <span style={{ fontSize: fs - 1, color: '#52525b', whiteSpace: 'nowrap' }}>目前班表</span>
+          <span style={{ fontSize: fs - 1, color: '#52525C', whiteSpace: 'nowrap' }}>目前班表</span>
           {currentScheduleName ? (
             <span
               style={{
                 fontSize: fs - 1,
-                color: '#94a3b8',
+                color: '#99A1AF',
                 backgroundColor: 'rgba(255,255,255,0.06)',
                 borderRadius: 4,
                 padding: '2px 8px',
@@ -449,7 +450,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#52525b',
+              color: '#52525C',
               fontSize: fs,
             }}
           >
@@ -462,7 +463,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#52525b',
+              color: '#52525C',
               fontSize: fs,
             }}
           >
@@ -486,7 +487,7 @@ export function ShiftListWidgetView({ widget }: { widget: ShiftListWidget }) {
                       padding: '6px 8px',
                       textAlign: 'left',
                       fontSize: fs - 1,
-                      color: '#52525b',
+                      color: '#52525C',
                       fontWeight: 500,
                       whiteSpace: 'nowrap',
                       userSelect: 'none',

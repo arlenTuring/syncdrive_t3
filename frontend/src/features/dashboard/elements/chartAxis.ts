@@ -7,8 +7,9 @@ import type {
   LineChartWidget,
 } from '../types';
 import { isLiveTimeAxis, resolveTimeWindow } from './lineChartSeries';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
-const FONT_MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace';
+const FONT_MONO = FONT_FAMILY_PRIMARY;
 
 export const CHART_PAD = { top: 16, right: 16, bottom: 36, left: 48 };
 
@@ -385,7 +386,7 @@ export function resolveAxisBandColor(
 ): string {
   const key = String(raw ?? '').trim();
   const hit = band.colorRules.find(r => String(r.value) === key);
-  return hit?.color ?? band.defaultColor ?? 'rgba(148,163,184,0.7)';
+  return hit?.color ?? band.defaultColor ?? 'rgba(144, 161, 185, 0.7)';
 }
 
 /** 將資料列轉成可繪製的軸向色帶矩形（X/Y 通用） */

@@ -166,7 +166,7 @@ function MapVehicleMqttCoordLabel({
   const track = trackCode ? ` · ${trackCode}` : '';
   return (
     <div
-      className="pointer-events-none absolute rounded px-1.5 py-1 font-mono text-caption-2 text-text-primary shadow-sm"
+      className="pointer-events-none absolute rounded px-1.5 py-1 tabular-nums text-caption-2 text-text-primary shadow-sm"
       style={{
         left,
         top,
@@ -1002,7 +1002,7 @@ export function MapAreaVehicleOverlay({
         let cellBadge: ReactElement | null = exitStage ? (
           <div
             key={`${vehicle.areaId}:${vehicle.vehicleId}:exit`}
-            className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
+            className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] tabular-nums leading-none"
             title="出廠任務已開始、還在場內：畫在所屬分區出入口（不代表實際位置與間距）"
             style={{
               left: badgeCenterX,
@@ -1036,7 +1036,7 @@ export function MapAreaVehicleOverlay({
             cellBadge = (
               <div
                 key={`${vehicle.areaId}:${vehicle.vehicleId}:badge`}
-                className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] font-mono leading-none"
+                className="pointer-events-none absolute flex items-center rounded px-2 py-[2px] tabular-nums leading-none"
                 style={{
                   left: badgeCenterX,
                   top: badgeTopY,

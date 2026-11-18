@@ -24,9 +24,10 @@ import {
   MAINLINE_SHIFTS_SQL,
   MAINTENANCE_SHIFTS_SQL,
 } from './demoSql';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 const DS = 'default-internal';
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 export const DEPLOYMENT_PLANE_NAME = '班表部署管理';
 export const DEPLOY_CURRENT_MODE_PANEL_ID = 'deploy-current-mode-panel';
@@ -73,11 +74,11 @@ const ROW3_W   = 1920 - PLANE_PAD * 2;            // = 1872
 const ROW3_H   = 1080 - ROW3_Y - PLANE_PAD;       // = 1080 - 416 - 24 = 640
 
 /** 設計稿：正常營運狀態區塊底色 */
-const MODE_STATUS_BG = '#1B4332';
-const INNER_CARD_BG = '#212124';
-const EVENT_ALERT_BORDER = '#F87171';
-const EVENT_ALERT_BG = 'rgba(127, 29, 29, 0.18)';
-const PERIOD_DOTS = ['#A78BFA', '#22C55E', '#F97316'] as const;
+const MODE_STATUS_BG = '#004F3B';
+const INNER_CARD_BG = '#18181B';
+const EVENT_ALERT_BORDER = '#FF6467';
+const EVENT_ALERT_BG = 'rgba(130, 24, 26, 0.18)';
+const PERIOD_DOTS = ['#A684FF', '#00C951', '#FF6900'] as const;
 
 const ICON = {
   delayed: 'Clock',
@@ -208,8 +209,8 @@ function ringGauge(x: number, y: number, size: number): GaugeWidget {
     refreshInterval: 0,
     refreshMode: 'event',
     colorStops: [
-      { at: 0, color: '#3B82F6' },
-      { at: 1, color: '#60A5FA' },
+      { at: 0, color: '#2B7FFF' },
+      { at: 1, color: '#51A2FF' },
     ],
   };
 }
@@ -402,7 +403,7 @@ function buildStatusRows(
 
   return rows.flatMap((row, index) => {
     const rowY = y + index * (rowH + rowGap);
-    const label = staticText(x, rowY, labelW, rowH, row.label, 14, '#A1A1AA', 'normal', 'left', {
+    const label = staticText(x, rowY, labelW, rowH, row.label, 14, '#99A1AF', 'normal', 'left', {
       verticalAlign: 'center',
     });
     label.icon = row.icon;
@@ -436,8 +437,8 @@ function statusBadge(
     refreshInterval: 0,
     refreshMode: 'event',
     defaultLabel: '進行中',
-    defaultBgColor: '#14532D',
-    defaultTextColor: '#86EFAC',
+    defaultBgColor: '#0D542B',
+    defaultTextColor: '#7BF1A8',
     showDot: true,
     fontSize: 11,
     borderRadius: 999,
@@ -446,8 +447,8 @@ function statusBadge(
       {
         value: 'RUNNING',
         label: '進行中',
-        bgColor: '#14532D',
-        textColor: '#86EFAC',
+        bgColor: '#0D542B',
+        textColor: '#7BF1A8',
       },
     ],
   };
@@ -484,12 +485,12 @@ export function buildExecutingSchedulePanel(
       24,
       '班表調整申請',
       11,
-      '#38BDF8',
+      '#00BCFF',
       'normal',
       'center',
       {
         borderWidth: 1,
-        borderColor: '#0EA5E9',
+        borderColor: '#00A6F4',
         borderRadius: 8,
         backgroundColor: 'transparent',
         contentPadding: '2px 6px',
@@ -508,13 +509,13 @@ export function buildExecutingSchedulePanel(
       'schedule_meta',
       DEPLOYMENT_EXECUTING_SCHEDULE_SQL,
       11,
-      '#A1A1AA',
+      '#99A1AF',
       { fontWeight: 'normal', textAlign: 'left', verticalAlign: 'center' },
     ),
     statusBadge(innerX + innerW - innerPad - 64, metaY - 1, 64, 20),
 
     // 綠條 + 班表名稱
-    colorBlock(innerX + innerPad, nameY + 4, 3, 20, '#22C55E', 2),
+    colorBlock(innerX + innerPad, nameY + 4, 3, 20, '#00C951', 2),
     boundText(
       innerX + innerPad + 10,
       nameY,
@@ -535,7 +536,7 @@ export function buildExecutingSchedulePanel(
       18,
       '審核人',
       11,
-      '#71717A',
+      '#71717B',
       'normal',
       'left',
       { verticalAlign: 'center' },
@@ -574,7 +575,7 @@ export function buildExecutingSchedulePanel(
           field,
           DEPLOYMENT_EXECUTING_SCHEDULE_SQL,
           11,
-          '#A1A1AA',
+          '#99A1AF',
           { fontWeight: 'normal', textAlign: 'left', verticalAlign: 'center' },
         ),
       ];
@@ -628,7 +629,7 @@ export function buildMajorEventsPanel(
       iconSize,
       '',
       18,
-      '#F87171',
+      '#FF6467',
       'normal',
       'center',
       {
@@ -655,7 +656,7 @@ export function buildMajorEventsPanel(
       'event_level',
       DEPLOYMENT_MAJOR_EVENTS_SQL,
       12,
-      '#A1A1AA',
+      '#99A1AF',
       { fontWeight: 'normal', textAlign: 'left', verticalAlign: 'center' },
     ),
     boundText(
@@ -666,7 +667,7 @@ export function buildMajorEventsPanel(
       'event_date',
       DEPLOYMENT_MAJOR_EVENTS_SQL,
       11,
-      '#A1A1AA',
+      '#99A1AF',
       { fontWeight: 'normal', textAlign: 'right', verticalAlign: 'center' },
     ),
     boundText(
@@ -677,7 +678,7 @@ export function buildMajorEventsPanel(
       'event_time',
       DEPLOYMENT_MAJOR_EVENTS_SQL,
       11,
-      '#A1A1AA',
+      '#99A1AF',
       { fontWeight: 'normal', textAlign: 'right', verticalAlign: 'center' },
     ),
 
@@ -691,7 +692,7 @@ export function buildMajorEventsPanel(
       'empty_hint',
       DEPLOYMENT_MAJOR_EVENTS_SQL,
       13,
-      '#71717A',
+      '#71717B',
       { fontWeight: 'normal', textAlign: 'center', verticalAlign: 'center' },
     ),
   ];
@@ -737,7 +738,7 @@ export function buildVehiclePhotoPanel(
     src: '',                // 由使用者在屬性面板填入 URL / 留空顯示佔位
     objectFit: 'cover',
     borderRadius: 8,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0F172B',
   };
 
   /* ── 標題文字 ── */
@@ -762,11 +763,11 @@ export function buildVehiclePhotoPanel(
     titleH,
     'LIVE',
     11,
-    '#86EFAC',
+    '#7BF1A8',
     'bold',
     'center',
     {
-      backgroundColor: '#14532D',
+      backgroundColor: '#0D542B',
       borderRadius: 999,
       contentPadding: '2px 8px',
       verticalAlign: 'center',
@@ -870,14 +871,14 @@ function buildVehicleCardTemplate(
     btnH,
     '自駕停駛',
     11,
-    '#60A5FA',
+    '#51A2FF',
     'normal',
     'center',
     {
       verticalAlign: 'center',
       backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: '#3B82F6',
+      borderColor: '#2B7FFF',
       borderRadius: 6,
       contentPadding: '2px 4px',
     },
@@ -891,14 +892,14 @@ function buildVehicleCardTemplate(
     btnH,
     '自駕啟動',
     11,
-    '#60A5FA',
+    '#51A2FF',
     'normal',
     'center',
     {
       verticalAlign: 'center',
       backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: '#3B82F6',
+      borderColor: '#2B7FFF',
       borderRadius: 6,
       contentPadding: '2px 4px',
     },
@@ -912,14 +913,14 @@ function buildVehicleCardTemplate(
     btnH,
     '系統重置',
     11,
-    '#F87171',
+    '#FF6467',
     'normal',
     'center',
     {
       verticalAlign: 'center',
       backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: '#EF4444',
+      borderColor: '#FB2C36',
       borderRadius: 6,
       contentPadding: '2px 4px',
     },
@@ -947,7 +948,7 @@ export function buildVehicleOpsTitlePanel(
     backgroundImage: '',
     opacity: 100,
     children: [
-      staticText(0, 0, 200, 24, '載具控制', 14, '#A1A1AA', 'bold', 'left', {
+      staticText(0, 0, 200, 24, '載具控制', 14, '#99A1AF', 'bold', 'left', {
         verticalAlign: 'center',
         backgroundColor: 'transparent',
       }),
@@ -1016,7 +1017,7 @@ function buildShiftListPanel(): CanvasElementProps {
     width: ROW3_W,
     height: ROW3_H,
     rowHeight: 44,
-    tabActiveColor: '#3b82f6',
+    tabActiveColor: '#2B7FFF',
     backgroundColor: '#18181b',
     headerBgColor: '#27272a',
     fontSize: 13,
@@ -1032,7 +1033,7 @@ function buildShiftListPanel(): CanvasElementProps {
             staticText(0, 0, 140, 44, '{trip_code}', 13, '#FFFFFF', 'bold', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'col-2', name: '運行方向', fieldKey: 'direction_label', width: 130, children: [
-            staticText(0, 0, 130, 44, '{direction_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 130, 44, '{direction_label}', 13, '#99A1AF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'col-3', name: '執行載具', fieldKey: 'vehicle_code', width: 140, children: [
             staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
@@ -1075,24 +1076,24 @@ function buildShiftListPanel(): CanvasElementProps {
               height: 28,
               valueField: 'status_label',
               defaultLabel: '準點運行',
-              defaultBgColor: 'rgba(34, 197, 94, 0.2)',
+              defaultBgColor: 'rgba(0, 201, 81, 0.2)',
               // StatusBadgeWidget 的必填項；缺任何一個整個物件就不符合 ChildWidget
               defaultTextColor: '#E4E4E7',
               showDot: true,
               fontSize: 11,
               borderRadius: 999,
               rules: [
-                { value: '運行中', label: '運行中', bgColor: 'rgba(34, 197, 94, 0.2)', textColor: '#22C55E' },
-                { value: '準備中', label: '準備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
-                { value: '延誤', label: '延誤', bgColor: 'rgba(239, 68, 68, 0.2)', textColor: '#EF4444' },
+                { value: '運行中', label: '運行中', bgColor: 'rgba(0, 201, 81, 0.2)', textColor: '#00C951' },
+                { value: '準備中', label: '準備中', bgColor: 'rgba(43, 127, 255, 0.2)', textColor: '#2B7FFF' },
+                { value: '延誤', label: '延誤', bgColor: 'rgba(251, 44, 54, 0.2)', textColor: '#FB2C36' },
               ],
             },
           ]},
           { id: 'col-6', name: '發車時間(預計/實際)', fieldKey: 'depart_time', width: 220, children: [
-            staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 220, 44, '{depart_time}', 13, '#99A1AF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'col-7', name: '操作', fieldKey: 'shift_key', width: 140, children: [
-            staticText(0, 0, 140, 44, '查看...', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 140, 44, '查看...', 13, '#00BCFF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
         ],
       },
@@ -1110,7 +1111,7 @@ function buildShiftListPanel(): CanvasElementProps {
             staticText(0, 0, 140, 44, '{vehicle_code}', 13, '#E4E4E7', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'mcol-3', name: '整備項目', fieldKey: 'maint_type_label', width: 260, children: [
-            staticText(0, 0, 260, 44, '{maint_type_label}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 260, 44, '{maint_type_label}', 13, '#99A1AF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'mcol-4', name: '進度狀態', fieldKey: 'status_label', width: 160, children: [
             {
@@ -1122,24 +1123,24 @@ function buildShiftListPanel(): CanvasElementProps {
               height: 28,
               valueField: 'status_label',
               defaultLabel: '整備中',
-              defaultBgColor: 'rgba(59, 130, 246, 0.2)',
+              defaultBgColor: 'rgba(43, 127, 255, 0.2)',
               // StatusBadgeWidget 的必填項；缺任何一個整個物件就不符合 ChildWidget
               defaultTextColor: '#E4E4E7',
               showDot: true,
               fontSize: 11,
               borderRadius: 999,
               rules: [
-                { value: '整備中', label: '整備中', bgColor: 'rgba(59, 130, 246, 0.2)', textColor: '#3B82F6' },
-                { value: '待檢', label: '待檢', bgColor: 'rgba(234, 179, 8, 0.2)', textColor: '#EAB308' },
-                { value: '完成', label: '完成', bgColor: 'rgba(34, 197, 94, 0.2)', textColor: '#22C55E' },
+                { value: '整備中', label: '整備中', bgColor: 'rgba(43, 127, 255, 0.2)', textColor: '#2B7FFF' },
+                { value: '待檢', label: '待檢', bgColor: 'rgba(239, 177, 0, 0.2)', textColor: '#EFB100' },
+                { value: '完成', label: '完成', bgColor: 'rgba(0, 201, 81, 0.2)', textColor: '#00C951' },
               ],
             },
           ]},
           { id: 'mcol-5', name: '預計完成時間', fieldKey: 'depart_time', width: 220, children: [
-            staticText(0, 0, 220, 44, '{depart_time}', 13, '#A1A1AA', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 220, 44, '{depart_time}', 13, '#99A1AF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
           { id: 'mcol-6', name: '操作', fieldKey: 'shift_key', width: 140, children: [
-            staticText(0, 0, 140, 44, '詳情', 13, '#38BDF8', 'normal', 'left', { verticalAlign: 'center' }),
+            staticText(0, 0, 140, 44, '詳情', 13, '#00BCFF', 'normal', 'left', { verticalAlign: 'center' }),
           ]},
         ],
       },

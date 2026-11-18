@@ -8,6 +8,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 interface Props {
   widget: SlotGridType;
@@ -23,27 +24,27 @@ function resolveSlotColors(
     if (hit) {
       return {
         bg: hit.bgColor,
-        text: hit.textColor ?? widget.defaultSlotTextColor ?? '#0f172a',
+        text: hit.textColor ?? widget.defaultSlotTextColor ?? '#0F172B',
       };
     }
     return {
       bg: widget.inactiveColor,
-      text: widget.defaultSlotTextColor ?? '#64748b',
+      text: widget.defaultSlotTextColor ?? '#6A7282',
     };
   }
   const isActive = widget.activeValues.includes(status);
   return {
     bg: isActive ? widget.activeColor : widget.inactiveColor,
-    text: isActive ? '#0f172a' : 'rgba(255,255,255,0.3)',
+    text: isActive ? '#0F172B' : 'rgba(255,255,255,0.3)',
   };
 }
 
 export const MAINTENANCE_SLOT_STATUS_RULES: SlotStatusColorRule[] = [
-  { status: 'AVAILABLE', bgColor: '#334155', textColor: '#64748b' },
-  { status: 'OCCUPIED', bgColor: '#94a3b8', textColor: '#0f172a' },
-  { status: 'CHARGING', bgColor: '#94a3b8', textColor: '#0f172a' },
-  { status: 'ERROR', bgColor: '#ef4444', textColor: '#ffffff' },
-  { status: 'OFFLINE', bgColor: '#334155', textColor: '#64748b' },
+  { status: 'AVAILABLE', bgColor: '#364153', textColor: '#6A7282' },
+  { status: 'OCCUPIED', bgColor: '#99A1AF', textColor: '#0F172B' },
+  { status: 'CHARGING', bgColor: '#99A1AF', textColor: '#0F172B' },
+  { status: 'ERROR', bgColor: '#FB2C36', textColor: '#ffffff' },
+  { status: 'OFFLINE', bgColor: '#364153', textColor: '#6A7282' },
 ];
 
 export function SlotGridWidget({ widget }: Props) {
@@ -101,7 +102,7 @@ export function SlotGridWidget({ widget }: Props) {
             flexShrink: 0,
           }}
         >
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#06b6d4' }} />
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00B8DB' }} />
           {widget.title}
         </div>
       )}
@@ -138,8 +139,8 @@ export function SlotGridWidget({ widget }: Props) {
                 fontSize: slotFs,
                 fontWeight: isCompactRow ? 500 : 700,
                 fontFamily: isCompactRow
-                  ? 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif'
-                  : 'monospace',
+                  ? FONT_FAMILY_PRIMARY
+                  : FONT_FAMILY_PRIMARY,
                 background: bg,
                 color: text,
                 border: status === 'AVAILABLE' && !widget.statusColorRules?.length

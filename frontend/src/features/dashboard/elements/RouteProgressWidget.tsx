@@ -252,8 +252,8 @@ function DispatchCardView({
 
   const cardStyle: CSSProperties = {
     border: borderStyle,
-    background: 'linear-gradient(180deg, rgba(15,23,42,0.92) 0%, rgba(9,14,26,0.98) 100%)',
-    boxShadow: widget.alertBorder || alertFromVar ? '0 0 16px rgba(239,68,68,0.2)' : undefined,
+    background: 'linear-gradient(180deg, rgba(15, 23, 43, 0.92) 0%, rgba(2, 6, 24, 0.98) 100%)',
+    boxShadow: widget.alertBorder || alertFromVar ? '0 0 16px rgba(251, 44, 54, 0.2)' : undefined,
     padding: pad,
     paddingBottom: 0,
   };
@@ -268,8 +268,8 @@ function DispatchCardView({
               style={{
                 fontSize: pillFs,
                 padding: `${Math.round(2 * scale)}px ${Math.round(8 * scale)}px`,
-                backgroundColor: String(variables.direction_pill_bg ?? '#1e3a8a'),
-                color: String(variables.direction_pill_color ?? '#bfdbfe'),
+                backgroundColor: String(variables.direction_pill_bg ?? '#1C398E'),
+                color: String(variables.direction_pill_color ?? '#BEDBFF'),
               }}
             >
               {String(variables.direction_label)}
@@ -293,8 +293,8 @@ function DispatchCardView({
             style={{
               fontSize: pillFs,
               padding: `${Math.round(2 * scale)}px ${Math.round(6 * scale)}px`,
-              backgroundColor: statusBg ?? '#064e3b',
-              color: statusTx ?? '#34d399',
+              backgroundColor: statusBg ?? '#004F3B',
+              color: statusTx ?? '#00D492',
             }}
           >
             <span
@@ -302,7 +302,7 @@ function DispatchCardView({
               style={{
                 width: Math.max(5, Math.round(6 * scale)),
                 height: Math.max(5, Math.round(6 * scale)),
-                backgroundColor: statusTx ?? '#34d399',
+                backgroundColor: statusTx ?? '#00D492',
               }}
             />
             {status}
@@ -317,7 +317,7 @@ function DispatchCardView({
         <div className="flex min-w-0 items-start gap-1.5">
           <Navigation2
             size={iconMd}
-            color="#38bdf8"
+            color="#00BCFF"
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div className="min-w-0">
@@ -342,7 +342,7 @@ function DispatchCardView({
         <div className="flex shrink-0 items-start gap-1.5 text-right">
           <Clock
             size={iconMd}
-            color="#38bdf8"
+            color="#00BCFF"
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div>
@@ -391,11 +391,11 @@ function DispatchCardView({
         }}
       >
         <span className="flex items-center gap-1">
-          <Clock size={iconSm} color="#94a3b8" />
+          <Clock size={iconSm} color="#99A1AF" />
           {departLabel} {depart || '—'}
         </span>
         <span className="flex items-center gap-1">
-          <CheckCircle2 size={iconSm} color="#94a3b8" />
+          <CheckCircle2 size={iconSm} color="#99A1AF" />
           {endLabel} {endT || '—'}
         </span>
       </div>
@@ -610,12 +610,12 @@ function MaintenanceCardView({
   const departLabel = widget.cardDepartLabel ?? '開始';
   const endLabel = widget.cardEndLabel ?? '結束';
   const metricAlertValues = widget.cardMetricAlertValues ?? [];
-  const etaValueColor = metricAlertValues.includes(etaLabel) ? (statusTx ?? '#f87171') : '#f8fafc';
+  const etaValueColor = metricAlertValues.includes(etaLabel) ? (statusTx ?? '#FF6467') : '#f8fafc';
 
   const cardStyle: CSSProperties = {
     border: borderStyle,
-    background: 'linear-gradient(180deg, rgba(15,23,42,0.92) 0%, rgba(9,14,26,0.98) 100%)',
-    boxShadow: widget.alertBorder || alertFromVar ? '0 0 16px rgba(239,68,68,0.2)' : undefined,
+    background: 'linear-gradient(180deg, rgba(15, 23, 43, 0.92) 0%, rgba(2, 6, 24, 0.98) 100%)',
+    boxShadow: widget.alertBorder || alertFromVar ? '0 0 16px rgba(251, 44, 54, 0.2)' : undefined,
     padding: pad,
     paddingBottom: 0,
   };
@@ -653,8 +653,8 @@ function MaintenanceCardView({
             style={{
               fontSize: pillFs,
               padding: `${Math.round(2 * scale)}px ${Math.round(6 * scale)}px`,
-              backgroundColor: statusBg ?? '#064e3b',
-              color: statusTx ?? '#34d399',
+              backgroundColor: statusBg ?? '#004F3B',
+              color: statusTx ?? '#00D492',
             }}
           >
             <span
@@ -662,7 +662,7 @@ function MaintenanceCardView({
               style={{
                 width: Math.max(5, Math.round(6 * scale)),
                 height: Math.max(5, Math.round(6 * scale)),
-                backgroundColor: statusTx ?? '#34d399',
+                backgroundColor: statusTx ?? '#00D492',
               }}
             />
             {status}
@@ -677,7 +677,7 @@ function MaintenanceCardView({
         <div className="flex min-w-0 items-start gap-1.5">
           <MapPin
             size={iconMd}
-            color="#38bdf8"
+            color="#00BCFF"
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div className="min-w-0">
@@ -702,7 +702,7 @@ function MaintenanceCardView({
         <div className="flex shrink-0 items-start gap-1.5 text-right">
           <Hourglass
             size={iconMd}
-            color="#38bdf8"
+            color="#00BCFF"
             style={{ marginTop: Math.round(10 * scale), flexShrink: 0 }}
           />
           <div>
@@ -742,11 +742,11 @@ function MaintenanceCardView({
         }}
       >
         <span className="flex items-center gap-1">
-          <AlarmClock size={iconSm} color="#94a3b8" />
+          <AlarmClock size={iconSm} color="#99A1AF" />
           {departLabel} {depart || '—'}
         </span>
         <span className="flex items-center gap-1">
-          <CheckCircle2 size={iconSm} color="#94a3b8" />
+          <CheckCircle2 size={iconSm} color="#99A1AF" />
           {endLabel} {endT || '—'}
         </span>
       </div>
@@ -866,8 +866,8 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
   const borderStyle = borderFromVar
     ? `1px solid ${borderFromVar}`
     : widget.alertBorder || alertFromVar
-      ? '1px solid rgba(239,68,68,0.75)'
-      : '1px solid rgba(34,197,94,0.35)';
+      ? '1px solid rgba(251, 44, 54, 0.75)'
+      : '1px solid rgba(0, 201, 81, 0.35)';
 
   const status =
     widget.statusLabelVarKey && variables[widget.statusLabelVarKey] !== undefined
@@ -912,9 +912,9 @@ export function RouteProgressWidgetView({ widget }: { widget: RouteProgressWidge
   const maintTypeLabel =
     variables.maint_type_label !== undefined ? String(variables.maint_type_label) : undefined;
   const maintTypeBg =
-    variables.maint_type_bg !== undefined ? String(variables.maint_type_bg) : '#422006';
+    variables.maint_type_bg !== undefined ? String(variables.maint_type_bg) : '#432004';
   const maintTypeColor =
-    variables.maint_type_color !== undefined ? String(variables.maint_type_color) : '#fdba74';
+    variables.maint_type_color !== undefined ? String(variables.maint_type_color) : '#FFB86A';
   const etaLabel =
     variables.eta_label !== undefined
       ? String(variables.eta_label)

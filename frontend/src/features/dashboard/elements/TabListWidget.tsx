@@ -16,6 +16,7 @@ import { useIsEditMode } from '../utils/widgetEditPreview';
 import { VariableProvider } from '../VariableContext';
 import { WidgetRenderer } from './WidgetRenderer';
 import { Edit3 } from 'lucide-react';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 const TAB_LIST_FONT_WIDGET_TYPES = new Set(['text', 'status-badge', 'alert-banner', 'clock', 'route-progress']);
 
@@ -136,7 +137,7 @@ function TabListCell({
   const align = column.align ?? tabAlign ?? globalAlign ?? 'left';
   // 內容字級以表格為準，避免各欄元件自己的 fontSize 把統一調整拆散
   const cellFs = fontSize;
-  const cellColor = column.textColor ?? textColor ?? '#cbd5e1';
+  const cellColor = column.textColor ?? textColor ?? '#D1D5DC';
 
   const fieldKey = column.fieldKey || (
     column.name?.includes('班次') ? 'trip_code' :
@@ -312,12 +313,12 @@ export function TabListWidgetView({
   ), [queryState.data, mqttState.data, activeTab?.dataRowPath, activeTab?.mergeKeyField, activeTab?.rowCoupling]);
 
   const fs = widget.fontSize ?? 13;
-  const bodyTextColor = widget.textColor ?? '#cbd5e1';
+  const bodyTextColor = widget.textColor ?? '#D1D5DC';
   const headerFs = widget.headerFontSize ?? 12;
-  const headerTextColor = widget.headerTextColor ?? '#94a3b8';
+  const headerTextColor = widget.headerTextColor ?? '#99A1AF';
   const tabFs = widget.tabFontSize ?? 14;
-  const tabActiveColor = widget.tabActiveColor ?? '#3b82f6';
-  const tabInactiveColor = widget.tabInactiveColor ?? '#64748b';
+  const tabActiveColor = widget.tabActiveColor ?? '#2B7FFF';
+  const tabInactiveColor = widget.tabInactiveColor ?? '#6A7282';
   const globalAlign = widget.align ?? 'left';
   const rowH = widget.rowHeight ?? 48;
   const headerH = widget.headerHeight ?? 38;
@@ -411,7 +412,7 @@ export function TabListWidgetView({
         borderColor: widget.borderColor ?? 'transparent',
         overflow: 'hidden',
         boxSizing: 'border-box',
-        fontFamily: 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif',
+        fontFamily: FONT_FAMILY_PRIMARY,
       }}
     >
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
@@ -459,14 +460,14 @@ export function TabListWidgetView({
 
         {/* 右側：目前班表 / 輔助資訊 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 4 }}>
-          <span style={{ fontSize: fs - 1, color: '#64748b', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: fs - 1, color: '#6A7282', whiteSpace: 'nowrap' }}>
             {widget.currentScheduleLabel ?? t('dashboard.tabListChrome.currentSchedule')}
           </span>
           {currentScheduleName ? (
             <span
               style={{
                 fontSize: fs - 1,
-                color: '#cbd5e1',
+                color: '#D1D5DC',
                 backgroundColor: 'rgba(255,255,255,0.06)',
                 borderRadius: 4,
                 padding: '2px 8px',
@@ -480,7 +481,7 @@ export function TabListWidgetView({
             <span
               style={{
                 fontSize: fs - 1,
-                color: '#cbd5e1',
+                color: '#D1D5DC',
                 backgroundColor: 'rgba(255,255,255,0.05)',
                 borderRadius: 4,
                 padding: '2px 8px',
@@ -497,7 +498,7 @@ export function TabListWidgetView({
       {/* ── 表格區塊 ────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {queryState.error ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#f87171', fontSize: fs }}>查詢失敗：{queryState.error}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#FF6467', fontSize: fs }}>查詢失敗：{queryState.error}</div>
         ) : queryState.loading && rows.length === 0 ? (
           <div
             style={{
@@ -505,7 +506,7 @@ export function TabListWidgetView({
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#64748b',
+              color: '#6A7282',
               fontSize: fs,
             }}
           >
@@ -518,7 +519,7 @@ export function TabListWidgetView({
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#64748b',
+              color: '#6A7282',
               fontSize: fs,
             }}
           >
@@ -590,8 +591,8 @@ export function TabListWidgetView({
                               padding: '2px 4px',
                               borderRadius: 3,
                               border: 'none',
-                              background: 'rgba(59,130,246,0.15)',
-                              color: '#60a5fa',
+                              background: 'rgba(43, 127, 255, 0.15)',
+                              color: '#51A2FF',
                               cursor: 'pointer',
                               fontSize: 10,
                             }}
@@ -610,8 +611,8 @@ export function TabListWidgetView({
                           onKeyDown={event => resizeColumnByKeyboard(event, col)}
                           style={{
                             position: 'absolute', right: -5, top: 0, bottom: 0, width: 10, zIndex: 20,
-                            padding: 0, border: 0, borderRight: '1px solid rgba(56,189,248,.85)',
-                            background: 'rgba(56,189,248,.08)', cursor: 'col-resize', touchAction: 'none',
+                            padding: 0, border: 0, borderRight: '1px solid rgba(0, 188, 255, 0.85)',
+                            background: 'rgba(0, 188, 255, 0.08)', cursor: 'col-resize', touchAction: 'none',
                           }}
                         />
                       )}
@@ -624,7 +625,7 @@ export function TabListWidgetView({
             <tbody>
               {isEditMode && rows.length === 0 && (
                 <tr>
-                  <td colSpan={Math.max(1, columns.length)} style={{ padding: 12, textAlign: 'center', color: '#64748b', fontSize: fs }}>
+                  <td colSpan={Math.max(1, columns.length)} style={{ padding: 12, textAlign: 'center', color: '#6A7282', fontSize: fs }}>
                     {t('dashboard.tabListChrome.noData')}
                   </td>
                 </tr>

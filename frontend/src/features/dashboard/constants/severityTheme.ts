@@ -9,9 +9,9 @@ export interface SeverityStyle {
 }
 
 const STYLES: Record<SeverityLevel, SeverityStyle> = {
-  CRITICAL: { stripBg: '#dc2626', stripText: '#ffffff', label: 'Critical' },
-  WARNING: { stripBg: '#f97316', stripText: '#0f172a', label: 'Warning' },
-  INFO: { stripBg: '#64748b', stripText: '#0f172a', label: 'Info' },
+  CRITICAL: { stripBg: '#E7000B', stripText: '#ffffff', label: 'Critical' },
+  WARNING: { stripBg: '#FF6900', stripText: '#0F172B', label: 'Warning' },
+  INFO: { stripBg: '#6A7282', stripText: '#0F172B', label: 'Info' },
 };
 
 export function normalizeSeverity(raw: unknown): SeverityLevel {

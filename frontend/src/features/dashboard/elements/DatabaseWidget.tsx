@@ -9,6 +9,7 @@ import {
   shouldShowEditPreview,
   widgetHasDataBinding,
 } from '../utils/widgetEditPreview';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 export function DatabaseWidgetView({ widget }: { widget: DatabaseWidget }) {
   const isEditMode = useIsEditMode();
@@ -29,14 +30,14 @@ export function DatabaseWidgetView({ widget }: { widget: DatabaseWidget }) {
     >
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
                   background: 'transparent', borderRadius: 4, overflow: 'hidden',
-                  fontFamily: 'monospace' }}>
+                  fontFamily: FONT_FAMILY_PRIMARY }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
                     borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <Database size={11} color="#a78bfa" />
+        <Database size={11} color="#A684FF" />
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{widget.title}</span>
-        {loading && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 'auto' }}>載入中…</span>}
-        {error && <span style={{ fontSize: 9, color: '#ef4444', marginLeft: 'auto' }} title={error}>錯誤</span>}
+        {loading && <span style={{ fontSize: 9, color: '#FD9A00', marginLeft: 'auto' }}>載入中…</span>}
+        {error && <span style={{ fontSize: 9, color: '#FB2C36', marginLeft: 'auto' }} title={error}>錯誤</span>}
         {data.length > 0 && !loading && (
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto' }}>
             {data.length} 筆
@@ -60,8 +61,8 @@ export function DatabaseWidgetView({ widget }: { widget: DatabaseWidget }) {
               <tr>
                 {cols.map(c => (
                   <th key={c} style={{ padding: '3px 6px', textAlign: 'left', position: 'sticky', top: 0,
-                                       background: 'rgba(167,139,250,0.12)', color: '#a78bfa',
-                                       borderBottom: '1px solid rgba(167,139,250,0.2)', whiteSpace: 'nowrap' }}>
+                                       background: 'rgba(166, 132, 255, 0.12)', color: '#A684FF',
+                                       borderBottom: '1px solid rgba(166, 132, 255, 0.2)', whiteSpace: 'nowrap' }}>
                     {c}
                   </th>
                 ))}
@@ -84,7 +85,7 @@ export function DatabaseWidgetView({ widget }: { widget: DatabaseWidget }) {
         )}
 
         {widget.displayMode === 'json' && rows.length > 0 && (
-          <pre style={{ margin: 0, padding: '6px 8px', fontSize: 9, color: '#86efac',
+          <pre style={{ margin: 0, padding: '6px 8px', fontSize: 9, color: '#7BF1A8',
                         whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
             {JSON.stringify(rows, null, 2)}
           </pre>

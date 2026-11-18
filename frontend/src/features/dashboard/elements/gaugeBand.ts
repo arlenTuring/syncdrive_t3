@@ -8,14 +8,14 @@ export type BandSegment = { end: number; color: string };
 /** 速度：低綠 → 黃 → 紅（與 semi-arc 速度弧同一組分界） */
 export const SPEED_BAND_SEGMENTS: BandSegment[] = [
   { end: 0.72, color: '#00D492' },
-  { end: 0.86, color: '#FDC700' },
+  { end: 0.86, color: '#FCC800' },
   { end: 1, color: '#FB2C36' },
 ];
 
 /** 電量：低紅 → 黃 → 綠（與 semi-arc 電量弧同一組分界） */
 export const LOAD_BAND_SEGMENTS: BandSegment[] = [
   { end: 0.14, color: '#FB2C36' },
-  { end: 0.24, color: '#FDC700' },
+  { end: 0.24, color: '#FCC800' },
   { end: 1, color: '#00D492' },
 ];
 

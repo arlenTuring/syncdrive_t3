@@ -30,7 +30,7 @@ function SH({ icon, label, color }: { icon: React.ReactNode; label: string; colo
   return (
     <div
       className="flex items-center gap-1.5 text-body-xs-bold uppercase pb-1 border-b border-border-quaternary"
-      style={{ color: color ?? '#71717a' }}
+      style={{ color: color ?? '#71717B' }}
     >
       {icon} {label}
     </div>
@@ -138,7 +138,7 @@ export function RouteProgressSettings({
 
   return (
     <div className="space-y-4">
-      <SH icon={<LucideIcons.Route size={14} className="text-text-theme" />} label={t('dashboard.routeProgress.title')} color="#3b82f6" />
+      <SH icon={<LucideIcons.Route size={14} className="text-text-theme" />} label={t('dashboard.routeProgress.title')} color="#2B7FFF" />
 
       <Field label={t('dashboard.routeProgress.variant')}>
         <SiteSelect
@@ -237,7 +237,7 @@ export function RouteProgressSettings({
       </div>
 
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
-        <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.stationSource')} color="#10b981" />
+        <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.stationSource')} color="#00BC7D" />
         <Field label={t('dashboard.routeProgress.mode')}>
           <SiteSelect
             value={stationSource}
@@ -320,7 +320,7 @@ export function RouteProgressSettings({
       {stationSource === 'manual' && (
         <div className="space-y-2 pt-2 border-t border-border-quaternary">
           <div className="flex items-center justify-between">
-            <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.manualStations')} color="#10b981" />
+            <SH icon={<MapPin size={12} />} label={t('dashboard.routeProgress.manualStations')} color="#00BC7D" />
             <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={addStation} label="新增" icon={<Plus />} />
           </div>
           {w.stations.map((s, i) => (
@@ -343,7 +343,7 @@ export function RouteProgressSettings({
 
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
         <div className="flex items-center justify-between gap-2">
-          <SH icon={<Zap size={12} />} label={t('dashboard.routeProgress.actionMapping')} color="#f59e0b" />
+          <SH icon={<Zap size={12} />} label={t('dashboard.routeProgress.actionMapping')} color="#FD9A00" />
           <div className="flex gap-1">
             <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadCatalog')} onPress={() => onUpdate({ actionIconRules: buildCatalogActionRules() })}>{t('dashboard.routeProgress.catalogBtn')}</Button>
             <Button hierarchy="subordinate" variant="tonal" title={t('dashboard.routeProgress.loadSample')} onPress={() => onUpdate({ actionIconRules: [...DEFAULT_ROUTE_ACTION_ICON_RULES] })}>{t('dashboard.routeProgress.sampleBtn')}</Button>
@@ -426,7 +426,7 @@ export function RouteProgressSettings({
       </div>
 
       <div className="space-y-2 pt-2 border-t border-border-quaternary">
-        <SH icon={<Palette size={12} />} label={t('dashboard.routeProgress.appearance')} color="#ec4899" />
+        <SH icon={<Palette size={12} />} label={t('dashboard.routeProgress.appearance')} color="#F6339A" />
         <div className="grid grid-cols-2 gap-2">
           <Field label={t('dashboard.routeProgress.activeColor')}>
             <SiteColorInput

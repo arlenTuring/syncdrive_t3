@@ -52,6 +52,7 @@ import { DEMO_FS as FS } from './demoTypography';
 import demoPlaneSnapshot from './demoPlane.snapshot.json';
 import { upgradeVehicleCardGroup } from '../utils/vehicleInfoCardTemplate';
 import { operationStatusBadgeBinding } from '../utils/operationStatusBadge';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 const DS = 'default-internal';
 const MQTT = 'default-mqtt';
@@ -88,7 +89,7 @@ function cid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-const FONT_UI = 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_UI = FONT_FAMILY_PRIMARY;
 
 function staticText(
   x: number, y: number, w: number, h: number, content: string,
@@ -287,8 +288,8 @@ function statCard(
     labelFontSize: opts?.labelFontSize ?? FS.aux,
     unit: opts?.unit ?? '',
     valueColor: opts?.valueColor ?? '#f1f5f9',
-    labelColor: opts?.labelColor ?? '#94a3b8',
-    unitColor: opts?.unitColor ?? opts?.valueColor ?? '#64748b',
+    labelColor: opts?.labelColor ?? '#99A1AF',
+    unitColor: opts?.unitColor ?? opts?.valueColor ?? '#6A7282',
     unitFontSize: opts?.unitFontSize,
     labelPosition: opts?.labelPosition ?? 'top',
     contentAlign: opts?.contentAlign ?? 'center',
@@ -1282,7 +1283,7 @@ const elements: CanvasElementProps[] = [
   {
     id: cid(), type: 'canvas', x: MAINLINE_X, y: TOP_ROW_Y, width: MAINLINE_GROUP_W, height: TOP_RIGHT_H,
     label: '正線班次',
-    backgroundColor: '#111827', backgroundImage: '', opacity: 100, children: [],
+    backgroundColor: '#101828', backgroundImage: '', opacity: 100, children: [],
     isGroup: true,
     groupRepeatMode: 'slots',
     slotCount: MAINLINE_SLOT_COUNT,
@@ -1309,7 +1310,7 @@ const elements: CanvasElementProps[] = [
   {
     id: cid(), type: 'canvas', x: MAINT_X, y: TOP_ROW_Y, width: MAINT_GROUP_W, height: TOP_RIGHT_H,
     label: '整備班表',
-    backgroundColor: '#111827', backgroundImage: '', opacity: 100, children: [],
+    backgroundColor: '#101828', backgroundImage: '', opacity: 100, children: [],
     isGroup: true,
     groupRepeatMode: 'slots',
     slotCount: MAINT_SLOT_COUNT,
@@ -1348,7 +1349,7 @@ const elements: CanvasElementProps[] = [
   {
     id: cid(), type: 'canvas', x: RIGHT_X, y: BOT_Y, width: RIGHT_W, height: MAP_H,
     label: '即時圖台',
-    backgroundColor: '#020617', backgroundImage: '', opacity: 100,
+    backgroundColor: '#030712', backgroundImage: '', opacity: 100,
     canvasKind: 'map-platform', mapId: 't3-main-version', zoomFactor: 1.15,
     useDefaultVehicleDefinition: true,
     vehicleDefinitionName: 'VTMS 巴士 · PMS01',
@@ -1628,7 +1629,7 @@ elements[5].children = [
           { value: 'IN_SERVICE', color: '#FD9A00' },
           { value: 'SCHEDULED', color: '#009966' },
         ],
-        defaultColor: '#64748b',
+        defaultColor: '#6A7282',
         thickness: 2,
         opacity: 1,
       },
@@ -1681,16 +1682,16 @@ function mapVehicleContainerWidget(): VehicleContainerWidget {
 elements[8].children = [
   {
     ...clock, id: cid(), width: 420, height: 72, format: '12h', showDate: true, showSeconds: true,
-    fontSize: FS.emphasis, dateFontSize: FS.aux, color: '#f1f5f9', dateColor: '#94a3b8', fontFamily: 'monospace',
+    fontSize: FS.emphasis, dateFontSize: FS.aux, color: '#f1f5f9', dateColor: '#99A1AF', fontFamily: FONT_FAMILY_PRIMARY,
   },
   {
     ...badge, id: cid(), width: 260, height: 44,
-    defaultBgColor: '#27272a', defaultTextColor: '#a1a1aa', fontSize: FS.body, borderRadius: 8,
+    defaultBgColor: '#27272a', defaultTextColor: '#99A1AF', fontSize: FS.body, borderRadius: 8,
     // 營運狀態：正常營運／降級運轉中／未部署班表／調度暫停中／營運狀態未知（見 utils/operationStatusBadge）
     ...operationStatusBadgeBinding(),
   },
-  staticText(780, 24, 180, 32, '班距 03:00', FS.body, '#fdba74'),
-  staticText(980, 24, 220, 32, '正線營運 4 / 4', FS.body, '#7dd3fc'),
+  staticText(780, 24, 180, 32, '班距 03:00', FS.body, '#FFB86A'),
+  staticText(980, 24, 220, 32, '正線營運 4 / 4', FS.body, '#74D4FF'),
   mapVehicleContainerWidget(),
 ];
 

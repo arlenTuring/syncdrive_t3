@@ -5,6 +5,7 @@ import {
   getWidgetDisplayName,
   getWidgetTypeLabel,
 } from '../utils/widgetDisplayMeta';
+import { FONT_FAMILY_PRIMARY } from '../../../styles/tokens';
 
 type Props = {
   open: boolean;
@@ -84,8 +85,8 @@ export function CanvasChildListPortal({
         maxHeight: Math.min(280, Math.max(120, pos.top - 12)),
         overflowY: 'auto',
         borderRadius: 4,
-        border: '1px solid rgba(6,182,212,0.55)',
-        background: 'rgba(15,22,35,0.98)',
+        border: '1px solid rgba(0, 184, 219, 0.55)',
+        background: 'rgba(16, 24, 40, 0.98)',
         boxShadow: '0 8px 28px rgba(0,0,0,0.65)',
         pointerEvents: 'auto',
       }}
@@ -95,8 +96,8 @@ export function CanvasChildListPortal({
           style={{
             padding: '8px 10px',
             fontSize: 10,
-            color: 'rgba(148,163,184,0.9)',
-            fontFamily: 'system-ui, sans-serif',
+            color: 'rgba(144, 161, 185, 0.9)',
+            fontFamily: FONT_FAMILY_PRIMARY,
           }}
         >
           此畫布尚無子元件
@@ -125,11 +126,11 @@ export function CanvasChildListPortal({
                 padding: '6px 10px',
                 cursor: 'pointer',
                 background: itemSelected
-                  ? 'rgba(6,182,212,0.28)'
+                  ? 'rgba(0, 184, 219, 0.28)'
                   : 'transparent',
-                color: itemSelected ? '#e0f2fe' : '#e2e8f0',
+                color: itemSelected ? '#DFF2FE' : '#e2e8f0',
                 outline: itemSelected
-                  ? '1px solid rgba(34,211,238,0.45)'
+                  ? '1px solid rgba(0, 211, 242, 0.45)'
                   : 'none',
                 outlineOffset: -1,
               }}
@@ -138,7 +139,7 @@ export function CanvasChildListPortal({
                 style={{
                   fontSize: 10,
                   fontWeight: 600,
-                  fontFamily: 'system-ui, sans-serif',
+                  fontFamily: FONT_FAMILY_PRIMARY,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -150,8 +151,8 @@ export function CanvasChildListPortal({
                 style={{
                   marginTop: 2,
                   fontSize: 9,
-                  color: itemSelected ? '#67e8f9' : 'rgba(148,163,184,0.85)',
-                  fontFamily: 'monospace',
+                  color: itemSelected ? '#53EAFD' : 'rgba(144, 161, 185, 0.85)',
+                  fontFamily: FONT_FAMILY_PRIMARY,
                 }}
               >
                 {getWidgetTypeLabel(child.type)}
