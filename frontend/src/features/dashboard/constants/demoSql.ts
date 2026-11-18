@@ -113,8 +113,11 @@ function transitionLabelSql(o: string): string {
 /**
  * 現行站名（同一張圖、同一個站點 ID → 圖資上最新保存的名稱），規則跟後端 MapService.stationNameIndex
  * （map-operation-nodes.js effectiveStationName）相同：
- * - 只看有站點 ID、有場域座標的停靠點（DockingPoint）；鍵是站點 ID（stationId）與停靠點設施 ID 兩種。
- * - 名稱：自訂顯示名稱 → stationName → 舊版 dockingStation；都沒有就不列（呼叫端保留快照）。
+ * - 停靠點（DockingPoint）：要有站點 ID 與場域座標；鍵是站點 ID（stationId）與設施 ID 兩種。
+ *   名稱：自訂顯示名稱 → stationName → 舊版 dockingStation。
+ * - 途經點（Waypoint）：要有場域座標與自訂顯示名稱；鍵是設施 ID（訂單站序的 station_id 就是它）。
+ *   名稱只看自訂顯示名稱——途經點代碼（waypointCode）是內部識別，不當站名。
+ * - 都沒有名稱就不列（呼叫端保留訂單上的快照）。同一個鍵兩種都有時，停靠點優先。
  * - 讀資料庫裡已保存的圖資（map_versions 第 0 版＝最新保存）；不同地圖各自一份，不比對名稱。
  * 只用在現行畫面；訂單上的快照不改。
  */
@@ -122,21 +125,27 @@ const MAP_STATION_NAMES_CTE = `map_station_names AS (
   SELECT DISTINCT ON (mv.map_id, k.station_key)
     mv.map_id,
     k.station_key,
-    COALESCE(
-      NULLIF(regexp_replace(TRIM(f->>'customName'), '\\s+', ' ', 'g'), ''),
-      NULLIF(regexp_replace(TRIM(f->'parameters'->>'stationName'), '\\s+', ' ', 'g'), ''),
-      CASE WHEN f->'parameters'->>'dockingStation' IN ('N2W', 'T3', 'S2W') THEN f->'parameters'->>'dockingStation' END
-    ) AS station_name
+    CASE WHEN f->>'type' = 'Waypoint'
+      THEN NULLIF(regexp_replace(TRIM(f->>'customName'), '\\s+', ' ', 'g'), '')
+      ELSE COALESCE(
+        NULLIF(regexp_replace(TRIM(f->>'customName'), '\\s+', ' ', 'g'), ''),
+        NULLIF(regexp_replace(TRIM(f->'parameters'->>'stationName'), '\\s+', ' ', 'g'), ''),
+        CASE WHEN f->'parameters'->>'dockingStation' IN ('N2W', 'T3', 'S2W') THEN f->'parameters'->>'dockingStation' END
+      )
+    END AS station_name
   FROM map_versions mv
   CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(mv.body->'areas') = 'array' THEN mv.body->'areas' ELSE '[]'::jsonb END) a
   CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a->'facilities') = 'array' THEN a->'facilities' ELSE '[]'::jsonb END) f
-  CROSS JOIN LATERAL (VALUES (f->>'id'), (TRIM(f->'parameters'->>'stationId'))) k(station_key)
+  CROSS JOIN LATERAL (VALUES (f->>'id'), (CASE WHEN f->>'type' = 'DockingPoint' THEN TRIM(f->'parameters'->>'stationId') END)) k(station_key)
   WHERE mv.version = 0
-    AND f->>'type' = 'DockingPoint'
-    AND NULLIF(TRIM(f->'parameters'->>'stationId'), '') IS NOT NULL
+    AND (
+      (f->>'type' = 'DockingPoint' AND NULLIF(TRIM(f->'parameters'->>'stationId'), '') IS NOT NULL)
+      OR (f->>'type' = 'Waypoint' AND NULLIF(TRIM(f->>'customName'), '') IS NOT NULL)
+    )
     AND jsonb_typeof(f->'parameters'->'refFieldXM') = 'number'
     AND jsonb_typeof(f->'parameters'->'refFieldYM') = 'number'
     AND NULLIF(k.station_key, '') IS NOT NULL
+  ORDER BY mv.map_id, k.station_key, (f->>'type' = 'DockingPoint') DESC
 )`;
 
 /** 單一站點的現行站名（需要 MAP_STATION_NAMES_CTE）；圖上沒有回 NULL */
