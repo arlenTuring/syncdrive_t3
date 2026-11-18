@@ -360,6 +360,9 @@ export default function MapEditorApp({
     string | null
   >(null)
   const [nextNumericId, setNextNumericId] = useState(1)
+  /** 存檔時記下目前發到第幾號（地圖檔的 idHighWater），刪掉最大編號後重開也不會再發同一號 */
+  const nextNumericIdRef = useRef(1)
+  nextNumericIdRef.current = nextNumericId
   /** Map 像素畫布縮放：1 近、7 遠（一屏看全圖） */
   const [mapZoomLevel, setMapZoomLevel] = useState(MAP_PIXEL_ZOOM_DEFAULT_LEVEL)
   const [showFacilityToolbars, setShowFacilityToolbars] = useState(
@@ -814,7 +817,8 @@ export default function MapEditorApp({
       updateSelection(s.selectedAreaId, s.selectedFacilityIds)
       selectedBasemapIdRef.current = s.selectedBasemapId
       setSelectedBasemapId(s.selectedBasemapId)
-      setNextNumericId(s.nextNumericId)
+      // 復原不讓編號倒退：編輯中會自動存檔，發出去的編號可能已經寫進地圖檔
+      setNextNumericId((n) => Math.max(n, s.nextNumericId))
     },
     [updateSelection],
   )
@@ -1136,7 +1140,7 @@ export default function MapEditorApp({
       setAreas(repositioned.areas)
       const nextBasemaps = structuredClone(loaded.basemaps ?? [])
       setBasemaps(nextBasemaps)
-      setNextNumericId(nextNumericIdFromAreas(loaded.areas, nextBasemaps))
+      setNextNumericId(nextNumericIdFromAreas(loaded.areas, nextBasemaps, loaded.idHighWater))
       setMapRoutes(loaded.routes ?? [])
       setMapRouteGroups(
         ensureRouteGroupsForRoutes(loaded.routes ?? [], loaded.routeGroups ?? []),
@@ -1233,6 +1237,7 @@ export default function MapEditorApp({
       pointTopologyRef.current,
       [],
       basemapsRef.current,
+      nextNumericIdRef.current - 1,
     )
     writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
     markEntryUnpublished(updated)
@@ -1862,6 +1867,7 @@ export default function MapEditorApp({
         pointTopologyRef.current,
         [],
         basemapsRef.current,
+        nextNumericIdRef.current - 1,
       )
       writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
       markEntryUnpublished(updated)
@@ -1871,9 +1877,7 @@ export default function MapEditorApp({
     setAreas(
       applyExampleMapDefaultLabelStyleToAreas(currentAreas, meta.mapId),
     )
-    setNextNumericId(
-      nextNumericIdFromAreas(currentAreas, basemapsRef.current),
-    )
+    setNextNumericId((n) => Math.max(n, nextNumericIdFromAreas(currentAreas, basemapsRef.current)))
     clearSelection()
     setLeaveEditDialogOpen(false)
     setMapEditorMode('view')
@@ -1896,7 +1900,8 @@ export default function MapEditorApp({
     setMapRouteGroups(structuredClone(b.routeGroups))
     setMapRoutes(structuredClone(b.routes))
     setPointTopology(structuredClone(b.pointTopology))
-    setNextNumericId(b.nextNumericId)
+    // 放棄編輯也不讓編號倒退：編輯中自動存過檔，這段時間發出去的編號不能再用
+    setNextNumericId((n) => Math.max(n, b.nextNumericId))
     setLoadedMapMeta({ ...b.loadedMapMeta })
     setMapPixelSize(b.loadedMapMeta.pixelSize)
     setMapPixelOrigin(b.loadedMapMeta.pixelOrigin)
@@ -1957,6 +1962,7 @@ export default function MapEditorApp({
             pointTopologyRef.current,
             [],
             basemapsRef.current,
+            nextNumericIdRef.current - 1,
           )
           writeMapLibrary(upsertMapLibraryEntry(readMapLibrary(), updated))
           markEntryUnpublished(updated)

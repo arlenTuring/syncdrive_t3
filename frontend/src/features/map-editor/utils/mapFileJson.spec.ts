@@ -7,6 +7,7 @@ import { emptyPointTopology } from '../types/pointTopology'
 import {
   buildMapFileV2,
   facilityToMapEntry,
+  nextNumericIdFromAreas,
   migrateFacilityName,
   migrateMisclassifiedSmartPoleEntry,
   parseMapFileJson,
@@ -53,6 +54,34 @@ function baseFacility(
 }
 
 describe('mapFileJson', () => {
+  it('刪掉最大編號的點、存檔再重開：新編號不會跟以前發過的重複', () => {
+    const area = createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE)
+    const withPoints = {
+      ...area,
+      facilities: [
+        baseFacility({ id: '160', type: 'Waypoint', name: 'Waypoint' }),
+        baseFacility({ id: '194', type: 'Waypoint', name: 'Waypoint' }),
+      ],
+    }
+    const saved = buildMapFileV2('map-1', '地圖', DEFAULT_MAP_PIXEL_SIZE, [withPoints])
+    assert.equal(saved.idHighWater, 194)
+    // 刪掉 194 再存：上一次的最大編號要帶著
+    const without = { ...withPoints, facilities: withPoints.facilities.slice(0, 1) }
+    const resaved = buildMapFileV2('map-1', '地圖', DEFAULT_MAP_PIXEL_SIZE, [without], { idHighWater: saved.idHighWater })
+    assert.equal(resaved.idHighWater, 194)
+    const reopened = parseMapFileJson(JSON.parse(JSON.stringify(resaved)))
+    assert.equal(reopened.idHighWater, 194)
+    assert.equal(nextNumericIdFromAreas(reopened.areas, reopened.basemaps, reopened.idHighWater), 195)
+  })
+
+  it('舊檔沒有 idHighWater：以檔內現有的最大編號為準', () => {
+    const area = { ...createBlankArea('1', DEFAULT_MAP_PIXEL_SIZE), facilities: [baseFacility({ id: '042', type: 'Waypoint', name: 'Waypoint' })] }
+    const doc = buildMapFileV2('map-1', '地圖', DEFAULT_MAP_PIXEL_SIZE, [area]) as unknown as Record<string, unknown>
+    delete doc.idHighWater
+    const parsed = parseMapFileJson(doc)
+    assert.equal(parsed.idHighWater, 42)
+  })
+
   it('round-trips map description on parse → build', () => {
     const doc = buildMapFileV2(
       'map-1',

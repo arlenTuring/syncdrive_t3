@@ -521,6 +521,8 @@ export type ParsedMapFile = {
   /** 使用者最後設定的路線可視 id；缺欄＝空（不強制全開） */
   visibleRouteIds: string[]
   pointTopology: PointTopology
+  /** 發過的最大數字編號（見 MapFileV2.idHighWater）；舊檔＝檔內現有最大編號 */
+  idHighWater: number
   /** 建立模式；缺省 blank（舊檔） */
   creationMode: MapCreationMode
   createdAt?: string
@@ -629,6 +631,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       routeGroups: parseMapRouteGroups(json.routeGroups),
       visibleRouteIds: parseVisibleRouteIds(json.visibleRouteIds, routes),
       pointTopology: parsePointTopology(json.pointTopology),
+      idHighWater: Math.max(parseIdHighWater(json.idHighWater), maxNumericIdInAreas(areas, basemaps)),
       creationMode,
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
@@ -650,6 +653,7 @@ export function parseMapFileJson(json: unknown): ParsedMapFile {
       routeGroups: [],
       visibleRouteIds: [],
       pointTopology: parsePointTopology(undefined),
+      idHighWater: 0,
       creationMode: 'blank',
     }
   }
@@ -739,6 +743,8 @@ export function buildMapFileV2(
     pointTopology?: PointTopology
     basemaps?: MapBasemapObject[]
     creationMode?: MapCreationMode
+    /** 上一次存檔記下的最大編號；跟這次地圖上的最大編號取大的寫回去 */
+    idHighWater?: number
   },
 ): MapFileV2 {
   const origin = parsePixelOrigin(options?.pixelOrigin)
@@ -752,6 +758,7 @@ export function buildMapFileV2(
     routes,
   )
   const creationMode = parseCreationMode(options?.creationMode)
+  const idHighWater = Math.max(parseIdHighWater(options?.idHighWater), maxNumericIdInAreas(areas, basemaps))
   return {
     schemaVersion: MAP_FILE_SCHEMA_VERSION,
     mapId,
@@ -772,14 +779,32 @@ export function buildMapFileV2(
     ...(pointTopology && (pointTopology.nodes.length > 0 || pointTopology.edges.length > 0)
       ? { pointTopology }
       : {}),
+    ...(idHighWater > 0 ? { idHighWater } : {}),
   }
 }
 
-export function nextNumericIdFromAreas(
+function parseIdHighWater(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number.NaN
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
+/** 地圖上現有的最大數字編號（設施、區域、底圖） */
+export function maxNumericIdInAreas(
   areas: MapAreaObject[],
   basemaps: MapBasemapObject[] = [],
 ): number {
-  let max = 0
+  return nextNumericIdFromAreas(areas, basemaps) - 1
+}
+
+/**
+ * 下一個新編號。highWater＝這張地圖發過的最大編號（存在地圖檔裡）：刪掉的最大編號不會再發一次。
+ */
+export function nextNumericIdFromAreas(
+  areas: MapAreaObject[],
+  basemaps: MapBasemapObject[] = [],
+  highWater = 0,
+): number {
+  let max = Math.max(0, Math.floor(highWater))
   for (const b of basemaps) {
     const n = Number.parseInt(b.id, 10)
     if (!Number.isNaN(n) && n > max) max = n

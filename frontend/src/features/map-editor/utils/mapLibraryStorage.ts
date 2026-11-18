@@ -132,6 +132,7 @@ function entryFromParsed(
       pointTopology: parsed.pointTopology,
       basemaps: parsed.basemaps,
       creationMode: parsed.creationMode,
+      idHighWater: parsed.idHighWater,
     },
   )
   return {
@@ -656,6 +657,8 @@ export function saveEditorStateToLibraryEntry(
   pointTopology?: PointTopology,
   visibleRouteIds: readonly string[] = [],
   basemaps: MapBasemapObject[] = [],
+  /** 編輯器目前發到的最大編號（含這次刪掉的），一起寫進 idHighWater */
+  issuedIdHighWater = 0,
 ): MapLibraryEntry {
   const now = nowIso()
   const mapDocument = buildMapFileV2(
@@ -675,6 +678,8 @@ export function saveEditorStateToLibraryEntry(
       pointTopology,
       basemaps,
       creationMode: entry.mapDocument.creationMode,
+      // 上次存的最大編號要帶著：這次刪掉了最大的那一個，下次也不能再發同一號
+      idHighWater: Math.max(entry.mapDocument.idHighWater ?? 0, issuedIdHighWater),
     },
   )
   return {
