@@ -65,10 +65,14 @@ function StatusCard({ label, value, dot }: { label: string; value: string; dot?:
   );
 }
 
-function CameraWell({ src }: { src?: string | null }) {
+function CameraWell({ src, fill }: { src?: string | null; fill: boolean }) {
   const { t } = useTranslation();
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background">
+    <div
+      className={`relative overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background ${
+        fill ? 'min-h-0 flex-1' : 'aspect-video shrink-0'
+      }`}
+    >
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
@@ -94,9 +98,12 @@ export function DoorMonitorCard({
   kind,
   door,
   dwellSeconds,
+  fill = true,
   onModeChange,
 }: {
   kind: DoorKind;
+  /** true：卡片高度由外框決定、相機畫面填滿剩下的高度；false：卡片照內容長高，相機畫面固定比例 */
+  fill?: boolean;
   door: DoorMonitorState;
   dwellSeconds?: number | null;
   onModeChange: (mode: ControlMode) => void;
@@ -117,13 +124,13 @@ export function DoorMonitorCard({
   ] as const;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3">
+    <div className={`flex min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3 ${fill ? 'min-h-0' : ''}`}>
       <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3">
         <p className="text-body-s text-text-primary">{door.label}</p>
         <ModeToggle value={door.mode} onChange={onModeChange} />
       </div>
 
-      <CameraWell src={door.videoUrl} />
+      <CameraWell src={door.videoUrl} fill={fill} />
 
       <div className="mt-3 grid shrink-0 grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] gap-0">
         <div className="min-w-0 pr-4">

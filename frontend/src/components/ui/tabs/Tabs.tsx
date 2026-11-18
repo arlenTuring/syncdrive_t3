@@ -77,7 +77,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.id)}
             className={cn(
               'whitespace-nowrap rounded-md px-3 py-1.5 text-body-xs transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
-              active ? 'bg-link-standard-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary',
+              active ? 'bg-link-tonal text-text-theme ring-1 ring-inset ring-border-theme' : 'text-text-tertiary hover:text-text-primary',
             )}
           >
             {option.label}

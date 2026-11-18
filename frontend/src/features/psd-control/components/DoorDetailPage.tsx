@@ -183,16 +183,24 @@ export function DoorDetailPage({
                   ? t('psdControl.dwellNone')
                   : t('psdControl.dwellSeconds', { seconds: arrivalSeconds })}
             </p>
-            <Button hierarchy="subordinate" variant="standard" onPress={() => setDockDialog(true)} leadingIcon={<SlidersHorizontal />}>{t('psdControl.editDockTime')}</Button>
+            <Button hierarchy="superior" variant="outlined" onPress={() => setDockDialog(true)} leadingIcon={<SlidersHorizontal />}>{t('psdControl.editDockTime')}</Button>
           </div>
         ) : null}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[repeat(4,minmax(0,1fr))] gap-2.5 overflow-auto p-3 md:grid-cols-2 md:grid-rows-2">
+      {/* 四個門以內（一台車）：2×2 填滿畫面；月台門通常更多，固定兩列會把每張卡壓扁、相機畫面高度變 0，改成照內容高度往下捲 */}
+      <div
+        className={
+          items.length <= 4
+            ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-[repeat(4,minmax(0,1fr))] gap-2.5 overflow-auto p-3 md:grid-cols-2 md:grid-rows-2'
+            : 'grid min-h-0 flex-1 grid-cols-1 content-start gap-2.5 overflow-auto p-3 md:grid-cols-2'
+        }
+      >
         {items.map((door) => (
           <DoorMonitorCard
             key={door.id}
             kind={kind}
+            fill={items.length <= 4}
             door={door}
             dwellSeconds={arrivalSeconds}
             onModeChange={(mode) => setMode(door.id, mode)}
