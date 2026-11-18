@@ -136,7 +136,7 @@ export function TimeRangeField({
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[200]"
+            className="fixed z-[240]"
             style={{ top: panelPos.top, left: panelPos.left }}
           >
             <TimePickerPanel

@@ -195,9 +195,10 @@ export function ExecutionTimeField({
       <Clock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
       {open &&
         createPortal(
+          // 要高過共用對話框（Dialog z-230）：這個欄位常放在對話框裡，先前 z-200 被對話框蓋住，點了像沒反應
           <div
             ref={panelRef}
-            className="fixed z-[200]"
+            className="fixed z-[240]"
             style={{ top: panelPos.top, left: panelPos.left }}
           >
             <div className="relative w-[196px] rounded-xl border border-border-quaternary bg-surface-primary shadow-[0px_4px_24px_rgba(98,116,142,0.2)]">
