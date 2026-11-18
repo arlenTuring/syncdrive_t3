@@ -995,7 +995,7 @@ const enUS: DeepStringify<typeof zhTW> = {
       safetyPassed: "Safety check passed!",
       safetyFailed: "Safety check failed: {{count}} blocking publish",
       qualityPassed: "Quality check passed!",
-      qualityFailed: "Quality below target!",
+      qualityFailed: "Quality below target (does not block publishing)",
       blocksPublish: "Blocks publish",
       unresolved: "Unresolved",
       itemCount: "{{count}}",

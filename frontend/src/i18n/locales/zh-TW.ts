@@ -975,7 +975,7 @@ const zhTW = {
       safetyPassed: "安全檢查通過！",
       safetyFailed: "安全檢查未通過：{{count}} 項阻擋發布",
       qualityPassed: "品質檢查達標！",
-      qualityFailed: "品質檢查未達標！",
+      qualityFailed: "品質檢查未達標（不影響發布）",
       blocksPublish: "阻擋發布",
       unresolved: "尚未排妥",
       itemCount: "{{count}} 則",

@@ -6,7 +6,7 @@ import {
   type ScheduleEngineProgress,
 } from '../utils/schedule-engine/worker/runScheduleEngineInBackground';
 import i18n from '../../../i18n';
-import { ArrowRight, Check, ChevronDown, Info, Loader2, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, ClipboardList, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, Loader2, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, ClipboardList, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -553,8 +553,9 @@ function CheckReport({
             {t('shiftList.scheduleAdjust.qualityPassed')}
           </p>
         ) : (
-          <p className="flex items-center gap-2 rounded-lg bg-status-error-light px-4 py-2.5 text-body-s text-status-error-emphasis">
-            <X className="size-4 shrink-0" aria-hidden />
+          // 品質（班距、班次數）沒達標不擋發布，是提醒不是錯誤：用警告色，紅色只留給安全檢查不通過
+          <p className="flex items-center gap-2 rounded-lg bg-status-warning-light px-4 py-2.5 text-body-s text-status-warning-emphasis">
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.qualityFailed')}
           </p>
         )}
