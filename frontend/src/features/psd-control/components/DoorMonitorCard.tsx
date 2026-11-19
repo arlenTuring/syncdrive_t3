@@ -70,13 +70,15 @@ function CameraWell({ src, fill }: { src?: string | null; fill: boolean }) {
   return (
     <div
       className={`relative overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background ${
-        fill ? 'min-h-0 flex-1' : 'aspect-video shrink-0'
+        // 填滿模式也要留最低高度（夠放一行「尚未連接」），再矮才由外框捲動；
+        // 文字與影像貼滿相機框、置中，框多矮都不會被切掉（先前內層固定 120px 高、文字落在框外）
+        fill ? 'min-h-16 flex-1' : 'aspect-video shrink-0'
       }`}
     >
       {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full min-h-[120px] w-full items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center">
           <p className="text-body-s tracking-[0.4px] text-text-tertiary">{t('psdControl.notConnected')}</p>
         </div>
       )}

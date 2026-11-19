@@ -461,6 +461,8 @@ export function createBlankMapEntry(
     mapId: libraryId,
     displayName,
     version: DEFAULT_MAP_VERSION,
+    // 新地圖還沒發過編號；下一號仍取 max(這個值, 檔內現有最大編號)
+    idHighWater: 0,
     pixelSize,
     pixelOrigin: { x: 0, y: 0 },
     areas: [area],
@@ -513,6 +515,8 @@ export function createTrackGenMapEntry(
     mapId: libraryId,
     displayName,
     version: DEFAULT_MAP_VERSION,
+    // 新地圖還沒發過編號；下一號仍取 max(這個值, 檔內現有最大編號)
+    idHighWater: 0,
     pixelSize,
     pixelOrigin: { x: 0, y: 0 },
     areas: [],

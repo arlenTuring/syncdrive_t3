@@ -188,11 +188,11 @@ export function DoorDetailPage({
         ) : null}
       </div>
 
-      {/* 四個門以內（一台車）：2×2 填滿畫面；月台門通常更多，固定兩列會把每張卡壓扁、相機畫面高度變 0，改成照內容高度往下捲 */}
+      {/* 四個門以內（一台車）：2×2 填滿畫面，畫面太矮時每列不小於卡片內容（相機框最低高度＋按鈕＋狀態），改成捲動；月台門通常更多，固定兩列會把每張卡壓扁、相機畫面高度變 0，改成照內容高度往下捲 */}
       <div
         className={
           items.length <= 4
-            ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-[repeat(4,minmax(0,1fr))] gap-2.5 overflow-auto p-3 md:grid-cols-2 md:grid-rows-2'
+            ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-[repeat(4,minmax(min-content,1fr))] gap-2.5 overflow-auto p-3 md:grid-cols-2 md:grid-rows-[repeat(2,minmax(min-content,1fr))]'
             : 'grid min-h-0 flex-1 grid-cols-1 content-start gap-2.5 overflow-auto p-3 md:grid-cols-2'
         }
       >

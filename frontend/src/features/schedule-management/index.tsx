@@ -50,6 +50,7 @@ import { ScheduleModuleSidebar } from "./components/ScheduleModuleSidebar";
 import { ShellWorkspaceFrame } from "./components/ShellWorkspaceFrame";
 import { AttachModuleDashboardDialog } from "./components/AttachModuleDashboardDialog";
 import { useAdminModePreference } from "./utils/adminModePreference";
+import { readLastView, writeLastView } from "./utils/lastViewPreference";
 import {
   createModuleDashboardPageId,
   moduleDashboardViewId,
@@ -333,17 +334,30 @@ function useWorkspaceChrome(
 export default function ScheduleManagementApp({
   initialView = "shift-records",
 }: ScheduleManagementAppProps) {
-  const [view, setView] = useState<string>(initialView);
+  const auth = useAuth();
+  const { user } = auth;
+  // 重新整理後回到同一頁；沒有記錄或這個帳號看不到那一頁時才用預設頁
+  const [view, setView] = useState<string>(() => {
+    const stored = readLastView();
+    if (!stored) return initialView;
+    const required = parseModuleDashboardViewId(stored)
+      ? "dashboard.dashboard.view"
+      : VIEW_PERMISSIONS[stored as ShellView];
+    return !required || permissionSatisfied(required, auth.can)
+      ? stored
+      : initialView;
+  });
+  useEffect(() => {
+    writeLastView(view);
+  }, [view]);
   const [videoHistoryRequest, setVideoHistoryRequest] = useState<{
     request: HistoryRequest | null;
     nonce: number;
   }>(() => ({
-    request: initialView === "video-history" ? takeHistoryRequest() : null,
+    request: view === "video-history" ? takeHistoryRequest() : null,
     nonce: 0,
   }));
-  const auth = useAuth();
-  const { user } = auth;
-  const [mapMounted, setMapMounted] = useState(initialView === "map");
+  const [mapMounted, setMapMounted] = useState(view === "map");
   const [adminModePreference] = useAdminModePreference();
   // 管理模式是瀏覽器偏好；沒有儀表板編輯權限的帳號（例如廠商）在同一台電腦登入也不顯示編輯入口
   const adminMode =
