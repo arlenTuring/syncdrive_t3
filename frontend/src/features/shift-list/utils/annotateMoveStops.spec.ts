@@ -40,9 +40,17 @@ function plan(block: GeneratedScheduleBlock): GeneratedSchedulePlan['timelines']
 }
 
 describe('annotateMoveStops：訂單途經點', () => {
-  it('走唯一最短路：不帶途經點（車自己規劃也會走同一條）', () => {
+  it('走唯一最短路也帶途經點：車端的「最短」不一定跟引擎同一把尺', () => {
     const block = moveCard(['G', 'P1', 'T', 'H']);
     annotateMoveStops(plan(block), topology(40));
+    assert.deepEqual(block.yardMoveStops?.map((stop) => stop.stationId), ['p1', 't']);
+  });
+
+  it('中途沒有點位識別碼的節點：不帶', () => {
+    const block = moveCard(['G', 'P1', 'T', 'H']);
+    const topo = topology(40);
+    topo.nodes = topo.nodes.map((n) => ({ ...n, stationId: undefined })) as PointTopology['nodes'];
+    annotateMoveStops(plan(block), topo);
     assert.equal(block.yardMoveStops, undefined);
   });
 

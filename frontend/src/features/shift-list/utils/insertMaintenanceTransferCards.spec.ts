@@ -1752,3 +1752,50 @@ describe('同場區兩台車同時互換格子：改成各自留在原格', () =
     assert.notEqual(at('c1'), at('c2'));
   });
 });
+
+describe('同場區接力換格（2026-11-19 午夜充電洗車區）', () => {
+  const block = (id: string, row: number, taskType: string, start: number, end: number) => ({
+    id, timelineRow: row, taskType, label: taskType, anchorStartMinute: start, plannedStartMinute: start,
+    plannedEndMinute: end, travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+  });
+  /** E1～E3 掛在同一個分區、分區入口 G；格位都經 G 進出，各 50 秒 */
+  const zoneTopology = {
+    ...emptyPointTopology(),
+    nodes: [
+      { id: 'E1', kind: 'facility', label: 'E1', x: 0, y: 0, color: '#222' },
+      { id: 'E2', kind: 'facility', label: 'E2', x: 0, y: 0, color: '#222' },
+      { id: 'E3', kind: 'facility', label: 'E3', x: 0, y: 0, color: '#222' },
+      { id: 'G', kind: 'waypoint', label: 'G', x: 0, y: 0, color: '#111' },
+    ],
+    edges: ['E1', 'E2', 'E3'].flatMap((slot) => [edge(slot, 'G', 50), edge('G', slot, 50)]),
+  } as PointTopology;
+  const zoneAreas = [{
+    id: 'e-area',
+    facilities: [
+      { id: 'zone-e', type: 'Facility', parameters: { zonePartitionEntranceId: 'G' } },
+      { id: 'G', type: 'Facility', parameters: {} },
+      ...['E1', 'E2', 'E3'].map((id) => ({ id, type: 'Facility', parameters: { parentZoneId: 'zone-e' } })),
+    ],
+  }] as never;
+  const maintenanceBody = {
+    charging: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'E1' }, { id: 'b', mapCode: 'E2' }, { id: 'c', mapCode: 'E3' }] },
+    mobile: { stepEnabled: true, equipmentRows: [{ id: 'd', mapCode: 'E1' }, { id: 'e', mapCode: 'E2' }, { id: 'f', mapCode: 'E3' }] },
+  };
+
+  it('前一台還沒走、後一台就挑了它的格子：前一台留在原格，後一台改去空格', () => {
+    // 時間線 1 先挑到 E1 充電；時間線 2 的充電 12:00 開始，E1 那一刻剛好空出來，照清單順序也挑 E1；
+    // 時間線 1 充完電要待命，E1 已被訂走只好換到 E2——一條「進 E1、E1 換 E2」的接力。
+    const timelines = [
+      { row: 1, blocks: [block('c1', 1, 'charging', 600, 720), block('s1', 1, 'standby', 720, 900)] },
+      { row: 2, blocks: [block('c2', 2, 'charging', 720, 840)] },
+    ] as never as GeneratedSchedulePlan['timelines'];
+    insertMaintenanceTransferCards({
+      timelines, topology: zoneTopology, maintenanceBody,
+      selectedRoutes: [], minimumRecoveryTimeSeconds: 0, collisionProtectionSeconds: 30,
+      sectionCodes: SECTION_CODES, decideOnly: true, areas: zoneAreas,
+    });
+    const at = (id: string) => timelines.flatMap((t) => t.blocks).find((b) => b.id === id)!.yardFacilityLabel;
+    assert.equal(at('s1'), at('c1'), '時間線 1 待命留在充電那一格，不換格');
+    assert.notEqual(at('c2'), at('c1'), '時間線 2 改去別的空格');
+  });
+});

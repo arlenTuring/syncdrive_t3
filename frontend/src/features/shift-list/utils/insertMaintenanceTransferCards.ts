@@ -2044,6 +2044,192 @@ export function insertMaintenanceTransferCards(args: {
       if (!swapped) break;
     }
   }
+  /**
+   * 拆掉「一串接力換格」：能留在原格的車就留在原格，擋路的那一台改去別的空格。
+   *
+   * 選位依整備開始時刻一台一台挑，跨日那一刻的順序又是倒過來的（隔天 00:00 開始的那段先挑），
+   * 挑到的格子常常剛好是另一台車還沒離開的格子，於是湊出一條鏈（2026-11-19 午夜充電洗車區）：
+   * 正線車進 E1 → E1 的車換到 E4 → E4 的車換到 E2 → E2 的車出場。其實只要正線車改進
+   * 早就空下來的 E3，另外兩台各自留在原格，一次換格都不用。成對互換（{@link eliminateYardSlotSwaps}）
+   * 只拆得掉兩台的情形，這裡拆任意長度的鏈。
+   *
+   * 只動卡在零秒交接（同一格前一台離開、後一台不到一個碰撞保護時間就進來）裡的換格；第一次試做時
+   * 每一筆換格都動，牽動了跟午夜無關的時段，反而多出三處排不出的進出場（2026-11-19 重播）。
+   *
+   * 做法：每一筆這樣的換格（後一段那一類整備准停在原格的），先試後一段直接留在前一段的格子；被別台的停留
+   * 擋住時，試著把那一台整段搬到它允許、整段空著、進出成本不比原格高的另一格。整張班表的換格次數
+   * 變少（零秒交接不增加），或次數不變、總移動成本不增加、零秒交接變少，才採用，否則還原。
+   * 不寫任何格位或場區名稱。
+   */
+  function keepVehiclesInPlace(): void {
+    type Move = { row: number; earlier: GeneratedScheduleBlock; later: GeneratedScheduleBlock; from: string; to: string };
+    const collectMoves = (): Move[] => {
+      const moves: Move[] = [];
+      for (const timeline of timelines) {
+        const sorted = [...timeline.blocks].sort((a, b) => a.plannedStartMinute - b.plannedStartMinute);
+        sorted.forEach((block, index) => {
+          if (!YARD_TASK_TYPES.has(block.taskType)) return;
+          const prev = immediatePrevCyclic(sorted, index);
+          if (!prev || !YARD_TASK_TYPES.has(prev.block.taskType)) return;
+          const from = yardBlockFacility.get(prev.block.id)?.nodeId;
+          const to = yardBlockFacility.get(block.id)?.nodeId;
+          if (!from || !to || from === to) return;
+          moves.push({ row: timeline.row, earlier: prev.block, later: block, from, to });
+        });
+      }
+      return moves;
+    };
+    const labelOf = (nodeId: string) => nodeById.get(nodeId)?.label || nodeId;
+    const allowed = (block: GeneratedScheduleBlock, nodeId: string) =>
+      facilityNodesForBlock(block).some((facility) => facility.id === nodeId);
+    const fitsAt = (block: GeneratedScheduleBlock, nodeId: string) => stayFacilityIsFree(
+      nodeId, block, block.timelineRow,
+      vehicleArrivesFacilityAtSecond(block, nodeId), vehicleLeavesFacilityAtSecond(block),
+    );
+    const movesClear = (block: GeneratedScheduleBlock, nodeId: string) => {
+      const ctx = chainContext.get(block.id);
+      return !ctx || !stayMovesBlocked(block, block.timelineRow, ctx.sorted, ctx.index, nodeId);
+    };
+    /** 這一段停在 nodeId 的進出比較成本；到不了回 +∞ */
+    const stayCost = (block: GeneratedScheduleBlock, nodeId: string) => {
+      const ctx = chainContext.get(block.id);
+      if (!ctx) return 0;
+      const prev = resolveAnchor(ctx.sorted, ctx.index, 'prev');
+      const next = resolveAnchor(ctx.sorted, ctx.index, 'next');
+      const inCost = prev ? moveDecisionCost(prev, nodeId) : 0;
+      const outCost = next ? moveDecisionCost(nodeId, next) : 0;
+      return inCost === null || outCost === null ? Number.POSITIVE_INFINITY : inCost + outCost;
+    };
+    /**
+     * 交接太緊的次數：同一格前一台（別的時間線）離開到下一台進來不到一個碰撞保護時間。
+     * 場區格位的交接本來只要求不重疊（{@link handoverEdgeIsClear}），前一台出場、後一台進場
+     * 都要經過同一個入口點，零秒交接就是兩台在入口點對撞。
+     */
+    const tightHandovers = (involved?: Set<string>, arrivals?: string[]) => {
+      const byFacility = new Map<string, MoveCardFacilityBooking[]>();
+      for (const booking of yardBookingByBlockId.values()) {
+        const list = byFacility.get(booking.facilityNodeId) ?? [];
+        list.push(booking);
+        byFacility.set(booking.facilityNodeId, list);
+      }
+      let count = 0;
+      for (const list of byFacility.values()) {
+        for (const leaving of list) {
+          for (const arriving of list) {
+            if (arriving.timelineRow === leaving.timelineRow) continue;
+            const gap = (((arriving.startSecond - leaving.endSecond) % daySeconds) + daySeconds) % daySeconds;
+            if (gap < collisionBufferSeconds - 1e-9) {
+              count += 1;
+              if (leaving.blockId) involved?.add(leaving.blockId);
+              if (arriving.blockId) {
+                involved?.add(arriving.blockId);
+                arrivals?.push(arriving.blockId);
+              }
+            }
+          }
+        }
+      }
+      return count;
+    };
+    const movesCost = (moves: Move[]) => moves.reduce((sum, move) => {
+      const cost = moveDecisionCost(move.from, move.to);
+      return sum + (cost === null ? Number.POSITIVE_INFINITY : cost);
+    }, 0);
+    /** 換格次數變少、零秒交接不增加；或次數一樣、總移動成本不增加、零秒交接變少 */
+    const better = (before: Move[], beforeTight: number) => {
+      const after = collectMoves();
+      const tight = tightHandovers();
+      if (after.length !== before.length) return after.length < before.length && tight <= beforeTight;
+      return movesCost(after) <= movesCost(before) + 1e-9 && tight < beforeTight;
+    };
+    /** 這一段前一段（同一條線、緊鄰的整備）停的格子；沒有回 null */
+    const previousSlotOf = (block: GeneratedScheduleBlock) => {
+      const ctx = chainContext.get(block.id);
+      const prev = ctx ? immediatePrevCyclic(ctx.sorted, ctx.index) : null;
+      return prev && YARD_TASK_TYPES.has(prev.block.taskType) ? yardBlockFacility.get(prev.block.id)?.nodeId ?? null : null;
+    };
+    /**
+     * 第一步：零秒交接裡後進來的那一台改去別格——優先回到它自己前一段的格子（等於不換格），
+     * 其次是進出成本不比原格高、整段空著的格子。不動任何別台車，所以先做。
+     */
+    const relocateArrivals = (before: Move[], beforeTight: number, arrivals: string[]) => {
+      for (const blockId of new Set(arrivals)) {
+        const block = blockById.get(blockId);
+        const current = block ? yardBlockFacility.get(block.id)?.nodeId : undefined;
+        if (!block || !current || !YARD_TASK_TYPES.has(block.taskType)) continue;
+        const baseCost = stayCost(block, current);
+        const own = previousSlotOf(block);
+        const options = [
+          ...(own && own !== current ? [own] : []),
+          ...facilityNodesForBlock(block).map((facility) => facility.id).filter((id) => id !== current && id !== own),
+        ];
+        for (const nodeId of options) {
+          if (!allowed(block, nodeId) || stayCost(block, nodeId) > baseCost + 1e-9) continue;
+          assignYardStay(block, nodeId, labelOf(nodeId));
+          if (fitsAt(block, nodeId) && movesClear(block, nodeId) && better(before, beforeTight)) {
+            engineTrace('yard-handover-relocated', { row: block.timelineRow, blockId: block.id, from: labelOf(current), to: labelOf(nodeId) });
+            return true;
+          }
+          assignYardStay(block, current, labelOf(current));
+        }
+      }
+      return false;
+    };
+    const blockById = new Map<string, GeneratedScheduleBlock>();
+    for (const timeline of timelines) for (const block of timeline.blocks) blockById.set(block.id, block);
+    const rejected = new Set<string>();
+    /** 卡過零秒交接的停留：只動這些，其他換格維持原樣（整張重排會牽動別的時段） */
+    const involved = new Set<string>();
+    for (let guard = 0; guard < 64; guard += 1) {
+      const before = collectMoves();
+      const arrivals: string[] = [];
+      const beforeTight = tightHandovers(involved, arrivals);
+      if (involved.size === 0) break;
+      if (arrivals.length > 0 && relocateArrivals(before, beforeTight, arrivals)) continue;
+      // 第二步：後一段留在前一段的格子，擋路的那一台改去別格
+      let improved = false;
+      for (const move of before) {
+        if (!involved.has(move.earlier.id) && !involved.has(move.later.id)) continue;
+        const key = `${move.later.id}|${move.from}`;
+        if (rejected.has(key) || !allowed(move.later, move.from)) continue;
+        assignYardStay(move.later, move.from, labelOf(move.from));
+        /** 搬走的擋路者（還原用） */
+        let displaced: { block: GeneratedScheduleBlock; nodeId: string } | null = null;
+        let ok = fitsAt(move.later, move.from) && movesClear(move.later, move.from);
+        if (!ok && lastBlocker?.kind === 'facility' && lastBlocker.blockingBlockId) {
+          const blocker = blockById.get(lastBlocker.blockingBlockId);
+          const blockerAt = blocker ? yardBlockFacility.get(blocker.id)?.nodeId : undefined;
+          if (blocker && blockerAt === move.from && YARD_TASK_TYPES.has(blocker.taskType)) {
+            const baseCost = stayCost(blocker, move.from);
+            for (const facility of facilityNodesForBlock(blocker)) {
+              if (facility.id === move.from) continue;
+              if (stayCost(blocker, facility.id) > baseCost + 1e-9) continue;
+              assignYardStay(blocker, facility.id, labelOf(facility.id));
+              if (fitsAt(blocker, facility.id) && movesClear(blocker, facility.id)
+                && fitsAt(move.later, move.from) && movesClear(move.later, move.from)) {
+                displaced = { block: blocker, nodeId: move.from };
+                ok = true;
+                break;
+              }
+              assignYardStay(blocker, move.from, labelOf(move.from));
+            }
+          }
+        }
+        if (ok && better(before, beforeTight)) {
+          engineTrace('yard-chain-kept', {
+            row: move.row, blockId: move.later.id, slot: labelOf(move.from),
+            displaced: displaced ? { row: displaced.block.timelineRow, blockId: displaced.block.id } : null,
+          });
+          improved = true;
+          break;
+        }
+        if (displaced) assignYardStay(displaced.block, displaced.nodeId, labelOf(displaced.nodeId));
+        assignYardStay(move.later, move.to, labelOf(move.to));
+        rejected.add(key);
+      }
+      if (!improved) break;
+    }
+  }
   /** 兩個日內秒數在日循環上的差（−半天～半天） */
   function cyclicDeltaSeconds(a: number, b: number): number {
     const raw = ((a - b) % daySeconds + daySeconds) % daySeconds;
@@ -2108,6 +2294,7 @@ export function insertMaintenanceTransferCards(args: {
   }
 
   eliminateYardSlotSwaps();
+  keepVehiclesInPlace();
 
   if (decideOnly) {
     return {
