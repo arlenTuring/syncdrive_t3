@@ -50,6 +50,7 @@ import {
   parseModuleDashboardViewId,
 } from "../utils/moduleDashboardPages";
 import { ShellClock } from "./ShellClock";
+import { useModuleAddModePreference } from "../utils/moduleAddModePreference";
 import { IconButton } from '../../../components/ui';
 
 const SIDEBAR_COLLAPSED_KEY = "syncdrive_vtms_sidebar_collapsed";
@@ -186,6 +187,7 @@ export function ScheduleModuleSidebar({
 }: ScheduleModuleSidebarProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
+  const [moduleAddMode] = useModuleAddModePreference();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     operations: true,
     service: true,
@@ -427,7 +429,8 @@ export function ScheduleModuleSidebar({
                   ) : null}
                 </button>
 
-                {!collapsed && adminMode ? (
+                {/* ＋號只在「模組新增頁面」模式開啟時出現（儀表介面管理的開關），平常不佔側欄空間 */}
+                {!collapsed && adminMode && moduleAddMode ? (
                   <IconButton size="small" hierarchy="subordinate" variant="standard" className="mr-1 shrink-0" onPress={(event) => {
            event.stopPropagation();
            onAddModuleDashboard?.(group.id);

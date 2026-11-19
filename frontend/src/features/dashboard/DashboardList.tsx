@@ -17,7 +17,8 @@ import type { DashboardPlane } from './types';
 import { ExportTemplateButton, ImportTemplateDialog } from './components/TemplateFileActions';
 import type { TemplateImportResult } from './template/types';
 import { systemConfirm } from '../../lib/systemDialog';
-import { Button, IconButton } from '../../components/ui';
+import { Button, IconButton, Switch } from '../../components/ui';
+import { useModuleAddModePreference } from '../schedule-management/utils/moduleAddModePreference';
 
 interface Props {
   planes: DashboardPlane[];
@@ -52,6 +53,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [moduleAddMode, setModuleAddMode] = useModuleAddModePreference();
   const rowMenuRef = useRef<HTMLDivElement>(null);
 
   const formatDate = (ts: number | undefined) => {
@@ -157,6 +159,11 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
             }} disabled={!canReset}>{t('mapLibrary.reset')}</Button>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {/* 開啟後側欄各模組旁才出現＋號（加入模組子頁面），預設關閉 */}
+          <div className="flex items-center gap-2">
+            <span className="whitespace-nowrap text-body-s text-text-secondary">模組新增頁面</span>
+            <Switch checked={moduleAddMode} onCheckedChange={setModuleAddMode} aria-label="開啟模組新增頁面模式" />
+          </div>
           <Button variant="outlined" leadingIcon={<CloudDownload />} onPress={() => setImportOpen(true)}>匯入儀表板</Button>
           <Button leadingIcon={<Plus />} onPress={onCreate}>建立儀表板</Button>
         </div>

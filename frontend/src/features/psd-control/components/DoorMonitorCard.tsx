@@ -180,16 +180,17 @@ export function DoorMonitorCard({
               <StatusCard label={t('psdControl.fields.antiPinch')} value={door.antiPinch} dot />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            // 與車門同一套排列：上排 門體狀態／（月台門以對準取代行車速度）／門體開度，下排 連線／自動鎖定／防夾
+            <div className="grid grid-cols-3 gap-2">
               <StatusCard label={t('psdControl.fields.bodyStatus')} value={door.bodyStatus} />
-              <StatusCard label={t('psdControl.fields.connection')} value={door.connection} />
               <StatusCard
                 label={t('psdControl.fields.alignment')}
                 value={door.alignment ?? t('psdControl.status.aligned')}
                 dot
               />
-              <StatusCard label={t('psdControl.fields.autoLock')} value={door.autoLock} dot />
               <StatusCard label={t('psdControl.fields.opening')} value={door.opening} dot />
+              <StatusCard label={t('psdControl.fields.connection')} value={door.connection} />
+              <StatusCard label={t('psdControl.fields.autoLock')} value={door.autoLock} dot />
               <StatusCard label={t('psdControl.fields.antiPinch')} value={door.antiPinch} dot />
             </div>
           )}

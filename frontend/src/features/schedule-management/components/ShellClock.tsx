@@ -41,7 +41,7 @@ export function ShellClock({ compact = false }: { compact?: boolean }) {
   }, [i18n.language]);
 
   return (
-    <div className={`whitespace-nowrap tabular-nums ${compact ? 'py-1 text-center' : 'px-3 py-1.5'}`}>
+    <div className={`whitespace-nowrap tabular-nums ${compact ? 'py-1 text-center' : 'px-3 py-1.5 text-center'}`}>
       <div className={compact ? 'text-body-xs-bold text-text-primary' : 'text-headline-5 text-text-primary'}>{text.time}</div>
       {compact ? null : <div className="text-body-xs text-text-quaternary">{text.date}</div>}
     </div>
