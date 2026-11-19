@@ -53,13 +53,24 @@ function ModeToggle({
   );
 }
 
+/** 「0 km/h」「79 %」拆成數字與單位：設計稿數字粗體、單位縮小 */
+function splitUnit(value: string): { main: string; unit: string | null } {
+  const match = /^(-?[\d.,]+)\s*([^\d\s].*)$/.exec(value.trim());
+  return match ? { main: match[1], unit: match[2] } : { main: value, unit: null };
+}
+
 function StatusCard({ label, value, dot }: { label: string; value: string; dot?: boolean }) {
+  const { main, unit } = splitUnit(value);
   return (
-    <div className="min-w-0 rounded-md bg-[#2a2a2e] px-2.5 py-2">
-      <p className="text-body-xs text-text-tertiary">{label}</p>
-      <p className="mt-1.5 flex items-center gap-1.5 text-body-s text-text-primary">
-        {dot ? <span className="size-1.5 shrink-0 rounded-full bg-[#22c55e]" aria-hidden /> : null}
-        {value}
+    // 設計稿：綠點在欄位名稱前，數值粗體、單位小一級
+    <div className="min-w-0 rounded-md bg-surface-secondary px-2.5 py-1.5">
+      <p className="flex items-center gap-1.5 text-body-xs text-text-tertiary">
+        {dot ? <span className="size-2 shrink-0 rounded-full bg-status-success" aria-hidden /> : null}
+        <span className="truncate">{label}</span>
+      </p>
+      <p className="mt-0.5 flex items-baseline gap-1 text-body-m-bold text-text-primary">
+        <span className="truncate">{main}</span>
+        {unit ? <span className="shrink-0 text-body-xs text-text-secondary">{unit}</span> : null}
       </p>
     </div>
   );
@@ -68,8 +79,8 @@ function StatusCard({ label, value, dot }: { label: string; value: string; dot?:
 function CameraWell({ src }: { src?: string | null }) {
   const { t } = useTranslation();
   return (
-    // 設計稿比例：影像框寬高約 875：325（35：13），不隨畫面高度壓扁；畫面矮時整頁往下捲
-    <div className="relative aspect-[35/13] shrink-0 overflow-hidden rounded-lg bg-surface-primary">
+    // 設計稿比例：影像框寬高約 875：325（35：13），直角、貼齊卡片左右，不隨畫面高度壓扁；畫面矮時整頁往下捲
+    <div className="relative aspect-[35/13] shrink-0 overflow-hidden bg-surface-primary">
       {src ? (
         <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
@@ -128,25 +139,29 @@ export function DoorMonitorCard({
 
       <CameraWell src={door.videoUrl} />
 
-      <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 px-3 @[30rem]:grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] @[30rem]:gap-0">
+      {/*
+        * 設計稿：左邊控制區只佔按鈕需要的寬度（兩欄固定寬按鈕，約三成），其餘給車門狀態。
+        * 按鈕照系統規格（高 34），用灰色有底色的樣式接近設計稿的深色方塊。
+        */}
+      <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 px-3 @[30rem]:grid-cols-[auto_minmax(0,1fr)] @[30rem]:gap-0">
         <div className="min-w-0 @[30rem]:pr-4">
           <div className="mb-2.5 flex items-center gap-2">
-            <p className="whitespace-nowrap text-body-s text-text-primary">{controlTitle}</p>
-            <span className="whitespace-nowrap rounded-full border border-border-tertiary bg-surface-primary px-2 py-0.5 text-caption-2 text-text-secondary">
+            <p className="whitespace-nowrap text-body-m text-text-primary">{controlTitle}</p>
+            <span className="whitespace-nowrap rounded-lg border border-border-secondary px-2 py-0.5 text-body-s text-text-secondary">
               {t('psdControl.latency', { value: door.latency })}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-[repeat(2,5.5rem)] gap-2">
             {actions.map((action) => (
-              <Button hierarchy="subordinate" variant="outlined" key={action.id}>{action.label}</Button>
+              <Button block hierarchy="subordinate" variant="tonal" key={action.id}>{action.label}</Button>
             ))}
           </div>
         </div>
 
         <div className="min-w-0 border-t border-border-quaternary pt-3 @[30rem]:border-t-0 @[30rem]:border-l @[30rem]:pt-0 @[30rem]:pl-4">
           <div className="mb-2.5 flex items-center justify-between gap-2">
-            <p className="text-body-s text-text-primary">{t('psdControl.doorStatus')}</p>
-            <p className="flex items-center gap-1.5 text-body-xs text-text-secondary">
+            <p className="text-body-m text-text-primary">{t('psdControl.doorStatus')}</p>
+            <p className="flex items-center gap-1.5 text-body-s text-text-secondary">
               <Hourglass className="size-3.5 stroke-[1.5]" aria-hidden />
               {timer ?? t('psdControl.notDocked')}
             </p>
