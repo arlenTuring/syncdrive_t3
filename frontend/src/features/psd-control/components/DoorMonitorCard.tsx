@@ -126,7 +126,8 @@ export function DoorMonitorCard({
   ] as const;
 
   return (
-    <div className={`flex min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3 ${fill ? 'min-h-0' : ''}`}>
+    // @container：卡片窄（側邊窗格、手機）時，控制區與車門狀態改成上下排，不再把字擠成一字一行
+    <div className={`@container flex min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3 ${fill ? 'min-h-0' : ''}`}>
       <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3">
         <p className="text-body-s text-text-primary">{door.label}</p>
         <ModeToggle value={door.mode} onChange={onModeChange} />
@@ -134,11 +135,11 @@ export function DoorMonitorCard({
 
       <CameraWell src={door.videoUrl} fill={fill} />
 
-      <div className="mt-3 grid shrink-0 grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] gap-0">
-        <div className="min-w-0 pr-4">
+      <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 @[30rem]:grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] @[30rem]:gap-0">
+        <div className="min-w-0 @[30rem]:pr-4">
           <div className="mb-2.5 flex items-center gap-2">
-            <p className="text-body-s text-text-primary">{controlTitle}</p>
-            <span className="rounded-full border border-border-tertiary bg-surface-primary px-2 py-0.5 text-caption-2 text-text-secondary">
+            <p className="whitespace-nowrap text-body-s text-text-primary">{controlTitle}</p>
+            <span className="whitespace-nowrap rounded-full border border-border-tertiary bg-surface-primary px-2 py-0.5 text-caption-2 text-text-secondary">
               {t('psdControl.latency', { value: door.latency })}
             </span>
           </div>
@@ -149,7 +150,7 @@ export function DoorMonitorCard({
           </div>
         </div>
 
-        <div className="min-w-0 border-l border-border-quaternary pl-4">
+        <div className="min-w-0 border-t border-border-quaternary pt-3 @[30rem]:border-t-0 @[30rem]:border-l @[30rem]:pt-0 @[30rem]:pl-4">
           <div className="mb-2.5 flex items-center justify-between gap-2">
             <p className="text-body-s text-text-primary">{t('psdControl.doorStatus')}</p>
             <p className="flex items-center gap-1.5 text-body-xs text-text-secondary">

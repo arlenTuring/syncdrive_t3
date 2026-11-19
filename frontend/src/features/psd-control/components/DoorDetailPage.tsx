@@ -170,20 +170,21 @@ export function DoorDetailPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
       <div className="flex h-11 shrink-0 items-center justify-between gap-4 px-4">
-        <div className="flex min-w-0 items-center gap-2">
+        {/* 返回與車號不縮；畫面窄時由右側的停靠時間文字截斷，避免左右疊在一起 */}
+        <div className="flex shrink-0 items-center gap-2">
           <IconButton hierarchy="subordinate" variant="standard" onPress={onBack} label={t('psdControl.back')} icon={<ArrowLeft />} />
           <h2 className="truncate text-body-m font-normal tracking-[0.2px]">{title}</h2>
         </div>
         {kind === 'vehicle' ? (
-          <div className="flex shrink-0 items-center gap-3">
-            <p className="hidden text-body-s text-text-primary sm:block">
+          <div className="flex min-w-0 items-center gap-3">
+            <p className="hidden min-w-0 truncate text-body-s text-text-primary sm:block">
               {dwellLoading
                 ? t('psdControl.dwellLoading')
                 : arrivalSeconds == null
                   ? t('psdControl.dwellNone')
                   : t('psdControl.dwellSeconds', { seconds: arrivalSeconds })}
             </p>
-            <Button hierarchy="superior" variant="outlined" onPress={() => setDockDialog(true)} leadingIcon={<SlidersHorizontal />}>{t('psdControl.editDockTime')}</Button>
+            <Button hierarchy="superior" variant="outlined" onPress={() => setDockDialog(true)} leadingIcon={<SlidersHorizontal />} className="shrink-0 whitespace-nowrap">{t('psdControl.editDockTime')}</Button>
           </div>
         ) : null}
       </div>
