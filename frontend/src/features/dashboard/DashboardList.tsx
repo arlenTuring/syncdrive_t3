@@ -161,8 +161,8 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
         <div className="flex shrink-0 items-center gap-3">
           {/* 開啟後側欄各模組旁才出現＋號（加入模組子頁面），預設關閉 */}
           <div className="flex items-center gap-2">
-            <span className="whitespace-nowrap text-body-s text-text-secondary">模組新增頁面</span>
-            <Switch checked={moduleAddMode} onCheckedChange={setModuleAddMode} aria-label="開啟模組新增頁面模式" />
+            <span className="whitespace-nowrap text-body-s text-text-secondary">模組編輯頁面</span>
+            <Switch checked={moduleAddMode} onCheckedChange={setModuleAddMode} aria-label="開啟模組編輯頁面模式" />
           </div>
           <Button variant="outlined" leadingIcon={<CloudDownload />} onPress={() => setImportOpen(true)}>匯入儀表板</Button>
           <Button leadingIcon={<Plus />} onPress={onCreate}>建立儀表板</Button>

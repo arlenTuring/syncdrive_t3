@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * 「模組新增頁面」模式：開啟後側欄每個模組旁才出現＋號，可替模組加入儀表板子頁面。
+ * 「模組編輯頁面」模式：開啟後側欄每個模組旁才出現＋號、子頁才出現改名與移除，可替模組加入或整理儀表板子頁面。
  * 平常用不到、又佔側欄空間，所以預設關閉；開關在 系統基礎模組 → 進階管理模式 → 儀表介面管理。
  */
 const MODULE_ADD_MODE_STORAGE_KEY = 'syncdrive_vtms_module_add_mode';

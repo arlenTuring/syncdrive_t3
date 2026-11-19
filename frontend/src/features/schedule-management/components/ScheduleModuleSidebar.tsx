@@ -188,6 +188,8 @@ export function ScheduleModuleSidebar({
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [moduleAddMode] = useModuleAddModePreference();
+  // 子頁的新增、改名、移除都只在「模組編輯頁面模式」（儀表介面管理的開關）開啟時可用
+  const canEditPages = adminMode && moduleAddMode;
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     operations: true,
     service: true,
@@ -198,6 +200,8 @@ export function ScheduleModuleSidebar({
   const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
+  // 編輯模式關掉時，正在改名的輸入框跟著收起（不送出）
+  const editingPageId = canEditPages ? renamingPageId : null;
 
   useEffect(() => {
     if (!renamingPageId) return;
@@ -271,7 +275,7 @@ export function ScheduleModuleSidebar({
   return (
     <aside
       className={`flex shrink-0 flex-col bg-surface-sub-background transition-[width] duration-200 ease-out ${
-        // 沒有＋號時收窄：最長的模組名稱＋箭頭剛好放得下（約 192px）；開啟模組新增頁面模式才放寬留出＋號
+        // 沒有＋號時收窄：最長的模組名稱＋箭頭剛好放得下（約 192px）；開啟模組編輯頁面模式才放寬留出＋號
         collapsed ? "w-[64px]" : adminMode && moduleAddMode ? "w-[240px]" : "w-[192px]"
       }`}
     >
@@ -430,8 +434,8 @@ export function ScheduleModuleSidebar({
                   ) : null}
                 </button>
 
-                {/* ＋號只在「模組新增頁面」模式開啟時出現（儀表介面管理的開關），平常不佔側欄空間 */}
-                {!collapsed && adminMode && moduleAddMode ? (
+                {/* ＋號只在「模組編輯頁面」模式開啟時出現（儀表介面管理的開關），平常不佔側欄空間 */}
+                {!collapsed && canEditPages ? (
                   <IconButton size="small" hierarchy="subordinate" variant="standard" className="mr-1 shrink-0" onPress={(event) => {
            event.stopPropagation();
            onAddModuleDashboard?.(group.id);
@@ -478,7 +482,7 @@ export function ScheduleModuleSidebar({
                   {dashPages.map((page) => {
                     const viewId = moduleDashboardViewId(page.id);
                     const active = activeView === viewId;
-                    const isRenaming = renamingPageId === page.id;
+                    const isRenaming = editingPageId === page.id;
                     return (
                       <div
                         key={page.id}
@@ -517,7 +521,7 @@ export function ScheduleModuleSidebar({
                             type="button"
                             onClick={() => onViewChange(viewId)}
                             onDoubleClick={(event) => {
-                              if (!adminMode) return;
+                              if (!canEditPages) return;
                               event.preventDefault();
                               startRename(page);
                             }}
@@ -527,7 +531,7 @@ export function ScheduleModuleSidebar({
                                 : "text-text-tertiary hover:bg-link-standard hover:text-text-primary"
                             }`}
                             title={
-                              adminMode
+                              canEditPages
                                 ? t("shell.renamePageHint", {
                                     name: page.label,
                                   })
@@ -538,7 +542,7 @@ export function ScheduleModuleSidebar({
                             <span className="truncate">{page.label}</span>
                           </button>
                         )}
-                        {adminMode && !isRenaming ? (
+                        {canEditPages && !isRenaming ? (
                           <>
                             <IconButton size="small" hierarchy="subordinate" variant="standard" className="shrink-0 opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100" onPress={() => startRename(page)} title={t("shell.renamePage")} label={t("shell.renamePageAria", {
                 name: page.label,
