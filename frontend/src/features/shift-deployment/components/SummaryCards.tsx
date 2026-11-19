@@ -41,14 +41,16 @@ export function SummaryCards({
   const { t } = useTranslation();
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+    // 設計稿四張卡寬度不同（目前模式 278、數據統計 388、執行班表 718、重大事件 374），照這個比例分；
+    // 側欄展開時內容變窄，前、二、四張保留最低寬度（字不被擠斷），縮的是最寬的執行班表
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(12rem,278fr)_minmax(19rem,388fr)_minmax(0,718fr)_minmax(17rem,374fr)]">
       <section className={CARD}>
         <h2 className="text-body-m-bold text-text-primary">
           {t('shiftDeployment.summary.currentMode')}
         </h2>
         <div className="mt-3 flex flex-1 items-center justify-center rounded-xl bg-[#1B4332] px-4 py-8 text-center">
           <div>
-            <div className="text-headline-2 text-text-primary">{mode.modeLabel}</div>
+            <div className="whitespace-nowrap text-headline-2 text-text-primary">{mode.modeLabel}</div>
             <div className="mt-1 text-body-s text-white-80">{mode.modeLevel}</div>
           </div>
         </div>

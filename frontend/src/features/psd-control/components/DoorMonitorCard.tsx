@@ -65,16 +65,11 @@ function StatusCard({ label, value, dot }: { label: string; value: string; dot?:
   );
 }
 
-function CameraWell({ src, fill }: { src?: string | null; fill: boolean }) {
+function CameraWell({ src }: { src?: string | null }) {
   const { t } = useTranslation();
   return (
-    <div
-      className={`relative overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background ${
-        // 填滿模式也要留最低高度（夠放一行「尚未連接」），再矮才由外框捲動；
-        // 文字與影像貼滿相機框、置中，框多矮都不會被切掉（先前內層固定 120px 高、文字落在框外）
-        fill ? 'min-h-16 flex-1' : 'aspect-video shrink-0'
-      }`}
-    >
+    // 設計稿比例：影像框寬高約 875：325（35：13），不隨畫面高度壓扁；畫面矮時整頁往下捲
+    <div className="relative aspect-[35/13] shrink-0 overflow-hidden rounded-lg bg-surface-primary">
       {src ? (
         <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
@@ -100,12 +95,9 @@ export function DoorMonitorCard({
   kind,
   door,
   dwellSeconds,
-  fill = true,
   onModeChange,
 }: {
   kind: DoorKind;
-  /** true：卡片高度由外框決定、相機畫面填滿剩下的高度；false：卡片照內容長高，相機畫面固定比例 */
-  fill?: boolean;
   door: DoorMonitorState;
   dwellSeconds?: number | null;
   onModeChange: (mode: ControlMode) => void;
@@ -126,16 +118,17 @@ export function DoorMonitorCard({
   ] as const;
 
   return (
+    // 設計稿：門與門之間只靠間距分開，不另外加框；影像貼齊卡片左右，標題與控制區內縮
     // @container：卡片窄（側邊窗格、手機）時，控制區與車門狀態改成上下排，不再把字擠成一字一行
-    <div className={`@container flex min-w-0 flex-col rounded-xl border border-white/15 bg-[#161618] p-3 ${fill ? 'min-h-0' : ''}`}>
-      <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3">
-        <p className="text-body-s text-text-primary">{door.label}</p>
+    <div className="@container flex min-w-0 flex-col">
+      <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3 px-3">
+        <p className="text-body-m text-text-primary">{door.label}</p>
         <ModeToggle value={door.mode} onChange={onModeChange} />
       </div>
 
-      <CameraWell src={door.videoUrl} fill={fill} />
+      <CameraWell src={door.videoUrl} />
 
-      <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 @[30rem]:grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] @[30rem]:gap-0">
+      <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 px-3 @[30rem]:grid-cols-[minmax(148px,0.78fr)_minmax(0,1.22fr)] @[30rem]:gap-0">
         <div className="min-w-0 @[30rem]:pr-4">
           <div className="mb-2.5 flex items-center gap-2">
             <p className="whitespace-nowrap text-body-s text-text-primary">{controlTitle}</p>

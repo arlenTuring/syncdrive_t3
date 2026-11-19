@@ -189,19 +189,12 @@ export function DoorDetailPage({
         ) : null}
       </div>
 
-      {/* 四個門以內（一台車）：2×2 填滿畫面，畫面太矮時每列不小於卡片內容（相機框最低高度＋按鈕＋狀態），改成捲動；月台門通常更多，固定兩列會把每張卡壓扁、相機畫面高度變 0，改成照內容高度往下捲 */}
-      <div
-        className={
-          items.length <= 4
-            ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-[repeat(4,minmax(min-content,1fr))] gap-2.5 overflow-auto p-3 md:grid-cols-2 md:grid-rows-[repeat(2,minmax(min-content,1fr))]'
-            : 'grid min-h-0 flex-1 grid-cols-1 content-start gap-2.5 overflow-auto p-3 md:grid-cols-2'
-        }
-      >
+      {/* 照設計稿：兩欄，每張卡照內容長高（影像固定比例），不為了塞進一個畫面把影像壓扁；畫面矮時往下捲 */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-x-5 gap-y-8 overflow-auto px-4 pb-4 pt-2 md:grid-cols-2">
         {items.map((door) => (
           <DoorMonitorCard
             key={door.id}
             kind={kind}
-            fill={items.length <= 4}
             door={door}
             dwellSeconds={arrivalSeconds}
             onModeChange={(mode) => setMode(door.id, mode)}
