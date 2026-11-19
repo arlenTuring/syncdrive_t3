@@ -271,7 +271,8 @@ export function ScheduleModuleSidebar({
   return (
     <aside
       className={`flex shrink-0 flex-col bg-surface-sub-background transition-[width] duration-200 ease-out ${
-        collapsed ? "w-[64px]" : "w-[240px]"
+        // 沒有＋號時收窄：最長的模組名稱＋箭頭剛好放得下（約 192px）；開啟模組新增頁面模式才放寬留出＋號
+        collapsed ? "w-[64px]" : adminMode && moduleAddMode ? "w-[240px]" : "w-[192px]"
       }`}
     >
       <div
