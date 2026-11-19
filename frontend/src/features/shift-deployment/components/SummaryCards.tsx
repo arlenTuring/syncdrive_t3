@@ -16,7 +16,7 @@ import type {
   ShiftDeploymentAction,
 } from '../types';
 import { RingProgress } from './RingProgress';
-import { Button } from '../../../components/ui';
+import { Badge, Button } from '../../../components/ui';
 
 const PERIOD_DOTS = ['#A78BFA', '#22C55E', '#F97316'] as const;
 
@@ -108,41 +108,38 @@ export function SummaryCards({
           </h2>
           <Button variant="outlined" onPress={() => onAction({ kind: 'schedule-adjust' })}>{t('shiftDeployment.summary.scheduleAdjust')}</Button>
         </div>
-        <DispatchControlPanel dispatchEnabled={dispatchEnabled} onAction={onAction} />
-        <div className="mt-3 flex flex-1 flex-col rounded-xl bg-surface-primary p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-body-xs text-text-tertiary">{schedule.scheduleMeta}</span>
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-body-xs ${
-                schedule.pending
-                  ? 'bg-status-warning-light text-status-warning'
-                  : 'bg-status-success-light text-status-success'
-              }`}
-            >
+        {/*
+          * 照設計稿：一個內框，左邊綠色直線＋班表資訊、右上狀態標籤；分隔線下是三個時段。
+          * 部署開關只留一顆按鈕，放在狀態標籤下面（按鈕文字本身就說明目前狀態）。
+          */}
+        <div className="mt-3 flex flex-1 flex-col rounded-xl bg-surface-primary p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 gap-3">
               <span
-                className={`size-1.5 rounded-full ${
+                className={`w-1 shrink-0 self-stretch rounded-full ${
                   schedule.pending ? 'bg-status-warning' : 'bg-status-success'
                 }`}
               />
-              {schedule.statusLabel}
-            </span>
+              <div className="min-w-0">
+                <p className="text-body-s text-text-tertiary">{schedule.scheduleMeta}</p>
+                <p className="mt-0.5 truncate text-headline-4 text-text-primary">{schedule.scheduleName}</p>
+                <p className="mt-1 flex items-center gap-1.5 text-body-m text-text-primary">
+                  <span className="text-text-tertiary">{t('shiftDeployment.summary.reviewer')}</span>
+                  <User className="size-4 shrink-0 text-text-primary" />
+                  {schedule.reviewerName}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <Badge size="md" dot tone={schedule.pending ? 'warning' : 'success'}>
+                {schedule.statusLabel}
+              </Badge>
+              <DispatchToggle dispatchEnabled={dispatchEnabled} onAction={onAction} />
+            </div>
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span
-              className={`h-5 w-0.5 rounded-full ${
-                schedule.pending ? 'bg-status-warning' : 'bg-status-success'
-              }`}
-            />
-            <span className="text-headline-5 text-text-primary">{schedule.scheduleName}</span>
-          </div>
-          <div className="mt-1.5 flex items-center gap-1.5 text-body-xs text-text-secondary">
-            <span className="text-text-quaternary">{t('shiftDeployment.summary.reviewer')}</span>
-            <User className="size-3.5 text-text-quaternary" />
-            {schedule.reviewerName}
-          </div>
-          <div className="mt-2 space-y-1 border-t border-border-quaternary pt-2">
+          <div className="mt-3 space-y-1.5 border-t border-border-quaternary pt-3">
             {schedule.periods.map((period, index) => (
-              <div key={period} className="flex items-center gap-2 text-body-xs text-text-tertiary">
+              <div key={period} className="flex items-center gap-2 text-body-m text-text-tertiary">
                 <span
                   className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: PERIOD_DOTS[index] ?? '#71717A' }}
@@ -184,14 +181,17 @@ export function SummaryCards({
 }
 
 /**
- * 即時調度引擎的小控制面板：暫停／開始自動下訂單。
+ * 即時調度引擎的部署開關：暫停／開始自動下訂單。
  *
  * 要在地端拿模擬器測試時，得先讓真實班表停下來，不然調度引擎跟模擬器手動
  * 建的測試單會搶同一批車。暫停不影響已經在跑的訂單，車輛照樣把手上這一趟
  * 開完，只是不會再收到下一張——真的要清空車隊還是得等在跑的訂單自然結束，
  * 或另外用取消。
+ *
+ * 一顆按鈕切換：暫停中時「開始部署」是主要動作（藍色實心）；調度中時「暫停部署」是
+ * 次要動作（灰色淡底）。狀態讀不到時不給按，免得按了不知道結果。
  */
-function DispatchControlPanel({
+function DispatchToggle({
   dispatchEnabled,
   onAction,
 }: {
@@ -199,47 +199,17 @@ function DispatchControlPanel({
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const { t } = useTranslation();
-  const statusLabel = dispatchEnabled === null
-    ? t('shiftDeployment.dispatch.unknown')
-    : dispatchEnabled
-      ? t('shiftDeployment.dispatch.running')
-      : t('shiftDeployment.dispatch.paused');
-  const dotColor = dispatchEnabled === null
-    ? 'bg-status-inactive'
-    : dispatchEnabled
-      ? 'bg-status-success'
-      : 'bg-status-warning';
-
-  /*
-   * 一顆按鈕切換部署與暫停：暫停中時「開始部署」是這張卡唯一要做的事（主要、藍色實心）；
-   * 調度中時「暫停部署」是次要動作（灰色淡底）。狀態讀不到時不給按，免得按了不知道結果。
-   * 先前兩顆按鈕並排塞在窄卡裡，字被擠成直排。
-   */
-  const toggle = dispatchEnabled === true
+  return dispatchEnabled === true
     ? (
-      <Button hierarchy="subordinate" variant="tonal" leadingIcon={<Pause />} className="shrink-0 whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-pause' })}>
+      <Button hierarchy="subordinate" variant="tonal" leadingIcon={<Pause />} className="whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-pause' })}>
         {t('shiftDeployment.dispatch.pause')}
       </Button>
     )
     : (
-      <Button hierarchy="superior" variant="filled" leadingIcon={<Play />} className="shrink-0 whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-start' })} disabled={dispatchEnabled === null}>
+      <Button hierarchy="superior" variant="filled" leadingIcon={<Play />} className="whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-start' })} disabled={dispatchEnabled === null}>
         {t('shiftDeployment.dispatch.start')}
       </Button>
     );
-
-  return (
-    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-surface-primary px-3 py-2">
-      {/* 狀態要看得到：卡片窄時名稱可以換行，不截掉後面的「已暫停／調度中」 */}
-      <div className="min-w-0">
-        <p className="text-caption-1 text-text-tertiary">{t('shiftDeployment.dispatch.label')}</p>
-        <p className="flex items-center gap-1.5 text-body-s text-text-primary">
-          <span className={`size-1.5 shrink-0 rounded-full ${dotColor}`} />
-          {statusLabel}
-        </p>
-      </div>
-      {toggle}
-    </div>
-  );
 }
 
 function StatRow({
