@@ -1,5 +1,6 @@
 import { DispatchEngineService } from './dispatch-engine.service';
 import { localMidnight } from './dispatch.plan';
+import { operatingDayOf as operatingDay } from '../operating-day/operating-day';
 import type { TimetableTripDto } from '../operation-shift/timetable/expand-timetable';
 
 /**
@@ -91,6 +92,12 @@ function build(
       .fn()
       .mockResolvedValue({ shiftId: 'shift-1', shiftName: '模擬正線', body }),
     getDeployedTrips: jest.fn().mockResolvedValue({
+      shiftId: 'shift-1',
+      shiftName: '模擬正線',
+      trips,
+      body,
+    }),
+    getShiftTrips: jest.fn().mockResolvedValue({
       shiftId: 'shift-1',
       shiftName: '模擬正線',
       trips,
@@ -194,6 +201,34 @@ describe('DispatchEngineService.tick', () => {
     const result = await engine.tick({ now: REFERENCE });
     expect(scheduledOrders.publishDue).toHaveBeenCalled();
     expect(result.checked).toBe(1);
+  });
+
+  it('過了午夜仍照前一天的計畫發延續到凌晨的卡（計畫分鐘 ≥ 1440）', async () => {
+    // 前一天 00:02:40 之後還有一張：日尾跨過午夜那一段
+    const { engine, created } = build([trip(12 * 3600 + 60), trip(86_400 + 160, 1, 'NIGHT')]);
+    const yesterdayNoon = REFERENCE - 86_400_000;
+    await engine.tick({ now: yesterdayNoon }); // 前一天在跑的時候採用了這份班表
+    created.length = 0;
+
+    const departAt = MIDNIGHT + 160_000;
+    const result = await engine.tick({ now: departAt - 30_000 });
+    const night = created.find((order) => order.trip_code === 'NIGHT');
+    expect(night).toBeDefined();
+    expect(night!.planned_start).toBe(departAt);
+    // 屬於前一個營運日
+    const payload = night!.payload as unknown as Record<string, unknown>;
+    expect(payload.operating_day).toBe(operatingDay(MIDNIGHT - 1));
+    expect(result.issued.map((item) => item.tripCode)).toContain('NIGHT');
+
+    // 下一個 tick 不重發
+    await engine.tick({ now: departAt - 20_000 });
+    expect(created.filter((order) => order.trip_code === 'NIGHT')).toHaveLength(1);
+  });
+
+  it('前一天沒有採用紀錄就不補發凌晨的卡', async () => {
+    const { engine, created } = build([trip(86_400 + 160, 1, 'NIGHT')]);
+    await engine.tick({ now: MIDNIGHT + 130_000 });
+    expect(created.filter((order) => order.trip_code === 'NIGHT')).toHaveLength(0);
   });
 
   it('發車時刻進入提前量才下訂單', async () => {

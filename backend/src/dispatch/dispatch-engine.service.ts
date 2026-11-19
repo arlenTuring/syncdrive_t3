@@ -91,6 +91,13 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   /** issued 集合對應的日期（當地零點）。換日就重置。 */
   private issuedDay = 0;
 
+  /** 前一營運日延續到今天凌晨的卡（見 previousDayTail）；同一份採用紀錄一分鐘內不重算 */
+  private tailCache: {
+    key: string;
+    builtAt: number;
+    value: Awaited<ReturnType<DispatchEngineService['buildPreviousDayTail']>>;
+  } | null = null;
+
   private static readonly ENABLED_SETTING = 'dispatch.execution.enabled';
   private static readonly EXECUTOR_LOCK = 814729351;
 
@@ -605,6 +612,57 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * 前一營運日延續到今天凌晨的卡。
+   *
+   * 班表的一天是完全循環：日尾的卡會跨過午夜（計畫分鐘 ≥ 1440），接到隔天日首那一段。這些卡屬於
+   * <strong>前一個營運日</strong>，但訂單是開車前才發——過了午夜 tick 只讀今天的計畫，前一天剩下的卡
+   * 就再也沒有人發。2026-11-17～19 每天 PMS07 凌晨的兩趟正線、進 E3、在 E3 充電，PMS06 01:32 的
+   * E1 → CHG → H3，全都沒有訂單；只有 00:00 整點的卡因為午夜前就進了發車窗口才發出去。
+   *
+   * 只收發車時刻在今天零點（再往前一個補發窗口）之後的卡；更早的卡前一天就已經在窗口裡發過。
+   * 前一天沒有採用紀錄就沒有（不拿現在的班表回填過去的日子）。
+   */
+  async previousDayTail(now: number): Promise<{
+    shiftId: string;
+    shiftName: string;
+    operatingDay: string;
+    planDigest: string;
+    mapId: string | null;
+    planned: PlannedDispatch[];
+  } | null> {
+    const today = localMidnight(now);
+    const day = operatingDayOf(today - 1);
+    const adoption = await this.dailyPlans.get(day);
+    if (!adoption) return null;
+    const key = `${day}|${adoption.shift_id}|${adoption.plan_digest}|${adoption.adopted_at}`;
+    const realNow = Date.now();
+    if (this.tailCache?.key === key && realNow - this.tailCache.builtAt < 60_000) {
+      return this.tailCache.value;
+    }
+    const value = await this.buildPreviousDayTail(day, today);
+    this.tailCache = { key, builtAt: realNow, value };
+    return value;
+  }
+
+  private async buildPreviousDayTail(day: string, today: number) {
+    const reference = operatingDayReference(day);
+    if (reference == null) return null;
+    const resolved = await this.resolveDailySource(day, { allowAuto: false });
+    if (!resolved) return null;
+    const source = await resolved.load();
+    const plan = await this.buildPlan(source, reference);
+    const from = today - dispatchConfig.catchUpSeconds * 1000;
+    return {
+      shiftId: plan.shiftId,
+      shiftName: plan.shiftName,
+      operatingDay: day,
+      planDigest: planDigestOf(plan.planned),
+      mapId: resolveMapIdFromShiftBody(source.body),
+      planned: plan.planned.filter((item) => item.departAt >= from),
+    };
+  }
+
+  /**
    * 一次檢查。<code>dryRun</code> 時只回報「會發什麼」，不真的發。
    */
   async tick(options?: { dryRun?: boolean; now?: number }): Promise<{
@@ -674,8 +732,20 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       const lateShunts = (await this.rotationOverlays.overlaysUntil(previousDay))
         .filter((overlay) => overlay.operatingDay === previousDay)
         .flatMap((overlay) => overlay.shunts);
-      for (const item of [...plan.planned, ...lateShunts]) {
+      // 前一天班表延續到今天凌晨的卡：屬於前一個營運日，照前一天的計畫發
+      let tail: Awaited<ReturnType<typeof this.previousDayTail>> = null;
+      try {
+        tail = await this.previousDayTail(now);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`讀前一營運日延續到凌晨的卡失敗：${message}`);
+      }
+      const tailItems = new Set(tail?.planned ?? []);
+      const seen = new Set<string>();
+      for (const item of [...plan.planned, ...(tail?.planned ?? []), ...lateShunts]) {
         if (this.issued.has(item.orderId)) continue;
+        if (seen.has(item.orderId)) continue;
+        seen.add(item.orderId);
         const decision = dispatchDecision({
           departAt: item.departAt,
           now,
@@ -715,7 +785,7 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
           continue;
         }
         try {
-          await this.issueOrder(item, plan);
+          await this.issueOrder(item, tail && tailItems.has(item) ? tail : plan);
           this.issued.add(item.orderId);
           issued.push(item);
         } catch (error) {
