@@ -11,10 +11,10 @@ import { vehicleEtaConfig } from '../vehicle/eta/vehicle-eta.config';
 import {
   mergeStationEvents,
   type LiveVehicle,
-  type PlannedStop,
   type StationEventKind,
   type TripState,
 } from './station-eta';
+import { buildStationPlan, tripKeyOf, type StationPlan } from './station-eta.plan';
 
 function num(value: unknown): number | null {
   const n =
@@ -34,14 +34,11 @@ function str(value: unknown): string | null {
  */
 @Injectable()
 export class StationEtaService {
-  private planCache: {
+  private planCache: (StationPlan & {
     key: string;
-    stops: PlannedStop[];
-    stopsByTrip: Map<string, string[]>;
-    names: Map<string, string>;
     /** 班表引用的地圖：站點 ID 屬於這張圖 */
     mapId: string | null;
-  } | null = null;
+  }) | null = null;
 
   constructor(
     private readonly engine: DispatchEngineService,
@@ -59,8 +56,10 @@ export class StationEtaService {
     const operatingNow = this.clock.now();
     const day = this.clock.operatingDay();
     const adoption = await this.engine.ensureDailyPlan(day);
+    // 前一營運日延續到今天凌晨的卡也是要到站的車（跟調度發單同一份）
+    const tail = await this.engine.previousDayTail(operatingNow).catch(() => null);
     const plan = adoption
-      ? await this.plannedArrivals(day, adoption.shift_id, adoption.plan_digest)
+      ? await this.plannedArrivals(day, adoption.shift_id, adoption.plan_digest, tail)
       : null;
 
     // 模擬器／車端路徑使用圖資 facility id（如 156），班表使用營運 station id（如 t3_u）。
@@ -77,14 +76,22 @@ export class StationEtaService {
     const live = (await this.liveVehicles()).map((vehicle) => ({
       ...vehicle,
       targetStationId: normalizeStationId(vehicle.targetStationId),
+      // 車端回報訂單號：認得就用那張卡的身分（前一天延續的卡跟今天同代號的卡分得開）
+      tripKey:
+        (vehicle.orderId && plan?.keyByOrderId.get(vehicle.orderId)) ||
+        (vehicle.tripCode ? tripKeyOf(day, vehicle.tripCode) : null),
     }));
     const tripStates = new Map<string, TripState>();
-    if (adoption) {
+    const sources = [
+      ...(tail ? [{ day: tail.operatingDay, shiftId: tail.shiftId, digest: tail.planDigest }] : []),
+      ...(adoption ? [{ day, shiftId: adoption.shift_id, digest: adoption.plan_digest }] : []),
+    ];
+    for (const source of sources) {
       /*
        * 班次代號只在「同一營運日、同一份計畫」內唯一（E021830 每天都有）；重播時再限定這一次執行，
        * 同一天跑過的前幾輪不會跟這一輪串在一起（跟運能統計同一個條件）。
        */
-      const params: unknown[] = [day, adoption.shift_id, adoption.plan_digest];
+      const params: unknown[] = [source.day, source.shiftId, source.digest];
       const replay = this.clock.replayRun();
       let runFilter = '';
       if (replay?.runId) {
@@ -110,7 +117,7 @@ export class StationEtaService {
       );
       // 同一班重發：以最後一張為準
       for (const row of rows)
-        tripStates.set(row.trip_code, {
+        tripStates.set(tripKeyOf(source.day, row.trip_code), {
           status: row.status,
           closedReason: row.closed_reason,
           lastDwellStationId: normalizeStationId(row.last_dwell_station_id),
@@ -145,6 +152,7 @@ export class StationEtaService {
       stopsByTrip: plan?.stopsByTrip ?? new Map(),
       live,
       tripStates,
+      holds: plan?.holds ?? [],
       operatingNow,
       staleAfterSeconds: vehicleEtaConfig.dataStaleSeconds,
       limit,
@@ -169,40 +177,24 @@ export class StationEtaService {
     };
   }
 
-  /** 每日計畫展開後各站的計畫到站（營運時刻）；同一版本只算一次 */
-  private async plannedArrivals(day: string, shiftId: string, digest: string) {
-    const key = `${day}|${shiftId}|${digest}`;
+  /** 每日計畫（＋前一天延續到凌晨的卡）展開後各站的事件；同一版本只算一次 */
+  private async plannedArrivals(
+    day: string,
+    shiftId: string,
+    digest: string,
+    tail: Awaited<ReturnType<DispatchEngineService['previousDayTail']>>,
+  ) {
+    const tailKey = tail ? `${tail.operatingDay}|${tail.shiftId}|${tail.planDigest}|${tail.planned.length}` : '-';
+    const key = `${day}|${shiftId}|${digest}|${tailKey}`;
     if (this.planCache?.key === key) return this.planCache;
     const reference = operatingDayReference(day) ?? Date.now();
     const plan = await this.engine.planForShift(shiftId, reference);
-    const stops: PlannedStop[] = [];
-    const stopsByTrip = new Map<string, string[]>();
-    const names = new Map<string, string>();
-    for (const item of plan.planned) {
-      stopsByTrip.set(
-        item.tripCode,
-        item.stations.map((s) => s.stationId),
-      );
-      item.stations.forEach((station, index) => {
-        names.set(station.stationId, station.stationName);
-        if (station.arriveAt == null && station.departAt == null) return;
-        stops.push({
-          tripCode: item.tripCode,
-          vehicleCode: item.vehicleCode,
-          stationId: station.stationId,
-          stationName: station.stationName,
-          taskLabel: item.cardLabel || item.routeName || item.tripCode,
-          stopIndex: index,
-          arriveAt: station.arriveAt ?? null,
-          departAt: station.departAt ?? null,
-        });
-      });
-    }
     this.planCache = {
       key,
-      stops,
-      stopsByTrip,
-      names,
+      ...buildStationPlan([
+        ...(tail ? [{ operatingDay: tail.operatingDay, planned: tail.planned }] : []),
+        { operatingDay: day, planned: plan.planned },
+      ]),
       mapId: resolveMapIdFromShiftBody(plan.body ?? {}),
     };
     return this.planCache;

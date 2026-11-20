@@ -7,6 +7,7 @@ import {
   directionOf,
   eventStatus,
   formatCountdown,
+  intentLabel,
   nextTickDelay,
   placeLabel,
   rowTag,
@@ -81,9 +82,9 @@ describe('到站動態卡片：狀態與方向', () => {
     assert.equal(eventStatus(dep(NOW - 600_000), NOW).text, '即將出發');
   });
 
-  it('後續列只標出發與資料中斷；到站不另外標', () => {
-    assert.equal(rowTag(ev({ at: NOW + 30_000 })), null);
-    assert.equal(rowTag(ev({ at: NOW + 300_000, delay_seconds: 120 })), null);
+  it('後續列每一列都標抵達／出發／通過；資料中斷另外標', () => {
+    assert.deepEqual(rowTag(ev({ at: NOW + 30_000 })), { text: '抵達', tone: 'normal' });
+    assert.deepEqual(rowTag(ev({ event: 'pass', at: NOW + 30_000 })), { text: '通過', tone: 'normal' });
     assert.deepEqual(rowTag(ev({ event: 'depart', at_station: true, at: NOW + 60_000 })), { text: '出發', tone: 'normal' });
     assert.deepEqual(rowTag(ev({ event: 'depart', at_station: true, at: NOW - 120_000 })), { text: '出發', tone: 'normal' });
     assert.deepEqual(rowTag(ev({ kind: 'plan', time_state: 'stale' })), { text: '資料中斷', tone: 'stale' });
@@ -97,18 +98,27 @@ describe('到站動態卡片：狀態與方向', () => {
     assert.equal(cardScale(320, 280, undefined), 1);
   });
 
-  it('方向只看 task_label；判不出來不猜', () => {
+  it('方向看意圖，舊資料看 task_label；判不出來不猜', () => {
+    assert.equal(directionOf({ intent: '載客上行', task_label: '整備' }), 'up');
+    assert.equal(directionOf({ intent: '入廠', task_label: '下行' }), null);
     assert.equal(directionOf({ task_label: '上行' }), 'up');
     assert.equal(directionOf({ task_label: '下行' }), 'down');
     assert.equal(directionOf({ task_label: '整備' }), null);
     assert.equal(directionOf({}), null);
   });
 
-  it('方向／停靠點文字：屬性填的名稱優先，否則後端站名；名稱沒帶上／下才補', () => {
+  it('站點位置：屬性填的名稱優先，否則後端站名；不再補上下行（方向在意圖）', () => {
     assert.equal(placeLabel(ev({}), [{ stationId: 't3_u', label: 't3_u' }]), 'T3上行');
     assert.equal(placeLabel(ev({ station_id: 'n2w_d_end', station_name: 'NW上停1' }), []), 'NW上停1');
-    assert.equal(placeLabel(ev({ station_id: 't3_u', station_name: 'T3' }), []), 'T3 上行');
-    assert.equal(placeLabel(ev({}), [{ stationId: 't3_u', label: 'T3 月台A' }]), 'T3 月台A 上行');
+    assert.equal(placeLabel(ev({ station_id: 't3_u', station_name: 'T3' }), []), 'T3');
+    assert.equal(placeLabel(ev({}), [{ stationId: 't3_u', label: 'T3 月台A' }]), 'T3 月台A');
+  });
+
+  it('車輛意圖照卡片；出發前在站上暫停／待命寫成「暫停→下一張卡」；舊資料用 task_label', () => {
+    assert.equal(intentLabel(ev({ intent: '終點下車' })), '終點下車');
+    assert.equal(intentLabel(ev({ event: 'depart', intent: '入廠', hold_label: '暫停' })), '暫停→入廠');
+    assert.equal(intentLabel(ev({ event: 'arrive', intent: '出場', hold_label: '暫停' })), '出場');
+    assert.equal(intentLabel(ev({})), '上行');
   });
 });
 

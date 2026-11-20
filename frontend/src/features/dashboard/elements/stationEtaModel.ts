@@ -12,7 +12,8 @@ export type StationEvent = {
   /** 同一車、同一次停靠的穩定識別；到站轉出發時不變 */
   coupling_key?: string;
   row_key?: string;
-  event: 'arrive' | 'depart';
+  /** pass：移動卡經過這一站、不停 */
+  event: 'arrive' | 'depart' | 'pass';
   vehicle_code: string;
   trip_code: string;
   station_id: string;
@@ -21,6 +22,10 @@ export type StationEvent = {
   /** 這班的任務標籤（正線為「上行」／「下行」） */
   task_label?: string;
   event_label?: string;
+  /** 車輛意圖（依排班卡片：載客上行、載客下行、終點下車、出場、入廠、通過） */
+  intent?: string;
+  /** 出發前停在站上的月台暫停／待命（出發那一筆才有） */
+  hold_label?: string | null;
   /** 營運時刻（毫秒） */
   at: number;
   /** live：車端即時推估；plan：每日計畫時刻 */
@@ -115,23 +120,34 @@ export function formatCountdown(ms: number): string {
 
 export type Direction = 'up' | 'down' | null;
 
-/** 方向只看正式欄位 task_label（班次的上行／下行）；判不出來就是 null，不猜 */
-export function directionOf(event: Pick<StationEvent, 'task_label'>): Direction {
-  const label = event.task_label ?? '';
+/** 方向看意圖（載客上行／載客下行），舊資料沒有意圖才看 task_label；判不出來就是 null，不猜 */
+export function directionOf(event: Pick<StationEvent, 'task_label' | 'intent'>): Direction {
+  const label = event.intent ?? event.task_label ?? '';
   if (label.includes('上行')) return 'up';
   if (label.includes('下行')) return 'down';
   return null;
 }
 
 /**
- * 方向／停靠點文字：屬性面板填的名稱優先，沒填用後端站名；名稱裡完全沒有上／下（如「T3」）才補上下行。
- * 「SW下停1」「NW上發2」這類站名本身已帶方向，不再重複補，卡片寬度留給站名本身。
+ * 站點位置：屬性面板填的名稱優先，沒填用後端站名。不再補上下行（方向在意圖裡，使用者 2026-11-20）。
  */
 export function placeLabel(event: StationEvent, stations: StationConfig[]): string {
   const config = stations.find((s) => s.stationId === event.station_id);
-  const name = config?.label && config.label !== config.stationId ? config.label : (event.station_name || event.station_id);
-  const dir = event.task_label && directionOf(event) ? event.task_label : '';
-  return dir && !/[上下]/.test(name) ? `${name} ${dir}` : name;
+  return config?.label && config.label !== config.stationId ? config.label : (event.station_name || event.station_id);
+}
+
+/**
+ * 車輛意圖：照排班卡片（載客上行、終點下車、出場、入廠、通過）。出發前在站上暫停／待命的，
+ * 寫成「暫停→載客上行」，月台看得出這台車停一下之後要做什麼。舊資料沒有意圖用 task_label。
+ */
+export function intentLabel(event: StationEvent): string {
+  const intent = event.intent || event.task_label || '';
+  return event.event === 'depart' && event.hold_label ? `${event.hold_label}→${intent}` : intent;
+}
+
+/** 時間的種類：抵達、出發、通過 */
+export function eventKindLabel(event: Pick<StationEvent, 'event'>): string {
+  return event.event === 'depart' ? '出發' : event.event === 'pass' ? '通過' : '抵達';
 }
 
 export type EventStatus = { text: string; tone: 'normal' | 'stale' };
@@ -147,18 +163,21 @@ export function eventStatus(event: StationEvent, operatingNow: number): EventSta
     if (remain > 0) return { text: event.at_station ? '停靠中 出發倒數' : '出發倒數', tone: 'normal' };
     return { text: '即將出發', tone: 'normal' };
   }
+  if (event.event === 'pass') {
+    if (remain <= 0 || (event.kind === 'live' && remain <= APPROACHING_MS)) return { text: '即將通過', tone: 'normal' };
+    return { text: '通過倒數', tone: 'normal' };
+  }
   if (remain <= 0 || (event.kind === 'live' && remain <= APPROACHING_MS)) return { text: '即將到站', tone: 'normal' };
   return { text: '到站倒數', tone: 'normal' };
 }
 
 /**
- * 後續列的短標記（列寬有限）：出發的列標「出發」、資料中斷標「資料中斷」；到站不標，倒數本身就是到站。
+ * 後續列的短標記：時間是抵達、出發還是通過，每一列都標（使用者 2026-11-20）；資料中斷標「資料中斷」。
  * 主卡的完整狀態（即將出發等）見 eventStatus。
  */
-export function rowTag(event: StationEvent): EventStatus | null {
+export function rowTag(event: StationEvent): EventStatus {
   if (event.time_state === 'stale') return { text: '資料中斷', tone: 'stale' };
-  if (event.event !== 'depart') return null;
-  return { text: '出發', tone: 'normal' };
+  return { text: eventKindLabel(event), tone: 'normal' };
 }
 
 /**

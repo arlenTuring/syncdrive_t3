@@ -1,7 +1,7 @@
 import type { TimetableTripDto } from '../operation-shift/timetable/expand-timetable';
 import type { YardMove } from './dispatch.yard-moves';
 import type { BlockPurpose } from './dispatch.service-purpose';
-import type { YardTask } from './dispatch.yard-tasks';
+import type { StationHold, YardTask } from './dispatch.yard-tasks';
 
 /**
  * 把班表班次換算成「今天要下的訂單」——不碰資料庫、不碰時鐘以外的東西，
@@ -68,6 +68,11 @@ export type PlannedDispatch = {
   transitionFacility?: string | null;
   /** 這張任務服務的用途（營運／整備／待命）與服務對象的任務類型；營運分佈依它分類 */
   servicePurpose?: BlockPurpose | null;
+  /**
+   * 停在月台上的暫停、待命卡（見 planStationHolds）。時刻完全由同一台車前後兩張卡決定，
+   * 不算進計畫版本摘要（planDigestOf）。
+   */
+  stationHold?: boolean;
 };
 
 /**
@@ -456,6 +461,63 @@ export function planYardTasks(args: {
     });
   }
 
+  planned.sort((a, b) => a.departAt - b.departAt);
+  return { planned, skipped };
+}
+
+/**
+ * 月台暫停卡 → 訂單：車停在那個月台，從卡片開始停到卡片結束（起訖都是那個月台）。
+ *
+ * kind 用 maintenance（協議裡停著不動的任務），但不帶 maintenance 欄位——沒有格位、不算整備佔用；
+ * 業務分類照任務子類型（idle、standby）歸過渡，卡片短名稱是「暫停 NWD」。
+ */
+export function planStationHolds(args: {
+  holds: StationHold[];
+  fleet: readonly string[];
+  reference: number;
+}): {
+  planned: PlannedDispatch[];
+  skipped: Array<{ tripCode: string; reason: string }>;
+} {
+  const { holds, fleet, reference } = args;
+  const midnight = localMidnight(reference);
+  const planned: PlannedDispatch[] = [];
+  const skipped: Array<{ tripCode: string; reason: string }> = [];
+  for (const hold of holds) {
+    const vehicleCode = vehicleForRow(hold.timelineRow, fleet);
+    if (!vehicleCode) {
+      skipped.push({
+        tripCode: hold.tripCode,
+        reason: `時間線第 ${hold.timelineRow} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+      });
+      continue;
+    }
+    const departAt = midnight + Math.round(hold.startMinute * 60) * 1000;
+    const arriveAt = midnight + Math.round(hold.endMinute * 60) * 1000;
+    const point = { id: hold.stationId, name: hold.stationName, kind: 'station' as const };
+    planned.push({
+      kind: 'maintenance',
+      maintenance: null,
+      orderId: buildOrderId(hold.tripCode, departAt),
+      tripCode: hold.tripCode,
+      planBlockId: hold.blockId,
+      vehicleCode,
+      timelineRow: hold.timelineRow,
+      taskType: hold.taskType,
+      cardLabel: hold.cardLabel,
+      routeCode: null,
+      routeName: hold.cardLabel,
+      transitionPurpose: hold.taskType === 'standby' ? 'standby' : 'hold',
+      transitionFacility: hold.stationName,
+      servicePurpose: hold.servicePurpose ?? null,
+      stationHold: true,
+      departAt,
+      arriveAt,
+      origin: { ...point, arriveAt: null, departAt },
+      destination: { ...point, arriveAt, departAt: null },
+      stations: [],
+    });
+  }
   planned.sort((a, b) => a.departAt - b.departAt);
   return { planned, skipped };
 }

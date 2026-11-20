@@ -21,11 +21,12 @@ import {
   localMidnight,
   planDispatches,
   planYardMoves,
+  planStationHolds,
   planYardTasks,
   type PlannedDispatch,
 } from './dispatch.plan';
 import { extractYardMoves } from './dispatch.yard-moves';
-import { extractYardTasks } from './dispatch.yard-tasks';
+import { extractStationHolds, extractYardTasks } from './dispatch.yard-tasks';
 import { buildChargingLookup } from './dispatch.charging';
 import { MaintenanceTaskService } from '../maintenance-task/maintenance-task.service';
 import { dispatchOrderFields } from './dispatch-order-kind';
@@ -566,9 +567,15 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
         : undefined,
     });
 
+    // 月台上的暫停、待命卡（車在月台等下一班）：跟整備一起開關，排班排出的每一張卡都要是訂單
+    const rawHolds = includeTasks
+      ? extractStationHolds(deployed.body)
+      : { holds: [], skipped: [] };
+    const stationHolds = planStationHolds({ holds: rawHolds.holds, fleet, reference });
+
     // 補齊只記了一端的移動卡，要在兩種來源合併之後做——缺的那一端通常在正線班次上
     const merged = fillMissingEndpoints(
-      [...trips.planned, ...moves.planned, ...yardTasks.planned].sort(
+      [...trips.planned, ...moves.planned, ...yardTasks.planned, ...stationHolds.planned].sort(
         (a, b) => a.departAt - b.departAt,
       ),
     );
@@ -577,7 +584,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
       ...trips.skipped,
       ...moves.skipped,
       ...yardTasks.skipped,
-      ...[...rawMoves.skipped, ...rawTasks.skipped].map((item) => ({
+      ...stationHolds.skipped,
+      ...[...rawMoves.skipped, ...rawTasks.skipped, ...rawHolds.skipped].map((item) => ({
         tripCode: item.blockId,
         reason: item.reason,
       })),

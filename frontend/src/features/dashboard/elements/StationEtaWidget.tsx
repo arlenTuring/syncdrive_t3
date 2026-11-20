@@ -10,8 +10,10 @@ import {
   cardRows,
   cardScale,
   directionOf,
+  eventKindLabel,
   eventStatus,
   formatCountdown,
+  intentLabel,
   nextTickDelay,
   placeLabel,
   rowTag,
@@ -73,7 +75,7 @@ function directionColor(event: StationEvent): string {
 function rowTooltip(event: StationEvent, place: string): string {
   return [
     `${event.vehicle_code}｜${event.trip_code}`,
-    `${event.event === 'arrive' ? '到站' : '出發'} ${place}`,
+    `${eventKindLabel(event)} ${place}｜${intentLabel(event)}`,
     `${event.kind === 'live' ? '即時推估' : '計畫時刻'} ${clockText(event.at)}（營運時間）`,
   ].join('\n');
 }
@@ -83,12 +85,23 @@ function countdownText(event: StationEvent, operatingNow: number): string {
   return event.time_state === 'stale' ? '--:--' : formatCountdown(event.at - operatingNow);
 }
 
-function Place({ event, place, fontSize, icon, gap }: { event: StationEvent; place: string; fontSize: number; icon: number; gap: number }) {
-  const color = directionColor(event);
+/**
+ * 右側兩行：上面車輛意圖（依方向上色：上行藍、下行紫，其餘中性），下面站點位置。
+ * 意圖較長（「暫停→載客上行」）時省略，完整內容在 tooltip。
+ */
+function PlaceIntent({ event, place, intentSize, placeSize, icon, gap, placeColor }: {
+  event: StationEvent; place: string; intentSize: number; placeSize: number; icon: number; gap: number; placeColor: string;
+}) {
+  const ellipsis: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap, minWidth: 0, color, fontSize, fontWeight: 500 }}>
-      <MapPin size={icon} aria-hidden style={{ flexShrink: 0 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place}</span>
+    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0, lineHeight: 1.2 }}>
+      <span data-eta-role="intent" style={{ ...ellipsis, maxWidth: '100%', color: directionColor(event), fontSize: intentSize, fontWeight: 500 }}>
+        {intentLabel(event)}
+      </span>
+      <span data-eta-role="place" style={{ display: 'inline-flex', alignItems: 'center', gap, minWidth: 0, maxWidth: '100%', color: placeColor, fontSize: placeSize }}>
+        <MapPin size={icon} aria-hidden style={{ flexShrink: 0 }} />
+        <span style={ellipsis}>{place}</span>
+      </span>
     </span>
   );
 }
@@ -183,8 +196,8 @@ export function StationEtaWidgetView({ widget }: { widget: StationEtaWidget }) {
                   >
                     {countdownText(row, operatingNow)}
                   </span>
-                  <span style={{ minWidth: 0, display: 'flex', paddingBottom: u(6) }}>
-                    <Place event={row} place={place} fontSize={fs(20)} icon={u(18)} gap={u(4)} />
+                  <span style={{ minWidth: 0, display: 'flex', paddingBottom: u(4) }}>
+                    <PlaceIntent event={row} place={place} intentSize={fs(20)} placeSize={fs(16)} icon={u(14)} gap={u(4)} placeColor={soft} />
                   </span>
                 </div>
               </div>
@@ -211,11 +224,9 @@ export function StationEtaWidgetView({ widget }: { widget: StationEtaWidget }) {
               >
                 {countdownText(row, operatingNow)}
               </span>
-              {tag && (
-                <span style={{ fontSize: fs(14), flexShrink: 0, color: tag.tone === 'stale' ? T.warning : soft }}>{tag.text}</span>
-              )}
+              <span style={{ fontSize: fs(14), flexShrink: 0, color: tag.tone === 'stale' ? T.warning : soft }}>{tag.text}</span>
               <span style={{ marginLeft: 'auto', minWidth: 0, display: 'flex' }}>
-                <Place event={row} place={place} fontSize={fs(18)} icon={u(18)} gap={u(4)} />
+                <PlaceIntent event={row} place={place} intentSize={fs(16)} placeSize={fs(14)} icon={u(12)} gap={u(3)} placeColor={soft} />
               </span>
             </div>
           );

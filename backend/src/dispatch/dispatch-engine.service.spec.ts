@@ -733,7 +733,7 @@ describe('整備班次', () => {
     ).toBe('保養');
   });
 
-  it('停在備用月台的待命卡不算整備，不佔格位', async () => {
+  it('停在備用月台的待命卡不算整備、不佔格位，但照樣發成停在那個月台的過渡訂單', async () => {
     const { engine, created } = build(
       [],
       [],
@@ -751,7 +751,15 @@ describe('整備班次', () => {
 
     const result = await engine.tick({ now: REFERENCE });
 
-    expect(created).toHaveLength(0);
+    // 排班排出的每一張卡都要是訂單（使用者 2026-11-20）；不帶格位，整備分佈不會多出佔用
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ line_kind: 'TRANSITION', maint_station: undefined });
+    expect(created[0].payload).toMatchObject({
+      kind: 'maintenance',
+      task_type: 'standby',
+      origin: { id: 'station_10', kind: 'station' },
+      destination: { id: 'station_10', kind: 'station' },
+    });
     expect(result.skipped).toHaveLength(0);
   });
 

@@ -114,7 +114,8 @@ function buildLegacyTripCode(
  * 抽出計畫中的全部整備班次。
  *
  * 只認<strong>有場區設施節點</strong>的卡。正線上的暫停卡（車停在月台等下一班）
- * 也是 taskType='idle'，但它記的是站點不是格位——那不是整備，不該佔用整備格位。
+ * 也是 taskType='idle'，但它記的是站點不是格位——那不是整備，不該佔用整備格位；
+ * 那些卡由 {@link extractStationHolds} 另外發成過渡訂單。
  */
 export function extractYardTasks(body: Record<string, unknown>): {
   tasks: YardTask[];
@@ -149,12 +150,13 @@ export function extractYardTasks(body: Record<string, unknown>): {
       const blockId = str(block.id) ?? '(無 id)';
       const facilityNodeId = str(block.yardFacilityNodeId);
       const yardSlotId = str(block.yardFacilityLabel);
-      // 正線月台上的暫停卡沒有格位，跳過且不算異常——它本來就不是整備
-      if (!facilityNodeId || !yardSlotId) continue;
-      // 待命卡也可能停在<strong>備用月台</strong>而不是場區格位：那種卡帶著
-      // yardFacilityStationId，標籤是站名（「[備用]N2W下行出發」）。車停在月台上
-      // 沒有佔用任何整備格位，發成整備訂單會讓整備分佈多出不存在的佔用。
+      // 停在月台（正線月台或備用月台）的暫停、待命卡帶著 yardFacilityStationId：車沒有佔用任何整備格位，
+      // 不在這裡發整備訂單（整備分佈會多出不存在的佔用），由 extractStationHolds 發成過渡訂單。
       if (str(block.yardFacilityStationId)) continue;
+      if (!facilityNodeId || !yardSlotId) {
+        skipped.push({ blockId, reason: `「${str(block.label) ?? taskType}」卡沒有格位也沒有月台，無法發訂單` });
+        continue;
+      }
       if (!/^[A-Za-z]+[0-9]+$/.test(yardSlotId)) {
         skipped.push({
           blockId,
@@ -209,4 +211,92 @@ export function extractYardTasks(body: Record<string, unknown>): {
   }
 
   return { tasks, skipped };
+}
+
+/** 停在月台上的暫停、待命卡（車在月台等下一班）。見 {@link extractStationHolds} */
+export type StationHold = {
+  blockId: string;
+  servicePurpose?: BlockPurpose;
+  /** 班表卡的任務類型（idle＝暫停、standby＝待命），原封保留 */
+  taskType: string;
+  timelineRow: number;
+  /** 班次代號（暫停代號＋列號＋HHMM，例如 WT020219）；同一份班表內唯一，order_id 由它組成 */
+  tripCode: string;
+  cardLabel: string;
+  /** 月台的站點 id（n2w_d）與名稱（NWD），與載客訂單的起訖點同一套 */
+  stationId: string;
+  stationName: string;
+  startMinute: number;
+  endMinute: number;
+};
+
+/**
+ * 抽出停在月台上的暫停、待命卡。
+ *
+ * 排班排出來的每一張卡都要是車輛可以照著做的訂單（使用者 2026-11-20）。月台上的暫停卡以前被跳過：
+ * 車照卡停在月台，卻沒有訂單，車輛卡、班次卡一片空白，看不出它在等下一班。
+ *
+ * 這些卡不是整備：不帶格位、不算整備佔用（業務分類是過渡，見 order-business-kind.ts）。
+ * 起訖都是那個月台，從卡片開始停到卡片結束。
+ */
+export function extractStationHolds(body: Record<string, unknown>): {
+  holds: StationHold[];
+  skipped: Array<{ blockId: string; reason: string }>;
+} {
+  const plan = asRecord(asRecord(body.scheduleOutput)?.plan);
+  const timelines = plan?.timelines;
+  const holds: StationHold[] = [];
+  const skipped: Array<{ blockId: string; reason: string }> = [];
+  if (!Array.isArray(timelines)) return { holds, skipped };
+
+  const codeSettings = readCardCodeSettings(body);
+  const purposes = servicePurposeByBlock(body);
+
+  for (const timeline of timelines) {
+    const tl = asRecord(timeline);
+    if (!tl || !Array.isArray(tl.blocks)) continue;
+    for (const item of tl.blocks) {
+      const block = asRecord(item);
+      if (!block) continue;
+      const taskType = str(block.taskType);
+      const stationId = str(block.yardFacilityStationId);
+      if (!taskType || !YARD_TASK_TYPES.has(taskType) || !stationId) continue;
+
+      const blockId = str(block.id) ?? '(無 id)';
+      const startMinute = num(block.plannedStartMinute);
+      const endMinute = num(block.plannedEndMinute);
+      if (startMinute == null || endMinute == null) {
+        skipped.push({ blockId, reason: '月台暫停卡缺少計畫起訖時刻' });
+        continue;
+      }
+      const row = num(block.timelineRow) ?? 1;
+      let tripCode = `HOLD-${stationId.toUpperCase()}-R${row}-${Math.round(startMinute * 60)}`;
+      if (codeSettings.version === 2) {
+        const code = cardDisplayCode(block, codeSettings);
+        if (!code) {
+          const kind = cardCodeKind(block);
+          skipped.push({
+            blockId,
+            reason: kind ? `待補設定：「${kind.label}」卡沒有代號，未發月台暫停訂單` : `卡片種類 ${taskType}／${str(block.source) ?? '—'} 沒有對應的代號設定，未發月台暫停訂單`,
+          });
+          continue;
+        }
+        tripCode = code;
+      }
+      const stationName = str(block.yardFacilityLabel) ?? stationId;
+      holds.push({
+        blockId,
+        servicePurpose: purposes.get(blockId),
+        taskType,
+        timelineRow: row,
+        tripCode,
+        cardLabel: taskType === 'standby' ? '待命' : '暫停',
+        stationId,
+        stationName,
+        startMinute,
+        endMinute,
+      });
+    }
+  }
+  return { holds, skipped };
 }

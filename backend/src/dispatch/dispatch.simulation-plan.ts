@@ -261,9 +261,13 @@ export function assessSimulationReadiness(input: {
  * 展開後計畫的版本摘要。只看每一筆在當天的相對時刻與內容，不看是哪一天——同一份班表
  * 展開到不同營運日，摘要相同。模擬器載入身分（identity.plan_digest）、每日計畫採用紀錄、
  * 訂單 payload.plan_digest 都用這一支，三者才對得起來。
+ *
+ * 月台暫停卡（stationHold）不算進去：它的時刻完全由同一台車前後兩張卡決定，
+ * 不帶額外內容；算進去的話，開始發月台暫停訂單（2026-11-20）那一刻起，所有已採用的每日計畫版本都對不上，
+ * 當天已發的訂單就不算進班次中心與到站統計。
  */
 export function planDigestOf(planned: PlannedDispatch[]): string {
-  return contentDigest(planned.map(planIdentityOf));
+  return contentDigest(planned.filter((item) => !item.stationHold).map(planIdentityOf));
 }
 
 function planIdentityOf(item: PlannedDispatch) {
