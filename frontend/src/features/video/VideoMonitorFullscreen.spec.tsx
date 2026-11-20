@@ -111,7 +111,7 @@ describe('監控標籤頁整體全螢幕', () => {
   it('只有檢視權限也能進入；全螢幕對象是包住標籤名稱與全部格子的容器；離開回原樣', async () => {
     await mount();
     expect(players.mounted).toBe(3);
-    await click('標籤頁全螢幕');
+    await click('分頁全螢幕');
     expect(requests).toHaveLength(1);
     const target = requests[0];
     expect(target.querySelectorAll('video')).toHaveLength(3);
@@ -126,12 +126,12 @@ describe('監控標籤頁整體全螢幕', () => {
   it('進出全螢幕與單格放大都不重建播放器、不重取播放授權', async () => {
     await mount();
     const sessionsBefore = sessions.length;
-    await click('標籤頁全螢幕');
+    await click('分頁全螢幕');
     await click('鏡頭0 放大');
     expect(requests).toHaveLength(1); // 單格放大在容器內處理，不再要求第二層原生全螢幕
-    expect(document.body.textContent).toContain('單格放大中');
+    expect(document.body.textContent).toContain('返回整頁');
     await click('鏡頭0 返回整頁');
-    expect(document.body.textContent).not.toContain('單格放大中');
+    expect(document.body.textContent).not.toContain('返回整頁');
     // 瀏覽器 Esc／外部退出：以 fullscreenchange 為準
     await act(async () => {
       fsElement = null;
@@ -146,7 +146,7 @@ describe('監控標籤頁整體全螢幕', () => {
   it('瀏覽器拒絕時顯示錯誤，不假裝已全螢幕', async () => {
     await mount();
     reject = true;
-    await click('標籤頁全螢幕');
+    await click('分頁全螢幕');
     expect(document.body.textContent).toContain('無法進入全螢幕');
     expect(document.body.textContent).not.toContain('離開全螢幕');
   });
@@ -154,17 +154,18 @@ describe('監控標籤頁整體全螢幕', () => {
   it('不支援原生全螢幕：同一容器網頁滿版並標明；Esc 退出', async () => {
     Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: false });
     await mount();
-    await click('標籤頁全螢幕');
+    await click('分頁全螢幕');
     expect(requests).toHaveLength(0);
-    expect(document.body.textContent).toContain('網頁滿版');
+    expect(document.body.textContent).toContain('離開全螢幕');
+    expect(document.querySelector('[title^="網頁滿版"]')).not.toBeNull();
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-    expect(document.body.textContent).not.toContain('網頁滿版');
+    expect(document.body.textContent).not.toContain('離開全螢幕');
     expect(players.unmounted).toBe(0);
   });
 
   it('離開頁面時退出自己的全螢幕；別人的全螢幕不動', async () => {
     await mount();
-    await click('標籤頁全螢幕');
+    await click('分頁全螢幕');
     act(() => root?.unmount());
     root = null;
     expect(document.exitFullscreen).toHaveBeenCalledTimes(1);

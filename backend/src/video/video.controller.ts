@@ -129,7 +129,7 @@ export class VideoController {
   // ── 來源（影像資源管理） ──
   @Get('sources')
   @RequirePermission(CONFIGURE, RECORDING)
-  @ApiOperation({ summary: '來源清單：分頁（page、pageSize）、tags（逗號分隔且任一符合）；含實際狀態，不含密碼、不建立播放' })
+  @ApiOperation({ summary: '來源清單：分頁（page、pageSize）、tags（逗號分隔且任一符合）、ids（指定來源）、sort（name／status，_desc 反向）；含實際狀態，不含密碼、不建立播放' })
   sources(@Query() query: Record<string, unknown>) {
     return this.config.querySources(query ?? {});
   }

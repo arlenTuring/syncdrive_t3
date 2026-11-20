@@ -10,6 +10,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> & {
   type: Kind;
   /** 給了就用系統統一的輸入框外觀，className 只放排版；不給＝沿用呼叫端自己的樣式（舊寫法） */
   size?: FieldSize;
+  /** 不顯示右側的日曆／時鐘圖示（例如兩個欄位共用一個外框時，由外框放一個圖示） */
+  hideIcon?: boolean;
 };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -79,6 +81,8 @@ export function SiteDateTimeInput({
   name,
   id,
   title,
+  placeholder,
+  hideIcon = false,
   'aria-label': ariaLabel,
 }: Props) {
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -110,8 +114,8 @@ export function SiteDateTimeInput({
         onClick={() => setOpen((currentOpen) => !currentOpen)}
         className={cn(size ? fieldClass({ size, fullWidth: false }) : 'disabled:cursor-not-allowed disabled:opacity-50', 'flex min-w-0 items-center justify-between gap-2 text-left', className)}
       >
-        <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
-        {timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}
+        <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || placeholder || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
+        {hideIcon ? null : timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}
       </button>
       <AnchoredPopover
         open={open}

@@ -1,45 +1,41 @@
-import { Copy, Film, HardDrive, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Plus, RotateCw, Save, Search, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
 import { SiteMultiSelect } from '../../components/SiteMultiSelect';
-import { ListFooter, ListState } from '../event-log-shared/ui';
-import { Dialog, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
-import { videoApi, type StorageStatus, type VideoSourceItem } from './api';
-import { openVideoHistory } from './history-link';
-import { tagKey } from './layout';
+import { Toast } from '../media-groups/dialogs';
+import { videoApi, type SourceOption, type SourceSort, type StorageStatus, type VideoSourceItem } from './api';
 import { SourceDialog } from './SourceDialog';
-import { BADGE_TONE, onlineBadge, recordingBadge } from './status';
+import { onlineBadge, recordingBadge } from './status';
 import { StorageDialog } from './StorageDialog';
 import { useCoalescedQuery } from '../../lib/useCoalescedQuery';
-import { AnchoredPopover } from '../../lib/AnchoredPopover';
-import { Button, IconButton, MENU_PANEL_CLASS, Switch, cn, menuItemClass } from '../../components/ui';
+import { Badge, Button, Dialog, IconButton, Pagination, cn, type BadgeTone } from '../../components/ui';
 
 const PAGE_SIZE = 20;
-const HOUR = 3_600_000;
+const ONLINE_TONE: Record<ReturnType<typeof onlineBadge>['tone'], BadgeTone> = { green: 'success', red: 'error', amber: 'warning', sky: 'info', zinc: 'neutral' };
+/** 篩選用的來源名稱、新增對話框用的既有標籤；任一個失敗不影響另一個 */
+const loadOptions = () => Promise.all([videoApi.sourceOptions().catch(() => null), videoApi.sourceTags().catch(() => null)]);
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
 
-const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().replace(/-/g, '') : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`);
+type SortKey = 'name' | 'status';
 
-function RowActions({ source, open, busy, onToggle, onEdit, onDuplicate, onHistory, onDelete }: { source: VideoSourceItem; open: boolean; busy: boolean; onToggle: () => void; onEdit: () => void; onDuplicate: () => void; onHistory: () => void; onDelete: () => void }) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const choose = (action: () => void) => { onToggle(); action(); };
-  const item = cn(menuItemClass(), 'focus:bg-link-standard focus:outline-none');
-  return <>
-    <IconButton ref={anchorRef} aria-haspopup="menu" aria-expanded={open} label={`${source.name} 操作`} size="small" hierarchy="subordinate" variant="standard" icon={<MoreHorizontal />} onPress={onToggle} />
-    <AnchoredPopover open={open} anchorRef={anchorRef} onClose={onToggle} role="menu" ariaLabel={`${source.name} 操作`} className={cn(MENU_PANEL_CLASS, 'min-w-44')}>
-      <button type="button" role="menuitem" onClick={() => choose(onEdit)} className={item}><Pencil className="size-4" />編輯</button>
-      <button type="button" role="menuitem" disabled={busy} onClick={() => choose(onDuplicate)} className={item}><Copy className="size-4" />複製</button>
-      <button type="button" role="menuitem" onClick={() => choose(onHistory)} className={item}><Film className="size-4" />查看影像紀錄</button>
-      <button type="button" role="menuitem" onClick={() => choose(onDelete)} className={`${item} text-status-error-emphasis`}><Trash2 className="size-4" />刪除</button>
-    </AnchoredPopover>
-  </>;
+/** 可排序的表頭：未排序時上下箭頭、排序中顯示方向（設計稿 2026-11-20） */
+function SortHeader({ label, active, desc, onSort }: { label: string; active: boolean; desc: boolean; onSort: () => void }) {
+  const Icon = !active ? ChevronsUpDown : desc ? ChevronDown : ChevronUp;
+  return (
+    <button type="button" onClick={onSort} className="flex w-full items-center justify-between gap-2 text-left hover:text-text-primary">
+      {label}
+      <Icon className={cn('size-4 shrink-0', active ? 'text-text-theme' : 'text-text-tertiary')} aria-hidden />
+    </button>
+  );
 }
 
 /**
- * 影像資源管理：來源清單（分頁、篩選、真實狀態）、啟停、新增／編輯、一鍵複製、刪除、分類標籤與儲存錄影。
+ * 影像來源管理（設計稿 2026-11-20）：上方選擇影像來源＋搜尋／重置、右上錄影儲存狀態與新增來源；
+ * 清單欄位為影像名稱、來源標籤、載具/位置、啟用狀態、連線狀態、操作（編輯、刪除），名稱與連線狀態可排序（伺服器排序，跨分頁正確）。
  *
- * - 清單不播放影片、不建立任何播放 session、不載入縮圖；歷史錄影由獨立「影像管理紀錄」頁查詢。
- * - 「啟用」是使用者指令、「上線」是實際探測結果、「錄影」又是另一件事，三者分開顯示；過期狀態顯示「狀態待更新」。
+ * - 清單不播放影片、不建立任何播放 session、不載入縮圖；歷史錄影由獨立「歷史影像紀錄」頁查詢。
+ * - 「啟用」是使用者指令、「上線」是實際探測結果，分開顯示；錄影狀態放在連線狀態的滑鼠提示。啟停在編輯對話框裡切換。
  * - 來源連線逐筆設定；攝影機允許網段是部署設定，不在此頁修改。
  */
 export function VideoResourcesPage() {
@@ -48,25 +44,26 @@ export function VideoResourcesPage() {
   const canManageRecording = auth.can('events.video.recording-manage');
   const canList = canConfigure || canManageRecording;
 
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false });
   const [page, setPage] = useState(1);
+  const [sourceOptions, setSourceOptions] = useState<SourceOption[]>([]);
   const [tagOptions, setTagOptions] = useState<Array<{ tag: string; count: number }>>([]);
-  const [pending, setPending] = useState<Record<string, string>>({});
   const [highlight, setHighlight] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ source: VideoSourceItem | null } | null>(null);
   const [deleting, setDeleting] = useState<{ source: VideoSourceItem; impact: { tabs: number; tiles: number; stopsRecording: boolean } } | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [notice, setNotice] = useState<{ text: string; tone: 'success' | 'error'; id: number } | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const notify = useCallback((text: string, tone: 'success' | 'error') => setNotice((n) => ({ text, tone, id: (n?.id ?? 0) + 1 })), [setNotice]);
 
   // reload 不是資料身分；帳號切換時也不能沿用前一位使用者的列。
-  const normalizedTags = useMemo(() => [...new Set(selectedTags.map(tagKey))].sort(), [selectedTags]);
-  const queryKey = JSON.stringify({ tags: normalizedTags, page, accountId: auth.user?.id ?? '', canList });
+  const sortParam: SourceSort = sort.desc ? `${sort.key}_desc` : sort.key;
+  const queryKey = JSON.stringify({ ids: [...appliedIds].sort(), sort: sortParam, page, accountId: auth.user?.id ?? '', canList });
   const loadSources = useCallback(
-    (signal: AbortSignal) => videoApi.sources({ tags: normalizedTags, page, pageSize: PAGE_SIZE }, signal),
-    [normalizedTags, page],
+    (signal: AbortSignal) => videoApi.sources({ ids: appliedIds, sort: sortParam, page, pageSize: PAGE_SIZE }, signal),
+    [appliedIds, sortParam, page],
   );
   const sourceQuery = useCoalescedQuery({ enabled: canList, queryKey, load: loadSources });
   const items = sourceQuery.data?.items ?? [];
@@ -87,31 +84,32 @@ export function VideoResourcesPage() {
     }));
   }, [setSourceData]);
 
-  const applyTagOptions = useCallback((next: Array<{ tag: string; count: number }>) => {
-    setTagOptions(next);
-    const valid = new Set(next.map((item) => tagKey(item.tag)));
-    setSelectedTags((current) => {
-      const filtered = current.filter((tag) => valid.has(tag));
-      if (filtered.length === current.length) return current;
-      setPage(1);
-      return filtered;
-    });
-  }, [setPage, setSelectedTags, setTagOptions]);
-  const refreshTags = useCallback(async () => applyTagOptions(await videoApi.sourceTags()), [applyTagOptions]);
+  // 選項：篩選用的來源名稱、對話框用的既有標籤；來源被刪掉時把它從選擇裡拿掉
+  const applyOptions = useCallback(([opts, tags]: Awaited<ReturnType<typeof loadOptions>>) => {
+    if (opts) {
+      const valid = new Set(opts.items.map((o) => o.id));
+      const keep = (current: string[]) => (current.every((id) => valid.has(id)) ? current : current.filter((id) => valid.has(id)));
+      setSourceOptions(opts.items);
+      setDraftIds(keep);
+      setAppliedIds(keep);
+    }
+    if (tags) setTagOptions(tags);
+  }, [setSourceOptions, setDraftIds, setAppliedIds, setTagOptions]);
+  const refreshOptions = useCallback(() => loadOptions().then(applyOptions), [applyOptions]);
   useEffect(() => {
-    if (canList) void videoApi.sourceTags().then(applyTagOptions, () => undefined);
+    if (canList) void loadOptions().then(applyOptions);
     if (canList) void videoApi.storageStatus().then(setStorage, () => undefined);
-  }, [applyTagOptions, canList]);
+  }, [applyOptions, canList]);
   // 狀態變化（worker 探測、其他人修改）：有界地重新取得目前這一頁，不建立任何播放
   useEffect(() => {
     if (!canList) return undefined;
     return subscribeDatasourceInvalidation((payload) => {
       if (payload.tags.includes('table:video_sources')) {
         backgroundRefresh();
-        void refreshTags().catch(() => undefined);
+        void refreshOptions();
       }
     });
-  }, [canList, backgroundRefresh, refreshTags]);
+  }, [canList, backgroundRefresh, refreshOptions]);
   useEffect(() => {
     if (!canList) return undefined;
     const timer = window.setInterval(backgroundRefresh, 30_000);
@@ -125,49 +123,18 @@ export function VideoResourcesPage() {
 
   const replaceItem = (next: VideoSourceItem) => setItems((list) => list.map((s) => (s.id === next.id ? next : s)));
 
-  const toggleEnabled = async (s: VideoSourceItem) => {
-    if (!auth.require('events.video.configure') || pending[s.id]) return;
-    setPending((p) => ({ ...p, [s.id]: s.enabled ? '停用中…' : '啟用中…' }));
-    try {
-      replaceItem(await videoApi.setSourceEnabled(s.id, { expectedVersion: s.version, enabled: !s.enabled }));
-      notify(s.enabled ? `已停用「${s.name}」：停止本站接入與新錄影，歷史保留` : `已啟用「${s.name}」：連線由背景套用，狀態會在清單更新`, 'success');
-    } catch (reason) {
-      notify(`「${s.name}」${s.enabled ? '停用' : '啟用'}失敗：${(reason as Error).message}`, 'error');
-      refresh();
-    } finally {
-      setPending((p) => {
-        const next = { ...p };
-        delete next[s.id];
-        return next;
-      });
-    }
+  const search = () => {
+    setAppliedIds(draftIds);
+    setPage(1);
   };
-
-  const duplicate = async (s: VideoSourceItem) => {
-    if (!auth.require('events.video.configure') || pending[s.id]) return;
-    setPending((p) => ({ ...p, [s.id]: '複製中…' }));
-    try {
-      const copy = await videoApi.duplicateSource(s.id, { expectedVersion: s.version, requestId: newRequestId() });
-      // 新列直接出現在原來源下方並標示；依排序可能不在這一頁，提示可用名稱找到它
-      setItems((list) => {
-        const i = list.findIndex((x) => x.id === s.id);
-        const next = list.filter((x) => x.id !== copy.id);
-        next.splice(i + 1, 0, copy);
-        return next;
-      });
-      setTotal((t) => t + 1);
-      setHighlight(copy.id);
-      void refreshTags().catch(() => undefined);
-      notify(`已複製為「${copy.name}」（新的來源，沒有沿用原來源的歷史）；重新整理後依名稱排序`, 'success');
-    } catch (reason) {
-      notify(`複製失敗：${(reason as Error).message}`, 'error');
-    } finally {
-      setPending((p) => {
-        const next = { ...p };
-        delete next[s.id];
-        return next;
-      });
-    }
+  const reset = () => {
+    setDraftIds([]);
+    setAppliedIds([]);
+    setPage(1);
+  };
+  const toggleSort = (key: SortKey) => {
+    setSort((current) => (current.key === key ? { key, desc: !current.desc } : { key, desc: false }));
+    setPage(1);
   };
 
   const askDelete = async (s: VideoSourceItem) => {
@@ -189,30 +156,32 @@ export function VideoResourcesPage() {
     }
   };
 
-  const openHistory = (s?: VideoSourceItem) => {
-    if (!auth.require('events.video-history.view')) return;
-    const now = Date.now();
-    openVideoHistory({ from: now - HOUR, to: now, sourceIds: s ? [s.id] : [] });
-  };
-
   const tagSuggestions = useMemo(() => tagOptions.map((t) => t.tag), [tagOptions]);
+  const filterOptions = useMemo(() => sourceOptions.map((o) => ({ value: o.id, label: o.name })), [sourceOptions]);
+  const draftNames = draftIds.map((id) => sourceOptions.find((o) => o.id === id)?.name ?? id);
+  const filtered = appliedIds.length > 0;
+  const th = 'px-5 py-4 font-normal';
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-text-primary">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-[15rem] flex-col gap-1.5">
-          <span className="text-body-xs text-text-tertiary">來源標籤</span>
-          <SiteMultiSelect
-            ariaLabel="來源標籤"
-            allLabel="全部標籤"
-            values={normalizedTags}
-            options={tagOptions.map(({ tag, count }) => ({ value: tagKey(tag), label: tag, badge: count }))}
-            onChange={(tags) => { setOpenMenuId(null); setSelectedTags(tags); setPage(1); }}
-            className="w-[min(22rem,calc(100vw-2rem))]"
-          />
-        </label>
+    <div className="flex h-full min-h-0 flex-col gap-5 p-4 text-text-primary">
+      <div className="flex flex-wrap items-center gap-3">
+        <SiteMultiSelect
+          ariaLabel="選擇影像來源"
+          allLabel="選擇影像來源"
+          values={draftIds}
+          options={filterOptions}
+          onChange={setDraftIds}
+          hideAllOption
+          maxSelections={200}
+          filterPlaceholder="搜尋影像來源"
+          emptyLabel="還沒有影像來源"
+          triggerLabel={draftNames.length ? draftNames.join('、') : undefined}
+          className="w-[15.5rem]"
+        />
+        <IconButton label="搜尋" icon={<Search />} disabled={sameIds(draftIds, appliedIds)} onPress={search} />
+        <Button variant="outlined" leadingIcon={<RotateCw />} disabled={!draftIds.length && !appliedIds.length} onPress={reset}>重置</Button>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <Button hierarchy={storage?.paused ? 'danger' : 'subordinate'} variant="outlined" leadingIcon={<HardDrive />} onPress={() => void openStorage()}>
+          <Button hierarchy={storage?.paused ? 'danger' : 'superior'} variant="outlined" leadingIcon={<Save />} onPress={() => void openStorage()}>
             {storage?.paused ? `錄影暫停：${storage.paused.reason}` : '錄影儲存狀態'}
           </Button>
           <Button leadingIcon={<Plus />} onPress={() => auth.require('events.video.configure') && setDialog({ source: null })}>
@@ -231,58 +200,64 @@ export function VideoResourcesPage() {
               <Button variant="text" className="ml-2" onPress={refresh}>重試</Button>
             </div>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border-quaternary">
-            <table className="w-full min-w-[78rem] text-left text-body-s">
-              <thead className="sticky top-0 z-10 bg-surface-primary text-text-tertiary">
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+            <table className="w-full min-w-[56rem] table-fixed text-left text-body-m">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[10%]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-surface-sub-background text-text-tertiary">
                 <tr className="border-b border-border-quaternary">
-                  <th className="px-3 py-3 font-normal">名稱</th>
-                  <th className="px-3 py-3 font-normal">來源標籤</th>
-                  <th className="px-3 py-3 font-normal">載具／位置</th>
-                  <th className="px-3 py-3 font-normal">啟用</th>
-                  <th className="px-3 py-3 font-normal">上線狀態</th>
-                  <th className="px-3 py-3 font-normal">儲存錄影</th>
-                  <th className="px-3 py-3 font-normal">實際錄影</th>
-                  <th className="px-3 py-3 font-normal">來源</th>
-                  <th className="px-3 py-3 font-normal">操作</th>
+                  <th className={th} aria-sort={sort.key === 'name' ? (sort.desc ? 'descending' : 'ascending') : undefined}><SortHeader label="影像名稱" active={sort.key === 'name'} desc={sort.desc} onSort={() => toggleSort('name')} /></th>
+                  <th className={th}>來源標籤</th>
+                  <th className={th}>載具/位置</th>
+                  <th className={th}>啟用狀態</th>
+                  <th className={th} aria-sort={sort.key === 'status' ? (sort.desc ? 'descending' : 'ascending') : undefined}><SortHeader label="連線狀態" active={sort.key === 'status'} desc={sort.desc} onSort={() => toggleSort('status')} /></th>
+                  <th className={th}>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((s) => {
                   const online = onlineBadge(s);
                   const rec = recordingBadge(s);
-                  const busy = pending[s.id];
+                  const statusTip = [s.actualStatus.reason, `錄影：${rec.text}`, s.connection?.maskedUrl].filter(Boolean).join('\n');
                   return (
-                    <tr key={s.id} className={`border-b border-border-quaternary align-top ${highlight === s.id ? 'bg-surface-theme' : ''}`}>
-                      <td className="max-w-[14rem] px-3 py-3"><span className="block truncate" title={s.name}>{s.name}</span>{highlight === s.id ? <span className="text-body-xs text-text-theme">新複製</span> : null}</td>
-                      <td className="max-w-[12rem] px-3 py-3">
-                        <div className="flex flex-wrap gap-1">{s.tags.length ? s.tags.map((t) => <span key={t} className="rounded bg-surface-secondary px-1.5 py-0.5 text-body-xs text-text-secondary">{t}</span>) : <span className="text-body-xs text-text-disabled">—</span>}</div>
+                    <tr key={s.id} className={cn('border-b border-border-quaternary', highlight === s.id && 'bg-surface-theme-light')}>
+                      <td className="px-5 py-3"><span className="block truncate" title={s.name}>{s.name}</span></td>
+                      <td className="px-5 py-3"><span className="block truncate" title={s.tags.join('、')}>{s.tags.length ? s.tags.join('、') : <span className="text-text-disabled">—</span>}</span></td>
+                      <td className="px-5 py-3"><span className="block truncate">{[s.vehicleCode, s.location].filter(Boolean).join('・') || <span className="text-text-disabled">—</span>}</span></td>
+                      <td className="px-5 py-3"><Badge size="md" tone={s.enabled ? 'theme' : 'neutral'}>{s.enabled ? '啟用' : '未啟用'}</Badge></td>
+                      <td className="px-5 py-3"><span title={statusTip}><Badge size="md" tone={ONLINE_TONE[online.tone]}>{online.text}</Badge></span></td>
+                      <td className="px-5 py-2">
+                        <div className="flex items-center gap-1">
+                          <IconButton size="small" hierarchy="subordinate" variant="standard" label={`編輯 ${s.name}`} icon={<Pencil />} onPress={() => auth.require('events.video.configure') && setDialog({ source: s })} />
+                          <IconButton size="small" hierarchy="subordinate" variant="standard" label={`刪除 ${s.name}`} icon={<Trash2 />} onPress={() => void askDelete(s)} />
+                        </div>
                       </td>
-                      <td className="px-3 py-3 text-body-xs text-text-secondary">{[s.vehicleCode, s.location].filter(Boolean).join('・') || '—'}</td>
-                      <td className="px-3 py-3">
-                        <Switch checked={s.enabled} aria-label={`${s.name} ${s.enabled ? '停用' : '啟用'}`} disabled={Boolean(busy)} onCheckedChange={() => void toggleEnabled(s)} />
-                        {busy ? <span className="ml-2 text-body-xs text-text-tertiary">{busy}</span> : null}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className={`rounded px-1.5 py-0.5 text-body-xs ${BADGE_TONE[online.tone]}`} title={s.actualStatus.reason ?? undefined}>{online.text}</span>
-                        {s.enabled && s.actualStatus.state === 'offline' && s.actualStatus.reason && !s.actualStatus.stale ? <span className="mt-1 block max-w-[12rem] truncate text-body-xs text-text-quaternary" title={s.actualStatus.reason}>{s.actualStatus.reason}</span> : null}
-                      </td>
-                      <td className="px-3 py-3 text-body-xs">{s.recordingEnabled ? '儲存' : '不儲存'}</td>
-                      <td className="px-3 py-3"><span className={`rounded px-1.5 py-0.5 text-body-xs ${BADGE_TONE[rec.tone]}`}>{rec.text}</span></td>
-                      <td className="max-w-[16rem] px-3 py-3"><span className="block truncate font-mono text-body-xs text-text-tertiary" title={s.connection?.maskedUrl}>{s.connection?.maskedUrl ?? '—'}</span></td>
-                      <td className="px-3 py-3"><RowActions source={s} open={openMenuId === s.id} busy={Boolean(busy)} onToggle={() => setOpenMenuId((current) => current === s.id ? null : s.id)} onEdit={() => auth.require('events.video.configure') && setDialog({ source: s })} onDuplicate={() => void duplicate(s)} onHistory={() => openHistory(s)} onDelete={() => void askDelete(s)} /></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <ListState loading={sourceQuery.initialLoading} error={sourceQuery.initialError} empty={!items.length} emptyText={normalizedTags.length === 0 ? '還沒有影像來源' : '沒有符合標籤的來源'} onRetry={refresh} />
-            {!items.length && !sourceQuery.initialLoading && !sourceQuery.initialError && normalizedTags.length === 0 ? (
-              <div className="-mt-8 pb-10 text-center">
-                <PrimaryButton onClick={() => auth.require('events.video.configure') && setDialog({ source: null })}>新增第一個來源</PrimaryButton>
+            {sourceQuery.initialError ? (
+              <div role="alert" className="py-14 text-center text-body-s text-status-error-emphasis">
+                {sourceQuery.initialError}
+                <Button variant="text" className="ml-3" onPress={refresh}>重試</Button>
+              </div>
+            ) : !items.length && sourceQuery.initialLoading ? (
+              <div className="py-14 text-center text-body-s text-text-quaternary">載入中…</div>
+            ) : !items.length ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-14 text-center text-text-secondary">
+                <p className="text-headline-4">( ¯ㄴ¯ )ง</p>
+                <p className="text-body-m">{filtered ? '沒有符合的影像來源' : '尚未新增影像來源'}</p>
               </div>
             ) : null}
           </div>
-          <ListFooter page={page} total={total} pageSize={PAGE_SIZE} onPage={(next) => { setOpenMenuId(null); setPage(next); }} summary={<>共 {total} 個來源</>} />
+          {total > PAGE_SIZE ? <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} className="justify-center" /> : null}
         </>
       )}
 
@@ -299,7 +274,7 @@ export function VideoResourcesPage() {
               setTotal((t) => t + 1);
               setHighlight(saved.id);
             } else replaceItem(saved);
-            void refreshTags().catch(() => undefined);
+            void refreshOptions();
             notify(isNew ? `已新增「${saved.name}」${saved.recordingEnabled ? '，啟用後由伺服器持續錄影' : ''}` : `已儲存「${saved.name}」`, 'success');
           }}
         />
@@ -308,21 +283,31 @@ export function VideoResourcesPage() {
         <Dialog
           title="刪除影像來源"
           onClose={() => setDeleting(null)}
-          footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => {
-            const d = deleting;
-            setDeleting(null);
-            void videoApi.deleteSource(d.source.id, d.source.version).then(
-              () => { notify(`已刪除「${d.source.name}」；已錄的影片仍可在歷史錄影查詢`, 'success'); refresh(); void refreshTags().catch(() => undefined); },
-              (reason: Error) => notify(reason.message, 'error'),
-            );
-          }}>刪除</PrimaryButton></>}
+          footer={
+            <>
+              <Button hierarchy="subordinate" variant="standard" onPress={() => setDeleting(null)}>取消</Button>
+              <Button
+                hierarchy="danger"
+                onPress={() => {
+                  const d = deleting;
+                  setDeleting(null);
+                  void videoApi.deleteSource(d.source.id, d.source.version).then(
+                    () => { notify(`已刪除「${d.source.name}」；已錄的影片仍可在歷史影像紀錄查詢`, 'success'); refresh(); void refreshOptions(); },
+                    (reason: Error) => notify(reason.message, 'error'),
+                  );
+                }}
+              >
+                刪除
+              </Button>
+            </>
+          }
         >
           <div className="space-y-2 text-body-s text-text-secondary">
             <p>確定刪除「{deleting.source.name}」？</p>
             <ul className="list-disc space-y-1 pl-5 text-text-tertiary">
-              <li>{deleting.impact.tabs ? `${deleting.impact.tabs} 個監控標籤頁（${deleting.impact.tiles} 格）引用這個來源：格子保留位置，顯示「來源已刪除」，可重新選擇。` : '沒有監控標籤頁引用這個來源。'}</li>
+              <li>{deleting.impact.tabs ? `${deleting.impact.tabs} 個監控分頁（${deleting.impact.tiles} 個視窗）引用這個來源：視窗保留位置，顯示「來源已刪除」，可重新選擇。` : '沒有監控分頁引用這個來源。'}</li>
               <li>{deleting.impact.stopsRecording ? '會停止這個來源的錄影（完成目前片段）。' : '這個來源目前沒有錄影。'}</li>
-              <li>已錄的影片與稽核紀錄保留，仍可從「歷史錄影」查詢；刪除影片需要另外的權限。</li>
+              <li>已錄的影片與稽核紀錄保留，仍可從「歷史影像紀錄」查詢；刪除影片需要另外的權限。</li>
             </ul>
           </div>
         </Dialog>

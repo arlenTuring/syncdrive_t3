@@ -117,7 +117,7 @@ const src = (patch: Partial<VideoSourceItem>) => ({ enabled: true, recordingEnab
 
 describe('來源與格子狀態', () => {
   it('啟用、上線、錄影分開；過期狀態不沿用綠燈', () => {
-    expect(onlineBadge(src({})).text).toBe('線上');
+    expect(onlineBadge(src({})).text).toBe('上線');
     expect(onlineBadge(src({ actualStatus: { state: 'online', stale: true } })).text).toBe('狀態待更新');
     expect(onlineBadge(src({ enabled: false })).text).toBe('已停用');
     expect(onlineBadge(src({ actualStatus: { state: 'offline', reason: '連線逾時', stale: false } })).text).toBe('離線');

@@ -1,5 +1,6 @@
-import { HardDrive, LayoutDashboard, Maximize2, Minimize2, MoreHorizontal, Plus } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { Copy, HardDrive, LayoutGrid, Maximize, Minimize2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { AnchoredPopover } from '../../lib/AnchoredPopover';
 import { useAuth } from '../access-control/AuthContext';
 import { subscribeDatasourceInvalidation } from '../dashboard/utils/datasourceInvalidationBus';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton, Toast } from '../media-groups/dialogs';
@@ -7,7 +8,7 @@ import { videoApi, type Bootstrap, type Tab, type Tile } from './api';
 import { openVideoResources } from './history-link';
 import { CANVAS } from './layout';
 import { LayoutEditorDialog } from './LayoutEditorDialog';
-import { SourcePicker } from './SourcePicker';
+import { SourceSelectDialog } from './SourceSelectDialog';
 import { TileView } from './TileView';
 import { Button, cn, fieldClass, IconButton, MENU_PANEL_CLASS, menuItemClass } from '../../components/ui';
 
@@ -31,7 +32,9 @@ function writePref(pref: { tabId?: string; audio?: string }) {
 }
 
 /**
- * 即時影像監控：使用者自訂的監控標籤頁（每頁 1–12 格、自由版面），格子綁定既有來源後播放。
+ * 即時影像監控：使用者自訂的監控分頁（每頁 1–12 個視窗、自由版面），視窗綁定既有來源後播放。
+ * 畫面照設計稿 2026-11-20：底線分頁（名稱旁「⋯」：重新命名、複製、刪除）、右側「編輯版面」與全螢幕圖示、
+ * 視窗是左上角編號的圓角卡片，選來源用「選擇影像來源」對話框。分頁順序用拖曳調整。
  *
  * - 版面與綁定存在後端，所有有權帳號看到相同版面；目前所在標籤頁與開聲音的格子是個人偏好（只存在這台瀏覽器）。
  * - 平常監看時版面鎖定，要調整請按「編輯版面」；螢幕大小改變只等比例縮放整個畫布，不重排。
@@ -46,7 +49,7 @@ export function VideoMonitorPage() {
   const [error, setError] = useState('');
   const [tabId, setTabId] = useState<string | undefined>(() => readPref().tabId);
   const [audioTile, setAudioTile] = useState<string | undefined>(() => readPref().audio);
-  const [rebinding, setRebinding] = useState<Tile | null>(null);
+  const [picking, setPicking] = useState<Tile | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ tab: Tab | null } | null>(null);
@@ -148,7 +151,7 @@ export function VideoMonitorPage() {
 
   const bind = (tile: Tile, sourceId: string | null) => {
     if (!current || !requireConfigure()) return;
-    void mutate(() => videoApi.bindTile(current.id, tile.id, { expectedVersion: tile.version, sourceId }), sourceId ? undefined : '已清除這一格的來源');
+    void mutate(() => videoApi.bindTile(current.id, tile.id, { expectedVersion: tile.version, sourceId }), sourceId ? undefined : '已清除這個視窗的來源');
   };
 
   const onDrop = (event: DragEvent, targetId: string) => {
@@ -160,15 +163,6 @@ export function VideoMonitorPage() {
     ids.splice(ids.indexOf(targetId), 0, from);
     void mutate(() => videoApi.reorderTabs(ids));
   };
-  const move = (tab: Tab, delta: number) => {
-    const ids = tabs.map((t) => t.id);
-    const i = ids.indexOf(tab.id);
-    const j = i + delta;
-    if (j < 0 || j >= ids.length || !requireConfigure()) return;
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-    void mutate(() => videoApi.reorderTabs(ids));
-  };
-
   const enterFull = (tab: Tab) => {
     setMenu(null);
     setTabId(tab.id);
@@ -188,97 +182,86 @@ export function VideoMonitorPage() {
     else if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
   };
 
-  // 畫布依保存的長寬比等比例 fit 到可用區；格子座標依畫布換算，不依影片大小。全螢幕時可用區來自全螢幕容器內的畫布區
+  // 畫布依保存的長寬比換算高度；格子座標依畫布換算，不依影片大小。
+  // 一般頁面：寬度鋪滿可用區（設計稿 2026-11-20），比可用區高就往下捲；全螢幕：整張畫布塞進螢幕（不捲動）。
   const aspect = current?.canvasAspectRatio ?? 16 / 9;
-  const minW = full ? 0 : 640;
-  const fitW = Math.max(minW, Math.min(stage.w, stage.h > 0 ? stage.h * aspect : stage.w));
+  const fitW = full ? Math.min(stage.w, stage.h > 0 ? stage.h * aspect : stage.w) : Math.max(640, stage.w);
   const fitH = fitW / aspect;
   const storage = data?.storage;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 text-text-primary">
-      <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-1" role="tablist" aria-label="監控標籤頁">
-          {tabs.map((tab, index) => (
-            <div
-              key={tab.id}
-              draggable={renaming !== tab.id}
-              onDragStart={() => (dragging.current = tab.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => onDrop(e, tab.id)}
-              className={`relative flex shrink-0 items-center rounded-lg ${tab.id === current?.id ? 'bg-surface-secondary text-text-primary' : 'text-text-tertiary hover:bg-link-standard'}`}
-            >
-              {renaming === tab.id ? (
-                <input
-                  autoFocus
-                  defaultValue={tab.name}
-                  maxLength={60}
-                  aria-label="標籤頁名稱"
-                  onBlur={(e) => {
-                    setRenaming(null);
-                    const name = e.target.value.trim();
-                    if (name && name !== tab.name) void mutate(() => videoApi.updateTab(tab.id, { name, expectedVersion: tab.version }));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    if (e.key === 'Escape') setRenaming(null);
-                  }}
-                  className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-36')}
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-end gap-2 overflow-x-auto" role="tablist" aria-label="監控分頁">
+          {tabs.map((tab) => {
+            const active = tab.id === current?.id;
+            return (
+              <div
+                key={tab.id}
+                draggable={renaming !== tab.id}
+                onDragStart={() => (dragging.current = tab.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => onDrop(e, tab.id)}
+                className={cn('relative flex shrink-0 items-center gap-1 px-3 py-2', active ? 'text-text-theme' : 'text-text-tertiary hover:text-text-primary')}
+              >
+                {renaming === tab.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={tab.name}
+                    maxLength={60}
+                    aria-label="分頁名稱"
+                    onBlur={(e) => {
+                      setRenaming(null);
+                      const name = e.target.value.trim();
+                      if (name && name !== tab.name) void mutate(() => videoApi.updateTab(tab.id, { name, expectedVersion: tab.version }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      if (e.key === 'Escape') setRenaming(null);
+                    }}
+                    className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-36')}
+                  />
+                ) : (
+                  <button type="button" role="tab" aria-selected={active} title={`${tab.tileCount} 個視窗`} onClick={() => setTabId(tab.id)} onDoubleClick={() => requireConfigure() && setRenaming(tab.id)} className={active ? 'text-body-m-bold' : 'text-body-m'}>
+                    {tab.name}
+                  </button>
+                )}
+                <TabMenu
+                  name={tab.name}
+                  open={menu === tab.id}
+                  onToggle={(open) => setMenu(open ? tab.id : null)}
+                  items={[
+                    { label: '重新命名', icon: <Pencil />, run: () => requireConfigure() && setRenaming(tab.id) },
+                    { label: '複製', icon: <Copy />, run: () => requireConfigure() && void mutate(async () => setTabId((await videoApi.duplicateTab(tab.id)).id), '已複製分頁（引用相同來源，不複製來源或錄影）') },
+                    { label: '刪除', icon: <Trash2 />, run: () => requireConfigure() && setDeleting(tab), divided: true },
+                  ]}
                 />
-              ) : (
-                <button type="button" role="tab" aria-selected={tab.id === current?.id} onClick={() => setTabId(tab.id)} onDoubleClick={() => requireConfigure() && setRenaming(tab.id)} className="h-8 px-3 text-body-s">
-                  {tab.name}
-                  <span className="ml-1.5 text-body-xs text-text-quaternary">{tab.tileCount} 格</span>
-                </button>
-              )}
-              <IconButton size="small" hierarchy="subordinate" variant="standard" label={`${tab.name} 更多操作`} onPress={() => setMenu(menu === tab.id ? null : tab.id)} icon={<MoreHorizontal />} />
-              {menu === tab.id ? (
-                <div role="menu" className={cn(MENU_PANEL_CLASS, 'absolute top-full left-0 z-30 mt-1 w-40')}>
-                  {[
-                    ['此標籤頁全螢幕', () => enterFull(tab)],
-                    ['編輯版面', () => requireConfigure() && setEditor({ tab })],
-                    ['改名', () => requireConfigure() && setRenaming(tab.id)],
-                    ['複製', () => requireConfigure() && mutate(async () => setTabId((await videoApi.duplicateTab(tab.id)).id), '已複製標籤頁（引用相同來源，不複製來源或錄影）')],
-                    ['往左移', () => move(tab, -1), index === 0],
-                    ['往右移', () => move(tab, 1), index === tabs.length - 1],
-                    ['刪除', () => requireConfigure() && setDeleting(tab)],
-                  ].map(([label, fn, disabled]) => (
-                    <button key={label as string} type="button" role="menuitem" disabled={Boolean(disabled)} onClick={() => { setMenu(null); (fn as () => void)(); }} className={cn(menuItemClass(), 'min-h-8', label === '刪除' && 'text-status-error-emphasis')}>
-                      {label as string}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-          <Button hierarchy="subordinate" variant="standard" aria-label="新增監控標籤頁" leadingIcon={<Plus />} onPress={() => requireConfigure() && setEditor({ tab: null })}>新增標籤頁</Button>
+                {active ? <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-theme" aria-hidden /> : null}
+              </div>
+            );
+          })}
+          <Button hierarchy="subordinate" variant="standard" aria-label="新增分頁" leadingIcon={<Plus />} onPress={() => requireConfigure() && setEditor({ tab: null })}>新增分頁</Button>
         </div>
-        {current ? (
-          <Button variant="outlined" aria-label="標籤頁全螢幕" title="標籤頁全螢幕" leadingIcon={<Maximize2 />} onPress={() => enterFull(current)}>全螢幕</Button>
-        ) : null}
-        {current ? (
-          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<LayoutDashboard />} onPress={() => requireConfigure() && setEditor({ tab: current })}>編輯版面</Button>
-        ) : null}
-        {storage ? (
-          <Button
-            hierarchy={storage.paused ? 'danger' : 'subordinate'}
-            variant="outlined"
-            onPress={() => openVideoResources()}
-            title="錄影儲存設定在「影像資源管理」"
-            leadingIcon={<HardDrive />}
-          >
-            {storage.paused ? `錄影暫停：${storage.paused.reason}` : `錄影用量 ${storage.usagePct}%`}
+        <span className="shrink-0 text-body-xs text-text-quaternary" aria-live="polite">{saving ? '儲存中…' : ''}</span>
+        {storage?.paused ? (
+          <Button hierarchy="danger" variant="outlined" onPress={() => openVideoResources()} title="錄影儲存設定在「影像來源管理」" leadingIcon={<HardDrive />}>
+            錄影暫停：{storage.paused.reason}
           </Button>
         ) : null}
-        <span className="shrink-0 text-body-xs text-text-quaternary" aria-live="polite">{saving ? '儲存中…' : ''}</span>
+        {current ? (
+          <Button hierarchy="subordinate" variant="outlined" leadingIcon={<LayoutGrid />} onPress={() => requireConfigure() && setEditor({ tab: current })}>編輯版面</Button>
+        ) : null}
+        {current ? (
+          <IconButton hierarchy="subordinate" variant="standard" label="分頁全螢幕" icon={<Maximize />} onPress={() => enterFull(current)} />
+        ) : null}
       </div>
 
       {error ? <ErrorLine text={`載入失敗：${error}`} /> : null}
       {!data && !error ? <p className="py-16 text-center text-text-quaternary">載入中…</p> : null}
       {data && !current ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-tertiary">
-          <p>還沒有監控標籤頁</p>
-          <PrimaryButton onClick={() => requireConfigure() && setEditor({ tab: null })}>新增標籤頁</PrimaryButton>
+          <p>還沒有監控分頁</p>
+          <PrimaryButton onClick={() => requireConfigure() && setEditor({ tab: null })}>新增分頁</PrimaryButton>
         </div>
       ) : null}
       {current ? (
@@ -287,25 +270,22 @@ export function VideoMonitorPage() {
           className={full ? `flex flex-col bg-surface-sub-background ${full === 'web' ? 'fixed inset-0 z-[200]' : 'h-full w-full'}` : 'flex min-h-0 flex-1 flex-col'}
         >
           {full ? (
-            <div className="flex h-10 shrink-0 items-center gap-3 px-3 text-body-s text-text-primary">
-              <span className="truncate font-medium">{current.name}</span>
-              <span className="shrink-0 text-body-xs text-text-quaternary">
-                {full === 'web' ? '網頁滿版（瀏覽器工具列仍會顯示）' : '標籤頁全螢幕'}・{current.tileCount} 格{zoomTile ? '・單格放大中' : ''}
-              </span>
+            <div className="flex shrink-0 items-center gap-3 px-3 py-2 text-text-primary" title={full === 'web' ? '網頁滿版：瀏覽器不支援全螢幕，瀏覽器工具列仍會顯示' : undefined}>
+              <span className="truncate text-body-l">{current.name}</span>
               {zoomTile ? (
                 <Button hierarchy="subordinate" variant="outlined" onPress={() => setZoomTile(null)}>返回整頁</Button>
               ) : null}
               <Button hierarchy="subordinate" variant="tonal" className="ml-auto" leadingIcon={<Minimize2 />} onPress={exitFull}>離開全螢幕</Button>
             </div>
           ) : null}
-          <div ref={stageRef} className={full ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1' : 'min-h-0 flex-1 overflow-auto'}>
+          <div ref={stageRef} className={full ? 'flex min-h-0 flex-1 items-start justify-center overflow-hidden p-1' : '-mx-1.5 -mt-1.5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden'}>
             <div className="relative mx-auto shrink-0" style={{ width: fitW, height: fitH }} aria-label={`${current.name} 監控畫面`}>
               {current.tiles.map((tile) => {
                 const zoomed = zoomTile === tile.id;
                 return (
                   <div
                     key={tile.id}
-                    className={`absolute p-1 ${zoomTile && !zoomed ? 'invisible' : ''}`}
+                    className={`absolute p-1.5 ${zoomTile && !zoomed ? 'invisible' : ''}`}
                     style={
                       zoomed
                         ? { left: 0, top: 0, width: '100%', height: '100%', zIndex: 10 }
@@ -315,13 +295,11 @@ export function VideoMonitorPage() {
                     <TileView
                       tile={tile}
                       source={tile.sourceId ? optionById.get(tile.sourceId) : undefined}
-                      options={options}
                       active
                       audio={audioTile === tile.id}
                       canConfigure={canConfigure}
                       onAudio={() => setAudioTile(audioTile === tile.id ? undefined : tile.id)}
-                      onBind={(sourceId) => bind(tile, sourceId)}
-                      onSettings={() => requireConfigure() && setRebinding(tile)}
+                      onSettings={() => requireConfigure() && setPicking(tile)}
                       pageFullscreen={Boolean(full)}
                       zoomed={zoomed}
                       onZoom={() => setZoomTile(zoomed ? null : tile.id)}
@@ -333,16 +311,21 @@ export function VideoMonitorPage() {
           </div>
 
           {/* 對話框與通知放在全螢幕容器內，原生全螢幕時才看得到 */}
-          {rebinding ? (
-            <RebindDialog
-              tile={rebinding}
+          {picking ? (
+            <SourceSelectDialog
               options={options}
-              onClose={() => setRebinding(null)}
+              value={picking.sourceId}
+              onClose={() => setPicking(null)}
               onPick={(sourceId) => {
-                const tile = rebinding;
-                setRebinding(null);
+                const tile = picking;
+                setPicking(null);
                 bind(tile, sourceId);
               }}
+              onClear={picking.sourceId ? () => {
+                const tile = picking;
+                setPicking(null);
+                bind(tile, null);
+              } : undefined}
             />
           ) : null}
           {notice ? <Toast key={notice.id} text={notice.text} tone={notice.tone} /> : null}
@@ -358,12 +341,12 @@ export function VideoMonitorPage() {
             setEditor(null);
             setTabId(saved.id);
             void load();
-            notify(editor.tab ? '已儲存版面' : '已新增標籤頁', 'success');
+            notify(editor.tab ? '已儲存版面' : '已新增分頁', 'success');
           }}
         />
       ) : null}
       {deleting ? (
-        <Dialog title="刪除監控標籤頁" onClose={() => setDeleting(null)} footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => { const t = deleting; setDeleting(null); void mutate(() => videoApi.deleteTab(t.id, t.version), '已刪除標籤頁'); }}>刪除</PrimaryButton></>}>
+        <Dialog title="刪除監控分頁" onClose={() => setDeleting(null)} footer={<><GhostButton onClick={() => setDeleting(null)}>取消</GhostButton><PrimaryButton danger onClick={() => { const t = deleting; setDeleting(null); void mutate(() => videoApi.deleteTab(t.id, t.version), '已刪除分頁'); }}>刪除</PrimaryButton></>}>
           <p className="text-body-s text-text-secondary">確定刪除「{deleting.name}」？只移除這個版面，不刪影像來源，也不影響任何來源的錄影。</p>
         </Dialog>
       ) : null}
@@ -372,24 +355,53 @@ export function VideoMonitorPage() {
   );
 }
 
-/** 已綁定格子的設定：只能重新選來源或清除綁定；取消沒有任何副作用 */
-function RebindDialog({ tile, options, onClose, onPick }: { tile: Tile; options: import('./api').SourceOption[]; onClose: () => void; onPick: (sourceId: string | null) => void }) {
-  const [picked, setPicked] = useState<string | null>(tile.sourceId);
-  const current = options.find((o) => o.id === tile.sourceId);
+/**
+ * 分頁名稱旁的「⋯」選單：重新命名、複製、刪除（設計稿 2026-11-20）。
+ * 按鈕跟著分頁文字顏色、不加底色，所以不用 IconButton（34×34 會撐高分頁列）；
+ * 選單用浮層，分頁列是橫向捲動區，放在裡面會被裁掉。
+ */
+function TabMenu({
+  name,
+  open,
+  onToggle,
+  items,
+}: {
+  name: string;
+  open: boolean;
+  onToggle: (open: boolean) => void;
+  items: Array<{ label: string; icon: ReactNode; run: () => unknown; divided?: boolean }>;
+}) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
   return (
-    <Dialog
-      title={`第 ${tile.position + 1} 格的來源`}
-      onClose={onClose}
-      footer={
-        <>
-          <Button hierarchy="danger" variant="text" className="mr-auto" onPress={() => onPick(null)}>清除綁定</Button>
-          <GhostButton onClick={onClose}>取消</GhostButton>
-          <PrimaryButton onClick={() => (picked && picked !== tile.sourceId ? onPick(picked) : onClose())} disabled={!picked}>套用</PrimaryButton>
-        </>
-      }
-    >
-      <p className="mb-2 text-body-xs text-text-tertiary">目前：{current ? current.name : tile.sourceId ? '來源已刪除' : '未設定'}。換來源不改版面，也不影響任何來源的錄影；連線與錄影請到「影像資源管理」設定。</p>
-      <SourcePicker options={options} value={picked} onPick={setPicked} className="w-full" />
-    </Dialog>
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        aria-label={`${name} 更多操作`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onToggle(!open)}
+        className="flex size-6 items-center justify-center rounded hover:bg-link-standard"
+      >
+        <MoreHorizontal className="size-4" aria-hidden />
+      </button>
+      <AnchoredPopover open={open} anchorRef={anchorRef} onClose={() => onToggle(false)} role="menu" ariaLabel={`${name} 操作`} align="start" className={cn(MENU_PANEL_CLASS, 'w-40')}>
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onToggle(false);
+              item.run();
+            }}
+            className={cn(menuItemClass(), item.divided && 'border-t border-border-quaternary', '[&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-text-tertiary')}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </AnchoredPopover>
+    </>
   );
 }

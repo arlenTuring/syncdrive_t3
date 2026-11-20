@@ -100,6 +100,21 @@ export function addressOf(rev: Pick<VideoSourceRevision, 'protocol' | 'host' | '
  * - 密碼只寫不讀：回應只有 hasPassword；空白保留原密碼，明確 clearPassword 才清除。
  * - 所有修改帶 expectedVersion，後端拒絕舊版本覆蓋較新的設定。
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * 來源清單排序（白名單，不接受任意欄位）：name＝名稱、status＝連線狀態（上線 → 其他 → 停用），後綴 _desc 反向。
+ * 同值一律再依名稱、id 排，分頁才穩定。
+ */
+export function sourceOrder(sort: unknown): string {
+  const [key, dir] = String(sort ?? '').split('_');
+  const d = dir === 'desc' ? 'DESC' : 'ASC';
+  if (key === 'status') {
+    return `CASE WHEN NOT s.enabled THEN 2 WHEN s.actual_status->>'state' = 'online' THEN 0 ELSE 1 END ${d}, lower(s.name), s.id`;
+  }
+  return `lower(s.name) ${d}, s.id ${d}`;
+}
+
 @Injectable()
 export class VideoConfigService {
   constructor(
@@ -239,21 +254,25 @@ export class VideoConfigService {
     const tags = [...new Set(String(query.tags ?? '').split(',').map((t) => tagKey(t)).filter(Boolean))];
     if (tags.length > 100) throw new BadRequestException('來源標籤篩選最多 100 個');
     if (tags.length) where.push(`EXISTS (SELECT 1 FROM jsonb_array_elements_text(s.tags) tg WHERE lower(regexp_replace(normalize(tg, NFKC), '\\s+', ' ', 'g')) = ANY(${add(tags)}::text[]))`);
+    // 指定來源（清單上方的「選擇影像來源」）：只接受 uuid，其餘忽略
+    const ids = [...new Set(String(query.ids ?? '').split(',').map((v) => v.trim().toLowerCase()).filter((v) => UUID_RE.test(v)))];
+    if (ids.length > 200) throw new BadRequestException('來源篩選最多 200 個');
+    if (ids.length) where.push(`s.id = ANY(${add(ids)}::uuid[])`);
     const base = `FROM video_sources s LEFT JOIN video_source_revisions r ON r.id = s.current_revision_id WHERE ${where.join(' AND ')}`;
     const [{ total }] = await this.dataSource.query(`SELECT count(*)::int AS total ${base}`, params);
-    const rows: Array<{ id: string }> = await this.dataSource.query(`SELECT s.id ${base} ORDER BY lower(s.name), s.id LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params);
-    const ids = rows.map((r) => r.id);
-    const sources = ids.length ? await this.dataSource.manager.find(VideoSource, { where: { id: In(ids) } }) : [];
+    const rows: Array<{ id: string }> = await this.dataSource.query(`SELECT s.id ${base} ORDER BY ${sourceOrder(query.sort)} LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params);
+    const pageIds = rows.map((r) => r.id);
+    const sources = pageIds.length ? await this.dataSource.manager.find(VideoSource, { where: { id: In(pageIds) } }) : [];
     const revIds = sources.map((s) => s.currentRevisionId).filter(Boolean) as string[];
     const revisions = revIds.length ? await this.dataSource.manager.find(VideoSourceRevision, { where: { id: In(revIds) } }) : [];
     const revById = new Map(revisions.map((r) => [r.id, r]));
-    const usage = await this.usage(this.dataSource.manager, ids);
+    const usage = await this.usage(this.dataSource.manager, pageIds);
     const byId = new Map(sources.map((s) => [s.id, s]));
     return {
       page,
       pageSize,
       total,
-      items: ids.map((id) => byId.get(id)!).map((s) => this.presentSource(s, revById.get(s.currentRevisionId ?? '') ?? null, usage.get(s.id) ?? { tiles: 0, tabs: 0 })),
+      items: pageIds.map((id) => byId.get(id)!).map((s) => this.presentSource(s, revById.get(s.currentRevisionId ?? '') ?? null, usage.get(s.id) ?? { tiles: 0, tabs: 0 })),
     };
   }
 

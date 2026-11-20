@@ -18,6 +18,7 @@ export function SegmentFollower({
   muted = true,
   onDrift,
   onJump,
+  fit = 'contain',
 }: {
   manifest: Manifest | null;
   cursor: number | null;
@@ -26,6 +27,8 @@ export function SegmentFollower({
   muted?: boolean;
   onDrift?: (ms: number | null) => void;
   onJump?: (t: number) => void;
+  /** cover＝鋪滿裁切（歷史影像格子）；contain＝完整顯示（事件回放） */
+  fit?: 'contain' | 'cover';
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -95,7 +98,7 @@ export function SegmentFollower({
   const next = !segment && cursor !== null ? nextAvailable(manifest, cursor) : null;
   return (
     <div className="relative h-full w-full bg-surface-sub-background">
-      <video ref={videoRef} crossOrigin="use-credentials" playsInline muted={muted} className={`h-full w-full object-contain ${segment ? '' : 'invisible'}`} />
+      <video ref={videoRef} crossOrigin="use-credentials" playsInline muted={muted} className={`h-full w-full ${fit === 'cover' ? 'object-cover' : 'object-contain'} ${segment ? '' : 'invisible'}`} />
       {!segment ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-body-s text-text-tertiary">
           <span>{!manifest ? '載入中…' : gap?.kind === 'expired' ? '此時段的錄影已到期刪除' : gap?.kind === 'recording' ? '錄製中，片段完成後可回放' : gap?.kind === 'failed' ? '此時段錄影損壞' : '此時段沒有錄影'}</span>

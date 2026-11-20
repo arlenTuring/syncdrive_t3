@@ -1,14 +1,13 @@
 import { X } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { SiteSelect } from '../../components/SiteSelect';
 import { useAuth } from '../access-control/AuthContext';
-import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/dialogs';
+import { ErrorLine } from '../media-groups/dialogs';
 import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { videoApi, type ConnectionInput, type Protocol, type SourceTest, type VideoSourceItem } from './api';
 import { tagKey } from './layout';
-import { Button, Checkbox, IconButton, SegmentedControl, fieldClass } from '../../components/ui';
+import { Button, Checkbox, Dialog, Field, IconButton, SegmentedControl, Switch, TextInput } from '../../components/ui';
 
-const field = fieldClass({ size: 'md' });
 const PROTOCOLS: Array<{ value: Protocol; label: string }> = [
   { value: 'rtsp', label: 'RTSP' },
   { value: 'rtsps', label: 'RTSPS' },
@@ -21,18 +20,34 @@ const PROTOCOLS: Array<{ value: Protocol; label: string }> = [
 const TAGS_MAX = 10;
 const TAG_LENGTH_MAX = 30;
 
-function Labeled({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+/** 對話框裡的一個區塊：圓角外框＋標題（設計稿 2026-11-20） */
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-body-xs text-text-tertiary">{label}</span>
+    <section className="flex flex-col gap-3 rounded-xl border border-border-quaternary p-4">
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <h3 className="text-body-m-bold text-text-primary">{title}</h3>
+        {action}
+      </div>
       {children}
-      {hint ? <span className="text-body-xs text-text-quaternary">{hint}</span> : null}
-    </label>
+    </section>
+  );
+}
+
+/** 開關卡片：左邊標題＋說明，右邊開關 */
+function SwitchCard({ title, description, checked, onChange, disabled }: { title: string; description: string; checked: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-border-quaternary px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="text-body-m text-text-primary">{title}</div>
+        <div className="mt-0.5 text-body-s text-text-tertiary">{description}</div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} aria-label={title} />
+    </div>
   );
 }
 
 /** 來源標籤輸入：Enter 或逗號加入、Backspace 移除最後一個；全半形與大小寫不同的視為同一個 */
-function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (next: string[]) => void; suggestions: string[] }) {
+function TagInput({ id, value, onChange, suggestions }: { id?: string; value: string[]; onChange: (next: string[]) => void; suggestions: string[] }) {
   const [draft, setDraft] = useState('');
   const listId = useId();
   const add = (raw: string) => {
@@ -43,7 +58,7 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
     onChange([...value, tag]);
   };
   return (
-    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-lg border border-border-quaternary bg-surface-secondary px-2 py-1 focus-within:border-border-theme">
+    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-lg border border-transparent bg-surface-secondary px-2 py-1 focus-within:border-border-theme">
       {value.map((t) => (
         <span key={t} className="inline-flex items-center gap-1 rounded-md bg-surface-theme px-2 py-0.5 text-body-xs text-text-theme">
           {t}
@@ -71,7 +86,8 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
           add(draft);
           setDraft('');
         }}
-        placeholder={value.length ? '' : '例如：前門、PMS01、月台（Enter 加入）'}
+        placeholder={value.length ? '' : '請輸入（Enter 加入）'}
+        id={id}
         aria-label="來源標籤"
         className="h-7 min-w-[8rem] flex-1 bg-transparent text-body-s text-text-primary outline-none placeholder:text-text-quaternary"
         maxLength={TAG_LENGTH_MAX}
@@ -82,10 +98,12 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 }
 
 /**
- * 新增／編輯影像來源（只有這裡能測試連線與預覽）。
- * - 「儲存錄影」預設勾選：來源啟用後就由伺服器持續錄影，與是否放進監控格、是否開著網頁無關。
+ * 新增／編輯影像來源（設計稿 2026-11-20；只有這裡能測試連線與預覽）。
+ * - 左邊：基本設定、連線設定（參數／網址）、設備屬性、啟用來源連線、儲存全時錄影；右邊：即時連線預覽。
+ * - 「儲存全時錄影」預設開：來源啟用後就由伺服器持續錄影，與是否放進監控格、是否開著網頁無關。
  * - 名稱、標籤、啟用、儲存錄影的修改不會重啟串流；改連線或鏡頭關聯才建立新版本。
  * - 密碼只寫不讀：編輯時空白＝保留原密碼，要移除需明確勾選。預覽是暫時的、不會錄影，關閉就釋放。
+ * - 必填沒填完時「新增」不能按；編輯時沒動到連線就不檢查連線欄位（沿用原設定）。
  */
 export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { source: VideoSourceItem | null; tagSuggestions: string[]; onClose: () => void; onSaved: (saved: VideoSourceItem) => void }) {
   const auth = useAuth();
@@ -128,6 +146,12 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
   const connectionTouched = connMode === 'url'
     ? Boolean(form.url.trim())
     : !editing || form.protocol !== editing.connection?.protocol || form.host !== editing.connection?.host || form.port !== String(editing.connection?.port ?? '') || form.path !== editing.connection?.path || form.username !== (editing.connection?.username ?? '') || Boolean(form.password) || form.clearPassword;
+  const connectionReady = editing && !connectionTouched
+    ? true
+    : connMode === 'url'
+      ? Boolean(form.url.trim())
+      : Boolean(form.host.trim() && form.port.trim() && form.path.trim());
+  const ready = Boolean(form.name.trim() && form.tags.length && connectionReady);
 
   const runTest = async () => {
     setTesting(true);
@@ -146,7 +170,7 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
 
   const save = async () => {
     setError('');
-    if (!form.name.trim()) return setError('請輸入影像名稱');
+    if (!ready) return;
     setSaving(true);
     try {
       const meta = {
@@ -177,129 +201,113 @@ export function SourceDialog({ source, tagSuggestions, onClose, onSaved }: { sou
 
   return (
     <Dialog
-      title={editing ? `編輯來源：${editing.name}` : '新增影像來源'}
-      width="max-w-4xl"
-      onClose={saving ? undefined : onClose}
+      title={editing ? '編輯來源' : '新增來源'}
+      widthClassName="max-w-5xl"
+      busy={saving}
+      onClose={onClose}
       footer={
         <>
-          <GhostButton onClick={onClose} disabled={saving}>取消</GhostButton>
-          <PrimaryButton onClick={() => void save()} disabled={saving}>{saving ? '儲存中…' : editing ? '儲存來源' : '新增來源'}</PrimaryButton>
+          <Button hierarchy="subordinate" variant="standard" onPress={onClose} disabled={saving}>取消</Button>
+          <Button onPress={() => void save()} disabled={!ready || saving}>{saving ? '儲存中…' : editing ? '儲存' : '新增'}</Button>
         </>
       }
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <Labeled label="影像名稱">
-            <input className={field} value={form.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} placeholder="例如：一號車前鏡頭" />
-          </Labeled>
-          <div className="flex flex-col gap-1">
-            <span className="text-body-xs text-text-tertiary">來源標籤（分類用，最多 10 個；與監控標籤頁無關）</span>
-            <TagInput value={form.tags} onChange={(tags) => set({ tags })} suggestions={tagSuggestions} />
-          </div>
-          <SegmentedControl
-            label="連線設定方式"
-            value={connMode}
-            onChange={setConnMode}
-            options={[{ id: 'fields' as const, label: '分欄輸入' }, { id: 'url' as const, label: '完整網址' }]}
-          />
-          {connMode === 'url' ? (
-            <Labeled label="完整網址" hint="例如 rtsp://帳號:密碼@10.20.0.10:554/cameras/front01/main；儲存後只顯示遮蔽後的網址">
-              <input className={field} value={form.url} onChange={(e) => set({ url: e.target.value })} placeholder={editing?.connection?.maskedUrl ?? 'rtsp://…'} autoComplete="off" />
-            </Labeled>
-          ) : (
-            <div className="grid grid-cols-[8rem_minmax(0,1fr)_6rem] gap-2">
-              <Labeled label="協定">
-                <SiteSelect aria-label="協定" value={form.protocol} options={PROTOCOLS} onChange={(e) => set({ protocol: e.target.value as Protocol })} size="md" className="w-full" />
-              </Labeled>
-              <Labeled label="主機">
-                <input className={field} value={form.host} onChange={(e) => set({ host: e.target.value })} placeholder="10.20.0.10" />
-              </Labeled>
-              <Labeled label="連接埠">
-                <input className={field} value={form.port} inputMode="numeric" onChange={(e) => set({ port: e.target.value.replace(/\D/g, '') })} placeholder="預設" />
-              </Labeled>
-              <div className="col-span-3">
-                <Labeled label="路徑">
-                  <input className={field} value={form.path} onChange={(e) => set({ path: e.target.value })} placeholder="/cameras/front01/main" />
-                </Labeled>
-              </div>
-              <div className="col-span-3 grid grid-cols-2 gap-2">
-                <Labeled label="帳號（選填）" hint="攝影機沒有設帳密就留空">
-                  <input className={field} value={form.username} onChange={(e) => set({ username: e.target.value })} autoComplete="off" />
-                </Labeled>
-                <Labeled label="密碼（選填）" hint={editing?.connection?.hasPassword ? (form.clearPassword ? '儲存後移除已存的密碼' : '已設定；空白＝保留原密碼') : undefined}>
-                  <input className={field} type="password" value={form.password} disabled={form.clearPassword} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" placeholder={editing?.connection?.hasPassword && !form.clearPassword ? '••••••（保留）' : ''} />
-                </Labeled>
+        <div className="flex flex-col gap-4">
+          <Section title="基本設定">
+            <Field label="影像名稱" required>
+              {(id) => <TextInput id={id} value={form.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} placeholder="請輸入" />}
+            </Field>
+            <Field label="來源標籤" required hint="分類用，最多 10 個；與監控分頁無關">
+              {(id) => <TagInput id={id} value={form.tags} onChange={(tags) => set({ tags })} suggestions={tagSuggestions} />}
+            </Field>
+          </Section>
+
+          <Section
+            title="連線設定"
+            action={<SegmentedControl label="連線設定方式" value={connMode} onChange={setConnMode} options={[{ id: 'fields' as const, label: '參數' }, { id: 'url' as const, label: '網址' }]} />}
+          >
+            {connMode === 'url' ? (
+              <Field label="完整網址" required={!editing} hint={editing ? '空白＝沿用目前的連線；儲存後只顯示遮蔽後的網址' : '儲存後只顯示遮蔽後的網址'}>
+                {(id) => <TextInput id={id} value={form.url} onChange={(e) => set({ url: e.target.value })} placeholder={editing?.connection?.maskedUrl ?? 'rtsp://…'} autoComplete="off" />}
+              </Field>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="協定" required>
+                    <SiteSelect aria-label="協定" value={form.protocol} options={PROTOCOLS} onChange={(e) => set({ protocol: e.target.value as Protocol })} size="md" className="w-full" />
+                  </Field>
+                  <Field label="主機 IP / Domain" required>
+                    {(id) => <TextInput id={id} value={form.host} onChange={(e) => set({ host: e.target.value })} placeholder="請輸入" />}
+                  </Field>
+                  <Field label="連接埠" required>
+                    {(id) => <TextInput id={id} value={form.port} inputMode="numeric" onChange={(e) => set({ port: e.target.value.replace(/\D/g, '') })} placeholder="請輸入" />}
+                  </Field>
+                </div>
+                <Field label="路徑" required>
+                  {(id) => <TextInput id={id} value={form.path} onChange={(e) => set({ path: e.target.value })} placeholder="請輸入" />}
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="帳號">
+                    {(id) => <TextInput id={id} value={form.username} onChange={(e) => set({ username: e.target.value })} autoComplete="off" placeholder="請輸入" />}
+                  </Field>
+                  <Field label="密碼" hint={editing?.connection?.hasPassword ? (form.clearPassword ? '儲存後移除已存的密碼' : '已設定；空白＝保留原密碼') : undefined}>
+                    {(id) => <TextInput id={id} type="password" value={form.password} disabled={form.clearPassword} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password" placeholder={editing?.connection?.hasPassword && !form.clearPassword ? '••••••（保留）' : '請輸入'} />}
+                  </Field>
+                </div>
                 {editing?.connection?.hasPassword ? (
-                  <label className="col-span-2 flex items-center gap-2 text-body-xs text-text-tertiary">
-                    <Checkbox size="small" checked={form.clearPassword} onCheckedChange={(clearPassword) => set({ clearPassword, password: '' })} />
-                    移除已存的密碼（攝影機改成不需密碼時勾選；清空帳號也會一併移除）
-                  </label>
+                  <Checkbox size="small" label="移除已存的密碼（攝影機改成不需密碼時勾選；清空帳號也會一併移除）" checked={form.clearPassword} onCheckedChange={(clearPassword) => set({ clearPassword, password: '' })} />
                 ) : null}
-              </div>
+              </>
+            )}
+          </Section>
+
+          <Section title="設備屬性">
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="載具識別">
+                {(id) => <TextInput id={id} value={form.vehicleCode} onChange={(e) => set({ vehicleCode: e.target.value })} placeholder="請輸入" />}
+              </Field>
+              <Field label="攝影機識別">
+                {(id) => <TextInput id={id} value={form.cameraId} onChange={(e) => set({ cameraId: e.target.value })} placeholder="請輸入" />}
+              </Field>
+              <Field label="位置/視角">
+                {(id) => <TextInput id={id} value={form.location} onChange={(e) => set({ location: e.target.value })} placeholder="請輸入" />}
+              </Field>
             </div>
-          )}
-          <div className="grid grid-cols-3 gap-2">
-            <Labeled label="載具（選填）">
-              <input className={field} value={form.vehicleCode} onChange={(e) => set({ vehicleCode: e.target.value })} placeholder="PMS01" />
-            </Labeled>
-            <Labeled label="攝影機識別（選填）">
-              <input className={field} value={form.cameraId} onChange={(e) => set({ cameraId: e.target.value })} placeholder="front01" />
-            </Labeled>
-            <Labeled label="位置／視角（選填）">
-              <input className={field} value={form.location} onChange={(e) => set({ location: e.target.value })} placeholder="車頭" />
-            </Labeled>
-          </div>
-          <div className="space-y-2 rounded-lg bg-surface-secondary px-3 py-2.5 text-body-s">
-            <label className="flex items-start gap-2">
-              <Checkbox checked={form.enabled} onCheckedChange={(enabled) => set({ enabled })} />
-              <span>
-                啟用來源
-                <span className="block text-body-xs text-text-tertiary">停用會停止本站接入、即時播放與新錄影（不是關掉攝影機電源），已錄的影片保留。</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2">
-              <Checkbox checked={form.recordingEnabled} onCheckedChange={(recordingEnabled) => set({ recordingEnabled })} />
-              <span>
-                儲存錄影
-                <span className="block text-body-xs text-text-tertiary">
-                  來源啟用時由伺服器持續錄影，與是否放進監控畫面、是否開著網頁無關；取消只停止新的錄影，不刪除已錄的影片。
-                  {!canRecord ? ' 變更這個設定需要錄影管理權限。' : ''}
-                </span>
-              </span>
-            </label>
-            <p className="text-body-xs text-text-quaternary">錄影品質：原始（保留來源碼流，不重新壓縮）。</p>
-          </div>
+          </Section>
+
+          <SwitchCard title="啟用來源連線" description="開啟後開始接收串流。停用時停止本站接入（不影響硬體電源）" checked={form.enabled} onChange={(enabled) => set({ enabled })} />
+          <SwitchCard
+            title="儲存全時錄影"
+            description={`啟用後由伺服器持續錄影。取消僅停止新錄影，不刪除歷史影片${canRecord ? '' : '（變更需要錄影管理權限）'}`}
+            checked={form.recordingEnabled}
+            onChange={(recordingEnabled) => set({ recordingEnabled })}
+          />
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
+        <section className="flex min-h-[20rem] flex-col gap-3 rounded-xl border border-border-quaternary p-4">
+          <div className="flex items-center gap-3">
+            <h3 className="flex-1 text-body-m-bold text-text-primary">即時連線預覽</h3>
+            <span className="text-body-s text-text-tertiary">暫時預覽，不寫入存檔</span>
             <Button hierarchy="subordinate" variant="outlined" onPress={() => void runTest()} disabled={testing}>
-              {testing ? '測試中…' : '測試連線並預覽'}
+              {testing ? '測試中…' : '測試並預覽'}
             </Button>
-            <span className="text-body-xs text-text-quaternary">預覽是暫時的，不會錄影</span>
           </div>
-          <div className="aspect-video overflow-hidden rounded-lg border border-border-quaternary bg-surface-sub-background">
+          <div className="relative min-h-[14rem] flex-1 overflow-hidden rounded-lg bg-surface-sub-background">
             {test?.status === 'ready' && test.hlsUrl ? (
-              <LivePlayer hlsUrl={test.hlsUrl} whepUrl={test.whepUrl} onStats={setPreviewStats} />
-            ) : (
-              <div className="flex h-full items-center justify-center px-4 text-center text-body-s text-text-quaternary">
-                {test?.status === 'failed' ? <span className="text-status-error-emphasis">{test.error}</span> : testing ? '連線中…' : '按「測試連線並預覽」查看畫面'}
+              <LivePlayer hlsUrl={test.hlsUrl} whepUrl={test.whepUrl} onStats={setPreviewStats} className="absolute inset-0" />
+            ) : test?.status === 'failed' || testing ? (
+              <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-body-s">
+                {test?.status === 'failed' ? <span className="text-status-error-emphasis">{test.error}</span> : <span className="text-text-quaternary">連線中…</span>}
               </div>
-            )}
+            ) : null}
           </div>
           {test ? (
-            <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-y-1 text-body-xs">
-              <dt className="text-text-quaternary">位址</dt>
-              <dd className="truncate text-text-secondary">{test.maskedUrl}</dd>
-              <dt className="text-text-quaternary">編碼</dt>
-              <dd className="text-text-secondary">{test.tracks.length ? test.tracks.join('、') : '未知'}</dd>
-              <dt className="text-text-quaternary">解析度</dt>
-              <dd className="text-text-secondary">{previewStats?.width ? `${previewStats.width}×${previewStats.height}` : '未知'}</dd>
-              <dt className="text-text-quaternary">fps</dt>
-              <dd className="text-text-secondary">{previewStats?.fps ?? '未知'}</dd>
-            </dl>
+            <p className="truncate text-body-xs text-text-tertiary" title={test.maskedUrl}>
+              {[test.maskedUrl, test.tracks.length ? test.tracks.join('、') : '編碼未知', previewStats?.width ? `${previewStats.width}×${previewStats.height}` : '', previewStats?.fps ? `${previewStats.fps} fps` : ''].filter(Boolean).join('・')}
+            </p>
           ) : null}
-        </div>
+        </section>
       </div>
       {error ? <ErrorLine text={error} /> : null}
     </Dialog>

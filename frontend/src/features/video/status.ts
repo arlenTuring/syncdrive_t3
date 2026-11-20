@@ -19,7 +19,7 @@ export function onlineBadge(source: Pick<VideoSourceItem, 'enabled' | 'actualSta
   const st = source.actualStatus ?? {};
   if (!source.enabled) return { text: '已停用', tone: 'zinc' };
   if (st.stale || !st.state) return { text: '狀態待更新', tone: 'zinc' };
-  if (st.state === 'online') return { text: '線上', tone: 'green' };
+  if (st.state === 'online') return { text: '上線', tone: 'green' };
   if (st.state === 'media_unavailable') return { text: '影像服務無法連線', tone: 'red' };
   if (st.state === 'offline' || st.state === 'error') return { text: '離線', tone: 'red' };
   return { text: '狀態待更新', tone: 'zinc' };
@@ -56,4 +56,12 @@ export function tileBadges(source: SourceOption | undefined, bound: boolean, sta
   if (stats?.state === 'error') return [{ text: stats.error ?? '連線中斷', tone: 'red' }];
   if (source.state === 'offline' || source.state === 'error') return [{ text: '來源離線，等待恢復', tone: 'red' }];
   return [{ text: '連線中', tone: 'sky' }];
+}
+
+/** 名稱膠囊的兩段：載具代號｜鏡頭名稱（名稱開頭已有代號就去掉，避免重複）；沒有代號只回名稱 */
+export function pillLabelParts(name: string, vehicleCode: string | null | undefined): [string | null, string] {
+  const code = vehicleCode?.trim();
+  if (!code) return [null, name];
+  const rest = name.startsWith(code) ? name.slice(code.length).trim() : name;
+  return [code, rest || name];
 }

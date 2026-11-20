@@ -38,12 +38,13 @@ describe('影像管理紀錄', () => {
     act(() => root!.render(createElement(VideoHistoryPage, { request: { from, to, sourceIds: ['src-1'], at: from + 30_000 } }))); await settle();
     expect(api.calls.some((call) => /availability|calendar|playback-sessions|manifest/.test(call))).toBe(false);
     expect(api.calls.some((call) => call.includes('/tabs'))).toBe(false);
-    expect(document.body.textContent).toContain('進入本頁不會自動查詢或播放');
+    expect(document.body.textContent).toContain('尚未條件篩選');
     expect([...document.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]')].map((node) => node.value.replace('.000', ''))).toEqual([
       toLocalInput(from, 'Asia/Taipei'),
       toLocalInput(to, 'Asia/Taipei'),
     ]);
-    const search = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.trim() === '搜尋')!;
+    const search = searchButton();
+    expect(search.disabled).toBe(false);
     act(() => search.click()); await settle();
     expect(api.calls.some((call) => call.includes('/recordings/availability'))).toBe(true);
     expect(api.calls.some((call) => call.includes('/playback-sessions'))).toBe(true);
@@ -63,25 +64,25 @@ describe('影像管理紀錄', () => {
     });
     vi.stubGlobal('fetch', fetch); box = document.createElement('div'); document.body.appendChild(box); root = createRoot(box);
     act(() => root!.render(createElement(VideoHistoryPage, { request: { from: Date.now() - 60_000, to: Date.now(), sourceIds: ids } }))); await settle();
-    act(() => buttonByText('搜尋').click()); await settle();
+    act(() => searchButton().click()); await settle();
     const availability = calls.find((call) => call.includes('/recordings/availability'))!;
     const url = new URL(availability.replace(/^GET /, ''), 'http://x');
     expect(url.searchParams.get('sourceIds')?.split(',')).toEqual(ids);
     expect(calls.some((call) => call.includes('/tabs'))).toBe(false);
   });
 
-  it('來源對話框取消不套用，確定只套用選擇且不自動查詢', async () => {
+  it('來源下拉只套用選擇、不自動查詢；沒有時間區間時不能搜尋', async () => {
     const api = backend(); vi.stubGlobal('fetch', api.fetch); box = document.createElement('div'); document.body.appendChild(box); root = createRoot(box);
     act(() => root!.render(createElement(VideoHistoryPage))); await settle();
-    act(() => document.querySelector<HTMLButtonElement>('[aria-label="選擇影像來源"]')!.click());
-    const source = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.includes('前鏡頭'))!;
-    act(() => source.click());
-    act(() => buttonByText('取消').click());
-    expect(document.body.textContent).toContain('0/12');
-    act(() => document.querySelector<HTMLButtonElement>('[aria-label="選擇影像來源"]')!.click());
-    act(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.includes('前鏡頭'))!.click());
-    act(() => buttonByText('確定（1/12）').click());
-    expect(document.body.textContent).toContain('1/12');
+    expect(searchButton().disabled).toBe(true);
+    expect(buttonByText('重置').disabled).toBe(true);
+    const trigger = document.querySelector<HTMLButtonElement>('[aria-label="選擇影像來源"]')!;
+    expect(trigger.textContent).toContain('選擇影像來源');
+    act(() => trigger.click());
+    act(() => [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((node) => node.textContent?.includes('前鏡頭'))!.click());
+    expect(trigger.textContent).toContain('前鏡頭');
+    expect(searchButton().disabled).toBe(true);
+    expect(buttonByText('重置').disabled).toBe(false);
     expect(api.calls.some((call) => /availability|playback-sessions/.test(call))).toBe(false);
   });
 
@@ -106,15 +107,19 @@ describe('影像管理紀錄', () => {
     vi.stubGlobal('fetch', fetch);
     box = document.createElement('div'); document.body.appendChild(box); root = createRoot(box);
     act(() => root!.render(createElement(VideoHistoryPage, { request: { from: Date.now() - 60_000, to: Date.now(), sourceIds: ['src-1'] } }))); await settle();
-    act(() => buttonByText('搜尋').click());
+    act(() => searchButton().click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 1)));
     act(() => buttonByText('重置').click());
     await settle();
     expect(availabilitySignal?.aborted).toBe(true);
     expect(calls.some((call) => call.endsWith('/playback-sessions'))).toBe(false);
-    expect(document.body.textContent).toContain('進入本頁不會自動查詢或播放');
+    expect(document.body.textContent).toContain('尚未條件篩選');
   });
 });
+
+function searchButton() {
+  return document.querySelector<HTMLButtonElement>('button[aria-label="搜尋"]')!;
+}
 
 function buttonByText(label: string) {
   return [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.trim() === label)!;

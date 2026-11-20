@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
-import { VideoConfigService } from './video-config.service';
+import { sourceOrder, VideoConfigService } from './video-config.service';
 
 describe('VideoConfigService 來源標籤查詢', () => {
   const build = () => {
@@ -22,5 +22,15 @@ describe('VideoConfigService 來源標籤查詢', () => {
     const { service } = build();
     const tags = Array.from({ length: 101 }, (_, index) => `t${index}`).join(',');
     await expect(service.querySources({ tags })).rejects.toBeInstanceOf(BadRequestException);
+  });
+  it('指定來源只接受 uuid，與標籤一起用 AND；排序只走白名單', async () => {
+    const { service, query } = build();
+    const id = '0f8e2a9c-1b2d-4e3f-8a7b-6c5d4e3f2a1b';
+    await service.querySources({ ids: `${id.toUpperCase()}, x; DROP TABLE video_sources,${id}`, sort: 'status_desc' });
+    expect(query.mock.calls[0][0]).toContain('s.id = ANY($1::uuid[])');
+    expect(query.mock.calls[0][1]).toEqual([[id]]);
+    expect(query.mock.calls[1][0]).toContain("CASE WHEN NOT s.enabled THEN 2 WHEN s.actual_status->>'state' = 'online' THEN 0 ELSE 1 END DESC");
+    expect(sourceOrder('name_desc')).toBe('lower(s.name) DESC, s.id DESC');
+    expect(sourceOrder('s.name; DROP')).toBe('lower(s.name) ASC, s.id ASC');
   });
 });

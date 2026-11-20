@@ -21,6 +21,7 @@ export function SiteMultiSelect({
   filterPlaceholder,
   hideAllOption = false,
   triggerLabel,
+  emptyLabel = '目前沒有來源標籤',
 }: {
   values: string[];
   options: SiteMultiSelectOption[];
@@ -35,6 +36,8 @@ export function SiteMultiSelect({
   hideAllOption?: boolean;
   /** 取代按鈕上的「第一項 +N」摘要；選項另外列在畫面上時用 */
   triggerLabel?: string;
+  /** 清單沒有任何選項時的文字 */
+  emptyLabel?: string;
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -125,7 +128,7 @@ export function SiteMultiSelect({
             </button>
           );
         })}
-        {visible.length === 0 ? <div className={MENU_EMPTY_CLASS}>{keyword ? '沒有符合的項目' : '目前沒有來源標籤'}</div> : null}
+        {visible.length === 0 ? <div className={MENU_EMPTY_CLASS}>{keyword ? '沒有符合的項目' : emptyLabel}</div> : null}
       </AnchoredPopover>
     </>
   );

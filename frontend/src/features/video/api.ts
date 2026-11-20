@@ -55,7 +55,9 @@ export type SourceOption = {
 };
 
 export type SourcePage = { page: number; pageSize: number; total: number; items: VideoSourceItem[] };
-export type SourceQuery = { page?: number; pageSize?: number; tags?: string[] };
+/** sort：name／status，加 _desc 反向 */
+export type SourceSort = 'name' | 'name_desc' | 'status' | 'status_desc';
+export type SourceQuery = { page?: number; pageSize?: number; tags?: string[]; ids?: string[]; sort?: SourceSort };
 
 /** 格子：0–10000 正規化座標（與螢幕像素無關） */
 export type Tile = { id: string; position: number; sourceId: string | null; displayName: string | null; x: number; y: number; w: number; h: number; version: number };
@@ -164,7 +166,7 @@ export const videoApi = {
   reorderTabs: (ids: string[]) => send<Tab[]>('POST', '/tabs/reorder', { ids }),
   duplicateTab: (id: string) => send<Tab>('POST', `/tabs/${id}/duplicate`),
   sources: (query: SourceQuery, signal?: AbortSignal) =>
-    v('/sources', { page: query.page, pageSize: query.pageSize, tags: query.tags?.length ? query.tags.join(',') : undefined }, signal) as Promise<SourcePage>,
+    v('/sources', { page: query.page, pageSize: query.pageSize, tags: query.tags?.length ? query.tags.join(',') : undefined, ids: query.ids?.length ? query.ids.join(',') : undefined, sort: query.sort }, signal) as Promise<SourcePage>,
   sourceTags: (signal?: AbortSignal) => v('/source-tags', undefined, signal) as Promise<Array<{ tag: string; count: number }>>,
   sourceOptions: (includeDeleted = false, signal?: AbortSignal) => v('/source-options', { includeDeleted: includeDeleted || undefined }, signal) as Promise<{ items: SourceOption[]; total: number; timeZone: string }>,
   source: (id: string) => v(`/sources/${id}`) as Promise<VideoSourceItem>,

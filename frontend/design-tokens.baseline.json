@@ -617,9 +617,7 @@
     "arbitrary": 1
   },
   "features/psd-control/components/DoorMonitorCard.tsx": {
-    "hex": 3,
-    "arbitrary": 5,
-    "palette": 1
+    "arbitrary": 2
   },
   "features/psd-control/PsdControlPage.tsx": {
     "hex": 1,
@@ -933,20 +931,20 @@
   "features/vehicle-run-history/QueryPanel.tsx": {
     "button": 2
   },
-  "features/video/SourcePicker.tsx": {
-    "button": 2
+  "features/video/SourceSelectDialog.tsx": {
+    "button": 1
   },
   "features/video/status.ts": {
     "palette": 1
   },
   "features/video/VideoHistoryPage.tsx": {
-    "button": 2
+    "button": 4
   },
   "features/video/VideoMonitorPage.tsx": {
-    "button": 2
+    "button": 3
   },
   "features/video/VideoResourcesPage.tsx": {
-    "button": 4
+    "button": 1
   },
   "features/virtual-fence-management/components/FenceFormPanel.tsx": {
     "arbitrary": 1
