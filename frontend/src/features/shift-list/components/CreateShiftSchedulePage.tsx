@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   checkOperationShiftNameUnique,
+  completeOperationShift,
   createOperationShiftDraft,
   deleteOperationShift,
   fetchOperationShiftDetail,
@@ -631,9 +632,21 @@ export function CreateShiftSchedulePage({
     goToStep(next);
   };
 
+  /** 完成建立：先存檔，再把製作狀態標成「已完成」；後端安全重驗不過就留在草稿區並說明原因 */
   const handleFinish = () => {
     if (!canGoNext || draft.currentStep !== 7) return;
-    void flushAutoSave().finally(onBack);
+    void (async () => {
+      try {
+        await flushAutoSave();
+        const id = savedShiftIdRef.current ?? editShiftId;
+        if (id) await completeOperationShift(id);
+        onSavedDraft?.();
+      } catch (e) {
+        await systemAlert(`班表已存在草稿區，但還不能標成已完成：${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        onBack();
+      }
+    })();
   };
 
   return (

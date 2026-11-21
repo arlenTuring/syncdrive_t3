@@ -46,6 +46,7 @@ export const AUDIT_ACTIONS = {
   SHIFT_DUPLICATE: op('複製班表', 'SHIFT'),
   SHIFT_PUBLISH: op('發布／撤回班表', 'SHIFT'),
   SHIFT_DEPLOY: op('部署班表', 'SHIFT'),
+  SHIFT_STOP: op('停用班表', 'SHIFT'),
   TIME_TEMPLATE_CREATE: op('建立時間模板', 'TIME_TEMPLATE'),
   TIME_TEMPLATE_UPDATE: op('修改時間模板', 'TIME_TEMPLATE'),
   TIME_TEMPLATE_DELETE: op('刪除時間模板', 'TIME_TEMPLATE'),

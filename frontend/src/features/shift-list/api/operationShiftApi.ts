@@ -179,6 +179,41 @@ export async function deployOperationShift(
   return res.json() as Promise<OperationShiftListItem>;
 }
 
+/** 停用使用中的班表（部署新班表前的第一步；後端同時暫停調度，已發出的訂單照常跑完） */
+export async function stopOperationShift(
+  shiftId: string,
+  payload?: { reviewer_name?: string },
+  backendUrl = resolveOperationShiftBackendUrl(),
+): Promise<OperationShiftListItem> {
+  const res = await fetch(
+    `${backendUrl}/syncdrive-api/operation-shift/detail/${encodeURIComponent(shiftId)}/stop`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload ?? {}),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, '停用班表失敗'));
+  }
+  return res.json() as Promise<OperationShiftListItem>;
+}
+
+/** 班表完成建立：製作狀態標成「已完成」（後端會再做一次安全重驗） */
+export async function completeOperationShift(
+  shiftId: string,
+  backendUrl = resolveOperationShiftBackendUrl(),
+): Promise<OperationShiftListItem> {
+  const res = await fetch(
+    `${backendUrl}/syncdrive-api/operation-shift/detail/${encodeURIComponent(shiftId)}/publish`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, '標成已完成失敗'));
+  }
+  return res.json() as Promise<OperationShiftListItem>;
+}
+
 export async function checkOperationShiftNameUnique(
   name: string,
   excludeShiftId?: string,

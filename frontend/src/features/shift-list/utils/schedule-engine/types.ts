@@ -641,7 +641,8 @@ export type ShiftScheduleMaintenanceTaskBinding = {
 /** 寫入 operation_shifts.body 的班表產出（Step 5 生成、Step 6 確認） */
 /** 排班產出儲存版本號：引擎邏輯／代號規則變更時遞增，自動作廢舊版快取 */
 // 7：移動卡途經點記下節點 id（yardMoveViaNodeIds），地圖改名不再讓班表過不了檢查（2026-11-18）
-export const CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION = 7;
+// 8：午夜換格拆鏈（keepVehiclesInPlace）、每張移動卡都寫行經站點（2026-11-19 c7eb9900）；舊結果在午夜排出零秒換格互卡
+export const CURRENT_SHIFT_SCHEDULE_OUTPUT_VERSION = 8;
 
 export type ShiftScheduleStoredOutput = {
   outputVersion: number;

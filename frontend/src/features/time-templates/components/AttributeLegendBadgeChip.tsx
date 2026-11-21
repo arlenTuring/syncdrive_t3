@@ -13,11 +13,16 @@ export function AttributeLegendBadgeChip({
   item,
   className = ATTRIBUTE_LEGEND_BADGE_CHIP_CLASS,
   highlighted = false,
+  compact = false,
 }: {
   item: AttributeIntervalLegend;
   className?: string;
   highlighted?: boolean;
+  /** 只顯示「名稱 班距」，運量與時段放在滑鼠提示（工具列空間不夠時用） */
+  compact?: boolean;
 }) {
+  const full = formatAttributeLegendBadgeText(item);
+  const headway = item.headwaySeconds != null && item.headwaySeconds > 0 ? ` ${item.headwaySeconds}秒` : '';
   return (
     <span
       className={`${className} transition-[box-shadow] duration-150`}
@@ -27,9 +32,9 @@ export function AttributeLegendBadgeChip({
         color: item.color,
         ...(highlighted ? softHighlightRingStyle(item.color) : {}),
       }}
-      title={formatAttributeLegendBadgeTitle(item)}
+      title={compact ? `${full}（${formatAttributeLegendBadgeTitle(item)}）` : formatAttributeLegendBadgeTitle(item)}
     >
-      {formatAttributeLegendBadgeText(item)}
+      {compact ? `${item.name}${headway}` : full}
     </span>
   );
 }

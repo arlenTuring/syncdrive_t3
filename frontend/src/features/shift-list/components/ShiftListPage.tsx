@@ -259,7 +259,7 @@ export function ShiftListPage({
                   </td>
                   <td className="py-3 pr-4">
                     <StatusTag
-                      label={t(`common.publishStatus.${row.publish_status}`)}
+                      label={t(`shiftList.buildStatus.${row.publish_status}`)}
                       style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
@@ -281,7 +281,8 @@ export function ShiftListPage({
                         ref={menuRef}
                         className="absolute right-0 top-full z-20 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
                       >
-                        {row.publish_status === 'draft' && (
+                        {/* 只有使用中的班表不能編輯（要改先停用或部署別份）；草稿、已完成的都可以 */}
+                        {row.usage_status !== 'in_use' && (
                           <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => {
                               setOpenMenuId(null);
                               onEditClick?.(row.shift_id);

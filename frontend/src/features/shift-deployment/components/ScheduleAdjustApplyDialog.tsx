@@ -11,6 +11,7 @@ import { useDemoAccount } from '../../schedule-management/utils/demoAccountPrefe
 import { useSupervisorApprovalPreference } from '../../schedule-management/utils/supervisorApprovalPreference';
 import {
   deployOperationShift,
+  stopOperationShift,
   fetchOperationShiftDetail,
   fetchOperationShiftList,
 } from '../../shift-list/api/operationShiftApi';
@@ -70,6 +71,8 @@ export function ScheduleAdjustApplyDialog({
   const [currentLoading, setCurrentLoading] = useState(false);
   const [currentError, setCurrentError] = useState<string | null>(null);
   const [missingCurrent, setMissingCurrent] = useState(false);
+  /** 目前使用中的班表已在這個對話框裡停用（部署前的緩衝步驟） */
+  const [stoppedCurrent, setStoppedCurrent] = useState(false);
 
   useEffect(() => {
     const pending = readPendingScheduleAdjust();
@@ -211,6 +214,27 @@ export function ScheduleAdjustApplyDialog({
       cancelled = true;
     };
   }, [currentScheduleName, draft, shiftId, shifts, step]);
+
+  /** 真正使用中的那一份（不是用名稱猜的）：部署前要先停用它 */
+  const inUseShift = shifts.find((item) => item.usage_status === 'in_use' && item.shift_id !== shiftId) ?? null;
+  const mustStopFirst = Boolean(inUseShift) && !stoppedCurrent;
+
+  const handleStopCurrent = async () => {
+    if (!inUseShift) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await stopOperationShift(inUseShift.shift_id, { reviewer_name: account.name });
+      setShifts((list) => list.map((item) => (item.shift_id === inUseShift.shift_id ? { ...item, usage_status: 'idle' } : item)));
+      setStoppedCurrent(true);
+      // 執行班表卡片要立刻看到「已停用、調度暫停」
+      onApplied?.();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const deploySelected = async () => {
     if (!shiftId) throw new Error(t('shiftDeployment.adjust.noScheduleSelected'));
@@ -375,6 +399,12 @@ export function ScheduleAdjustApplyDialog({
           {actionError ? (
             <p className="text-body-s text-status-error-emphasis">{actionError}</p>
           ) : null}
+          {step === 2 && inUseShift && !stoppedCurrent ? (
+            <p className="text-body-s text-status-warning-emphasis">{t('shiftDeployment.adjust.stopFirstHint', { name: inUseShift.name })}</p>
+          ) : null}
+          {step === 2 && stoppedCurrent ? (
+            <p className="text-body-s text-text-secondary">{t('shiftDeployment.adjust.stoppedHint')}</p>
+          ) : null}
           <div className="flex items-center justify-between">
           {step === 1 ? (
             <>
@@ -386,8 +416,13 @@ export function ScheduleAdjustApplyDialog({
               <Button hierarchy="danger" variant="outlined" disabled={busy} onPress={handleReject}>{t('shiftDeployment.adjust.reject')}</Button>
               <div className="flex items-center gap-4">
                 <Button hierarchy="subordinate" variant="text" disabled={busy} onPress={() => setStep(1)}>{t('shiftDeployment.adjust.previous')}</Button>
-                <Button disabled={busy || approvalText.trim() !== approvalPhrase} onPress={() => void handleDeployNow()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {t('shiftDeployment.adjust.approveAndApply')}</Button>
+                {mustStopFirst ? (
+                  <Button hierarchy="danger" variant="outlined" disabled={busy || approvalText.trim() !== approvalPhrase} onPress={() => void handleStopCurrent()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {t('shiftDeployment.adjust.stopCurrent')}</Button>
+                ) : (
+                  <Button disabled={busy || approvalText.trim() !== approvalPhrase} onPress={() => void handleDeployNow()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {t('shiftDeployment.adjust.approveAndApply')}</Button>
+                )}
               </div>
             </>
           ) : (
@@ -395,10 +430,15 @@ export function ScheduleAdjustApplyDialog({
               <Button hierarchy="subordinate" variant="tonal" onPress={onClose}>{t('common.cancel')}</Button>
               <div className="flex items-center gap-4">
                 <Button hierarchy="subordinate" variant="text" disabled={busy} onPress={() => setStep(1)}>{t('shiftDeployment.adjust.previous')}</Button>
-                <Button disabled={busy || !shiftId} onPress={handleSubmitApplication}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {supervisorApproval
-                    ? t('shiftDeployment.adjust.submitApplication')
-                    : t('shiftDeployment.adjust.deploySchedule')}</Button>
+                {mustStopFirst && !supervisorApproval ? (
+                  <Button hierarchy="danger" variant="outlined" disabled={busy || !shiftId} onPress={() => void handleStopCurrent()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {t('shiftDeployment.adjust.stopCurrent')}</Button>
+                ) : (
+                  <Button disabled={busy || !shiftId} onPress={handleSubmitApplication}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {supervisorApproval
+                      ? t('shiftDeployment.adjust.submitApplication')
+                      : t('shiftDeployment.adjust.deploySchedule')}</Button>
+                )}
               </div>
             </>
           )}

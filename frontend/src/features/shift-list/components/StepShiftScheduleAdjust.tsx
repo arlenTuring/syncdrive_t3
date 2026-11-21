@@ -6,7 +6,8 @@ import {
   type ScheduleEngineProgress,
 } from '../utils/schedule-engine/worker/runScheduleEngineInBackground';
 import i18n from '../../../i18n';
-import { ArrowRight, Check, ChevronDown, Info, Loader2, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, ClipboardList, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, Loader2, Trash2, Undo, Redo, Maximize2, Minimize2, X, CopyPlus, ClipboardList, ShieldCheck, TriangleAlert, RefreshCw } from 'lucide-react';
+import { systemConfirm } from '../../../lib/systemDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTimeTemplateDetail } from '../../time-templates/api/timeTemplatesApi';
 import {
@@ -736,6 +737,8 @@ export function StepShiftScheduleAdjust({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generationAttempt, setGenerationAttempt] = useState(0);
+  /** 「重新排班」：設定沒變也用目前的引擎重算一次（下一次生成 effect 讀到就清掉） */
+  const forceRegenerateRef = useRef(false);
   /** 生成在背景執行緒跑：目前這一次的取消控制與進度（新的一次開始就取消舊的，舊結果不會蓋掉新的） */
   const generationAbortRef = useRef<AbortController | null>(null);
   const [generationProgress, setGenerationProgress] = useState<ScheduleEngineProgress | null>(null);
@@ -844,7 +847,9 @@ export function StepShiftScheduleAdjust({
     void (async () => {
       try {
         let storedOutput = draft.scheduleOutput;
-        const needsRegen = !storedOutput?.plan || !isShiftScheduleOutputFresh(draft);
+        const forced = forceRegenerateRef.current;
+        forceRegenerateRef.current = false;
+        const needsRegen = forced || !storedOutput?.plan || !isShiftScheduleOutputFresh(draft);
 
         if (needsRegen) {
           const controller = startGeneration();
@@ -1395,9 +1400,25 @@ export function StepShiftScheduleAdjust({
     );
   }
 
+  /** 重新排班：用目前設定與引擎重算整張班表；這一步做過的手動調整會被新結果取代，先確認 */
+  const handleRegenerate = async () => {
+    const confirmed = await systemConfirm(t('shiftList.scheduleAdjust.regenerateConfirm'));
+    if (!confirmed) return;
+    forceRegenerateRef.current = true;
+    setGenerationAttempt((attempt) => attempt + 1);
+  };
+
   const renderToolbar = () => {
   return (
       <div className="ml-auto flex shrink-0 select-none items-center gap-1.5">
+        {!isManual ? (
+          <>
+            <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RefreshCw />} disabled={loading} onPress={() => void handleRegenerate()}>
+              {t('shiftList.scheduleAdjust.regenerate')}
+            </Button>
+            <div className="h-4 w-px bg-link-standard-hover" />
+          </>
+        ) : null}
         <IconButton
           size="small"
           hierarchy="danger"
@@ -1516,19 +1537,21 @@ export function StepShiftScheduleAdjust({
         </h2>
       ) : null}
       <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-border-theme-light bg-surface-secondary p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
-      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-4">
+      {/* 分頁、時段模式、工具列排成一行：模式標籤放不下時橫向捲動，不換行把工具列擠到第二行 */}
+      <div className="mb-4 flex shrink-0 items-center gap-3">
         <Tabs label="班表檢視" className="shrink-0" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.scheduleAdjust.tripPreview') }, { id: 'capacity', label: t('shiftList.scheduleAdjust.capacityTrend') }]} />
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
           {periodLegends.map((item) => (
             <AttributeLegendBadgeChip
               key={item.attributeId}
               item={item}
-              className="inline-flex min-h-[30px] max-w-full items-center whitespace-nowrap rounded-md border px-3 py-1 text-body-s"
+              compact
+              className="inline-flex min-h-[26px] shrink-0 items-center whitespace-nowrap rounded-md border px-1.5 py-0.5 text-body-xs"
             />
           ))}
-          {renderToolbar()}
         </div>
+        {renderToolbar()}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">

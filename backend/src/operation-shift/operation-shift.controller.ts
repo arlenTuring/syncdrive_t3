@@ -180,7 +180,7 @@ export class OperationShiftController {
   @Post('detail/:id/deploy')
   @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({
-    summary: '部署班表為使用中（同時發布；其他使用中班表改為閒置）',
+    summary: '部署班表為使用中（同時發布）；已有其他使用中的班表要先停用，否則回 409',
   })
   async deployShift(
     @Param('id') id: string,
@@ -209,6 +209,24 @@ export class OperationShiftController {
         counts: adoption.counts,
       },
     };
+  }
+
+  @AuditAction('SHIFT_STOP')
+  @Post('detail/:id/stop')
+  @RequirePermission('schedule.shift-list.publish')
+  @ApiOperation({
+    summary: '停用使用中的班表（部署新班表前的第一步；同時暫停調度、不再發新訂單，已發出的照常跑完）',
+  })
+  async stopShift(
+    @Param('id') id: string,
+    @Body() body?: { reviewer_name?: string },
+  ) {
+    const stopped = await this.operationShiftService.stopShift(id, {
+      reviewerName: body?.reviewer_name,
+    });
+    const engine = this.moduleRef.get(DispatchEngineService, { strict: false });
+    await engine.setEnabled(false);
+    return { ...stopped, dispatch_enabled: false };
   }
 
   @AuditAction('SHIFT_DUPLICATE')

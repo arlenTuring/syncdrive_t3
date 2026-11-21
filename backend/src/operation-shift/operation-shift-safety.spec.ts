@@ -311,3 +311,36 @@ describe('對外班表讀哪一份', () => {
     expect(result.meta.shift_id).toBe('deployed');
   });
 });
+
+describe('停用再部署、使用中不能編輯（2026-11-21）', () => {
+  it('已有別份使用中：部署回 409 要求先停用，不改動任何班表', async () => {
+    const f = fixture({ secondTripMinute: 630 });
+    const other = { id: 'other', name: '模擬正線_1118', usageStatus: OperationShiftUsageStatus.IN_USE } as unknown as OperationShift;
+    f.repo.findOne.mockImplementation(async (opts: { where: { id?: string; usageStatus?: string } }) => (opts.where.usageStatus ? other : f.row));
+    await expect(f.service.deployShift('shift')).rejects.toThrow('請先停用目前使用中的班表「模擬正線_1118」');
+    expect(f.repo.save).not.toHaveBeenCalled();
+  });
+
+  it('停用：使用中改成閒置並記下停用時間；不是使用中的回錯誤', async () => {
+    const f = fixture({ secondTripMinute: 630 });
+    (f.row as unknown as { usageStatus: string }).usageStatus = OperationShiftUsageStatus.IN_USE;
+    const saved = await f.service.stopShift('shift', { reviewerName: 'Luna' });
+    expect(saved.usage_status).toBe(OperationShiftUsageStatus.IDLE);
+    expect((f.row.body.deployment as { stoppedBy?: string }).stoppedBy).toBe('Luna');
+    await expect(f.service.stopShift('shift')).rejects.toThrow('不是使用中');
+  });
+
+  it('使用中的班表不能編輯；已完成的班表排班結果改了就回到草稿區，沒改仍是已完成', async () => {
+    const f = fixture({ secondTripMinute: 630 });
+    (f.service as unknown as { isShiftNameUnique: () => Promise<boolean> }).isShiftNameUnique = async () => true;
+    (f.row as unknown as { usageStatus: string }).usageStatus = OperationShiftUsageStatus.IN_USE;
+    await expect(f.service.updateDraft('shift', { name: 'x', body: f.body })).rejects.toThrow('使用中的班表無法編輯');
+
+    (f.row as unknown as { usageStatus: string }).usageStatus = OperationShiftUsageStatus.IDLE;
+    (f.row as unknown as { publishStatus: string }).publishStatus = OperationShiftPublishStatus.PUBLISHED;
+    const same = await f.service.updateDraft('shift', { name: 'x', body: { ...f.body, currentStep: 3 } });
+    expect(same.publish_status).toBe(OperationShiftPublishStatus.PUBLISHED);
+    const changed = await f.service.updateDraft('shift', { name: 'x', body: { ...f.body, scheduleOutput: { plan: { timelines: [] } } } });
+    expect(changed.publish_status).toBe(OperationShiftPublishStatus.DRAFT);
+  });
+});

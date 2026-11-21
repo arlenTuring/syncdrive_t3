@@ -1,5 +1,5 @@
 import { DAY_END_SECOND } from './timetable/clock';
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DatasourceInvalidationService, DS_TAGS } from '../events/datasource-invalidation.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -180,8 +180,20 @@ export class OperationShiftService {
     }
 
     const row = await this.getShiftById(id);
+    // 使用中的班表正被調度讀取，不能直接改；要改先部署別份（或停用）再編輯
+    if (row.usageStatus === OperationShiftUsageStatus.IN_USE) {
+      throw new BadRequestException('使用中的班表無法編輯，請先停用或部署其他班表');
+    }
+    const nextBody = input.body ?? {};
+    // 已完成的班表重新編輯、排班結果變了：回到草稿區，等再次完成建立才算已完成
+    if (
+      row.publishStatus === OperationShiftPublishStatus.PUBLISHED
+      && JSON.stringify((row.body ?? {}).scheduleOutput ?? null) !== JSON.stringify(nextBody.scheduleOutput ?? null)
+    ) {
+      row.publishStatus = OperationShiftPublishStatus.DRAFT;
+    }
     row.name = name;
-    row.body = input.body ?? {};
+    row.body = nextBody;
     row.updatedAt = String(Date.now());
 
     const saved = await this.repo.save(row);
@@ -361,6 +373,12 @@ export class OperationShiftService {
     }
     this.assertPublishSafe(row.body);
 
+    // 部署前要先停用目前使用中的班表（停用、再部署，中間留緩衝；不在部署時默默把它換掉）
+    const current = await this.repo.findOne({ where: { usageStatus: OperationShiftUsageStatus.IN_USE } });
+    if (current && current.id !== row.id) {
+      throw new ConflictException(`請先停用目前使用中的班表「${current.name}」，再部署新的班表`);
+    }
+
     const now = String(Date.now());
     await this.repo
       .createQueryBuilder()
@@ -386,6 +404,28 @@ export class OperationShiftService {
     row.updatedAt = now;
     const saved = await this.repo.save(row);
     this.invalidation?.emit([DS_TAGS.OPERATION_STATUS], 'shift_deployed');
+    return toOperationShiftListItem(saved);
+  }
+
+  /**
+   * 停用使用中的班表（部署新班表前的第一步）：改成閒置，記下停用時間。
+   * 已發出的訂單照常跑完；不再發新單由呼叫端同時暫停調度負責。
+   */
+  async stopShift(id: string, options?: { reviewerName?: string }): Promise<OperationShiftListItem> {
+    const row = await this.getShiftById(id);
+    if (row.usageStatus !== OperationShiftUsageStatus.IN_USE) {
+      throw new BadRequestException('這份班表不是使用中，不需要停用');
+    }
+    const now = String(Date.now());
+    const deployment = ((row.body ?? {}).deployment ?? {}) as Record<string, unknown>;
+    row.usageStatus = OperationShiftUsageStatus.IDLE;
+    row.body = {
+      ...(row.body ?? {}),
+      deployment: { ...deployment, stoppedAt: Number(now), stoppedBy: String(options?.reviewerName ?? '').trim() || null },
+    };
+    row.updatedAt = now;
+    const saved = await this.repo.save(row);
+    this.invalidation?.emit([DS_TAGS.OPERATION_STATUS], 'shift_stopped');
     return toOperationShiftListItem(saved);
   }
 
