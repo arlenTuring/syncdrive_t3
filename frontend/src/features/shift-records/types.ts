@@ -6,6 +6,7 @@ export type ExecutionStatusKey =
   | 'delayed'
   | 'fault_pending'
   | 'faulted'
+  | 'cancelled'
   | 'completed';
 
 export type ShiftRecordListItem = {
@@ -33,14 +34,15 @@ export const EXECUTION_STATUS_OPTIONS: Array<{ value: ExecutionStatusKey | 'all'
   { value: 'delayed', label: '延誤中' },
   { value: 'fault_pending', label: '車輛故障（結案待確認）' },
   { value: 'faulted', label: '故障' },
+  { value: 'cancelled', label: '已中止（中心端取消）' },
   { value: 'completed', label: '已完成' },
 ];
 
 /**
  * 畫面上顯示的執行狀態。中心端取消後車端照協議回報 FAULTED 結案的單是「已中止」，
- * 不是車輛故障——篩選仍歸在 faulted（後端 execution_status 不變），只是文字與顏色分開。
+ * 不是車輛故障；後端已回 cancelled，舊回應（faulted＋cancel_requested_at）也照樣顯示成已中止。
  */
-export type ExecutionDisplayKey = ExecutionStatusKey | 'cancelled';
+export type ExecutionDisplayKey = ExecutionStatusKey;
 
 export function executionDisplayKey(row: {
   execution_status: ExecutionStatusKey;

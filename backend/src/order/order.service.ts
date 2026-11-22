@@ -31,6 +31,7 @@ import {
   LIST_COLUMNS,
   LIST_PAYLOAD_SQL,
   PENDING_VEHICLE_FAULT_SQL,
+  CENTER_CANCELLED_SQL,
   ShiftRecordListItem,
   ShiftTab,
   toShiftRecordListItem,
@@ -494,7 +495,11 @@ export class OrderService {
           qb.andWhere(PENDING_VEHICLE_FAULT_SQL);
           break;
         case 'faulted':
-          qb.andWhere('o.status = :st', { st: OrderStatus.FAULTED });
+          // 只算真的故障；中心端取消的單另有「已中止」篩選
+          qb.andWhere(`o.status = :st AND NOT ${CENTER_CANCELLED_SQL}`, { st: OrderStatus.FAULTED });
+          break;
+        case 'cancelled':
+          qb.andWhere(`o.status = :st AND ${CENTER_CANCELLED_SQL}`, { st: OrderStatus.FAULTED });
           break;
         case 'completed':
           qb.andWhere('o.status = :st', { st: OrderStatus.END });

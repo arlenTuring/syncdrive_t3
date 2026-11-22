@@ -9,6 +9,7 @@ export type ExecutionStatusKey =
   | 'delayed'
   | 'fault_pending'
   | 'faulted'
+  | 'cancelled'
   | 'completed';
 
 /**
@@ -20,6 +21,9 @@ export function hasPendingVehicleFault(order: Pick<OperationOrder, 'status' | 'p
   const payload = (order.payload ?? {}) as Record<string, unknown>;
   return Boolean(payload.vehicle_fault) || String(payload.vehicle_phase ?? '').toUpperCase() === 'FAULTED';
 }
+
+/** 中心端取消過的單（別名 o）：車端照協議回報 FAULTED 結案，但不是車輛故障 */
+export const CENTER_CANCELLED_SQL = `(COALESCE(o.payload->'cancel_requested_at', 'null'::jsonb) <> 'null'::jsonb)`;
 
 /** 同一個判斷的 SQL 版本（班次運行紀錄篩選用） */
 export const PENDING_VEHICLE_FAULT_SQL = `(o.status IN ('PENDING', 'PROCESSING') AND (COALESCE(o.payload->'vehicle_fault', 'null'::jsonb) <> 'null'::jsonb OR UPPER(COALESCE(o.payload->>'vehicle_phase', '')) = 'FAULTED'))`;
@@ -97,9 +101,9 @@ export function resolveExecutionStatus(order: OperationOrder): {
     return { key: 'completed', label: '已完成' };
   }
   if (order.status === OrderStatus.FAULTED) {
-    // 中心端取消後車端照協議回報 FAULTED：是操作結束，不是車輛故障（篩選仍歸在 faulted）
+    // 中心端取消後車端照協議回報 FAULTED：是操作結束，不是車輛故障，篩選也分開算
     const payload = (order.payload ?? {}) as Record<string, unknown>;
-    if (payload.cancel_requested_at) return { key: 'faulted', label: '已中止（中心端取消）' };
+    if (payload.cancel_requested_at) return { key: 'cancelled', label: '已中止（中心端取消）' };
     return { key: 'faulted', label: '故障' };
   }
   if (hasPendingVehicleFault(order)) {

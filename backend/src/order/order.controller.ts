@@ -138,6 +138,7 @@ export class OrderController {
         | 'running'
         | 'delayed'
         | 'faulted'
+        | 'cancelled'
         | 'completed'
         | 'all'
         | undefined,

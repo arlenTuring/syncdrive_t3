@@ -117,6 +117,9 @@ describe('resolveExecutionStatus：中心端取消', () => {
   it('取消後車端回報 FAULTED：標示已中止，不說故障', () => {
     const cancelled = resolveExecutionStatus({ status: 'FAULTED', payload: { cancel_requested_at: 1 } } as never);
     expect(cancelled.label).toBe('已中止（中心端取消）');
-    expect(resolveExecutionStatus({ status: 'FAULTED', payload: {} } as never).label).toBe('故障');
+    expect(cancelled.key).toBe('cancelled');
+    const faulted = resolveExecutionStatus({ status: 'FAULTED', payload: {} } as never);
+    expect(faulted.label).toBe('故障');
+    expect(faulted.key).toBe('faulted');
   });
 });
