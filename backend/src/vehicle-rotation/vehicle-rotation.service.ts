@@ -436,7 +436,8 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     const rows: Array<Record<string, string | null>> = await this.dataSource.query(
       `SELECT v.vehicle_code, v.initial_mileage_km, r.hold, r.last_rotation_km, r.driven_km,
               (SELECT MAX(i.operating_day) FROM vehicle_rotation_items i
-                WHERE i.outgoing = v.vehicle_code AND i.status IN ('confirmed', 'done')) AS rotated_out_day,
+                WHERE i.outgoing = v.vehicle_code AND i.status IN ('confirmed', 'done')
+                  AND i.operating_day <= $1) AS rotated_out_day,
               m.telemetry_payload->'energy'->>'battery_level' AS battery,
               (SELECT MAX(o.completed_at) FROM operation_orders o
                 WHERE o.vehicle_code = v.vehicle_code AND o.line_kind = 'MAINLINE' AND o.status = 'END') AS last_service_at
@@ -445,6 +446,8 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
        LEFT JOIN vehicle_monitor_demo m ON m.vehicle_code = v.vehicle_code
        WHERE v.is_active = true AND v.service_enabled = true
        ORDER BY v.vehicle_code`,
+      // 只看今天以前的換下紀錄：別的時鐘（測試用的模擬日期）留下的未來日期，不能讓每台車永遠都算「今天剛換下」
+      [this.day()],
     );
     const rowOf = new Map<string, { row: number; passenger: boolean }>();
     for (const task of tasks) {
