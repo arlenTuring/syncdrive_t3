@@ -86,11 +86,32 @@ export class DashboardDemoSeedService implements OnApplicationBootstrap {
 
     await this.runSqlFile('seed-vehicle-monitor-demo.sql', undefined, 'vehicle monitor demo');
 
-    await this.runSqlFile('seed-dashboard-panels.sql', undefined, 'event + shift panels');
+    /*
+     * 示範事件（DEMO-EVT，車號 V005、C003…這些不存在的車）會混進即時事件清單與事件紀錄，
+     * 每次開機還被刷成「今天」，廠驗時看起來像真的事件。預設不灌、並清掉已有的；
+     * 要示範時設 DASHBOARD_DEMO_EVENTS=true，或在儀表板設定頁手動重灌（reseedPanels）。
+     */
+    const demoEvents = process.env.DASHBOARD_DEMO_EVENTS === 'true';
+    if (demoEvents) {
+      await this.runSqlFile('seed-dashboard-panels.sql', undefined, 'event + shift panels');
+    } else {
+      await this.clearDemoEvents();
+    }
     await this.runSqlFile('seed-dashboard-capacity-trend.sql', undefined, 'capacity trend');
     await this.runSqlFile('seed-dashboard-maintenance.sql', undefined, 'maintenance distribution');
     await this.runSqlFile('seed-dashboard-shifts.sql', undefined, 'mainline + maintenance shifts');
-    await this.refreshDemoTimestamps('boot');
+    if (demoEvents) await this.refreshDemoTimestamps('boot');
+  }
+
+  /** 清掉示範事件（不碰真實事件） */
+  private async clearDemoEvents(): Promise<void> {
+    try {
+      const result = await this.dataSource.query(`DELETE FROM security_event_logs WHERE event_id LIKE 'DEMO-EVT-%'`);
+      const removed = Array.isArray(result) ? Number(result[1] ?? 0) : 0;
+      if (removed > 0) this.logger.log(`Removed ${removed} demo events (DASHBOARD_DEMO_EVENTS is off)`);
+    } catch (err) {
+      this.logger.warn(`Could not remove demo events: ${(err as Error).message}`);
+    }
   }
 
   /** 每次啟動／手動 reseed 後刷新示範列時間戳，避免「今日」篩選落空 */

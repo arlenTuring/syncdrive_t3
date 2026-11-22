@@ -221,8 +221,8 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     ]);
     const middleware: ServiceProbe = {
       id: 'middleware',
-      label: '中介軟體',
-      detail: 'REST API Services',
+      label: '系統服務',
+      detail: '操作畫面與外部介接',
       status: 'ok',
       latencyMs: 0,
       message: '正常連線',
@@ -231,7 +231,8 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async probeDatabase(): Promise<ServiceProbe> {
-    const detail = `Port ${this.config.get<string>('DB_PORT', '5432')}`;
+    // 畫面給營運人員看：說明這項服務負責什麼，不寫連接埠與產品名稱
+    const detail = '營運資料與各項紀錄';
     try {
       const started = Date.now();
       const result = await this.datasource.ping();
@@ -241,7 +242,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
       const ok = result?.ok !== false;
       return {
         id: 'database',
-        label: '資料庫服務',
+        label: '資料儲存',
         detail,
         status: ok ? 'ok' : 'error',
         latencyMs,
@@ -250,7 +251,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       return {
         id: 'database',
-        label: '資料庫服務',
+        label: '資料儲存',
         detail,
         status: 'error',
         latencyMs: null,
@@ -261,15 +262,13 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
 
   private async probeMqtt(): Promise<ServiceProbe> {
     const mqttUrl = this.config.get<string>('MQTT_URL', 'mqtt://127.0.0.1:1883');
-    const publicPort = this.config.get<string>('MQTT_PUBLIC_PORT', '8883');
     let host = '127.0.0.1';
     let port = 1883;
-    let detail = `Port ${publicPort} (mTLS)`;
+    const detail = '接收車輛回報、下發訂單';
     try {
       const u = new URL(mqttUrl.replace(/^mqtts?:/, 'http:'));
       host = u.hostname || host;
       port = u.port ? Number(u.port) : mqttUrl.startsWith('mqtts') ? 8883 : 1883;
-      detail = port === 8883 ? `Port ${port} (mTLS)` : `Port ${port}`;
     } catch {
       // keep defaults
     }
@@ -277,7 +276,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
       const latencyMs = round1(await tcpConnectLatencyMs(host, port, 2500));
       return {
         id: 'mqtt',
-        label: 'MQTT Broker',
+        label: '車輛通訊',
         detail,
         status: 'ok',
         latencyMs,
@@ -286,7 +285,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       return {
         id: 'mqtt',
-        label: 'MQTT Broker',
+        label: '車輛通訊',
         detail,
         status: 'error',
         latencyMs: null,
@@ -296,7 +295,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async probeRedisTelemetry(): Promise<ServiceProbe> {
-    const detail = 'Kafka/Redis Cluster';
+    const detail = '車輛最新位置與狀態';
     try {
       const started = Date.now();
       const pong = await this.redis.ping();
@@ -304,7 +303,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
       const ok = typeof pong === 'string' && pong.toUpperCase() === 'PONG';
       return {
         id: 'telemetry',
-        label: '遙測數據管線',
+        label: '車輛即時資料',
         detail,
         status: ok ? 'ok' : 'error',
         latencyMs,
@@ -313,7 +312,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       return {
         id: 'telemetry',
-        label: '遙測數據管線',
+        label: '車輛即時資料',
         detail,
         status: 'error',
         latencyMs: null,
