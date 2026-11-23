@@ -2406,9 +2406,17 @@ function validateFacilityOccupancy(timelines, errors, options = {}) {
       if (block.yardZoneId) zoneByBlockId.set(block.id, block.yardZoneId);
     }
   }
+  const enteredFromOutside = (occupancy) => {
+    const timeline = timelines.find((item) => item.row === occupancy.timelineRow);
+    return Boolean(timeline?.blocks.some((block) => block.source === "yard_entry_move" && block.plannedEndMinute - block.plannedStartMinute > 1e-9 && block.yardExitFacilityNodeId?.trim() === occupancy.facilityNodeId && Math.abs(block.plannedEndMinute - occupancy.startMinute) < 1e-6));
+  };
+  const leftToOutside = (occupancy) => {
+    const timeline = timelines.find((item) => item.row === occupancy.timelineRow);
+    return Boolean(timeline?.blocks.some((block) => block.source === "yard_exit_move" && block.plannedEndMinute - block.plannedStartMinute > 1e-9 && Math.abs(block.plannedStartMinute - occupancy.actualDepartMinute) < 1e-6));
+  };
   for (const collision of collisions) {
     const { earlier, later } = collision;
-    if (collision.kind !== "overlap" && zoneByBlockId.has(earlier.blockId) && zoneByBlockId.get(earlier.blockId) === zoneByBlockId.get(later.blockId)) {
+    if (collision.kind !== "overlap" && zoneByBlockId.has(earlier.blockId) && zoneByBlockId.get(earlier.blockId) === zoneByBlockId.get(later.blockId) && !(enteredFromOutside(later) && leftToOutside(earlier))) {
       continue;
     }
     const detail = {

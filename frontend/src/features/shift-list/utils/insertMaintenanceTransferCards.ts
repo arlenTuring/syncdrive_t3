@@ -1176,15 +1176,62 @@ export function insertMaintenanceTransferCards(args: {
    * 整段停留另一端的時刻是別處定案、挪不動的，拿緩衝重驗那一端只會把格子判成全滿。
    */
   let handoverEnforced = true;
+  /**
+   * 場區格位跟場區入口之間的移動秒數（進、出各取最短的一條邊）。場區只有入口那一頭接外面，
+   * 格位的邊都是接到入口點（或同場區的格位）；查不到就當 0。
+   */
+  const yardSlotEntranceSeconds = new Map<string, { inSeconds: number; outSeconds: number }>();
+  function slotEntranceSeconds(facilityNodeId: string): { inSeconds: number; outSeconds: number } {
+    const cached = yardSlotEntranceSeconds.get(facilityNodeId);
+    if (cached) return cached;
+    let inSeconds = Number.POSITIVE_INFINITY;
+    let outSeconds = Number.POSITIVE_INFINITY;
+    for (const edge of topology?.edges ?? []) {
+      const seconds = Math.max(0, edge.avgTravelTimeSeconds ?? edge.minTravelTimeSeconds ?? 0);
+      if (edge.fromNodeId === facilityNodeId && !sameYardZone(facilityNodeId, edge.toNodeId)) {
+        outSeconds = Math.min(outSeconds, seconds);
+      }
+      if (edge.toNodeId === facilityNodeId && !sameYardZone(facilityNodeId, edge.fromNodeId)) {
+        inSeconds = Math.min(inSeconds, seconds);
+      }
+    }
+    const result = {
+      inSeconds: Number.isFinite(inSeconds) ? inSeconds : 0,
+      outSeconds: Number.isFinite(outSeconds) ? outSeconds : 0,
+    };
+    yardSlotEntranceSeconds.set(facilityNodeId, result);
+    return result;
+  }
+  /**
+   * 從場區外進到格位時，這一格的前一台至少要先離開多久：前一台開到入口點、
+   * 後一台從入口點開進來，中間再隔一個碰撞保護時間。
+   *
+   * 場區只有一個入口點，進出都要經過它。後一台比這個時刻早到，就只能停在入口點等格位空出來，
+   * 前一台要出場卻被它堵在格位裡，兩台都動不了（2026-11-21 午夜模擬實錄：PMS06 停在入口點等
+   * E4、E4 的 PMS08 等 E2、E2 的 PMS04 等入口點）。區內換格不經過入口點，不受這條限制。
+   */
+  function yardZoneEntryHandoverSeconds(facilityNodeId: string): number {
+    const { inSeconds, outSeconds } = slotEntranceSeconds(facilityNodeId);
+    return outSeconds + inSeconds + collisionBufferSeconds;
+  }
   function handoverEdgeIsClear(
     facilityNodeId: string,
     timelineRow: number,
     edgeSecond: number,
     side: 'entering' | 'leaving',
+    /** 車從哪裡開進來（進格時）；場區格位只有從場區外進來才要等前一台出完入口點 */
+    fromNodeId?: string,
   ): boolean {
     if (collisionBufferSeconds <= 0 || !handoverEnforced) return true;
-    // 場區內的格位：車在區內自己移動，交接只要求不重疊（不重疊由設施預約本身管）
-    if (facilityYardZone.has(facilityNodeId)) return true;
+    if (facilityYardZone.has(facilityNodeId)) {
+      // 場區內的格位：區內換格、出格都只要求不重疊（不重疊由設施預約本身管）
+      if (side !== 'entering' || !fromNodeId || fromNodeId === facilityNodeId || sameYardZone(fromNodeId, facilityNodeId)) {
+        return true;
+      }
+      lastBlocker = null;
+      const gap = yardZoneEntryHandoverSeconds(facilityNodeId);
+      return facilityBookingIsFree(facilityNodeId, timelineRow, edgeSecond - gap, edgeSecond, gap);
+    }
     lastBlocker = null;
     const [from, to] = side === 'entering'
       ? [edgeSecond - collisionBufferSeconds, edgeSecond]
@@ -2175,6 +2222,28 @@ export function insertMaintenanceTransferCards(args: {
       }
       return false;
     };
+    /**
+     * 擋路那一段，加上同一條線上緊接在前後、停在同一格的整備（例：充電完原地待命）。
+     * 擋路者要搬就整串一起搬；只搬一段的話，它跟留在原格的鄰段之間會多出一次換格，
+     * 換來的格子又被拿去比較，整張班表看起來沒變好（2026-11-21 午夜實錄）。
+     */
+    const sameSlotNeighbors = (block: GeneratedScheduleBlock, nodeId: string): GeneratedScheduleBlock[] => {
+      const group = [block];
+      const ctx = chainContext.get(block.id);
+      if (!ctx) return group;
+      for (const step of [immediatePrevCyclic, immediateNextCyclic]) {
+        let index = ctx.index;
+        for (let guard = 0; guard < ctx.sorted.length; guard += 1) {
+          const neighbor = step(ctx.sorted, index);
+          if (!neighbor || group.includes(neighbor.block)) break;
+          if (!YARD_TASK_TYPES.has(neighbor.block.taskType)) break;
+          if (yardBlockFacility.get(neighbor.block.id)?.nodeId !== nodeId) break;
+          group.push(neighbor.block);
+          index = ctx.sorted.indexOf(neighbor.block);
+        }
+      }
+      return group;
+    };
     const blockById = new Map<string, GeneratedScheduleBlock>();
     for (const timeline of timelines) for (const block of timeline.blocks) blockById.set(block.id, block);
     const rejected = new Set<string>();
@@ -2193,25 +2262,39 @@ export function insertMaintenanceTransferCards(args: {
         const key = `${move.later.id}|${move.from}`;
         if (rejected.has(key) || !allowed(move.later, move.from)) continue;
         assignYardStay(move.later, move.from, labelOf(move.from));
-        /** 搬走的擋路者（還原用） */
+        /** 搬走的擋路者（還原用）：擋路那一段＋跟它停同一格的前後整備 */
         let displaced: { block: GeneratedScheduleBlock; nodeId: string } | null = null;
+        let displacedGroup: GeneratedScheduleBlock[] = [];
         let ok = fitsAt(move.later, move.from) && movesClear(move.later, move.from);
         if (!ok && lastBlocker?.kind === 'facility' && lastBlocker.blockingBlockId) {
           const blocker = blockById.get(lastBlocker.blockingBlockId);
           const blockerAt = blocker ? yardBlockFacility.get(blocker.id)?.nodeId : undefined;
           if (blocker && blockerAt === move.from && YARD_TASK_TYPES.has(blocker.taskType)) {
             const baseCost = stayCost(blocker, move.from);
+            const group = sameSlotNeighbors(blocker, move.from);
+            const assignGroup = (nodeId: string) => {
+              for (const member of group) assignYardStay(member, nodeId, labelOf(nodeId));
+            };
             for (const facility of facilityNodesForBlock(blocker)) {
               if (facility.id === move.from) continue;
-              if (stayCost(blocker, facility.id) > baseCost + 1e-9) continue;
-              assignYardStay(blocker, facility.id, labelOf(facility.id));
-              if (fitsAt(blocker, facility.id) && movesClear(blocker, facility.id)
+              /*
+               * 擋路的那一台搬到同一個場區的另一格，進出成本只差在格位遠近（幾秒），
+               * 一律可以試；搬去別的場區才要求成本不比原格高。2026-11-21 午夜實錄：
+               * 列車 8 留在 E4、列車 6 改去 E3 每一項檢查都過，只因 E3 比 E4 遠 1 秒被擋掉，
+               * 結果留下「E2 的車出場、E4 的車換到 E2、正線車進 E4」三台同時互等。
+               * 採不採用最後仍由 better() 看整張班表。
+               */
+              if (!sameYardZone(move.from, facility.id) && stayCost(blocker, facility.id) > baseCost + 1e-9) continue;
+              if (!group.every((member) => allowed(member, facility.id))) continue;
+              assignGroup(facility.id);
+              if (group.every((member) => fitsAt(member, facility.id) && movesClear(member, facility.id))
                 && fitsAt(move.later, move.from) && movesClear(move.later, move.from)) {
                 displaced = { block: blocker, nodeId: move.from };
+                displacedGroup = group;
                 ok = true;
                 break;
               }
-              assignYardStay(blocker, move.from, labelOf(move.from));
+              assignGroup(move.from);
             }
           }
         }
@@ -2223,7 +2306,7 @@ export function insertMaintenanceTransferCards(args: {
           improved = true;
           break;
         }
-        if (displaced) assignYardStay(displaced.block, displaced.nodeId, labelOf(displaced.nodeId));
+        if (displaced) for (const member of displacedGroup) assignYardStay(member, displaced.nodeId, labelOf(displaced.nodeId));
         assignYardStay(move.later, move.to, labelOf(move.to));
         rejected.add(key);
       }
@@ -2612,7 +2695,7 @@ export function insertMaintenanceTransferCards(args: {
                 stayFacilityIsFree(
                   facility.id, yard, timeline.row, departure + path.avgSeconds, yardEndSecond,
                 )
-                && handoverEdgeIsClear(facility.id, timeline.row, departure + path.avgSeconds, 'entering');
+                && handoverEdgeIsClear(facility.id, timeline.row, departure + path.avgSeconds, 'entering', fromNodeId);
 
               /**
                * 提早到不了就晚一點到，不是整張卡作廢。
@@ -3357,7 +3440,7 @@ export function insertMaintenanceTransferCards(args: {
                 occupyFrom - laterOffsetSecond,
                 laterEndSecond - laterOffsetSecond,
               )
-              && handoverEdgeIsClear(entryFacility.id, timeline.row, occupyFrom - laterOffsetSecond, 'entering');
+              && handoverEdgeIsClear(entryFacility.id, timeline.row, occupyFrom - laterOffsetSecond, 'entering', exitFacility.id);
             };
             let facilityShift: number;
             if (entryFacilityFreeAt(0)) {
@@ -3436,7 +3519,7 @@ export function insertMaintenanceTransferCards(args: {
                   entryFacility.id, later, timeline.row,
                   arrive - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
                 )
-                && handoverEdgeIsClear(entryFacility.id, timeline.row, arrive - laterOffsetSecond, 'entering');
+                && handoverEdgeIsClear(entryFacility.id, timeline.row, arrive - laterOffsetSecond, 'entering', exitFacility.id);
               };
               if (!earlyEntryFree(earliestJunctionShift)) {
                 let busy = earliestJunctionShift;
@@ -3492,7 +3575,7 @@ export function insertMaintenanceTransferCards(args: {
                   entryFacility.id, later, timeline.row,
                   earlyArriveSecond - laterOffsetSecond, laterEndSecond - laterOffsetSecond,
                 )
-                || !handoverEdgeIsClear(entryFacility.id, timeline.row, earlyArriveSecond - laterOffsetSecond, 'entering')
+                || !handoverEdgeIsClear(entryFacility.id, timeline.row, earlyArriveSecond - laterOffsetSecond, 'entering', exitFacility.id)
               ) {
                 tallyFacilityBusy(tally);
                 continue;

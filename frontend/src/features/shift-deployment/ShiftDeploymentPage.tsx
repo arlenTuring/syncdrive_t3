@@ -9,8 +9,9 @@ import { cancelShiftOrder, setDispatchEnabled, useDeploymentData } from './hooks
 import type { ShiftDeploymentAction } from './types';
 import { systemConfirm } from '../../lib/systemDialog';
 import { Button } from '../../components/ui';
+import { VehicleFleetMqttProvider } from '../dashboard/context/VehicleFleetMqttContext';
 
-export function ShiftDeploymentPage() {
+function ShiftDeploymentContent() {
   const { t } = useTranslation();
   const data = useDeploymentData();
   const [hint, setHint] = useState<string | null>(null);
@@ -124,5 +125,17 @@ export function ShiftDeploymentPage() {
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 班次進度跟著車端 MQTT（operation/update）即時推進：跟儀表板、降級頁同一個車隊 hub。
+ * 班次清單本身（換單、狀態、延誤）由後端寫庫後推送的失效事件觸發重查，見 useDeploymentData。
+ */
+export function ShiftDeploymentPage() {
+  return (
+    <VehicleFleetMqttProvider>
+      <ShiftDeploymentContent />
+    </VehicleFleetMqttProvider>
   );
 }

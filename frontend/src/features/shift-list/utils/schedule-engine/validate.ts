@@ -1576,13 +1576,41 @@ export function validateFacilityOccupancy(
     }
   }
 
+  /**
+   * 後一台是不是從場區外開進來的：佔用開始那一刻有一張有長度的入廠卡剛好抵達這一格。
+   * 區內換格的轉場卡是零秒示意卡，不算。
+   */
+  const enteredFromOutside = (occupancy: (typeof occupancies)[number]): boolean => {
+    const timeline = timelines.find((item) => item.row === occupancy.timelineRow);
+    return Boolean(timeline?.blocks.some((block) =>
+      block.source === 'yard_entry_move'
+      && block.plannedEndMinute - block.plannedStartMinute > 1e-9
+      && block.yardExitFacilityNodeId?.trim() === occupancy.facilityNodeId
+      && Math.abs(block.plannedEndMinute - occupancy.startMinute) < 1e-6));
+  };
+
+  /** 前一台是不是開出場區：離開那一刻有一張有長度的出場／轉場出廠卡從這一格出發 */
+  const leftToOutside = (occupancy: (typeof occupancies)[number]): boolean => {
+    const timeline = timelines.find((item) => item.row === occupancy.timelineRow);
+    return Boolean(timeline?.blocks.some((block) =>
+      block.source === 'yard_exit_move'
+      && block.plannedEndMinute - block.plannedStartMinute > 1e-9
+      && Math.abs(block.plannedStartMinute - occupancy.actualDepartMinute) < 1e-6));
+  };
+
   for (const collision of collisions) {
     const { earlier, later } = collision;
-    // 場區內的格位：車在區內自己移動，交接只要求不重疊（重疊仍是硬錯誤）
+    /*
+     * 場區內的格位：車在區內自己移動，交接只要求不重疊（重疊仍是硬錯誤）。
+     * 例外是前一台要開出場區、後一台從場區外進來——場區只有一個入口點，後一台太早到就停在
+     * 入口點等格位，前一台要出場卻被它堵住（2026-11-21 午夜模擬：PMS04、PMS06、PMS08 三台互等）。
+     * 前一台只是區內換格時不經過入口點，不受影響。
+     */
     if (
       collision.kind !== 'overlap'
       && zoneByBlockId.has(earlier.blockId)
       && zoneByBlockId.get(earlier.blockId) === zoneByBlockId.get(later.blockId)
+      && !(enteredFromOutside(later) && leftToOutside(earlier))
     ) {
       continue;
     }

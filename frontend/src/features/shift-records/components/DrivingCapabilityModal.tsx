@@ -683,9 +683,11 @@ export function DrivingCapabilityModal({ orderId, onClose }: DrivingCapabilityMo
                   <Clock className="size-3.5 shrink-0" aria-hidden />
                   <span className="font-mono tabular-nums">{model.timeRangeLabel}</span>
                   <span className="text-text-quaternary">
-                    {t('shiftRecords.capabilityModal.durationMinutes', {
-                      minutes: model.durationMinutes,
-                    })}
+                    {model.durationSeconds < 60
+                      ? t('shiftRecords.capabilityModal.durationSeconds', { seconds: model.durationSeconds })
+                      : t('shiftRecords.capabilityModal.durationMinutes', {
+                        minutes: model.durationMinutes,
+                      })}
                   </span>
                 </div>
                 {runCode ? <RunCodeRow code={runCode} /> : null}

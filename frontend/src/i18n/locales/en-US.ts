@@ -375,6 +375,7 @@ const enUS: DeepStringify<typeof zhTW> = {
     capabilityModal: {
       title: "Operation record",
       durationMinutes: "Total {{minutes}} min",
+      durationSeconds: "Total {{seconds}} s",
       scrollHint: "Scroll the timeline sideways to see more tasks",
       laneAction: "Actions",
       laneEvent: "Events",

@@ -19,7 +19,7 @@ export interface RouteStationJsonItem {
  * 起點與終點一定停；中間站看停留秒數，0 秒的是轉線點那種經過而已的點。
  * 兩個欄位都沒帶的資料（像整備班表自己組的兩站）一律當成停靠站，不隱藏。
  */
-function isStoppingStation(item: RouteStationJsonItem): boolean {
+export function isStoppingStation(item: RouteStationJsonItem): boolean {
   const role = String(item.role ?? '').trim().toLowerCase();
   if (!role) return true;
   if (role === 'origin' || role === 'terminal' || role === 'destination') return true;

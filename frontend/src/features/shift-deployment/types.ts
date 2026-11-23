@@ -48,9 +48,12 @@ export type ShiftRow = {
   directionLabel: string;
   vehicleCode: string;
   routeStations: string;
-  routeProgress: number;
-  segmentIndex: number;
-  segmentRemainPct: number;
+  /** SQL 的這一段索引；車端還沒回報、沒有站序時是 null */
+  segmentIndex: number | null;
+  /** SQL 依距離算的這一段還剩幾 %；未知是 null（不是 100，也不是 0） */
+  segmentRemainPct: number | null;
+  /** 後端記下的各段距離分母（公尺），key 是目標站點 ID */
+  legDistanceMax: Record<string, number>;
   statusLabel: string;
   statusBg: string;
   statusColor: string;

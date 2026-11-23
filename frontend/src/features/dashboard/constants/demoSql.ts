@@ -774,6 +774,9 @@ SELECT
     NULLIF(o.route_origin, ''),
     '—'
   ) AS st_a,
+  -- 起訖點的站點 ID：沒有站序的單（進出廠、待命）畫起點→終點時，車端回報的目標站要靠它對上
+  NULLIF(o.payload->'origin'->>'id', '') AS origin_station_id,
+  NULLIF(o.payload->'destination'->>'id', '') AS destination_station_id,
   COALESCE(
     (SELECT st->>'station_name' FROM jsonb_array_elements(o.current_stations) st
       ORDER BY (st->>'order')::int ASC OFFSET 1 LIMIT 1),

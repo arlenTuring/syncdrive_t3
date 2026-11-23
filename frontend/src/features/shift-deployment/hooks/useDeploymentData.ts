@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEPLOYMENT_CURRENT_MODE_SQL,
   DEPLOYMENT_DATA_STATS_SQL,
@@ -9,6 +9,8 @@ import {
   MAINTENANCE_SHIFTS_SQL,
 } from '../../dashboard/constants/demoSql';
 import { executeDatasourceQuery, getDataSourceById } from '../../dashboard/store/useDataSourceStore';
+import { parseLegDistanceMax } from '../../dashboard/route-progress/legProgress';
+import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import {
   fetchOperationShiftDetail,
   fetchOperationShiftList,
@@ -36,6 +38,16 @@ import type {
 
 const DS = 'default-internal';
 
+/** 後端失效通知裡跟班次清單有關的標籤（backend datasource-invalidation.service.ts 的 DS_TAGS） */
+const LIVE_TAGS = new Set([
+  'table:operation_orders',
+  'domain:mainline_shifts',
+  'domain:maintenance_shifts',
+  'domain:shift_center',
+]);
+/** 兩次清單重查至少隔多久（後端本身也限每秒一次） */
+const LIVE_MIN_GAP_MS = 1_000;
+
 function str(row: Record<string, unknown> | undefined, key: string, fallback = ''): string {
   const v = row?.[key];
   if (v === null || v === undefined) return fallback;
@@ -45,6 +57,32 @@ function str(row: Record<string, unknown> | undefined, key: string, fallback = '
 function num(row: Record<string, unknown> | undefined, key: string, fallback = 0): number {
   const v = Number(row?.[key]);
   return Number.isFinite(v) ? v : fallback;
+}
+
+/** NULL／空值是「不知道」，不能被 Number(null) 變成 0 */
+function nullableNum(row: Record<string, unknown> | undefined, key: string): number | null {
+  const v = row?.[key];
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 站序：有就用單上的（payload.stations）。進出廠、待命這類沒有站序的單，用單上的起點→終點；
+ * 起訖同一點（原地待命、暫停）只畫一個點。不要補一條車根本不會走的固定路線。
+ */
+function routeStationsOf(row: Record<string, unknown>): string {
+  const raw = str(row, 'route_stations').trim();
+  if (raw && raw !== '[]') return raw;
+  const point = (nameKey: string, idKey: string) => {
+    const name = str(row, nameKey);
+    return name && name !== '—' ? { name, station_id: str(row, idKey) || undefined } : null;
+  };
+  const ends = [point('st_a', 'origin_station_id'), point('st_c', 'destination_station_id')]
+    .filter((item): item is { name: string; station_id: string | undefined } => item !== null);
+  const sameSpot = ends.length === 2
+    && (ends[0].station_id ? ends[0].station_id === ends[1].station_id : ends[0].name === ends[1].name);
+  return JSON.stringify(sameSpot ? [ends[0]] : ends);
 }
 
 function mapShiftRow(row: Record<string, unknown>): ShiftRow {
@@ -59,10 +97,12 @@ function mapShiftRow(row: Record<string, unknown>): ShiftRow {
     tripCode: str(row, 'trip_code', '—'),
     directionLabel: str(row, 'direction_label', '—'),
     vehicleCode: str(row, 'vehicle_code', '—'),
-    routeStations: str(row, 'route_stations'),
-    routeProgress: num(row, 'route_progress'),
-    segmentIndex: num(row, 'segment_index'),
-    segmentRemainPct: num(row, 'segment_remain_pct', 100),
+    routeStations: routeStationsOf(row),
+    // route_progress 不用：正線 SQL 沒有車端值時給固定 18，畫面會一直停在同一格。
+    // 進度改由車端 MQTT 依距離推進（ShiftRouteTrack），SQL 只在還沒收到回報時墊底。
+    segmentIndex: nullableNum(row, 'segment_index'),
+    segmentRemainPct: nullableNum(row, 'segment_remain_pct'),
+    legDistanceMax: parseLegDistanceMax(row?.leg_distance_max_m),
     statusLabel,
     statusBg: str(row, 'status_bg', 'rgba(34,197,94,0.2)'),
     statusColor: str(row, 'status_color', '#4ADE80'),
@@ -290,6 +330,71 @@ export function useDeploymentData() {
       cancelled = true;
     };
   }, [reloadToken]);
+
+  /*
+   * 班次清單跟著後端即時變：車端 MQTT 換單、到站換段、狀態或延誤改變時，後端寫庫後推
+   * datasource/invalidate（mqtt.service.ts → emitOrderLifecycle，最多每秒一次）。收到就只重查
+   * 清單與統計，不重拉班表、待核准那些慢資料。查詢中又來通知就排一次補查，不疊、不丟。
+   * 進度條本身不靠重查：ShiftRouteTrack 直接吃車隊 MQTT。
+   */
+  const liveRef = useRef({ running: false, again: false, timer: 0, lastAt: 0 });
+  useEffect(() => {
+    let disposed = false;
+    const live = liveRef.current;
+    const run = async () => {
+      if (live.running) {
+        live.again = true;
+        return;
+      }
+      live.running = true;
+      live.lastAt = Date.now();
+      try {
+        const [statsRows, mainRows, maintRows] = await Promise.all([
+          querySql(DEPLOYMENT_DATA_STATS_SQL),
+          querySql(MAINLINE_SHIFTS_SQL),
+          querySql(MAINTENANCE_SHIFTS_SQL),
+        ]);
+        if (disposed) return;
+        const statsRow = statsRows[0];
+        if (statsRow) {
+          setStats({
+            ontimePct: num(statsRow, 'ontime_pct', FALLBACK_STATS.ontimePct),
+            achievementPct: num(statsRow, 'achievement_pct', FALLBACK_STATS.achievementPct),
+            totalCount: num(statsRow, 'total_count', FALLBACK_STATS.totalCount),
+            completedCount: num(statsRow, 'completed_count', FALLBACK_STATS.completedCount),
+            delayedCount: num(statsRow, 'delayed_count', FALLBACK_STATS.delayedCount),
+            abnormalCount: num(statsRow, 'abnormal_count', FALLBACK_STATS.abnormalCount),
+            cancelledCount: num(statsRow, 'cancelled_count', FALLBACK_STATS.cancelledCount),
+          });
+        }
+        setMainline(mainRows.map(mapShiftRow));
+        setMaintenance(maintRows.map(mapShiftRow));
+      } finally {
+        live.running = false;
+        if (live.again && !disposed) {
+          live.again = false;
+          schedule();
+        }
+      }
+    };
+    const schedule = () => {
+      if (live.timer) return;
+      const wait = Math.max(0, LIVE_MIN_GAP_MS - (Date.now() - live.lastAt));
+      live.timer = window.setTimeout(() => {
+        live.timer = 0;
+        void run();
+      }, wait);
+    };
+    const unsubscribe = subscribeDatasourceInvalidation((payload) => {
+      if (payload.tags.some((tag) => LIVE_TAGS.has(tag))) schedule();
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+      if (live.timer) window.clearTimeout(live.timer);
+      live.timer = 0;
+    };
+  }, []);
 
   return { mode, stats, schedule, event, vehicles, mainline, maintenance, dispatchEnabled, reload };
 }

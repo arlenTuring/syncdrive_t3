@@ -1799,3 +1799,70 @@ describe('同場區接力換格（2026-11-19 午夜充電洗車區）', () => {
     assert.notEqual(at('c2'), at('c1'), '時間線 2 改去別的空格');
   });
 });
+
+describe('場區格位交接要等前一台開出入口點（2026-11-21 午夜充電洗車區）', () => {
+  /** N2W、S2 ─50s─ 入口點 G ─50s─ E1；E1 是分區裡唯一的格位，進出都經過 G */
+  const topology = {
+    ...emptyPointTopology(),
+    nodes: [
+      { id: 'n-n2w', kind: 'docking', label: 'N2W', stationId: 'station_n2w', x: 0, y: 0, color: '#111' },
+      { id: 'n-s2', kind: 'docking', label: 'S2', stationId: 'station_s2', x: 0, y: 0, color: '#111' },
+      { id: 'G', kind: 'waypoint', label: 'G', x: 0, y: 0, color: '#111' },
+      { id: 'E1', kind: 'facility', label: 'E1', x: 0, y: 0, color: '#222' },
+    ],
+    edges: [edge('n-n2w', 'G', 50), edge('G', 'n-n2w', 50), edge('n-s2', 'G', 50), edge('G', 'n-s2', 50), edge('G', 'E1', 50), edge('E1', 'G', 50)],
+  } as PointTopology;
+  const areas = [{
+    id: 'e-area',
+    facilities: [
+      { id: 'zone-e', type: 'Facility', parameters: { zonePartitionEntranceId: 'G' } },
+      { id: 'G', type: 'Facility', parameters: {} },
+      { id: 'E1', type: 'Facility', parameters: { parentZoneId: 'zone-e' } },
+    ],
+  }] as never;
+  const routes = [
+    {
+      routeId: 'as', routeCode: 'AS', routeName: 'A>S2', stationIds: ['station_a', 'station_s2'], stationDwells: [],
+      minTravelTimeSeconds: 300, avgTravelTimeSeconds: 300, dwellSlackSeconds: 0, switchBufferAfterSeconds: 0,
+    },
+    {
+      routeId: 'na', routeCode: 'NA', routeName: 'N2W>A', stationIds: ['station_n2w', 'station_a'], stationDwells: [],
+      minTravelTimeSeconds: 300, avgTravelTimeSeconds: 300, dwellSlackSeconds: 0, switchBufferAfterSeconds: 0,
+    },
+  ] as never as Parameters<typeof insertMaintenanceTransferCards>[0]['selectedRoutes'];
+  const block = (id: string, row: number, taskType: string, start: number, end: number, routeId?: string) => ({
+    id, timelineRow: row, taskType, label: taskType, routeId, anchorStartMinute: start, plannedStartMinute: start,
+    plannedEndMinute: end, travelSeconds: taskType === 'passenger' ? 300 : 0, dwellSeconds: 0, source: 'template_bar',
+  });
+
+  it('從正線進來的車晚一點進廠，不在前一台還在格子裡時就開到入口點', () => {
+    // 時間線 1 在 E1 充電到 12:00，12:02 從 N2W 發車；時間線 2 11:55 跑完正線到 S2，12:00 起在 E1 充電。
+    // 充電需要 60 分鐘，排了 90 分鐘：開頭可以讓出一點。
+    const timelines = [
+      { row: 1, blocks: [block('c1', 1, 'charging', 600, 720), block('p1', 1, 'passenger', 722, 727, 'na')] },
+      { row: 2, blocks: [block('p2', 2, 'passenger', 710, 715, 'as'), { ...block('c2', 2, 'charging', 720, 810), requiredChargingSeconds: 3600 }] },
+    ] as never as GeneratedSchedulePlan['timelines'];
+    const result = insertMaintenanceTransferCards({
+      timelines, topology, areas,
+      maintenanceBody: { charging: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'E1' }] } },
+      selectedRoutes: routes, minimumRecoveryTimeSeconds: 0, collisionProtectionSeconds: 30,
+      sectionCodes: SECTION_CODES,
+      maintenanceEntrySlackBySection: { charging: 600, preTrip: 600, mobile: 600, carWash: 600, maintenance: 600 },
+    });
+    const blocks = timelines.flatMap((t) => t.blocks);
+    const exit = blocks.find((b) => b.timelineRow === 1 && b.source === 'yard_exit_move')!;
+    const entry = blocks.find((b) => b.timelineRow === 2 && b.source === 'yard_entry_move')!;
+    assert.ok(exit, '時間線 1 要有出場卡');
+    assert.ok(entry, `時間線 2 要有入廠卡：${JSON.stringify(result.skipped)}`);
+    const leaveSecond = exit.plannedStartMinute * 60;
+    const arriveSecond = entry.plannedEndMinute * 60;
+    // 前一台 E1 → G 要 50 秒、後一台 G → E1 要 50 秒，再加 30 秒碰撞保護
+    assert.ok(
+      arriveSecond >= leaveSecond + 50 + 50 + 30 - 1e-6,
+      `後一台 ${arriveSecond} 秒到 E1，前一台 ${leaveSecond} 秒才離開，入口點會互卡`,
+    );
+    const charge = blocks.find((b) => b.id === 'c2')!;
+    assert.ok(charge.plannedStartMinute * 60 >= arriveSecond - 1e-6, '充電跟著晚開始');
+    assert.equal(charge.plannedEndMinute, 810, '充電結束不動');
+  });
+});

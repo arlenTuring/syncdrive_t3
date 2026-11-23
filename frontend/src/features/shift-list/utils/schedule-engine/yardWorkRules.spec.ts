@@ -131,3 +131,51 @@ describe('提早到設施是等待，等待也佔格位', () => {
     assert.equal(errors.filter((item) => item.code === 'FACILITY_SLOT_COLLISION').length, 1);
   });
 });
+
+describe('場區格位交接：前一台出場區、後一台從外面進來時也要留交接時間（2026-11-21 午夜互卡）', () => {
+  /**
+   * 時間線 1 在 E2 充電到 600 分，600 分開出場區（出廠卡 50 秒）；時間線 2 從正線入廠，
+   * 抵達 E2 的時刻由 arriveMinute 決定。兩格都屬同一場區 zone-e。
+   */
+  const plan = (arriveMinute: number, leaverMovesInside = false): GeneratedSchedulePlan['timelines'] => [
+    {
+      row: 1,
+      blocks: [
+        block({ id: 'c1', timelineRow: 1, plannedStartMinute: 500, plannedEndMinute: 600, yardFacilityNodeId: 'E2', yardZoneId: 'zone-e' }),
+        leaverMovesInside
+          ? block({ id: 'x1', timelineRow: 1, taskType: 'dispatch', source: 'yard_exit_move', plannedStartMinute: 600, plannedEndMinute: 600 })
+          : block({ id: 'x1', timelineRow: 1, taskType: 'dispatch', source: 'yard_exit_move', plannedStartMinute: 600, plannedEndMinute: 600 + 50 / 60 }),
+        leaverMovesInside
+          ? block({ id: 's1', timelineRow: 1, taskType: 'standby', plannedStartMinute: 600, plannedEndMinute: 700, yardFacilityNodeId: 'E3', yardZoneId: 'zone-e' })
+          : block({ id: 'p1', timelineRow: 1, taskType: 'passenger', plannedStartMinute: 602, plannedEndMinute: 610 }),
+      ],
+    },
+    {
+      row: 2,
+      blocks: [
+        block({ id: 'p2', timelineRow: 2, taskType: 'passenger', plannedStartMinute: 580, plannedEndMinute: 590 }),
+        block({
+          id: 'm2', timelineRow: 2, taskType: 'dispatch', source: 'yard_entry_move',
+          plannedStartMinute: arriveMinute - 100 / 60, plannedEndMinute: arriveMinute, yardExitFacilityNodeId: 'E2',
+        }),
+        block({ id: 'c2', timelineRow: 2, plannedStartMinute: arriveMinute, plannedEndMinute: 700, yardFacilityNodeId: 'E2', yardZoneId: 'zone-e' }),
+      ],
+    },
+  ];
+  const gaps = (timelines: GeneratedSchedulePlan['timelines']) => {
+    const errors: FeasibilityIssue[] = [];
+    const warnings: FeasibilityIssue[] = [];
+    validateFacilityOccupancy(timelines, errors, { collisionProtectionSeconds: 30, warnings });
+    return warnings.filter((item) => item.code === 'FACILITY_HANDOVER_GAP').length;
+  };
+
+  it('前一台開出場區的同一刻後一台就進格：交接太緊', () => {
+    assert.equal(gaps(plan(600)), 1);
+  });
+  it('隔了兩倍碰撞保護以上：不回報', () => {
+    assert.equal(gaps(plan(602)), 0);
+  });
+  it('前一台只是區內換格（零秒示意卡），不經過入口點：不回報', () => {
+    assert.equal(gaps(plan(600, true)), 0);
+  });
+});

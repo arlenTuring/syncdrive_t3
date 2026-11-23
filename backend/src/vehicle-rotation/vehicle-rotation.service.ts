@@ -170,14 +170,41 @@ function nextDayConflicts(
   order: ShuntOrder,
   back: PlannedDispatch,
   planned: readonly PlannedDispatch[],
-): { cancelled: string[]; blocking: string | null } {
+): { cancelled: string[]; blocking: string | null; tasks: PlannedDispatch[] } {
   const spareRow = planned.find((item) => item.vehicleCode === order.incoming)?.timelineRow;
   const early = nextPlanned.filter((item) => item.timelineRow === spareRow && item.departAt < back.arriveAt);
   const blocking = early.find((item) => item.kind !== 'maintenance');
+  const tasks = early.filter((item) => item.kind === 'maintenance');
   return {
-    cancelled: early.filter((item) => item.kind === 'maintenance').map((item) => item.orderId),
+    cancelled: tasks.map((item) => item.orderId),
     blocking: blocking?.tripCode ?? null,
+    tasks,
   };
+}
+
+/**
+ * 取消掉的備用列場內任務，改發給回到格位的被換車（role 'rest'）。
+ *
+ * 只取消不改派的話，被換車回到格位後手上一張單都沒有：主系統不知道那一格停著車，模擬器重開也只能把它當
+ * 待命車隨便放。2026-11-22 PMS02 被換下、00:26 回到 M4，備用列整天的待命 M100000 被取消後沒有人接，
+ * 22:13 模擬器重開把 PMS02 放進 E4，連鎖到 00:01 兩車在充電洗車入口對頂卡死。
+ * 同一格、而且原任務在被換車回來之後還沒結束的才改派；時間從回到格位起、到原本的結束時刻，等回場調車完成才發。
+ */
+function restLegsFor(tasks: readonly PlannedDispatch[], order: ShuntOrder, back: PlannedDispatch, day: string): ShuntLeg[] {
+  return tasks
+    .filter((task) => task.arriveAt > back.arriveAt && task.origin?.name != null && task.origin.name === back.destination?.name)
+    .map((task) => ({
+      ...task,
+      orderId: `${task.orderId}-RS`,
+      vehicleCode: order.outgoing,
+      departAt: back.arriveAt,
+      origin: task.origin && { ...task.origin, departAt: back.arriveAt },
+      role: 'rest' as const,
+      phase: 'hold' as const,
+      attempt: 1,
+      planDay: day,
+      planDepartAt: task.departAt,
+    }));
 }
 
 function retimed(leg: PlannedDispatch, departAt: number): Pick<PlannedDispatch, 'departAt' | 'arriveAt' | 'origin' | 'destination'> {
@@ -518,6 +545,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
           report.blocked.push({ code: order.outgoing, reason: `${spareTasks.blocking} 在回到格位之前就要開始，今天不換` });
           continue;
         }
+        shunts.push(...restLegsFor(spareTasks.tasks, order, shunts[1], nextDay(day)));
         const confirmed = rules.mode === 'auto';
         await manager.query(
           `INSERT INTO vehicle_rotation_items
@@ -677,7 +705,9 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     states = await this.loadStates(run);
     if (await this.drive(run, states, now)) await this.store.save(item.id, { shunts: run.legs, history: run.history.splice(0) });
     // 4. 全部做完才結案
-    if (run.finish) await this.finish(run.item, run.finish, run.legs);
+    // 接手的場內任務還沒下單成功就先不結案（結案後不再檢查，就再也不會補送）
+    const restPending = run.legs.some((leg) => leg.role === 'rest' && leg.phase === 'queued' && !leg.superseded);
+    if (run.finish && !restPending) await this.finish(run.item, run.finish, run.legs);
   }
 
   /** 記下車真的開動過的調車段：中止時只有開動過的接替車要開回格位 */
@@ -792,8 +822,33 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
 
     const outSettled = outs.some((leg) => st(leg)?.status === 'END') || outs.some((leg) => leg.gaveUp);
     if (!outSettled) return;
+    this.releaseRest(run, outs.some((leg) => st(leg)?.status === 'END'), now);
     const takeover = await this.takeover(item);
     if (takeover.done) run.finish = takeover;
+  }
+
+  /**
+   * 回場調車完成：被換車已停進格位，接手那一列剩下的場內任務改發給它（restLegsFor）。
+   * 沒回到格位（原地待命）、或原任務已經結束的就不發。
+   */
+  private releaseRest(run: Run, backInSlot: boolean, now: number): void {
+    for (const leg of run.role('rest')) {
+      if (leg.phase !== 'hold' || leg.superseded) continue;
+      const departAt = Math.max(now + ISSUE_LEAD_MS, leg.departAt);
+      if (!backInSlot || departAt >= leg.arriveAt) {
+        leg.superseded = true;
+        run.note('rest-skip', `${leg.vehicleCode} ${backInSlot ? `的 ${leg.tripCode} 已經過了結束時間` : '沒有回到格位'}，不接 ${leg.tripCode}`, false);
+        continue;
+      }
+      Object.assign(leg, {
+        departAt,
+        origin: leg.origin && { ...leg.origin, departAt },
+        phase: 'queued',
+        queuedAt: now,
+        waitFor: [],
+      });
+      run.note('rest', `${leg.vehicleCode} 回到格位，接手 ${leg.tripCode}（到原本的結束時刻）`, false);
+    }
   }
 
   /** 排一張重發：舊單要先取消（故障的單也記取消，不能再復歸），確認結案後才下新單 */
@@ -913,6 +968,8 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
         superseded: false,
       });
     }
+    // 輪替沒成：備用列的任務照原計畫由接替車（原備用車）做，不改派給被換車
+    for (const leg of run.role('rest')) leg.superseded = true;
     // 派遣不要再發的：只剩這裡補發的那幾張（更晚的照原計畫）
     run.cancelledOrderIds = overdue.map((task) => task.orderId);
     run.status = 'aborted';

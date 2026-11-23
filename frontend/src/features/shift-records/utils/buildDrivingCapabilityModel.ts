@@ -51,6 +51,8 @@ export type DrivingCapabilityModel = {
   directionLabel: string;
   timeRangeLabel: string;
   durationMinutes: number;
+  /** 不到一分鐘的單（例如 0 秒的過渡單）照實際秒數寫，不寫成「1 分鐘」 */
+  durationSeconds: number;
   plannedDurationHms: string;
   actualDurationHms: string;
   punctuality: '準時' | '延誤' | '進行中' | '—';
@@ -168,12 +170,19 @@ function resolveRangeMs(
   } else {
     // 沒有計畫時刻的舊單用現在當畫面範圍起點，不從班次代號推發車時刻
     startMs = plannedStartRaw ?? Date.now();
-    endMs =
-      (plannedEndRaw != null && plannedEndRaw > startMs ? plannedEndRaw : null)
-      ?? startMs + DEFAULT_LEG_MS;
+    endMs = Math.max(
+      plannedEndRaw ?? startMs,
+      completed != null && isNearTrip(completed, startMs, startMs) ? completed : startMs,
+    );
+    /*
+     * 計畫 0 秒的單（同一處換卡的過渡單，例如 NWU 停車點 → NWU 月台）車本來就不動、沒有站點動作。
+     * 以前起訖相同就補成 6 分鐘，畫面整段寫「行駛中」，看起來像車開了 6 分鐘卻什麼都沒記到
+     * （2026-11-23 OT040315：車端 4 秒就回報完成）。有完成時刻就照實際；連完成都還沒有、也沒有計畫結束的才用預設長度。
+     */
+    if (endMs <= startMs && plannedEndRaw == null && completed == null) endMs = startMs + DEFAULT_LEG_MS;
   }
 
-  if (endMs <= startMs) endMs = startMs + DEFAULT_LEG_MS;
+  if (endMs <= startMs) endMs = startMs + 1_000;
   const durationMs = endMs - startMs;
   return {
     startMs: startMs - RANGE_PAD_MS,
@@ -258,6 +267,7 @@ function buildStatusSegments(
   events: TimelineEvent[],
   startMs: number,
   endMs: number,
+  inPlace = false,
 ): StatusSegment[] {
   const main = events
     .filter((e) => e.channel === 'action')
@@ -269,8 +279,9 @@ function buildStatusSegments(
         id: 'travel-all',
         fromMs: startMs,
         toMs: endMs,
-        label: '行駛中',
-        tone: 'green',
+        // 起訖同一處、又沒有任何站點動作：車沒有開，不寫「行駛中」
+        label: inPlace ? '原地，不移動' : '行駛中',
+        tone: inPlace ? 'blue' : 'green',
       },
     ];
   }
@@ -411,7 +422,10 @@ export function buildDrivingCapabilityModel(detail: ShiftRecordDetail): DrivingC
       .sort((a, b) => a.atMs - b.atMs || a.id.localeCompare(b.id)),
   );
 
-  const statusSegments = buildStatusSegments(events, startMs, endMs);
+  // route_label 可能帶任務名稱前綴（「出場移動 · NWU → NWU」）：起點只取「·」後面
+  const ends = routeParts(detail.route_label).map((part, index) => (index === 0 ? part.split('·').pop()!.trim() : part));
+  const inPlace = ends.length >= 2 && ends[0] === ends[ends.length - 1];
+  const statusSegments = buildStatusSegments(events, startMs, endMs, inPlace);
   const punctuality = punctualityLabel(detail);
   const minutes = Math.max(1, Math.round(durationMs / 60_000));
 
@@ -421,6 +435,7 @@ export function buildDrivingCapabilityModel(detail: ShiftRecordDetail): DrivingC
     directionLabel: directionLabel(detail.route_label),
     timeRangeLabel: `${formatHms(startMs + RANGE_PAD_MS)} - ${formatHms(endMs - RANGE_PAD_MS)}`,
     durationMinutes: minutes,
+    durationSeconds: Math.round(durationMs / 1000),
     plannedDurationHms: formatDurationHms(durationMs),
     actualDurationHms: formatDurationHms(durationMs),
     punctuality,

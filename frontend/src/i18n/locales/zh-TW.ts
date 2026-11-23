@@ -368,6 +368,7 @@ const zhTW = {
     capabilityModal: {
       title: "運行紀錄",
       durationMinutes: "總時長 {{minutes}} 分鐘",
+      durationSeconds: "總時長 {{seconds}} 秒",
       scrollHint: "時軸可以左右滑動，查看更多任務",
       laneAction: "動作",
       laneEvent: "事件",

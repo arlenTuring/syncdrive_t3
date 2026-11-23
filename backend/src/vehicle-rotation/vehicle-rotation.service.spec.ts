@@ -561,4 +561,59 @@ describe('VehicleRotationService 監看流程', () => {
     expect(item(h).recovery_state).toBe('incomplete');
     expect(item(h).history.some((entry) => entry.kind === 'recovery-failed')).toBe(true);
   });
+
+  /** 備用列整天的待命（M3），被換車回到 M3 之後接手到原本的結束時刻（2026-11-22 PMS02／M100000） */
+  function restLeg(departAt: number): ShuntLeg {
+    const rest = task({ tripCode: 'M050000', vehicleCode: 'PMS02', departAt: T0, arriveAt: T0 + 24 * 60 * MIN, row: 5, kind: 'maintenance', origin: point('M3'), destination: point('M3') });
+    return { ...rest, orderId: `${rest.orderId}-RS`, vehicleCode: 'PMS01', departAt, origin: { ...rest.origin!, departAt }, role: 'rest', phase: 'hold', attempt: 1, planDay: NEXT, planDepartAt: T0 };
+  }
+
+  it('回場完成：被換車接手備用列剩下的待命，到原本的結束時刻；發出之前不結案', async () => {
+    const first = task({ tripCode: 'NT0100', vehicleCode: 'PMS02', departAt: T0 + 60 * MIN, row: 1 });
+    const h = harness({ planNext: [first] });
+    const { inLeg, outLeg, row } = addRotation(h);
+    const rest = restLeg(outLeg.arriveAt);
+    row.shunts = [...row.shunts, rest];
+    h.store.addOrder({ orderId: inLeg.orderId, vehicle: 'PMS02', status: 'END', startedAt: inLeg.departAt, endedAt: inLeg.arriveAt });
+    h.advance(6 * MIN);
+    await h.tick(); // 發回場
+    expect(legs(h, 'rest')[0].phase).toBe('hold');
+    const out = legs(h, 'out').at(-1)!;
+    h.store.order(out.orderId).status = 'END';
+    // 接替車已開始接班：承接完成，但接手的待命第一次下單失敗，先不結案
+    h.store.addOrder({ orderId: 'SIM-PLAN-run1-NT0100', planOrderId: first.orderId, vehicle: 'PMS02', status: 'PROCESSING' });
+    h.engine.failIssue = 1;
+    h.advance(MIN);
+    await h.tick();
+    expect(legs(h, 'rest')[0].phase).toBe('queued');
+    expect(item(h).status).toBe('confirmed');
+    await h.tick();
+    const issued = h.issued.find((leg) => leg.role === 'rest')!;
+    expect(issued.vehicleCode).toBe('PMS01');
+    expect(issued.tripCode).toBe('M050000');
+    expect(issued.departAt).toBeGreaterThanOrEqual(h.now);
+    expect(issued.arriveAt).toBe(T0 + 24 * 60 * MIN);
+    expect(issued.origin?.departAt).toBe(issued.departAt);
+    expect(item(h).status).toBe('done');
+  });
+
+  it('回場失敗、被換車原地待命：不接手備用列的待命（車不在那一格）', async () => {
+    const first = task({ tripCode: 'NT0100', vehicleCode: 'PMS02', departAt: T0 + 60 * MIN, row: 1 });
+    const h = harness({ planNext: [first] });
+    const { inLeg, outLeg, row } = addRotation(h);
+    row.shunts = [...row.shunts, restLeg(outLeg.arriveAt)];
+    h.store.addOrder({ orderId: inLeg.orderId, vehicle: 'PMS02', status: 'END', startedAt: inLeg.departAt, endedAt: inLeg.arriveAt });
+    h.advance(6 * MIN);
+    await h.tick();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      h.store.order(legs(h, 'out').at(-1)!.orderId).status = 'FAULTED';
+      h.advance(MIN);
+      await h.tick();
+    }
+    h.advance(10_000);
+    await h.tick();
+    expect(legs(h, 'out').at(-1)!.gaveUp).toBe(true);
+    expect(legs(h, 'rest')[0].superseded).toBe(true);
+    expect(h.issued.some((leg) => leg.role === 'rest')).toBe(false);
+  });
 });
