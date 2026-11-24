@@ -118,7 +118,7 @@ export function LegacyVehicleModelPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-surface-sub-background p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto max-w-5xl space-y-8 text-body-xs text-text-secondary">
         {message ? (
           <p role="status" className={message.tone === 'ok' ? 'text-status-success' : 'text-status-error-emphasis'}>
@@ -127,7 +127,7 @@ export function LegacyVehicleModelPanel() {
         ) : null}
 
         <section className="space-y-3">
-          <h2 className="text-body-s-bold text-text-primary">此瀏覽器的舊模型</h2>
+          <h2 className="text-body-m-bold text-text-primary">此瀏覽器的舊模型</h2>
           <p className="text-text-quaternary">
             只列出這台瀏覽器快取裡的模型；其他電腦或瀏覽器裡的模型這裡看不到，請到那台瀏覽器打開此頁匯入。
           </p>
@@ -215,7 +215,7 @@ export function LegacyVehicleModelPanel() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-body-s-bold text-text-primary">儀表板設定遷移成地圖設定</h2>
+          <h2 className="text-body-m-bold text-text-primary">儀表板設定遷移成地圖設定</h2>
           <p className="text-text-quaternary">
             把儀表板圖台上「載具容器」的模型、顯示尺寸與行為圖示，搬成圖資管理的地圖設定。只新增地圖設定、不改儀表板；
             地圖已有設定就跳過；同一張地圖在不同儀表板設得不一樣會列成衝突，不替你挑。

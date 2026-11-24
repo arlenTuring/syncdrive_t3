@@ -4,7 +4,7 @@ import { ApiError, type Candidate } from './api';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton } from './dialogs';
 import { EMPTY_SELECTION, pageState, toggle, togglePage, type PageItem } from './selection';
 import { Checkbox, Pagination, TypeBadge } from './widgets';
-import { Button } from '../../components/ui';
+import { Button, fieldClass, cn } from '../../components/ui';
 
 export type PickerItem = Omit<Candidate, 'in_group'> & { included: boolean };
 export type PickerPage = { items: PickerItem[]; total: number; pageSize: number };
@@ -112,7 +112,7 @@ export function MediaPickerDialog({
           onKeyDown={(event) => event.key === 'Enter' && search()}
           placeholder="請輸入關鍵字"
           aria-label="搜尋媒體名稱或內容描述"
-          className="w-full rounded-xl bg-surface-secondary py-3.5 pr-4 pl-12 text-headline-5 outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
+          className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pr-4 pl-12')}
         />
       </div>
       <table className="t3-table mt-4 w-full table-fixed text-left">

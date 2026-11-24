@@ -32,7 +32,7 @@ import {
   type ExecutionStatusKey,
   type ShiftTab,
 } from '../types';
-import { Button, Checkbox, IconButton, Pagination, Tabs } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Pagination, Tabs, Header, tabPanelProps, fieldClass, cn } from '../../../components/ui';
 
 type ShiftRecordsListPageProps = {
   onBackToHome?: () => void;
@@ -194,19 +194,20 @@ export function ShiftRecordsListPage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       {!embedded ? (
-        <header className="border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
-          <div className="flex items-center gap-3">
+        <header className="px-6 py-4">
+          {/* Header 規格 Sub Header：圖示 24、text-primary，標題 18/24/500，間距 8 */}
+          <div className="flex items-center gap-2">
             {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-            <ClipboardList className="size-5 text-text-theme" aria-hidden />
-            <h1 className="text-headline-5">{t('shiftRecords.title')}</h1>
+            <Header type="subheader" as="h1" icon={<ClipboardList />} title={t('shiftRecords.title')} />
           </div>
         </header>
       ) : null}
 
-      <div className="border-b border-border-quaternary px-6">
+      <div className="px-6">
         <Tabs
+          idBase="shift-records"
           label="班次類別"
           value={tab}
           onChange={(key) => {
@@ -220,9 +221,9 @@ export function ShiftRecordsListPage({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
-        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={resetFilters} title={t('common.resetFiltersTitle')} leadingIcon={<RotateCcw />}>{t('common.resetFilters')}</Button>
-        <div className="relative min-w-[180px] flex-1 basis-[200px]">
+      <div {...tabPanelProps('shift-records', tab)} className="contents">
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+        <div className="relative w-60 shrink-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
             type="search"
@@ -230,7 +231,7 @@ export function ShiftRecordsListPage({
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none"
+            className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pl-9 pr-3')}
           />
         </div>
         <SiteSelect
@@ -266,12 +267,12 @@ export function ShiftRecordsListPage({
             </option>
           ))}
         </SiteSelect>
-        <div className="shrink-0 min-w-[400px] max-w-[520px] flex-1 basis-[400px]">
+        <div className="min-w-[280px] max-w-[400px] flex-1">
           <DateTimeRangePicker value={dateRange} onChange={setDateRange} />
         </div>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
-        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => void handleDownload()} disabled={exporting}>{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {t('common.download')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" onPress={resetFilters} title={t('common.resetFiltersTitle')} leadingIcon={<RotateCcw />}>{t('common.resetFilters')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" className="ml-auto shrink-0" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting}>{t('common.download')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
@@ -340,9 +341,10 @@ export function ShiftRecordsListPage({
         </table>
       </div>
 
-      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+      <footer className="flex items-center justify-center px-6 py-4">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
+      </div>
     </div>
   );
 }

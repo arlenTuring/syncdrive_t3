@@ -22,10 +22,11 @@ export function ShellWorkspaceFrame({
   onOpenSystemFoundation,
 }: ShellWorkspaceFrameProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-primary p-3">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background ring-1 ring-black-30">
-        {/* Header 規格 Web-Header：高 40、標題 18/24/500、左側 Icon 24（上下各留 8，整列 56 跟以前一樣） */}
-        <header className="shrink-0 border-b border-border-quaternary px-3 py-2">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-sub-background p-3">
+      {/* 設計稿：外圍是黑底（surface-sub-background），內容卡片是 surface-background，頂欄與內容之間不畫分隔線 */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-surface-background">
+        {/* Header 規格 Web-Header：高 40、標題 18/24/500、左側 Icon 24、標題與 Icon 都是 text-primary */}
+        <header className="shrink-0 px-3 pb-2 pt-3">
           <Header
             type="web"
             as="h1"

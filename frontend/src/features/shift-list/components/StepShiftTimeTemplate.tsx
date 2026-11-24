@@ -211,7 +211,7 @@ export function StepShiftTimeTemplate({
         && hasEmptyIntervals && (
         <div className="mt-6 max-w-3xl shrink-0 space-y-3 rounded-xl border border-border-quaternary bg-black-30 p-5">
           <div>
-            <h3 className="text-body-s-bold text-text-primary">{t('shiftList.stepTimeTemplate.emptySlackTitle')}</h3>
+            <h3 className="text-body-m-bold text-text-primary">{t('shiftList.stepTimeTemplate.emptySlackTitle')}</h3>
             <p className="mt-1 text-body-xs text-text-quaternary">
               {t('shiftList.stepTimeTemplate.emptySlackHint')}
             </p>

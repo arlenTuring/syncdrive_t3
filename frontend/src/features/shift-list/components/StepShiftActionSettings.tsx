@@ -49,10 +49,10 @@ import {
   type ShiftMenuGroup,
   type ShiftMenuOption,
 } from './ShiftMenuSelect';
-import { IconButton } from '../../../components/ui';
+import { IconButton, cn, fieldClass } from '../../../components/ui';
 
 const INPUT_CLASS =
-  'h-10 w-[56px] shrink-0 rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s tabular-nums text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: false }), 'w-[56px] shrink-0 tabular-nums');
 const FIELD_LABEL_CLASS = 'mb-1.5 block text-body-xs text-text-tertiary';
 const MEDIA_FIELD_WIDTH_CLASS = 'w-[168px]';
 

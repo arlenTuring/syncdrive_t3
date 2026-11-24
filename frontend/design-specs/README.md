@@ -29,7 +29,7 @@
 | `t3-dropdown-engineering-spec.md` | `src/components/ui/dropdown/`、`SiteSelect` 選單 | 已實作 |
 | `t3-input-number-engineering-spec.md` | `src/components/ui/number/` | 已實作 |
 | `t3-header-engineering-spec.md` | `src/components/ui/header/`、全站頂欄 | 已實作 |
-| `t3-date-time-picker-engineering-spec.md` | `src/components/picker/`、`SiteDateTimeInput` | 部分（manifest `pending`：週／月／季／年／區間面板未做） |
+| `t3-date-time-picker-engineering-spec.md` | `src/components/ui/datepicker/`（全部面板）；`SiteDateTimeInput` 等沿用其面板 | 已實作 |
 | `t3-table-style-spec.md` | `src/components/table/table.css` | 已套用（manifest `styleSpecs`） |
 | `t3-navigation-style-spec.md` | `src/components/navigation/navigation.css`、側欄 | 已套用（manifest `styleSpecs`） |
 

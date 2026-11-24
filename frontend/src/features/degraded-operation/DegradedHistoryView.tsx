@@ -65,7 +65,7 @@ export function DegradedHistoryView({ onBack }: { onBack: () => void }) {
   const currentMeta = meta?.id === selectedId ? meta : null;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
+    <div className="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
       <section className="relative flex min-h-[420px] min-w-0 flex-col border-b border-border-quaternary p-4 xl:min-h-0 xl:border-r xl:border-b-0">
         <Button variant="outlined" className="absolute top-4 left-4 z-20" leadingIcon={<ChevronLeft />} onPress={onBack}>返回看即時</Button>
         {/* 以紀錄 id 為 key：換一筆就整個重建，前一筆的播放、請求、資料一起丟掉 */}
@@ -199,7 +199,7 @@ function HistoryDetailPanel({
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <span className="text-body-s text-text-tertiary">計畫名稱</span>
           <div className="flex items-start gap-3">
-            <h3 className="min-w-0 flex-1 text-headline-4 break-words">{value.name}</h3>
+            <h3 className="min-w-0 flex-1 text-headline-5 break-words">{value.name}</h3>
             <span className={`shrink-0 rounded px-3 py-1 text-body-xs ${levelBadge(value.level)}`}>Level {value.level}</span>
           </div>
           <p className="mt-3 flex items-center gap-2 text-text-secondary">

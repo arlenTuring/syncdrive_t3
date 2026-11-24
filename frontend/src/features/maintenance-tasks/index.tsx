@@ -70,6 +70,7 @@ export default function MaintenanceTasksApp({ onBackToHome, embedded }: Maintena
         <MaintenanceTaskListPage
           key={listReloadKey}
           onBackToHome={embedded ? undefined : onBackToHome}
+          embedded={embedded}
           onCreateClick={openCreateFlow}
           onEditClick={openEdit}
           onPreviewClick={openTaskPreview}

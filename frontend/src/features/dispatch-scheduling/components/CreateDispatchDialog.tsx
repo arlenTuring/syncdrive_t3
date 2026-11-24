@@ -35,7 +35,7 @@ import {
   type DispatchListItem,
   type DispatchPriorityKey,
 } from '../types';
-import { Button, Dialog, IconButton } from '../../../components/ui';
+import { Button, Dialog, IconButton, cn, fieldClass } from '../../../components/ui';
 
 type CreateDispatchDialogProps = {
   existingCodes: string[];
@@ -49,7 +49,7 @@ type StationStop = { id: string; stationId: string; actions: ShiftRouteSegmentAc
 
 const FIELD_LABEL = 'mb-1.5 block text-body-xs text-text-tertiary';
 const INPUT =
-  'h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 const STATION_ACTION_OPTIONS = SHIFT_ACTION_CATEGORY_CATALOG.filter(
   (item) => item.group === 'station',
@@ -432,7 +432,7 @@ export function CreateDispatchDialog({
             <div className="min-h-0 overflow-auto px-6 py-1 pb-4">
               <section className="mb-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-body-s-bold text-text-primary">
+                  <h3 className="text-body-m-bold text-text-primary">
                     {t('dispatchScheduling.createDialog.basicInfo')}
                   </h3>
                   <Button variant="text" trailingIcon={<ChevronRight />} onPress={() => setGroupPickerOpen((open) => !open)}>{t('dispatchScheduling.createDialog.selectRouteGroup')}</Button>
@@ -535,7 +535,7 @@ export function CreateDispatchDialog({
 
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-body-s-bold text-text-primary">
+                  <h3 className="text-body-m-bold text-text-primary">
                     {t('dispatchScheduling.createDialog.planSection')}
                   </h3>
                   <Button variant="text" leadingIcon={<Plus />} onPress={() => setStations((prev) => [...prev, emptyStation()])}>{t('dispatchScheduling.createDialog.createStation')}</Button>

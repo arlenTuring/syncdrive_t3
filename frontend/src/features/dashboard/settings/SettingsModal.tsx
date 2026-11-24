@@ -13,7 +13,7 @@ import {
   type DataSourceType,
 } from '../store/useDataSourceStore';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, Dialog, IconButton, Tabs } from '../../../components/ui';
+import { Button, Dialog, IconButton, Tabs, tabPanelProps } from '../../../components/ui';
 
 interface Props {
   onClose: () => void;
@@ -81,6 +81,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
               </span>
             )}
             <Tabs
+              idBase="dashboard-settings"
               label="資料設定分類"
               className="-mb-4"
               value={activeTab}
@@ -95,7 +96,7 @@ export function SettingsModal({ onClose, onClearAll, plane, planes = [], onChang
           <IconButton hierarchy="subordinate" variant="standard" onPress={onClose} type="submit" label="關閉" icon={<X />} />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+        <div {...tabPanelProps('dashboard-settings', activeTab)} className="flex-1 overflow-y-auto p-6 space-y-3">
           {activeTab === 'plane' && plane && onChangePlaneDataSettings ? (
             <PlaneDataSettingsPanel plane={plane} planes={planes} onChange={onChangePlaneDataSettings} />
           ) : activeTab === 'datasource' ? (

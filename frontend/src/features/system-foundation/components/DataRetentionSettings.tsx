@@ -152,12 +152,12 @@ export function DataRetentionSettings() {
       {error ? <p role="alert" className="text-body-xs text-status-error-emphasis">{error}</p> : null}
       {GROUPS.map((group) => (
         <section key={group.title} className="space-y-2">
-          <h3 className="text-body-s-bold text-text-primary">{group.title}</h3>
+          <h3 className="text-body-m-bold text-text-primary">{group.title}</h3>
           {group.categories.map(policyRow)}
         </section>
       ))}
       <section className="space-y-2">
-        <h3 className="text-body-s-bold text-text-primary">影像</h3>
+        <h3 className="text-body-m-bold text-text-primary">影像</h3>
         <Row title="監控錄影" note={videoError ? `無法取得影像設定：${videoError}` : '超過天數的錄影由影像儲存排程刪除；容量上限與儲存位置在影像管理設定。'}>
           <label className="text-text-tertiary">
             保存
@@ -177,7 +177,7 @@ export function DataRetentionSettings() {
         </Row>
       </section>
       <section className="space-y-2">
-        <h3 className="text-body-s-bold text-text-primary">稽核日誌</h3>
+        <h3 className="text-body-m-bold text-text-primary">稽核日誌</h3>
         <Row title="操作、權限異動、登入日誌" note="目前沒有自動清理，全部保留。" />
       </section>
     </div>

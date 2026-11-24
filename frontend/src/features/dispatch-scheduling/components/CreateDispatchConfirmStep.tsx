@@ -1,3 +1,4 @@
+import { fieldClass } from '../../../components/ui';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -267,7 +268,7 @@ export function CreateDispatchConfirmStep({
             onChange={(e) => onConfirmTextChange(e.target.value)}
             placeholder={resolvedConfirmPlaceholder}
             autoComplete="off"
-            className="h-10 w-full rounded-lg border border-border-quaternary bg-black-30 px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn"
+            className={fieldClass({ size: 'md', fullWidth: true })}
           />
         </label>
       ) : null}

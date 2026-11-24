@@ -169,7 +169,7 @@ export function DegradedOperationPage() {
 
   return (
     <div
-      className={`grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)] ${degraded ? "shadow-[inset_0_0_60px_rgba(220,38,38,.45)]" : ""}`}
+      className={`grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)] ${degraded ? "shadow-[inset_0_0_60px_rgba(220,38,38,.45)]" : ""}`}
     >
       <section className="flex min-h-[420px] min-w-0 flex-col border-b border-border-quaternary xl:min-h-0 xl:border-r xl:border-b-0">
         <div

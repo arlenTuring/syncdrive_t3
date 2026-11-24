@@ -22,7 +22,7 @@ import {
 import { draftFromDetail, emptyDraft, MODE_LABEL, PLAYLIST_MAX, timeZoneLabel, toInput, validateDraft, WEEKDAYS, weekdayLabel, type Draft } from './draft';
 import { GroupPickerDialog } from './GroupPickerDialog';
 import { WeeklyTimesDialog } from './WeeklyTimesDialog';
-import { Button, IconButton, Radio } from '../../components/ui';
+import { Button, IconButton, Radio, fieldClass, cn } from '../../components/ui';
 
 type Sub = 'weekly' | 'group' | 'media' | { replaceWith: MediaGroup } | null;
 
@@ -131,7 +131,7 @@ export function ScheduleEditorDialog({ scheduleId, onClose, onSaved, now = Date.
                 maxLength={SCHEDULE_NAME_MAX}
                 onChange={(event) => update('name', event.target.value)}
                 placeholder="請輸入排程名稱"
-                className="h-12 w-full rounded-xl bg-surface-secondary px-4 outline-none focus:ring-1 focus:ring-border-theme"
+                className={fieldClass({ size: 'md', fullWidth: true })}
               />
             </Field>
             <Field label="播放模式" required>
@@ -308,7 +308,7 @@ function VehicleField({ draft, vehicles, error, onScope, onIds }: { draft: Draft
         <div className="mt-3 rounded-xl bg-surface-secondary p-3">
           <div className="relative mb-2">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-quaternary" />
-            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜尋載具名稱或代號" aria-label="搜尋載具" className="h-10 w-full rounded-lg bg-surface-primary pr-3 pl-9 text-body-s outline-none focus:ring-1 focus:ring-border-theme" />
+            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜尋載具名稱或代號" aria-label="搜尋載具" className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pr-3 pl-9')} />
           </div>
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {removed.map((id) => (

@@ -37,7 +37,7 @@ export function PreviewSection({
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-body-xs-bold text-text-tertiary">
           {step}
         </span>
-        <h3 className="text-body-s-bold text-text-primary">{title}</h3>
+        <h3 className="text-body-m-bold text-text-primary">{title}</h3>
         {onEdit && (
           <Button hierarchy="subordinate" variant="outlined" leadingIcon={<Pencil />} onPress={() => onEdit(step as CreateMaintenanceTaskStep)}>{t('maintenanceTasks.previewChrome.edit')}</Button>
         )}

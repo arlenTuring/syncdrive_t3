@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveDwellConflict, type DwellConflict } from '../resolveDwellConflict';
 import { fetchVehicleStopDwellSeconds } from '../fetchVehicleStopDwell';
-import { Button, Dialog } from '../../../components/ui';
+import { Button, Dialog, fieldClass } from '../../../components/ui';
 
 const MIN_SECONDS = 10;
 
@@ -37,7 +37,7 @@ function ConfirmVerifyDialog({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t('psdControl.dock.confirmPlaceholder', { phrase })}
-            className="h-11 w-full rounded-md border border-border-tertiary bg-surface-popup px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
+            className={fieldClass({ size: 'md', fullWidth: true })}
           />
         </div>
     </Dialog>

@@ -112,19 +112,20 @@
       "figma": "1453:6406",
       "variants": 6,
       "playground": "design-specs/t3-header-playground.html"
+    },
+    {
+      "name": "DatePicker",
+      "spec": "design-specs/t3-date-time-picker-engineering-spec.md",
+      "css": "src/components/ui/datepicker/datepicker.css",
+      "component": "src/components/ui/datepicker/DatePicker.tsx",
+      "figma": "240:23231",
+      "variants": 12,
+      "playground": "design-specs/t3-date-time-picker-playground.html"
     }
   ],
   "pending": {
     "$comment": "設計已交付、程式還沒照規格實作的元件（2026-11-24 交付）。實作完成一項就搬到 components，designSpecs.spec.ts 才會開始管它。",
-    "items": [
-      {
-        "name": "DatePicker",
-        "spec": "design-specs/t3-date-time-picker-engineering-spec.md",
-        "playground": "design-specs/t3-date-time-picker-playground.html",
-        "current": "SiteDateTimeInput：觸發欄位（.t3-input）與日期＋時間面板已照規格；週／月／季／年／區間面板沒有畫面使用，尚未做",
-        "css": "src/components/picker/datepicker.css"
-      }
-    ]
+    "items": []
   },
   "styleSpecs": {
     "$comment": "只有樣式規範、沒有參考 CSS 的規格（designSpecs.spec.ts 的逐字比對不適用）；實作位置與套用範圍記在這裡。",

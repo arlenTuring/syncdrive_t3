@@ -50,7 +50,7 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
 
           {category === 'permissions' && log.changes ? (
             <section>
-              <h3 className="mb-2 text-body-s-bold">異動前後差異</h3>
+              <h3 className="mb-2 text-body-m-bold">異動前後差異</h3>
               {log.changes.length ? (
                 <ul className="space-y-2 text-body-s">
                   {log.changes.map((change) => (
@@ -77,7 +77,7 @@ export function LogDetailDialog({ category, id, timeZone, onClose }: { category:
           ) : null}
           {(category === 'system' || category === 'operations') && log.detail !== undefined ? (
             <section>
-              <h3 className="mb-2 text-body-s-bold">異動摘要（已遮蔽敏感欄位）</h3>
+              <h3 className="mb-2 text-body-m-bold">異動摘要（已遮蔽敏感欄位）</h3>
               <JsonBlock value={log.detail} />
             </section>
           ) : null}

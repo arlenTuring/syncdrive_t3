@@ -1,3 +1,4 @@
+import { cn, fieldClass } from '../../../components/ui';
 import { SiteSelect } from '../../../components/SiteSelect';
 import { SlidersHorizontal, Tag } from 'lucide-react';
 import type { TransitionCardCodes } from '../utils/cardCode';
@@ -31,9 +32,9 @@ import type { MaintenanceSectionCodeBySection } from '../utils/maintenanceSectio
 
 const LABEL_CLASS = 'text-body-xs text-text-tertiary';
 const INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-border-quaternary bg-surface-primary px-2.5 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 const SMALL_INPUT_CLASS =
-  'h-8 w-full rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-xs tabular-nums text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme';
+  cn(fieldClass({ size: 'sm', fullWidth: true }), 'tabular-nums');
 
 function SidebarCard({
   icon,
@@ -51,7 +52,7 @@ function SidebarCard({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border-quaternary px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           {icon}
-          <h3 className="truncate text-body-s-bold text-text-primary">{title}</h3>
+          <h3 className="truncate text-body-m-bold text-text-primary">{title}</h3>
         </div>
         {headerAction}
       </div>

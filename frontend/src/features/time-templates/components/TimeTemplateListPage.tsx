@@ -30,15 +30,17 @@ import {
   type TimeTemplateListItem,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, Checkbox, IconButton, Pagination } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Pagination, Header, fieldClass, cn } from '../../../components/ui';
 
 type TimeTemplateListPageProps = {
   onBackToHome?: () => void;
+  /** 嵌在模組外框裡時不顯示頁內標題（外框頂欄已有） */
+  embedded?: boolean;
 };
 
 const PAGE_SIZE = 20;
 
-export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps) {
+export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTemplateListPageProps) {
   const { t } = useTranslation();
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -188,18 +190,19 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
-      <header className="border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
-        <div className="flex items-center gap-3">
-          {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <FileText className="size-5 text-violet-400" aria-hidden />
-          <h1 className="text-headline-5">{t('timeTemplates.title')}</h1>
-        </div>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
+      {!embedded ? (
+        <header className="px-6 py-4">
+          {/* Header 規格 Sub Header：圖示 24、text-primary，標題 18/24/500，間距 8 */}
+          <div className="flex items-center gap-2">
+            {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
+            <Header type="subheader" as="h1" icon={<FileText />} title={t('timeTemplates.title')} />
+          </div>
+        </header>
+      ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
-        <Button hierarchy="subordinate" variant="outlined" className="shrink-0" leadingIcon={<RotateCcw />} onPress={resetFilters} title={t('common.resetFiltersTitle')}>{t('common.resetFilters')}</Button>
-        <div className="relative min-w-[200px] flex-1">
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+        <div className="relative w-60 shrink-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
           <input
             type="search"
@@ -207,7 +210,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             value={keywordDraft}
             onChange={(e) => setKeywordDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-violet-600 focus:outline-none"
+            className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pl-9 pr-3')}
           />
         </div>
         <SiteSelect
@@ -227,8 +230,9 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
           ))}
         </SiteSelect>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
-        <Button hierarchy="subordinate" variant="outlined" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button>
-        <Button className="ml-auto w-fit shrink-0" leadingIcon={<Plus />} onPress={() => setCreateOpen(true)}>{t('timeTemplates.create')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RotateCcw />} onPress={resetFilters} title={t('common.resetFiltersTitle')}>{t('common.resetFilters')}</Button>
+        <Button hierarchy="subordinate" variant="outlined" className="ml-auto shrink-0" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button>
+        <Button className="w-fit shrink-0" leadingIcon={<Plus />} onPress={() => setCreateOpen(true)}>{t('timeTemplates.create')}</Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
@@ -350,7 +354,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
         </table>
       </div>
 
-      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+      <footer className="flex items-center justify-center px-6 py-4">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
 

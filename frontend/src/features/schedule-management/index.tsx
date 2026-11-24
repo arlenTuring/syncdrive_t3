@@ -183,150 +183,150 @@ function useWorkspaceChrome(
       return {
         // 使用者自訂別名 page.label 不翻譯
         title: page?.label ? `${moduleLabel} · ${page.label}` : moduleLabel,
-        icon: <LayoutDashboard className="size-4 text-text-theme" aria-hidden />,
+        icon: <LayoutDashboard aria-hidden />,
       };
     }
     if (view === "shift-deployment") {
       return {
         title: t("nav.items.shift-deployment"),
-        icon: <Activity className="size-4 text-text-theme" aria-hidden />,
+        icon: <Activity aria-hidden />,
       };
     }
     if (view === "degraded-operation") {
       return {
         title: t("nav.items.degraded-operation"),
-        icon: <AlertTriangle className="size-4 text-status-warning" aria-hidden />,
+        icon: <AlertTriangle aria-hidden />,
       };
     }
     if (view === "dispatch-scheduling") {
       return {
         title: t("nav.items.dispatch-scheduling"),
-        icon: <Send className="size-4 text-text-theme" aria-hidden />,
+        icon: <Send aria-hidden />,
       };
     }
     if (view === "vehicle-rotation") {
       return {
         title: t("nav.items.vehicle-rotation"),
-        icon: <Repeat className="size-4 text-text-theme" aria-hidden />,
+        icon: <Repeat aria-hidden />,
       };
     }
     if (view === "scheduled-orders") {
       return {
         title: t("nav.items.scheduled-orders"),
-        icon: <ListChecks className="size-4 text-text-theme" aria-hidden />,
+        icon: <ListChecks aria-hidden />,
       };
     }
     if (view === "order-records") {
       return {
         title: t("nav.items.order-records"),
-        icon: <ListChecks className="size-4 text-text-theme" aria-hidden />,
+        icon: <ListChecks aria-hidden />,
       };
     }
     if (view === "psd-control") {
       return {
         title: t("nav.items.psd-control"),
-        icon: <DoorOpen className="size-4 text-text-theme" aria-hidden />,
+        icon: <DoorOpen aria-hidden />,
       };
     }
     if (view === "virtual-fence") {
       return {
         title: t("nav.items.virtual-fence"),
-        icon: <Pentagon className="size-4 text-text-theme" aria-hidden />,
+        icon: <Pentagon aria-hidden />,
       };
     }
     if (view === "dashboard") {
       return {
         title: t("nav.items.dashboard"),
-        icon: <LayoutDashboard className="size-4 text-text-theme" aria-hidden />,
+        icon: <LayoutDashboard aria-hidden />,
       };
     }
     if (view === "map") {
       return {
         title: t("nav.items.map"),
-        icon: <Map className="size-4 text-text-theme" aria-hidden />,
+        icon: <Map aria-hidden />,
       };
     }
     if (view === "vehicle-realtime") {
       return {
         title: "載具即時清單",
-        icon: <Route className="size-4 text-text-theme" aria-hidden />,
+        icon: <Route aria-hidden />,
       };
     }
     if (view === "vehicle-run-history") {
       return {
         title: "運行管理紀錄",
-        icon: <Route className="size-4 text-text-theme" aria-hidden />,
+        icon: <Route aria-hidden />,
       };
     }
     if (view === "vehicle-registry") {
       return {
         title: "載具註冊管理",
-        icon: <Route className="size-4 text-text-theme" aria-hidden />,
+        icon: <Route aria-hidden />,
       };
     }
     if (view === "media-content") {
       return {
         title: t("nav.items.media-content"),
-        icon: <Volume2 className="size-4 text-text-theme" aria-hidden />,
+        icon: <Volume2 aria-hidden />,
       };
     }
     if (view === "media-groups") {
       return {
         title: t("nav.items.media-groups"),
-        icon: <Volume2 className="size-4 text-text-theme" aria-hidden />,
+        icon: <Volume2 aria-hidden />,
       };
     }
     if (view === "media-schedule") {
       return {
         title: t("nav.items.media-schedule"),
-        icon: <Volume2 className="size-4 text-text-theme" aria-hidden />,
+        icon: <Volume2 aria-hidden />,
       };
     }
     if (isEventsView(view) || isLogsView(view)) {
       return {
         title: t(`nav.items.${view}`),
-        icon: <ClipboardList className="size-4 text-text-theme" aria-hidden />,
+        icon: <ClipboardList aria-hidden />,
       };
     }
     if (view === "system-foundation") {
       return {
         title: t("nav.modules.system"),
-        icon: <Settings2 className="size-4 text-text-theme" aria-hidden />,
+        icon: <Settings2 aria-hidden />,
       };
     }
     if (view === "account-management") {
       return {
         title: "帳號管理中心",
-        icon: <UserRoundCog className="size-4 text-text-theme" aria-hidden />,
+        icon: <UserRoundCog aria-hidden />,
       };
     }
     if (view === "role-management") {
       return {
         title: "角色管理設定",
-        icon: <ShieldCheck className="size-4 text-text-theme" aria-hidden />,
+        icon: <ShieldCheck aria-hidden />,
       };
     }
     if (view === "time-templates") {
       return {
-        title: t("nav.modules.schedule"),
-        icon: <FileText className="size-4 text-text-theme" aria-hidden />,
+        title: t("nav.items.time-templates"),
+        icon: <FileText aria-hidden />,
       };
     }
     if (view === "shift-list") {
       return {
-        title: t("nav.modules.schedule"),
-        icon: <List className="size-4 text-text-theme" aria-hidden />,
+        title: t("nav.items.shift-list"),
+        icon: <List aria-hidden />,
       };
     }
     if (view === "maintenance-tasks") {
       return {
-        title: t("nav.modules.schedule"),
-        icon: <Wrench className="size-4 text-text-theme" aria-hidden />,
+        title: t("nav.items.maintenance-tasks"),
+        icon: <Wrench aria-hidden />,
       };
     }
     return {
-      title: t("nav.modules.schedule"),
-      icon: <ClipboardList className="size-4 text-text-theme" aria-hidden />,
+      title: t("nav.items.shift-records"),
+      icon: <ClipboardList aria-hidden />,
     };
   }, [view, modulePages, t]);
 }

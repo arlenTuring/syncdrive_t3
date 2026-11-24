@@ -220,7 +220,7 @@ export function DispatchSchedulingPage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
         <SiteSelect
           value={priority}

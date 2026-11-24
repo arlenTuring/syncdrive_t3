@@ -1,3 +1,6 @@
+import { PickerDateIcon } from '../../../components/ui/datepicker/PickerIcons';
+import { cn } from '../../../components/ui';
+import { ArrowRight } from 'lucide-react';
 import { useId, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnchoredPopover } from '../../../lib/AnchoredPopover';
@@ -63,9 +66,8 @@ function FieldDateTimePopover({
       role="dialog"
       ariaLabel={label}
       align={field === 'end' ? 'end' : 'start'}
-      offset={10}
+      offset={12}
       autoFocus={false}
-      className="w-[min(420px,calc(100vw-24px))] rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50"
     >
       <span id={titleId} className="sr-only">
         {label}
@@ -104,60 +106,48 @@ export function DateTimeRangePicker({ value, onChange }: DateTimeRangePickerProp
   const startLabel = formatRangeLabel(value.start);
   const endLabel = formatRangeLabel(value.end);
 
+  // DatePicker 規格的欄位外觀（.picker-field）：高 34、圓角 8、tonal-theme 底；開啟中為 focus 框
   const fieldBtnClass = (hasValue: boolean, active: boolean) =>
-    `inline-flex shrink-0 items-center justify-start whitespace-nowrap py-2.5 text-left transition hover:text-text-primary ${
-      active ? 'text-text-theme' : hasValue ? 'text-text-primary' : 'text-text-quaternary'
-    }`;
+    cn(
+      'min-w-0 truncate text-left transition',
+      active ? 'text-text-theme' : hasValue ? 'text-text-primary' : 'placeholder',
+    );
 
   return (
     <>
       <div
         ref={rangeRef}
-        className="flex w-full min-w-[400px] max-w-[520px] shrink-0 flex-nowrap items-stretch overflow-hidden rounded-lg border border-border-quaternary bg-[#1c1c1e] text-body-s"
+        className="picker-field text-body-s"
+        data-state={openField ? 'focus' : 'default'}
         role="group"
         aria-label={t('shiftRecords.dateRange.aria')}
       >
-        <div className="flex min-w-0 flex-1 items-center justify-start py-0 pl-4 pr-2">
-          <button
-            ref={startBtnRef}
-            type="button"
-            onClick={() => open('start')}
-            className={fieldBtnClass(!!startLabel, openField === 'start')}
-          >
-            {startLabel ?? t('shiftRecords.dateRange.start')}
-          </button>
-          {!startLabel && (
-            <span className="inline-block w-[7.5rem] shrink-0" aria-hidden />
-          )}
-          <span className="shrink-0 px-2 text-text-disabled" aria-hidden>
-            →
-          </span>
-          <button
-            ref={endBtnRef}
-            type="button"
-            onClick={() => open('end')}
-            className={fieldBtnClass(!!endLabel, openField === 'end')}
-          >
-            {endLabel ?? t('shiftRecords.dateRange.end')}
-          </button>
-          {!endLabel && startLabel && (
-            <span className="inline-block w-[7.5rem] shrink-0" aria-hidden />
-          )}
-        </div>
+        <button
+          ref={startBtnRef}
+          type="button"
+          onClick={() => open('start')}
+          className={cn(fieldBtnClass(!!startLabel, openField === 'start'), 'flex-1')}
+        >
+          {startLabel ?? t('shiftRecords.dateRange.start')}
+        </button>
+        <ArrowRight className="size-4 shrink-0 text-text-tertiary" aria-hidden />
+        <button
+          ref={endBtnRef}
+          type="button"
+          onClick={() => open('end')}
+          className={cn(fieldBtnClass(!!endLabel, openField === 'end'), 'flex-1')}
+        >
+          {endLabel ?? t('shiftRecords.dateRange.end')}
+        </button>
         <button
           ref={iconBtnRef}
           type="button"
           onClick={() => open(value.start ? 'end' : 'start')}
-          className="flex w-11 shrink-0 items-center justify-center border-l border-border-quaternary opacity-90 transition hover:opacity-100"
+          className="flex shrink-0 items-center"
           title={t('shiftRecords.dateRange.selectDateTime')}
+          aria-label={t('shiftRecords.dateRange.selectDateTime')}
         >
-          <img
-            src="/shift-mgt-icons/timepick.png"
-            alt=""
-            className="size-4"
-            width={16}
-            height={16}
-          />
+          <PickerDateIcon className="picker-suffix" />
         </button>
       </div>
 

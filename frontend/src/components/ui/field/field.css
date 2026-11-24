@@ -78,6 +78,12 @@
 .t3-input:focus::placeholder { color:var(--text-primary); }
 .t3-input[aria-invalid="true"],.t3-input--error { --field-border:var(--status-error); }
 .t3-input[aria-invalid="true"]:focus { caret-color:var(--status-error-emphasis); }
+.t3-input--outlined[aria-invalid="true"]:focus,.t3-input--outlined.t3-input--error:focus { --field-bg:transparent; }
+.t3-input[aria-invalid="true"]::placeholder,.t3-input--error::placeholder { color:var(--text-primary); }
+/* 下拉、日期這類觸發鈕：選單展開＝Focus（Dropdown／DatePicker 規格），焦點移進選單時描邊仍維持 */
+.t3-input[aria-expanded="true"] { --field-border:var(--border-theme); }
+.t3-input--tonal-gray[aria-expanded="true"] { --field-border:var(--link-standard); }
+.t3-input--outlined[aria-expanded="true"] { --field-bg:var(--link-standard); --field-border:var(--border-theme); }
 .t3-input:disabled { --field-bg:var(--surface-disabled); color:var(--text-disabled); -webkit-text-fill-color:var(--text-disabled); cursor:not-allowed; }
 .t3-input--tonal-gray:disabled { --field-bg:transparent; }
 .t3-input--outlined:disabled { --field-bg:transparent; }

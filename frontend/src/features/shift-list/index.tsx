@@ -86,6 +86,7 @@ export default function ShiftListApp({ onBackToHome, embedded }: ShiftListAppPro
         <ShiftListPage
           key={listReloadKey}
           onBackToHome={embedded ? undefined : onBackToHome}
+          embedded={embedded}
           onCreateClick={openCreateFlow}
           onEditClick={openEdit}
           onPreviewClick={openPreview}

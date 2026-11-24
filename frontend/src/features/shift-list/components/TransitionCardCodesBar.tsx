@@ -11,7 +11,7 @@ import {
   type TransitionCardCodeKey,
   type TransitionCardCodes,
 } from '../utils/cardCode';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 /**
  * 路線群組步驟的「過渡卡代號」：入場、出場、暫停／停留各一個 1～2 個大寫英文字母。
@@ -96,11 +96,7 @@ export function TransitionCardCodesBar({
                 aria-label={`${meta.label}代號`}
                 aria-invalid={fieldIssues.length > 0}
                 data-transition-code={key}
-                className={`h-9 w-full rounded-lg border bg-link-standard-hover px-3 text-body-s tracking-wider text-text-primary placeholder:text-text-quaternary focus:outline-none focus:ring-1 ${
-                  fieldIssues.length > 0
-                    ? 'border-border-danger-light focus:border-status-error focus:ring-status-error'
-                    : 'border-transparent focus:border-border-theme focus:ring-border-theme'
-                }`}
+                className={cn(fieldClass({ size: 'md', invalid: fieldIssues.length > 0 }), 'uppercase')}
               />
               <span className="mt-1.5 block px-1 text-body-xs text-text-tertiary">
                 預覽：{isValidCardCode(normalizeCardCode(value)) ? `${normalizeCardCode(value)}011030` : '尚未填入代號'}

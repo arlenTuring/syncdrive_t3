@@ -14,10 +14,10 @@ import {
 import { sanitizeIntegerInput } from '../utils/numericInput';
 import { FacilityEquipmentRowsEditor } from './FacilityEquipmentRowsEditor';
 import { StepSectionToggle } from './StepSectionToggle';
-import { Checkbox } from '../../../components/ui';
+import { Checkbox, cn, fieldClass } from '../../../components/ui';
 
 const DURATION_INPUT_CLASS =
-  'h-[42px] w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 type StepStationDurationParamsProps = {
   title: string;

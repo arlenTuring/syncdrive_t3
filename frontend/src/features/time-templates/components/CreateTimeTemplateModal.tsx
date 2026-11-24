@@ -28,7 +28,7 @@ import {
   updateTimeTemplateDraft,
 } from '../api/timeTemplatesApi';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 type CreateTimeTemplateModalProps = {
   onClose: () => void;
@@ -38,7 +38,7 @@ type CreateTimeTemplateModalProps = {
 
 
 const BASIC_INFO_FIELD_CLASS =
-  'h-9 w-full rounded-lg bg-surface-theme px-3 text-body-s leading-[18px] tracking-[0.5px] text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 

@@ -13,5 +13,5 @@
  *
  * 版本日期是這個版號定下來的那一天（YYYY-MM-DD）。
  */
-export const APP_VERSION = '1.1.0'
-export const APP_VERSION_DATE = '2026-11-24'
+export const APP_VERSION = '1.2.0'
+export const APP_VERSION_DATE = '2026-11-25'

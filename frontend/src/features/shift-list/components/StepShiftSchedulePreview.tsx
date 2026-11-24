@@ -56,7 +56,7 @@ import {
 import { ShiftSchedulePlanGrid } from './ShiftSchedulePlanGrid';
 import { CapacityTrendChart } from './CapacityTrendChart';
 import { ScheduleTimeZoomToolbar } from './ScheduleTimeZoomToolbar';
-import { Button, IconButton, Tabs } from '../../../components/ui';
+import { Button, IconButton, Tabs, tabPanelProps } from '../../../components/ui';
 
 type PreviewTab = 'schedule' | 'capacity';
 
@@ -190,7 +190,7 @@ function ReviewSection({
               {title}
             </h3>
           ) : (
-            <h3 className="text-body-s-bold text-text-primary">{title}</h3>
+            <h3 className="text-body-m-bold text-text-primary">{title}</h3>
           )}
           {onNavigate ? (
             <IconButton
@@ -886,7 +886,7 @@ export function StepShiftSchedulePreview({
               )}
 
               <div className="mb-3 flex shrink-0 items-center gap-4">
-                <Tabs label="班表檢視" className="shrink-0 border-b border-border-quaternary" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.schedulePreview.tripPreview') }, { id: 'capacity', label: t('shiftList.schedulePreview.capacityTrend') }]} />
+                <Tabs idBase="schedule-preview" label="班表檢視" className="shrink-0 border-b border-border-quaternary" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.schedulePreview.tripPreview') }, { id: 'capacity', label: t('shiftList.schedulePreview.capacityTrend') }]} />
 
                 <div className="flex min-w-0 flex-1 items-center gap-2 pb-2">
                   <div className={`flex min-w-0 flex-1 items-center gap-2 ${wizard ? 'flex-wrap justify-end' : 'overflow-x-auto'}`}>
@@ -908,6 +908,7 @@ export function StepShiftSchedulePreview({
                 </div>
               </div>
 
+              <div {...tabPanelProps('schedule-preview', activeTab)} className="contents">
               {/* 保持掛載以免切換運能趨勢後橫移位置被重置 */}
               <div className={activeTab === 'schedule' ? '' : 'hidden'}>
                 {templateLoading ? (
@@ -951,6 +952,7 @@ export function StepShiftSchedulePreview({
                   />
                 )
               ) : null}
+              </div>
             </div>
           )}
         </ReviewSection>

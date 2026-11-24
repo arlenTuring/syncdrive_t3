@@ -1,3 +1,4 @@
+import { cn, fieldClass } from '../../../components/ui';
 import { SiteSelect } from '../../../components/SiteSelect';
 import { AlertTriangle, Lightbulb, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -29,11 +30,10 @@ import { ShiftSelectionEmptyState } from './ShiftSelectionEmptyState';
 import { YardEntryAllowancePanel } from './YardEntryAllowancePanel';
 
 /** 設計稿：無外框、灰藍底 */
-const SELECT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+const SELECT_CLASS = fieldClass({ size: 'md', fullWidth: true });
 
 const CODE_INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s uppercase text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: true }), 'uppercase');
 
 const SECTION_TITLE: Record<MaintenanceSectionCodeKey, string> = {
   charging: '充電任務',

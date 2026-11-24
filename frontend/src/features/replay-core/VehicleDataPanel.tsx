@@ -12,7 +12,7 @@ import {
   streamStatuses,
   type FieldNode,
 } from "./vehiclePanelModel";
-import { IconButton } from '../../components/ui';
+import { IconButton, fieldClass, cn } from '../../components/ui';
 
 export type RelatedRecords = {
   events: Array<Record<string, unknown> & { at: number | null }>;
@@ -121,7 +121,7 @@ export function VehicleDataPanel({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜尋欄位名稱、原始路徑或值"
           aria-label="搜尋欄位"
-          className="w-full rounded-lg bg-surface-primary py-1.5 pr-2 pl-8 text-body-s outline-none focus:ring-1 focus:ring-border-theme"
+          className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pr-2 pl-8')}
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">

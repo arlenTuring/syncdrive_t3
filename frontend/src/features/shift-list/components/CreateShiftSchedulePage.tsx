@@ -49,7 +49,7 @@ import { StepShiftTimeTemplate } from './StepShiftTimeTemplate';
 import { syncActionSettingsWithSelectedRoutes } from '../utils/actionSettings';
 import type { ShiftScheduleStoredOutput } from '../utils/shiftScheduleEngine.types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 type CreateShiftSchedulePageProps = {
   onBack: () => void;
@@ -61,7 +61,7 @@ type CreateShiftSchedulePageProps = {
 
 /** 設計稿：無外框、灰藍底的輸入框 */
 const INPUT_CLASS =
-  'h-9 w-full rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 

@@ -6,10 +6,10 @@ import {
   SCHEDULE_TIME_ALIGN_SECONDS,
   snapSecondsToScheduleAlign,
 } from '../types/editor';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass, PickerPopupArrow, PickerTimeColumns, type TimePart } from '../../../components/ui';
 
-const FIELD_CLASS =
-  'w-full rounded-lg bg-surface-theme px-3 text-left text-body-s leading-[18px] tracking-[0.5px] text-text-secondary focus:outline-none';
+/** 欄位外觀照 TextField 規格（.t3-input）；高度由表格列決定（FIELD_STYLE） */
+const FIELD_CLASS = cn(fieldClass({ size: 'md' }), 'text-left');
 
 const FIELD_STYLE = { height: INTERVAL_TABLE_FIELD_HEIGHT_PX };
 
@@ -34,56 +34,6 @@ function formatHm(hour: number, minute: number, second = 0): string {
   return `${pad2(hour)}:${pad2(minute)}:${pad2(snapped)}`;
 }
 
-function TimeColumn({
-  max,
-  value,
-  onChange,
-  step = 1,
-}: {
-  max: number;
-  value: number;
-  onChange: (n: number) => void;
-  step?: number;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const values = Array.from(
-    { length: Math.floor(max / step) + 1 },
-    (_, i) => i * step,
-  );
-  const selectedIndex = Math.max(0, values.indexOf(value));
-
-  useLayoutEffect(() => {
-    const el = ref.current?.children[selectedIndex] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: 'center' });
-  }, [selectedIndex]);
-
-  return (
-    <div
-      ref={ref}
-      className="h-[264px] w-[60px] overflow-y-auto py-1 pl-1 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {values.map((n) => {
-        const selected = value === n;
-        return (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className="mb-0 flex h-8 w-12 items-center justify-center"
-          >
-            <span
-              // DatePicker 規格 Time Button：48×32、圓角 8；Hover link-tonal-hover、Active link-tonal
-              className="t3-picker-time"
-              data-active={selected ? 'true' : undefined}
-            >
-              {pad2(n)}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 type TimePickerPanelProps = {
   hour: number;
@@ -110,41 +60,22 @@ export function TimePickerPanel({
   onConfirm,
   showSeconds = true,
 }: TimePickerPanelProps) {
+  // DatePicker 規格的 Time 面板：時、分、秒三欄（自繪捲軸）、頂端指向箭頭、底部「此刻」「確定」
+  const parts: TimePart[] = [
+    { label: '時', value: hour, max: 23, onChange: onHourChange },
+    { label: '分', value: minute, max: 59, onChange: onMinuteChange },
+  ];
+  if (showSeconds && onSecondChange) {
+    parts.push({ label: '秒', value: second, max: 50, step: SCHEDULE_TIME_ALIGN_SECONDS, onChange: onSecondChange });
+  }
   return (
-    <div
-      className={`t3-picker-shadow relative rounded-xl bg-surface-background ${
-        showSeconds ? 'w-[190px]' : 'w-[136px]'
-      }`}
-    >
-      <div
-        className="absolute -top-2 left-6 size-0 border-x-8 border-b-8 border-x-transparent border-b-border-quaternary"
-        aria-hidden
-      />
-      <div className="p-1">
-        <div className="flex rounded-lg p-1">
-          <TimeColumn max={23} value={hour} onChange={onHourChange} />
-          <div className="w-px self-stretch bg-surface-secondary" />
-          <TimeColumn max={59} value={minute} onChange={onMinuteChange} />
-          {showSeconds && onSecondChange ? (
-            <>
-              <div className="w-px self-stretch bg-surface-secondary" />
-              <TimeColumn
-                max={50}
-                value={second}
-                onChange={onSecondChange}
-                step={SCHEDULE_TIME_ALIGN_SECONDS}
-              />
-            </>
-          ) : null}
-        </div>
-      </div>
-      <div className="h-px w-full bg-surface-secondary" />
-      <div className={`flex items-center px-2 py-2 ${onNow ? 'justify-between' : 'justify-end'}`}>
-        {onNow ? (
-          <Button variant="text" onPress={onNow}>此刻</Button>
-        ) : null}
+    <div className="picker-panel" data-mode="time">
+      <PickerPopupArrow className="picker-popup-arrow" />
+      <PickerTimeColumns parts={parts} />
+      <footer>
+        {onNow ? <Button variant="text" onPress={onNow}>此刻</Button> : <span className="picker-footer-spacer" />}
         <Button onPress={onConfirm}>確定</Button>
-      </div>
+      </footer>
     </div>
   );
 }

@@ -18,16 +18,16 @@ import {
 import { sanitizeIntegerInput } from '../utils/numericInput';
 import { FacilityEquipmentRowsEditor } from './FacilityEquipmentRowsEditor';
 import { StepSectionToggle } from './StepSectionToggle';
-import { IconButton } from '../../../components/ui';
+import { IconButton, cn, fieldClass } from '../../../components/ui';
 
 const SMALL_INPUT_CLASS =
-  'h-9 w-[88px] rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: false }), 'w-[88px]');
 
 const UNIT_SELECT_CLASS =
   'h-9 rounded-lg border border-border-quaternary bg-surface-primary px-2 text-body-s text-text-primary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
 
 const EVENT_INPUT_CLASS =
-  'h-9 min-w-[140px] flex-1 rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: false }), 'min-w-[140px] flex-1');
 
 type StepMaintenanceParamsProps = {
   draft: MaintenanceTaskMaintenanceDraft;

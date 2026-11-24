@@ -1,6 +1,6 @@
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useState } from 'react';
-import { Button, IconButton } from '../../components/ui';
+import { Button, IconButton, fieldClass, cn } from '../../components/ui';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
@@ -37,11 +37,11 @@ export function LoginPage() {
         <p className="mt-2 text-body-s text-text-quaternary">請使用系統管理員提供的帳號與密碼。</p>
         <form onSubmit={submit} className="mt-7 space-y-5">
           <label className="block text-body-s text-text-secondary">帳號
-            <input autoFocus autoComplete="username" value={account} onChange={(event) => setAccount(event.target.value)} className="mt-2 w-full rounded-xl border border-transparent bg-surface-secondary px-4 py-3.5 outline-none placeholder:text-text-quaternary focus:border-border-theme" placeholder="請輸入帳號" />
+            <input autoFocus autoComplete="username" value={account} onChange={(event) => setAccount(event.target.value)} className={cn(fieldClass({ size: 'md', fullWidth: true }), 'mt-2')} placeholder="請輸入帳號" />
           </label>
           <label className="block text-body-s text-text-secondary">密碼
             <span className="relative mt-2 block">
-              <input autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} type={show ? 'text' : 'password'} className="w-full rounded-xl border border-transparent bg-surface-secondary px-4 py-3.5 pr-12 outline-none placeholder:text-text-quaternary focus:border-border-theme" placeholder="請輸入密碼" />
+              <input autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} type={show ? 'text' : 'password'} className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pr-12')} placeholder="請輸入密碼" />
               <IconButton hierarchy="subordinate" variant="standard" className="absolute right-3 top-1/2 -translate-y-1/2" onPress={() => setShow((value) => !value)} label={show ? '隱藏密碼' : '顯示密碼'} icon={show ? <EyeOff /> : <Eye />} />
             </span>
           </label>

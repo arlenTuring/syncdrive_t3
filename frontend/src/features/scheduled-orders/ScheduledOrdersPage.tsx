@@ -124,7 +124,7 @@ function RoutePicker({
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            className="w-full bg-transparent outline-none"
+            className={fieldClass({ size: 'md', fullWidth: true })}
             placeholder="搜尋路線或站點"
           />
         </label>

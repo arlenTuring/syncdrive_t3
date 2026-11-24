@@ -1,3 +1,4 @@
+import { cn, fieldClass } from '../../../components/ui';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,7 +17,7 @@ import { StepSectionToggle } from './StepSectionToggle';
 import { TriggerFieldRow } from './TriggerFieldRow';
 
 const RATE_INPUT_CLASS =
-  'h-[42px] w-[88px] rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: false }), 'w-[88px]');
 
 type StepChargingParamsProps = {
   draft: MaintenanceTaskChargingDraft;

@@ -100,7 +100,7 @@ export function ShellAccountToolbar({
         {settingsOpen && auth.user ? (
           <div id={panelId} role="dialog" aria-label="帳號資訊" className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50">
             <div className="flex items-center justify-between border-b border-border-quaternary px-4 py-3">
-              <h2 className="text-body-s-bold text-text-primary">帳號資訊</h2>
+              <h2 className="text-body-m-bold text-text-primary">帳號資訊</h2>
               <IconButton size="small" hierarchy="subordinate" variant="standard" label="關閉" icon={<X />} onPress={() => setSettingsOpen(false)} />
             </div>
             <div className="space-y-4 px-4 py-4">

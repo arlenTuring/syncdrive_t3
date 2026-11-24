@@ -51,7 +51,7 @@ import {
 } from "../utils/moduleDashboardPages";
 import { ShellClock } from "./ShellClock";
 import { useModuleAddModePreference } from "../utils/moduleAddModePreference";
-import { IconButton } from '../../../components/ui';
+import { IconButton, fieldClass, cn } from '../../../components/ui';
 
 const SIDEBAR_COLLAPSED_KEY = "syncdrive_vtms_sidebar_collapsed";
 const VTMS_MARK_SRC = "/logo.svg";
@@ -311,6 +311,7 @@ export function ScheduleModuleSidebar({
       </div>
 
       <nav className="t3-nav__menu">
+        <div className="t3-nav__scroll">
         {SIDEBAR_MODULE_GROUPS.map((group) => {
           const groupLabel = t(group.label);
           const isOpen = expanded[group.id] ?? false;
@@ -473,7 +474,7 @@ export function ScheduleModuleSidebar({
                                   setRenamingPageId(null);
                                 }
                               }}
-                              className="min-w-0 flex-1 rounded border border-border-theme-light bg-surface-sub-background px-1.5 py-0.5 text-body-s text-text-primary outline-none"
+                              className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'min-w-0 flex-1')}
                               aria-label={t("shell.renamePageInput")}
                             />
                           </div>
@@ -518,6 +519,7 @@ export function ScheduleModuleSidebar({
             </div>
           );
         })}
+        </div>
       </nav>
 
       <div className="shrink-0 border-t border-border-quaternary px-4 pt-3">

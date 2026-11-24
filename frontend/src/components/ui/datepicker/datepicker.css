@@ -82,23 +82,14 @@
 .picker-suffix { display: block; flex: none; }
 .picker-popup-arrow { position: absolute; top: -9px; left: 24px; display: block; pointer-events: none; }
 
-/* ── 專案調整：SiteDateTimeInput 的日期時間面板（Date + Time）用的面板內元件 ──
- * 觸發欄位沿用 field.css 的 .t3-input（同一組色票）；面板與格子照本規格 §3「面板內的元件」。
+/* ── 專案調整 ──
+ * 1. 欄位寬度跟著版面（規格樣本 240px），給 data-fluid 時填滿父層。
+ * 2. 導覽圖示、欄位尾端圖示、彈出箭頭用 currentColor（PickerIcons.tsx），顏色照原稿對應的 token。
+ * 3. 時間欄捲軸由 DatePicker.tsx 依實際 scrollTop 設定 top（規格 §3「時間欄捲軸」）。
  */
-.t3-picker-shadow { box-shadow:0 4px 24px var(--surface-disabled); }
-.t3-picker-panel { overflow:hidden; border-radius:12px; background:var(--surface-background); box-shadow:0 4px 24px var(--surface-disabled); }
-.t3-picker-header { display:flex; align-items:center; justify-content:space-between; height:40px; padding:0 8px; border-bottom:1px solid var(--border-quaternary); }
-.t3-picker-week { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding-bottom:8px; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
-.t3-picker-date { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:4px; border:0; background:transparent; cursor:pointer; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
-.t3-picker-date > span { display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; }
-.t3-picker-date:hover > span { background:var(--link-standard-hover); }
-.t3-picker-date[aria-current="date"] > span { outline:1px dashed var(--text-tertiary); outline-offset:-1px; }
-.t3-picker-date[data-other="true"] { color:var(--text-disabled); }
-.t3-picker-date[data-active="true"] > span { background:var(--link-theme-filled); color:var(--text-invert); outline:0; }
-.t3-picker-time-col { height:264px; padding:4px 8px 4px 4px; overflow-y:auto; scroll-behavior:smooth; scrollbar-width:none; border-left:1px solid var(--border-quaternary); }
-.t3-picker-time-col:first-child { border-left:0; }
-.t3-picker-time-col::-webkit-scrollbar { display:none; }
-.t3-picker-time { display:flex; align-items:center; justify-content:center; width:48px; height:32px; border:0; border-radius:8px; background:transparent; cursor:pointer; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; font-variant-numeric:tabular-nums; }
-.t3-picker-time:hover { background:var(--link-tonal-hover); }
-.t3-picker-time[data-active="true"] { background:var(--link-tonal); color:var(--text-theme); }
+.picker[data-fluid="true"] { width: 100%; }
+.picker-field .picker-suffix { color: var(--text-tertiary); }
+.picker-field:disabled .picker-suffix { color: var(--text-disabled); }
+.picker-popup-arrow { color: var(--surface-background); }
+.picker-panel .picker-footer-spacer { flex: 1; }
 }

@@ -16,10 +16,10 @@ import {
   shouldShowResourceStage,
   type ShiftRouteSegmentAction,
 } from '../../shift-list/utils/actionSettings';
-import { IconButton } from '../../../components/ui';
+import { IconButton, cn, fieldClass } from '../../../components/ui';
 
 const OFFSET_INPUT =
-  'h-8 w-[44px] shrink-0 rounded-md border border-border-quaternary bg-surface-primary px-1.5 text-body-xs tabular-nums text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-[44px] shrink-0 tabular-nums');
 const FIELD_LABEL = 'mb-1 block text-body-xs text-text-tertiary';
 
 type DispatchStationActionRowProps = {

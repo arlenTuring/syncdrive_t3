@@ -95,7 +95,7 @@ export function EventReplayDialog({ id, onClose, onOpenHistory }: { id: string; 
         <aside className="flex min-h-0 flex-col gap-3">
           <section className="rounded-xl border border-border-quaternary bg-surface-primary p-3">
             <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-body-s-bold">事件影像</h3>
+              <h3 className="text-body-m-bold">事件影像</h3>
               {drift !== null ? <span className="text-body-xs text-text-quaternary">與軌跡誤差 {drift} ms</span> : null}
               {playback?.permissions.video && playback.event.vehicleCode ? (
                 <Button variant="text" className="ml-auto" onPress={openHistory} leadingIcon={<Film />}>前往歷史影像紀錄（帶入條件）</Button>

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { StatusTag } from '../../../components/StatusTag';
 import { FENCE_ENABLE_STATUS, type FenceListItem } from '../types';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, fieldClass, cn } from '../../../components/ui';
 
 type FenceListPanelProps = {
   fences: FenceListItem[];
@@ -79,7 +79,7 @@ export function FenceListPanel({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('common.search')}
-            className="h-9 w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-8 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary outline-none focus:border-border-theme-light"
+            className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pl-8 pr-3')}
           />
         </label>
         <IconButton variant="outlined" className="shrink-0" onPress={() => onCollapsedChange(true)} title={t('virtualFence.list.collapse')} label={t('virtualFence.list.collapse')} icon={<PanelLeftClose />} />

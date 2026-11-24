@@ -29,10 +29,12 @@ import {
   type UsageStatusKey,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button, IconButton, Pagination } from '../../../components/ui';
+import { Button, IconButton, Pagination, Header, fieldClass, cn } from '../../../components/ui';
 
 type MaintenanceTaskListPageProps = {
   onBackToHome?: () => void;
+  /** 嵌在模組外框裡時不顯示頁內標題（外框頂欄已有） */
+  embedded?: boolean;
   onCreateClick?: () => void;
   onEditClick?: (taskId: string) => void;
   /** 開啟整備任務第七步「任務檢視」 */
@@ -42,6 +44,7 @@ type MaintenanceTaskListPageProps = {
 const PAGE_SIZE = 20;
 
 export function MaintenanceTaskListPage({
+  embedded = false,
   onBackToHome,
   onCreateClick,
   onEditClick,
@@ -164,16 +167,29 @@ export function MaintenanceTaskListPage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
-      <header className="border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
-        <div className="flex items-center gap-3">
-          {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
-          <Wrench className="size-5 text-violet-400" aria-hidden />
-          <h1 className="text-headline-5">{t('maintenanceTasks.title')}</h1>
-        </div>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
+      {!embedded ? (
+        <header className="px-6 py-4">
+          {/* Header 規格 Sub Header：圖示 24、text-primary，標題 18/24/500，間距 8 */}
+          <div className="flex items-center gap-2">
+            {onBackToHome && <BackToHomeButton onClick={onBackToHome} />}
+            <Header type="subheader" as="h1" icon={<Wrench />} title={t('maintenanceTasks.title')} />
+          </div>
+        </header>
+      ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-border-quaternary px-6 py-4">
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+        <div className="relative w-60 shrink-0">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
+          <input
+            type="search"
+            placeholder={t('common.keywordPlaceholder')}
+            value={keywordDraft}
+            onChange={(e) => setKeywordDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
+            className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pl-9 pr-3')}
+          />
+        </div>
         <SiteSelect
           value={publishStatus}
           onChange={(e) => {
@@ -206,17 +222,6 @@ export function MaintenanceTaskListPage({
             </option>
           ))}
         </SiteSelect>
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-quaternary" />
-          <input
-            type="search"
-            placeholder={t('common.keywordPlaceholder')}
-            value={keywordDraft}
-            onChange={(e) => setKeywordDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && canSearch && applySearch()}
-            className="w-full rounded-lg border border-border-quaternary bg-surface-primary py-2 pl-9 pr-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-violet-600 focus:outline-none"
-          />
-        </div>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <Button className="ml-auto w-fit shrink-0" onPress={() => onCreateClick?.()} leadingIcon={<Plus />}>{t('maintenanceTasks.create')}</Button>
       </div>
@@ -328,7 +333,7 @@ export function MaintenanceTaskListPage({
         </table>
       </div>
 
-      <footer className="flex items-center justify-center border-t border-border-quaternary px-6 py-4">
+      <footer className="flex items-center justify-center px-6 py-4">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
       </footer>
     </div>

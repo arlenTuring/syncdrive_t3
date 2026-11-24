@@ -742,7 +742,7 @@ export function RouteRelationGraphEditor({
     >
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border-quaternary px-4 py-3">
         <div>
-          <h3 className="text-body-s-bold text-text-primary">{t('shiftList.routeRelation.title')}</h3>
+          <h3 className="text-body-m-bold text-text-primary">{t('shiftList.routeRelation.title')}</h3>
           <p className="mt-0.5 text-body-xs text-text-quaternary">
             {t('shiftList.routeRelation.hint')}
           </p>

@@ -50,7 +50,7 @@ import { APP_VERSION, APP_VERSION_DATE } from '../../../config/appVersion';
 function ParamGroup({ title, usage, children }: { title: string; usage: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-body-s-bold text-text-primary">{title}</h3>
+      <h3 className="text-body-m-bold text-text-primary">{title}</h3>
       <p className="mb-3 mt-0.5 text-body-xs text-text-quaternary">用途：{usage}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
     </section>
@@ -387,7 +387,7 @@ export function SystemFoundationSettingsPanel() {
 
                     <div>
                       <div className="mb-3 flex items-center justify-between gap-2">
-                        <h3 className="text-body-s-bold text-text-primary">
+                        <h3 className="text-body-m-bold text-text-primary">
                           {t('systemFoundation.ssl.activeInfo')}
                         </h3>
                         <div className="flex items-center gap-3">
@@ -461,7 +461,7 @@ export function SystemFoundationSettingsPanel() {
                     </div>
 
                     <div className="rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-4">
-                      <h3 className="text-body-s-bold text-text-primary">
+                      <h3 className="text-body-m-bold text-text-primary">
                         {t('systemFoundation.ssl.rotateTitle')}
                       </h3>
                       <p className="mt-1 text-body-xs text-text-quaternary">

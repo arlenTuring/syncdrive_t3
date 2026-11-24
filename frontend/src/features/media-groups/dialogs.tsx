@@ -1,6 +1,6 @@
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { Button, Dialog as UiDialog } from '../../components/ui';
+import { Button, Dialog as UiDialog, fieldClass } from '../../components/ui';
 import { ApiError, deleteGroup, GROUP_NAME_MAX, getGroup, getGroupDeleteImpact, createGroup, renameGroup, type GroupDeleteImpact, type MediaGroup } from './api';
 
 /**
@@ -126,7 +126,7 @@ export function GroupNameDialog({ groupId, onClose, onSaved }: { groupId?: strin
         onKeyDown={(event) => event.key === 'Enter' && void submit()}
         placeholder={loading ? '載入中…' : '請輸入'}
         aria-invalid={Boolean(name) && Boolean(invalid)}
-        className="w-full rounded-xl bg-surface-secondary px-5 py-4 text-headline-5 text-text-primary outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
+        className={fieldClass({ size: 'md', fullWidth: true })}
       />
       <div className="mt-1 flex justify-between text-body-xs text-text-quaternary">
         <span className="text-status-warning">{name && invalid ? invalid : ''}</span>

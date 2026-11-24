@@ -64,4 +64,6 @@
  * Figma 值是 12% 灰＝link-standard，在元件內定義成同值。
  */
 .t3-dropdown { --link-standard-focus: var(--link-standard); }
+/* 共用下拉選單（SiteSelect 等，variants.ts 的 MENU_PANEL_CLASS）：規格的捲軸是 4px、border-disabled 色的細滑塊，用原生細捲軸對應 */
+.t3-menu-panel { scrollbar-width: thin; scrollbar-color: var(--border-disabled) transparent; }
 }

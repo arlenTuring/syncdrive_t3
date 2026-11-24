@@ -443,7 +443,7 @@ function TodayTab(props: {
       ) : null}
       {today.blocked.length ? (
         <section className={PANEL}>
-          <h2 className="border-b border-border-quaternary px-5 py-3 text-body-s-bold text-status-warning">今日無法輪替</h2>
+          <h2 className="border-b border-border-quaternary px-5 py-3 text-body-m-bold text-status-warning">今日無法輪替</h2>
           {today.blocked.map((item) => (
             <p key={item.code} className="flex gap-4 border-b border-border-quaternary px-5 py-2.5 text-body-s last:border-b-0">
               <span className="w-16 font-medium text-text-primary">{item.code}</span>
@@ -606,7 +606,7 @@ export function VehicleRotationPage() {
 
   if (!today) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-surface-sub-background text-body-s text-text-quaternary">
+      <div className="flex flex-1 items-center justify-center text-body-s text-text-quaternary">
         {error ?? '載入中'}
       </div>
     );
@@ -619,7 +619,7 @@ export function VehicleRotationPage() {
     { id: 'records', label: '輪替紀錄' },
   ];
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto text-text-primary">
       <AutomationBar rules={today.rules} deployedAt={today.deployed_at} onOpen={() => setRulesOpen(true)} />
       {actionError ?? error ? (
         <div className="border-b border-border-danger-light bg-status-error-light px-6 py-2 text-body-xs text-status-error-emphasis">{actionError ?? error}</div>

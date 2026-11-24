@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShiftDeploymentAction, ShiftListTab, ShiftRow } from '../types';
 import { ShiftRouteTrack } from './ShiftRouteTrack';
-import { Button, Tabs } from '../../../components/ui';
+import { Button, Tabs, tabPanelProps } from '../../../components/ui';
 
 export function DeploymentShiftTable({
   scheduleName,
@@ -24,6 +24,7 @@ export function DeploymentShiftTable({
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup">
       <div className="flex shrink-0 items-end justify-between gap-3 border-b border-border-quaternary px-4 pt-3">
         <Tabs
+          idBase="deployment-shift"
           label="班次類別"
           value={tab}
           onChange={setTab}
@@ -38,7 +39,7 @@ export function DeploymentShiftTable({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div {...tabPanelProps('deployment-shift', tab)} className="min-h-0 flex-1 overflow-auto">
         <table className="t3-table w-full min-w-[980px] border-collapse text-left text-body-s">
           <thead className="sticky top-0 bg-surface-secondary text-body-xs text-text-tertiary">
             <tr>

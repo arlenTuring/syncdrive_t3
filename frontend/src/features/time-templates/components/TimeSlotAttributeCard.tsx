@@ -12,10 +12,10 @@ import {
   type TimeSlotAttribute,
 } from '../types/editor';
 import { AttributeColorPalette } from './AttributeColorPalette';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 const EDIT_FIELD_CLASS =
-  'w-full rounded-md bg-surface-theme px-2 py-0 text-body-xs text-text-secondary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-border-theme-light';
+  cn(fieldClass({ size: 'sm', fullWidth: true }));
 
 const CARD_CLASS =
   'relative flex shrink-0 flex-col gap-0.5 rounded-lg bg-surface-theme px-2.5 pb-1 pt-0.5';

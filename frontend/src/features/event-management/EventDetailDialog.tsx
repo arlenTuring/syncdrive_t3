@@ -77,7 +77,7 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
       ) : (
         <div className="space-y-5">
           <section className="rounded-xl bg-surface-secondary p-4" aria-label="處理紀錄">
-            <h3 className="text-body-s-bold">處理紀錄</h3>
+            <h3 className="text-body-m-bold">處理紀錄</h3>
             {event.acknowledged ? (
               <div className="mt-2 space-y-1 text-body-s">
                 <div>
@@ -130,7 +130,7 @@ export function EventDetailDialog({ id, timeZone, refreshSignal = 0, onClose, on
           </dl>
 
           <section>
-            <h3 className="mb-2 text-body-s-bold">操作軌跡</h3>
+            <h3 className="mb-2 text-body-m-bold">操作軌跡</h3>
             {event.trail.length ? (
               <ul className="space-y-1 text-body-s">
                 {event.trail.map((item) => (

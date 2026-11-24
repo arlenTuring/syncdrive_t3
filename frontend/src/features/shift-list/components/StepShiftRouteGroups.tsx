@@ -63,7 +63,7 @@ import {
   type ShiftRouteGroupMapOption,
   type ShiftRouteOption,
 } from '../utils/shiftRouteGroupCatalog';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, fieldClass, cn } from '../../../components/ui';
 import { RouteRelationGraphEditor } from './RouteRelationGraphEditor';
 import { HelpTip } from './HelpTip';
 import { ShiftMenuSelect } from './ShiftMenuSelect';
@@ -96,11 +96,10 @@ type StepShiftRouteGroupsProps = {
 };
 
 /** 設計稿：無外框、灰藍底 */
-const FIELD_CLASS =
-  'h-9 rounded-lg border border-transparent bg-surface-secondary px-3 text-body-s tabular-nums text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+const FIELD_CLASS = cn(fieldClass({ size: 'md', fullWidth: false }), 'tabular-nums');
 
 const DWELL_INPUT_CLASS =
-  'h-9 w-full min-w-[7rem] rounded-lg border border-transparent bg-link-standard-hover pl-3 pr-8 text-body-s tabular-nums text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn disabled:cursor-not-allowed disabled:opacity-60';
+  cn(fieldClass({ size: 'md', fullWidth: true }), 'min-w-[7rem] pl-3 pr-8 tabular-nums');
 
 const DWELL_STATIC_CLASS =
   'flex h-9 min-w-[6rem] items-center rounded-lg bg-[#2a2e37]/60 px-3 text-body-s text-text-quaternary';
@@ -574,7 +573,7 @@ function RecoveryAndServiceDirectionBar({
                 }}
                 placeholder={t('shiftList.routeGroups.directionName')}
                 maxLength={24}
-                className="w-28 bg-transparent px-1.5 text-body-s text-text-primary placeholder-zinc-600 focus:outline-none"
+                className={cn(fieldClass({ size: 'md', fullWidth: false }), 'w-28')}
                 aria-label={t('shiftList.routeGroups.newDirAria')}
               />
               <IconButton size="small" hierarchy="subordinate" variant="standard" title={t('shiftList.routeGroups.confirmAdd')} label={t('shiftList.routeGroups.confirmAddDirAria')} onPress={commitDraft} disabled={!draftName.trim()} icon={<Check />} />
@@ -1752,7 +1751,7 @@ export function StepShiftRouteGroups({
                         e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase(),
                       )
                     }
-                    className="min-w-0 flex-1 bg-transparent px-1 text-body-s-bold text-text-theme focus:outline-none"
+                    className={cn(fieldClass({ size: 'md', fullWidth: false }), 'min-w-0 flex-1')}
                     title={t('shiftList.routeGroups.codeTitle')}
                     aria-label={t('shiftList.routeGroups.codeAria', { name: route.routeName })}
                     aria-required
@@ -1767,7 +1766,7 @@ export function StepShiftRouteGroups({
                     maxLength={12}
                     placeholder="例：環線 A"
                     onChange={(e) => updateCardLabel(instanceId, e.target.value)}
-                    className="h-9 w-32 rounded-lg border border-transparent bg-link-standard-hover px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none"
+                    className={cn(fieldClass({ size: 'md', fullWidth: false }), 'w-32')}
                     aria-label={`${route.routeName} 班次卡標籤`}
                   />
                 </label>

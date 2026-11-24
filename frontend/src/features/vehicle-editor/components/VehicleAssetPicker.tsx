@@ -1,3 +1,4 @@
+import { fieldClass, cn } from '../../../components/ui';
 import { ImageIcon } from 'lucide-react';
 import {
   resolveVehicleAssetUrl,
@@ -74,7 +75,7 @@ export function VehicleAssetPicker({
         <input
           value={value}
           onChange={(e) => onSelect(e.target.value)}
-          className="mt-2 w-full rounded border border-border-quaternary bg-surface-secondary px-2 py-1 font-mono text-caption-2 text-text-secondary"
+          className={cn(fieldClass({ size: 'sm', fullWidth: true }), 'mt-2 font-mono')}
           placeholder="或輸入檔名路徑"
         />
       )}

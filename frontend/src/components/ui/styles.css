@@ -12,8 +12,7 @@
 @import './pagination/pagination.css';
 @import './field/field.css';
 @import './dropdown/dropdown.css';
-/* DatePicker 只做了觸發欄位與日期＋時間面板（manifest pending），樣式放在 components/picker */
-@import '../picker/datepicker.css';
+@import './datepicker/datepicker.css';
 @import './number/number.css';
 /* Table 只有樣式規範、沒有參考 CSS；刻意不分層（見檔內說明），放在 components/table */
 @import '../table/table.css';

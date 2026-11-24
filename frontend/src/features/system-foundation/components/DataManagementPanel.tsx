@@ -21,7 +21,7 @@ import { CLEAR_ALL_ORDERS_SQL } from '../dataAdminTemplates'
 import { DataRetentionPanel } from './DataRetentionPanel'
 import { useAuth } from '../../access-control/AuthContext'
 import { systemConfirm } from '../../../lib/systemDialog';
-import { Button, IconButton, SegmentedControl } from '../../../components/ui';
+import { Button, IconButton, SegmentedControl, fieldClass, cn } from '../../../components/ui';
 
 const TABLE_PURPOSE: Record<string, string> = {
   operation_orders: '已建立的營運訂單',
@@ -185,7 +185,7 @@ export function DataManagementPanel() {
   if (!auth.can('system.data-admin.view')) return <div className="flex h-full items-center justify-center p-8 text-body-s text-status-warning">權限不足</div>
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] bg-surface-sub-background text-text-primary">
+    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)] text-text-primary">
       <aside className="min-h-0 overflow-auto border-r border-border-quaternary p-3">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-body-s-bold"><Database size={15} />資料庫結構</div>
@@ -196,7 +196,7 @@ export function DataManagementPanel() {
             <option value="current">{metadata.environment.database}@{metadata.environment.host}:{metadata.environment.port}</option>
           </SiteSelect>
         )}
-        <input aria-label="搜尋資料表" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="搜尋資料表或用途" className="mb-3 w-full rounded border border-border-quaternary bg-surface-sub-background px-2 py-1.5 text-body-xs outline-none focus:border-border-theme" />
+        <input aria-label="搜尋資料表" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="搜尋資料表或用途" className={cn(fieldClass({ size: 'sm', fullWidth: true }), 'mb-3')} />
         {groupedTables.map(([schema, tables]) => (
           <div key={schema} className="mb-3">
             <div className="mb-1 text-body-xs-bold text-text-theme">{schema}</div>
@@ -249,7 +249,7 @@ export function DataManagementPanel() {
         )}
         <div className="shrink-0 rounded border border-border-quaternary bg-surface-primary px-3 py-2 text-body-xs">
           <div className="flex items-center gap-2"><strong>完整重置測試資料</strong><Button variant="outlined" onPress={() => void previewLiveReset()}>檢查作用範圍</Button>{liveResetPreview && <><Button hierarchy="danger" variant="outlined" disabled={loading} onPress={() => void runLiveReset()}>執行完整重置</Button><Button hierarchy="subordinate" variant="outlined" onPress={() => void resumeLiveInputs()}>只恢復 MQTT 接收</Button></>}</div>
-          {liveResetPreview && <div className="mt-2 space-y-1 text-text-tertiary"><label className="block">車輛範圍<input value={liveResetScope} onChange={(event) => setLiveResetScope(event.target.value)} className="ml-2 w-2/3 rounded border border-border-quaternary bg-surface-sub-background px-2 py-1" /></label><div>完整重置步驟：{liveResetPreview.actions.join(' → ')}</div><div>Redis：{liveResetPreview.redisKeys.length} 個明確 key；Broker Topic：{liveResetPreview.mqttTopics.length} 個（未確認 retained 時不清除）</div><div className="text-status-warning">{liveResetPreview.warnings.join('；')}</div><div>保留：{liveResetPreview.preserved.join('、')}</div><details><summary className="cursor-pointer text-text-quaternary">查看單一交易 SQL</summary><pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap bg-surface-sub-background p-2 text-caption-2 text-status-success">{liveResetPreview.sql}</pre></details></div>}
+          {liveResetPreview && <div className="mt-2 space-y-1 text-text-tertiary"><label className="block">車輛範圍<input value={liveResetScope} onChange={(event) => setLiveResetScope(event.target.value)} className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'ml-2 w-2/3')} /></label><div>完整重置步驟：{liveResetPreview.actions.join(' → ')}</div><div>Redis：{liveResetPreview.redisKeys.length} 個明確 key；Broker Topic：{liveResetPreview.mqttTopics.length} 個（未確認 retained 時不清除）</div><div className="text-status-warning">{liveResetPreview.warnings.join('；')}</div><div>保留：{liveResetPreview.preserved.join('、')}</div><details><summary className="cursor-pointer text-text-quaternary">查看單一交易 SQL</summary><pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap bg-surface-sub-background p-2 text-caption-2 text-status-success">{liveResetPreview.sql}</pre></details></div>}
           {liveResetResult?.steps && <div className="mt-2 space-y-1"><div>{liveResetResult.operation}／{liveResetResult.status}／request ID：{liveResetResult.requestId}／資料庫：{liveResetResult.database?.committed ? '已提交' : liveResetResult.database?.rolledBack ? '已回滾' : '未提交'}／調度：{liveResetResult.dispatchPaused ? '已暫停' : '狀態未知'}</div>{liveResetResult.steps.map((step) => <div key={step.id} className={step.status === 'failed' ? 'text-status-error-emphasis' : step.status === 'skipped' || step.status === 'not_run' ? 'text-status-warning' : 'text-status-success'}>{step.id}：{step.status} — {step.detail}</div>)}</div>}
           {liveResetResult?.resumed && <div className="mt-2 text-status-success">{liveResetResult.note}</div>}
         </div>

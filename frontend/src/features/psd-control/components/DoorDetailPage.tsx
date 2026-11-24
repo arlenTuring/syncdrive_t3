@@ -168,7 +168,7 @@ export function DoorDetailPage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       <div className="flex h-11 shrink-0 items-center justify-between gap-4 px-4">
         {/* 返回與車號不縮；畫面窄時由右側的停靠時間文字截斷，避免左右疊在一起 */}
         <div className="flex shrink-0 items-center gap-2">

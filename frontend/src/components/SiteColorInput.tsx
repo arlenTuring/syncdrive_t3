@@ -1,3 +1,4 @@
+import { cn, fieldClass } from './ui';
 import { Pipette } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
@@ -72,7 +73,8 @@ export function SiteColorInput({ value, onChange, disabled, className = '', name
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => { if (parseColor(draft)) emit(draft.trim()); else setDraft(source); }}
             onKeyDown={(event) => { if (event.key === 'Enter' && parseColor(draft)) { emit(draft.trim()); setOpen(false); } }}
-            className={`mt-1 w-full rounded-lg border bg-surface-primary px-2 py-1.5 font-mono text-body-s text-text-primary outline-none ${parseColor(draft) ? 'border-border-quaternary focus:border-border-theme' : 'border-status-error'}`}
+            aria-invalid={parseColor(draft) ? undefined : true}
+            className={cn(fieldClass({ size: 'sm' }), 'mt-1 font-mono')}
           />
         </label>
         <label className="mt-3 block text-body-xs text-text-tertiary">

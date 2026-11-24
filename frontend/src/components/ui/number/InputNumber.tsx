@@ -110,7 +110,7 @@ export function InputNumber({
     >
       {label != null ? (
         <label id={labelId} htmlFor={inputId} className="t3-number__label">
-          {required ? <b>*</b> : null}
+          {required ? <b aria-hidden>*</b> : null}
           {label}
         </label>
       ) : null}

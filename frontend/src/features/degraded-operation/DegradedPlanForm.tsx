@@ -1,7 +1,7 @@
 import { SiteSelect } from '../../components/SiteSelect';
 /* eslint-disable react-refresh/only-export-components -- draft helpers are the form's shared validation contract */
 import type { DegradedOperationPlan, DegradedOperationPlanInput } from "./api";
-import { Button, Radio, InputNumber } from '../../components/ui';
+import { Button, Radio, InputNumber, cn, fieldClass } from '../../components/ui';
 
 export type PlanDraft = {
   name: string;
@@ -55,7 +55,7 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-transparent bg-[#252b34] px-4 py-3 text-text-primary outline-none transition placeholder:text-text-quaternary focus:border-border-theme disabled:cursor-not-allowed disabled:text-text-quaternary";
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 export function DegradedPlanForm({
   value,

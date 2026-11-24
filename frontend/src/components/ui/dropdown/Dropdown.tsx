@@ -124,7 +124,7 @@ export function Dropdown<T extends string = string>(props: DropdownProps<T>) {
     >
       {label != null && !textOnly ? (
         <span id={labelId} className="t3-dropdown__label">
-          {required ? <span className="t3-dropdown__required">*</span> : null}
+          {required ? <span className="t3-dropdown__required" aria-hidden>*</span> : null}
           {label}
         </span>
       ) : null}

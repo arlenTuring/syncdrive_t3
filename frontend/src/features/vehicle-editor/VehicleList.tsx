@@ -72,7 +72,7 @@ export function VehicleList({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-surface-sub-background p-6 md:p-8">
+    <div className="flex-1 overflow-y-auto p-6 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border-quaternary pb-5">
           <div>

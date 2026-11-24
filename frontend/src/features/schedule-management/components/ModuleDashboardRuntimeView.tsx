@@ -122,7 +122,7 @@ export function ModuleDashboardRuntimeView({
 
   if (resolving) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-surface-sub-background px-6 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <Loader2 className="size-8 animate-spin text-text-quaternary" />
         <p className="text-body-xs text-text-quaternary">{t('shell.moduleDashboard.loading')}</p>
       </div>
@@ -131,7 +131,7 @@ export function ModuleDashboardRuntimeView({
 
   if (!plane) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-surface-sub-background px-6 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <AlertCircle className="size-10 text-status-warning" />
         <div>
           <p className="text-body-s-bold text-text-primary">

@@ -184,7 +184,7 @@ export function VirtualFencePage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       <div className="relative flex shrink-0 items-center gap-2 border-b border-border-quaternary px-4 py-3">
         {!isEditing ? (
           <>

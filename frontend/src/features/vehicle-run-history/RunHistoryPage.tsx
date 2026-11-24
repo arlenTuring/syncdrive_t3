@@ -37,7 +37,7 @@ export function RunHistoryPage() {
   const onResolved = useCallback((value: Resolved | null) => setResolved(value), []);
 
   return (
-    <div className="relative grid h-full min-h-0 grid-cols-1 bg-surface-sub-background xl:grid-cols-[minmax(0,1.7fr)_minmax(380px,1fr)]">
+    <div className="relative grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(380px,1fr)]">
       <section className="relative flex min-h-[420px] min-w-0 flex-col p-4 xl:min-h-0 xl:border-r xl:border-border-quaternary">
         <Button
           hierarchy="subordinate"
@@ -60,6 +60,8 @@ export function RunHistoryPage() {
       >
         <div className="flex shrink-0 items-center border-b border-border-quaternary px-3">
           <Tabs
+            idBase="run-history"
+            panelPerTab
             className="-mb-px"
             value={tab}
             onChange={setTab}
@@ -80,10 +82,10 @@ export function RunHistoryPage() {
           />
           <IconButton label="收合" size="small" hierarchy="subordinate" variant="standard" className="ml-auto xl:hidden" icon={<X />} onPress={() => setDrawerOpen(false)} />
         </div>
-        <div role="tabpanel" className={`min-h-0 flex-1 flex-col ${tab === "query" ? "flex" : "hidden"}`}>
+        <div role="tabpanel" id="run-history-panel-query" aria-labelledby="run-history-tab-query" className={`min-h-0 flex-1 flex-col ${tab === "query" ? "flex" : "hidden"}`}>
           <QueryPanel resolved={resolved} onResolved={onResolved} />
         </div>
-        <div role="tabpanel" ref={setPanelSlot} className={`min-h-0 flex-1 flex-col ${tab === "vehicle" ? "flex" : "hidden"}`} />
+        <div role="tabpanel" id="run-history-panel-vehicle" aria-labelledby="run-history-tab-vehicle" ref={setPanelSlot} className={`min-h-0 flex-1 flex-col ${tab === "vehicle" ? "flex" : "hidden"}`} />
       </aside>
     </div>
   );

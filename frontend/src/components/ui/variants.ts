@@ -110,7 +110,7 @@ export const DIALOG_PANEL_CLASS = 't3-dialog-surface flex max-h-[calc(100vh-2rem
 /* ───────────── 浮層選單（下拉、選項清單、日期選擇器） ───────────── */
 
 /** 下拉選單：底色 surface-background、圓角 8、上下 4px、最高 312px（Dropdown 規格 §4） */
-export const MENU_PANEL_CLASS = 'max-h-78 overflow-y-auto rounded-lg bg-surface-background py-1';
+export const MENU_PANEL_CLASS = 't3-menu-panel max-h-78 overflow-y-auto rounded-lg bg-surface-background py-1';
 export const MENU_GROUP_LABEL_CLASS = 'px-3 py-2 text-caption-1 text-text-quaternary';
 export const MENU_EMPTY_CLASS = 'px-3 py-2 text-body-s text-text-quaternary';
 export const MENU_BADGE_CLASS = 'shrink-0 text-body-xs text-text-quaternary';

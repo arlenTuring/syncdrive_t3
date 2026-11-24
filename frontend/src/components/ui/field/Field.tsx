@@ -120,33 +120,120 @@ export type TextAreaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 's
   fieldStyle?: FieldStyle;
   /** 依內容自動長高、不出捲軸（規格行為）；預設開 */
   autoGrow?: boolean;
+  /** 下方顯示「目前字數／上限」（規格 §4；以可見字元計，換行算 1 字）；要配合 maxLength */
+  showCount?: boolean;
+  /** 有內容時右上角顯示清除鈕（清空並保留焦點）；需要配合 onChange 讓外部更新值 */
+  clearable?: boolean;
 };
 
+/** 可見字元數（Unicode grapheme；中文、emoji 各算 1 字） */
+export function countGraphemes(text: string): number {
+  const Segmenter = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment: (t: string) => Iterable<unknown> } }).Segmenter;
+  if (!Segmenter) return [...text].length;
+  let n = 0;
+  for (const _ of new Segmenter(undefined, { granularity: 'grapheme' }).segment(text)) n += 1;
+  return n;
+}
+
+function sliceGraphemes(text: string, max: number): string {
+  const Segmenter = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment: (t: string) => Iterable<{ segment: string }> } }).Segmenter;
+  if (!Segmenter) return [...text].slice(0, max).join('');
+  let out = '';
+  let n = 0;
+  for (const part of new Segmenter(undefined, { granularity: 'grapheme' }).segment(text)) {
+    if (n >= max) break;
+    out += part.segment;
+    n += 1;
+  }
+  return out;
+}
+
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
-  { invalid = false, fieldStyle = 'tonal-theme', autoGrow = true, className, ...rest },
+  { invalid = false, fieldStyle = 'tonal-theme', autoGrow = true, showCount = false, clearable = false, className, maxLength, ...rest },
   ref,
 ) {
   const inner = useRef<HTMLTextAreaElement | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [text, setText] = useState(String(rest.value ?? rest.defaultValue ?? ''));
+  const current = rest.value != null ? String(rest.value) : text;
   const grow = useCallback(() => {
     const node = inner.current;
     if (!node || !autoGrow) return;
     node.style.height = 'auto';
     node.style.height = `${node.scrollHeight}px`;
   }, [autoGrow]);
-  useLayoutEffect(grow, [grow, rest.value]);
+  useLayoutEffect(grow, [grow, current]);
+  const setRef = (node: HTMLTextAreaElement | null) => {
+    inner.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  };
+  const decorated = showCount || clearable;
+  if (!decorated) {
+    return (
+      <textarea
+        ref={setRef}
+        maxLength={maxLength}
+        aria-invalid={invalid || undefined}
+        data-autogrow={autoGrow ? 'true' : undefined}
+        className={cn(fieldClass({ invalid, multiline: true, style: fieldStyle }), className)}
+        {...rest}
+        onInput={(event) => { grow(); rest.onInput?.(event); }}
+      />
+    );
+  }
+  // 規格 §4：字數以可見字元計，超過上限保留前面的字；中文組字完成後才截
+  const limit = maxLength;
+  const disabled = rest.disabled;
+  const state = disabled ? 'disabled' : invalid ? (focused ? 'error-focus' : 'error') : focused ? 'focus' : current ? 'active' : 'default';
   return (
-    <textarea
-      ref={(node) => {
-        inner.current = node;
-        if (typeof ref === 'function') ref(node);
-        else if (ref) ref.current = node;
-      }}
-      aria-invalid={invalid || undefined}
-      data-autogrow={autoGrow ? 'true' : undefined}
-      className={cn(fieldClass({ invalid, multiline: true, style: fieldStyle }), className)}
-      {...rest}
-      onInput={(event) => { grow(); rest.onInput?.(event); }}
-    />
+    <div className={cn('t3-field', className)} data-kind="textarea" data-style={fieldStyle} data-state={state} data-fluid="true">
+      <div className="t3-field__box">
+        <textarea
+          ref={setRef}
+          className="t3-field__input"
+          aria-invalid={invalid || undefined}
+          {...rest}
+          onFocus={(event) => { setFocused(true); rest.onFocus?.(event); }}
+          onBlur={(event) => { setFocused(false); rest.onBlur?.(event); }}
+          onChange={(event) => {
+            const native = event.nativeEvent as InputEvent;
+            if (limit != null && !native.isComposing && countGraphemes(event.target.value) > limit) {
+              event.target.value = sliceGraphemes(event.target.value, limit);
+            }
+            setText(event.target.value);
+            rest.onChange?.(event);
+          }}
+          onCompositionEnd={(event) => {
+            const node = event.currentTarget;
+            if (limit != null && countGraphemes(node.value) > limit) setNativeValue(node, sliceGraphemes(node.value, limit));
+            rest.onCompositionEnd?.(event);
+          }}
+          onInput={(event) => { grow(); rest.onInput?.(event); }}
+        />
+        {clearable && current && !disabled ? (
+          <button
+            type="button"
+            className="t3-field__action"
+            aria-label="清除"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              if (!inner.current) return;
+              setNativeValue(inner.current, '');
+              setText('');
+              inner.current.focus();
+            }}
+          >
+            <XCircle aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      {showCount ? (
+        <p className="t3-field__help" aria-live="polite">
+          {countGraphemes(current)}{limit != null ? `/${limit}` : ''}
+        </p>
+      ) : null}
+    </div>
   );
 });
 
@@ -173,7 +260,7 @@ export function Field({
   return (
     <div className={cn('flex flex-col', className)}>
       <label htmlFor={id} className={cn(LABEL_CLASS, 'mb-1')}>
-        {required ? <span className="text-status-error-emphasis">*</span> : null}
+        {required ? <span className="text-status-error-emphasis" aria-hidden>*</span> : null}
         {label}
       </label>
       {typeof children === 'function' ? children(id) : children}
@@ -212,7 +299,7 @@ export function SelectField({
   return (
     <fieldset className={cn('t3-select', className)} data-config={config} data-fluid="true">
       <legend>
-        {required ? <b>*</b> : null}
+        {required ? <b aria-hidden>*</b> : null}
         {label}
       </legend>
       <div className="t3-select__slot">{children}</div>

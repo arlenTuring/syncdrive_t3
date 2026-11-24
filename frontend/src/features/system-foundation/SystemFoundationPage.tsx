@@ -27,7 +27,7 @@ import {
   resolveWarnThreshold,
   type MonitoringThresholdSettings,
 } from './thresholdSettings'
-import { Button, IconButton, SegmentedControl, Tabs } from '../../components/ui';
+import { Button, IconButton, SegmentedControl, Tabs, tabPanelProps } from '../../components/ui';
 import { HEALTH_SERIES_COLOR } from './components/healthSeriesColors';
 
 type TabKey = 'health' | 'settings' | 'advanced'
@@ -106,6 +106,7 @@ export function SystemFoundationPage({
     >
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border-quaternary">
         <Tabs
+          idBase="system-foundation"
           label={t('systemFoundation.title', { defaultValue: '系統基礎模組' })}
           value={tab}
           onChange={setTab}
@@ -129,6 +130,8 @@ export function SystemFoundationPage({
         ) : null}
       </div>
 
+      {/* 頁籤內容（contents：只加 tabpanel 語意，不影響排版） */}
+      <div {...tabPanelProps('system-foundation', tab)} className="contents">
       {tab === 'advanced' ? (
         <AdvancedManagementPanel initialSection={initialAdvancedSection} />
       ) : tab === 'settings' ? (
@@ -143,7 +146,7 @@ export function SystemFoundationPage({
 
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-body-s-bold text-text-secondary">
+              <h2 className="text-body-m-bold text-text-secondary">
                 {t('systemFoundation.liveResources')}
               </h2>
               <IconButton
@@ -194,7 +197,7 @@ export function SystemFoundationPage({
           </section>
 
           <section>
-            <h2 className="mb-3 text-body-s-bold text-text-secondary">
+            <h2 className="mb-3 text-body-m-bold text-text-secondary">
               {t('systemFoundation.health.coreServices')}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -226,7 +229,7 @@ export function SystemFoundationPage({
 
           <section className="min-h-[340px] rounded-2xl border border-border-quaternary bg-surface-popup p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-body-s-bold text-text-secondary">
+              <h2 className="text-body-m-bold text-text-secondary">
                 {t('systemFoundation.health.historyTrend')}
               </h2>
               <SegmentedControl
@@ -261,6 +264,7 @@ export function SystemFoundationPage({
           </section>
         </>
       )}
+      </div>
 
       <ThresholdSettingsDialog
         open={thresholdOpen}

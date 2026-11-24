@@ -5,7 +5,7 @@ import {
   type FenceBehaviorKind,
   type FenceDraft,
 } from '../types';
-import { Button, Checkbox, IconButton, Switch, InputNumber } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Switch, InputNumber, fieldClass } from '../../../components/ui';
 
 type FenceFormPanelProps = {
   mode: 'edit' | 'create';
@@ -106,7 +106,7 @@ export function FenceFormPanel({
             value={draft.name}
             onChange={(e) => onChange({ ...draft, name: e.target.value })}
             placeholder={t('virtualFence.form.inputPlaceholder')}
-            className="h-9 w-full rounded-lg border border-border-quaternary bg-surface-secondary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme-light"
+            className={fieldClass({ size: 'md', fullWidth: true })}
           />
         </div>
 

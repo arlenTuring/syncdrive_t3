@@ -23,6 +23,8 @@ export {
 } from './checkbox/Checkbox';
 export { cn } from './cn';
 export { Dialog, DialogEventActions, type DialogProps, type DialogTone } from './dialog/Dialog';
+export { PickerPopupArrow } from './datepicker/PickerIcons';
+export { DatePicker, DatePickerPanel, formatPickerValue, PickerTimeColumns, type DatePickerProps, type PickerMode, type PickerRange, type TimePart } from './datepicker/DatePicker';
 export { Dropdown, type DropdownOption, type DropdownProps } from './dropdown/Dropdown';
 export { Header, HeaderAvatar, HeaderDivider, HeaderIconButton, type HeaderType } from './header/Header';
 export { InputNumber } from './number/InputNumber';
@@ -32,7 +34,7 @@ export { Panel } from './panel/Panel';
 export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } from './radio/Radio';
 export { headerCheckState } from './checkbox/selection';
 export { Switch, type SwitchConfiguration, type SwitchProps } from './switch/Switch';
-export { SegmentedControl, Tabs, type TabItem, type TabsVariant } from './tabs/Tabs';
+export { SegmentedControl, TabPanel, tabPanelProps, Tabs, type TabItem, type TabsVariant } from './tabs/Tabs';
 export {
   buttonAttributes,
   badgeToneColors,

@@ -11,7 +11,7 @@ import {
 import type { TextWrapMode } from '../lib/textLayout';
 import type { LabelPlacement } from '../features/map-editor/utils/facilityLabelStyle';
 import { LABEL_PLACEMENT_LABELS } from '../features/map-editor/utils/facilityLabelStyle';
-import { Button, IconButton } from './ui';
+import { Button, IconButton, fieldClass, cn } from './ui';
 
 type Props = {
   textWrap: TextWrapMode;
@@ -121,7 +121,7 @@ export function TextLayoutControls({
                 const n = Number(raw);
                 if (Number.isFinite(n)) onLabelBoxWidthChange(n);
               }}
-              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
+              className={cn(fieldClass({ size: 'sm', fullWidth: true }), 'font-mono')}
             />
             <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={disabled} onPress={() => onLabelBoxWidthChange(undefined)}>自動</Button>
           </div>
@@ -146,7 +146,7 @@ export function TextLayoutControls({
                 const n = Number(raw);
                 if (Number.isFinite(n)) onLabelBoxHeightChange(n);
               }}
-              className="w-full rounded-md border border-border-tertiary bg-surface-sub-background px-2 py-1 font-mono text-body-xs text-text-primary outline-none focus:border-border-theme disabled:opacity-50"
+              className={cn(fieldClass({ size: 'sm', fullWidth: true }), 'font-mono')}
             />
             <Button hierarchy="subordinate" variant="outlined" className="shrink-0" disabled={disabled} onPress={() => onLabelBoxHeightChange(undefined)}>自動</Button>
           </div>

@@ -30,7 +30,7 @@ import {
   resolvePendingScheduleAdjust,
 } from '../pendingScheduleAdjust';
 import { systemConfirm } from '../../../lib/systemDialog';
-import { Button, Dialog } from '../../../components/ui';
+import { Button, Dialog, fieldClass } from '../../../components/ui';
 
 type ScheduleAdjustApplyDialogProps = {
   onClose: () => void;
@@ -378,7 +378,7 @@ export function ScheduleAdjustApplyDialog({
             {showSupervisorApproval ? (
               <section className="px-6 pb-4">
                 <div className="rounded-xl border border-border-quaternary bg-surface-popup p-4">
-                  <h3 className="mb-3 text-body-s-bold text-text-primary">
+                  <h3 className="mb-3 text-body-m-bold text-text-primary">
                     {t('shiftDeployment.adjust.approvalSection')}
                   </h3>
                   <input
@@ -387,7 +387,7 @@ export function ScheduleAdjustApplyDialog({
                     placeholder={t('shiftDeployment.adjust.approvalPlaceholder', {
                       phrase: approvalPhrase,
                     })}
-                    className="h-10 w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary outline-none placeholder:text-text-quaternary focus:border-border-theme"
+                    className={fieldClass({ size: 'md', fullWidth: true })}
                   />
                 </div>
               </section>

@@ -40,7 +40,7 @@ export function VehicleRealtimePage() {
     <div className="flex h-full min-h-0 flex-col px-6 py-5 text-text-primary">
       <div className="flex shrink-0 flex-wrap items-center gap-3">
         <div className={cn(fieldClass({ fullWidth: false }), 'flex w-[280px] items-center text-text-tertiary')}>
-          <Search className="mr-2 size-4" /><input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search(); }} placeholder="請輸入載具名稱" className="min-w-0 flex-1 bg-transparent text-body-s text-text-primary outline-none placeholder:text-text-quaternary" />
+          <Search className="mr-2 size-4" /><input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') search(); }} placeholder="請輸入載具名稱" className={cn(fieldClass({ size: 'md', fullWidth: false }), 'min-w-0 flex-1')} />
         </div>
         <IconButton label="搜尋" hierarchy="subordinate" variant="tonal" icon={<Search />} onPress={search} />
         <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RefreshCw />} onPress={reset}>重置</Button>

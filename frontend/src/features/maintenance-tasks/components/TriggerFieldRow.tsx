@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sanitizeIntegerInput } from '../utils/numericInput';
-import { Checkbox } from '../../../components/ui';
+import { Checkbox, cn, fieldClass } from '../../../components/ui';
 
 const INLINE_INPUT_ENABLED =
-  'h-[42px] w-[90%] min-w-[180px] flex-1 max-w-[900px] rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: false }), 'w-[90%] min-w-[180px] flex-1 max-w-[900px]');
 
 type TriggerFieldRowProps = {
   label: ReactNode;

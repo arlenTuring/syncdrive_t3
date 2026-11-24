@@ -5,7 +5,7 @@ import { StatusTag } from '../../../components/StatusTag';
 import { subscribeDatasourceInvalidation } from '../../dashboard/utils/datasourceInvalidationBus';
 import { fetchShiftRecordDetail, type ShiftRecordDetail } from '../api/shiftRecordsApi';
 import { EXECUTION_TAG_STYLE, executionDisplayKey } from '../types';
-import { Button } from '../../../components/ui';
+import { Button, Header } from '../../../components/ui';
 
 type ShiftRecordDetailPageProps = {
   orderId: string;
@@ -56,11 +56,11 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
   }, [load]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       <header className="flex items-center justify-between border-b border-border-quaternary px-6 py-4">
         <div className="flex items-center gap-3">
           <Button hierarchy="subordinate" variant="outlined" leadingIcon={<ArrowLeft />} onPress={onBack}>{t('shiftRecords.detail.backToList')}</Button>
-          <h1 className="text-headline-5">{t('shiftRecords.detail.title')}</h1>
+          <Header type="subheader" as="h1" title={t('shiftRecords.detail.title')} className="w-auto" />
           {detail && (
             <span className="font-mono text-body-s text-text-quaternary">{detail.trip_code}</span>
           )}
@@ -117,14 +117,14 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-body-s-bold text-text-secondary">
+              <h2 className="mb-2 text-body-m-bold text-text-secondary">
                 {t('shiftRecords.detail.currentLeg')}
               </h2>
               <JsonBlock value={detail.current_leg} />
             </section>
 
             <section>
-              <h2 className="mb-2 text-body-s-bold text-text-secondary">
+              <h2 className="mb-2 text-body-m-bold text-text-secondary">
                 {t('shiftRecords.detail.taskGroup')}
               </h2>
               {detail.task_group.length === 0 ? (
@@ -158,7 +158,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-body-s-bold text-text-secondary">
+              <h2 className="mb-2 text-body-m-bold text-text-secondary">
                 {t('shiftRecords.detail.stationActions')}
               </h2>
               {detail.actions.length === 0 ? (
@@ -192,7 +192,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
             </section>
 
             <section>
-              <h2 className="mb-2 text-body-s-bold text-text-secondary">
+              <h2 className="mb-2 text-body-m-bold text-text-secondary">
                 {t('shiftRecords.detail.rawPayload')}
               </h2>
               <JsonBlock value={detail.payload} />

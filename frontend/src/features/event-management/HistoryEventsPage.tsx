@@ -1,3 +1,4 @@
+import { fieldClass, cn } from '../../components/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../access-control/AuthContext';
 import { getSeverityStyle } from '../dashboard/constants/severityTheme';
@@ -214,7 +215,7 @@ export function HistoryEventsPage() {
       <div className="flex flex-wrap items-end gap-3" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(); } }}>
         <RangeFilter compact value={draft.range} onChange={(range) => setDraft({ ...draft, range })} timeZone={tz} error={!draft.eventRecordId.trim() ? rangeError : null} />
         <FilterField label="事件 ID">
-          <input type="text" inputMode="numeric" aria-label="事件 ID" placeholder="輸入事件 ID" maxLength={19} value={draft.eventRecordId} onChange={(event) => { setDraft({ ...draft, eventRecordId: event.target.value }); setRangeError(null); }} className="h-10 w-44 rounded-xl bg-surface-secondary px-3 font-mono text-body-s text-text-primary outline-none placeholder:font-sans placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme" />
+          <input type="text" inputMode="numeric" aria-label="事件 ID" placeholder="輸入事件 ID" maxLength={19} value={draft.eventRecordId} onChange={(event) => { setDraft({ ...draft, eventRecordId: event.target.value }); setRangeError(null); }} className={cn(fieldClass({ size: 'md', fullWidth: false }), 'w-44 font-mono')} />
           {draft.eventRecordId.trim() && rangeError ? <span role="alert" className="text-body-xs text-status-error-emphasis">{rangeError}</span> : null}
         </FilterField>
         <SelectFilter label="載具" value={draft.vehicleCode} onChange={(v) => setDraft({ ...draft, vehicleCode: v })}

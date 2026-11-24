@@ -16,7 +16,7 @@ import {
   type PsdVehicleCard,
 } from './loadPsdSources';
 import { useDoorBodyMqtt } from './useDoorBodyMqtt';
-import { Tabs } from '../../components/ui';
+import { Tabs, tabPanelProps } from '../../components/ui';
 
 type TabKey = 'vehicle' | 'platform';
 
@@ -151,10 +151,10 @@ export function PsdControlPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
-      <Tabs label="門控分類" className="shrink-0 border-b border-border-quaternary px-4" value={tab} onChange={setTab} items={[{ id: 'vehicle', label: t('psdControl.tabVehicle') }, { id: 'platform', label: t('psdControl.tabPlatform') }]} />
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
+      <Tabs idBase="psd-control" label="門控分類" className="shrink-0 border-b border-border-quaternary px-4" value={tab} onChange={setTab} items={[{ id: 'vehicle', label: t('psdControl.tabVehicle') }, { id: 'platform', label: t('psdControl.tabPlatform') }]} />
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+      <div {...tabPanelProps('psd-control', tab)} className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {tab === 'vehicle' ? (
           vehicleLoading ? (
             <p className="py-16 text-center text-body-s text-text-quaternary">{t('psdControl.loadingVehicles')}</p>

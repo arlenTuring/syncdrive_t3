@@ -9,7 +9,7 @@ import {
 } from '../constants/vehiclePreviewTestSequence';
 import type { VehicleDefinition } from '../types';
 import { readOperationActions } from '../utils/resolveBehaviorActions';
-import { Button, Checkbox, IconButton } from '../../../components/ui';
+import { Button, Checkbox, IconButton, fieldClass, cn } from '../../../components/ui';
 
 function mergePreviewData(
   base: Record<string, unknown> | undefined,
@@ -108,7 +108,7 @@ export function VehiclePreviewTestPanel({
                 const trip = e.target.value;
                 onUpdatePreviewData({ ...preview, trip_code: trip, badge_label: trip });
               }}
-              className="w-24 rounded border border-border-quaternary bg-surface-primary px-2 py-1 font-mono text-text-primary"
+              className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-24 font-mono')}
             />
           </label>
           <label className="flex flex-col gap-0.5">
@@ -116,7 +116,7 @@ export function VehiclePreviewTestPanel({
             <input
               value={String(preview.vehicle_code ?? '')}
               onChange={(e) => patchField('vehicle_code', e.target.value)}
-              className="w-24 rounded border border-border-quaternary bg-surface-primary px-2 py-1 font-mono text-text-primary"
+              className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'w-24 font-mono')}
             />
           </label>
           <label className="flex flex-col gap-0.5">

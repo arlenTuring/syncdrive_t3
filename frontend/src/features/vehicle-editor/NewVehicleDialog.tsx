@@ -2,7 +2,7 @@ import { NumberInput } from '../../components/NumberInput'
 import { useState } from 'react';
 import { Bus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Button, Dialog } from '../../components/ui';
+import { Button, Dialog, fieldClass } from '../../components/ui';
 
 const PRESET_KEYS = [
   { key: 'presetLandscape' as const, width: 500, height: 100 },
@@ -41,7 +41,7 @@ export function NewVehicleDialog({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-border-tertiary bg-surface-secondary px-3 py-2 text-body-s text-text-primary transition-colors focus:border-status-warning focus:outline-none focus:ring-1 focus:ring-status-warning-light"
+            className={fieldClass({ size: 'md', fullWidth: true })}
           />
         </div>
 

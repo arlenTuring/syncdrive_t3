@@ -140,7 +140,7 @@ export function MapVehicleSettingsPanel({
   const modelName = (key?: string | null) => models?.find((m) => m.id === key)?.name ?? key ?? '—';
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 bg-surface-sub-background lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="min-h-0 overflow-y-auto border-r border-border-quaternary p-3">
         <ul className="space-y-1.5">
           {rows.map((row) => (
@@ -168,7 +168,7 @@ export function MapVehicleSettingsPanel({
       <section className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
           <div className="space-y-3 rounded-xl border border-border-quaternary bg-surface-primary p-4 text-body-xs">
-            <h3 className="text-body-s-bold text-text-primary">
+            <h3 className="text-body-m-bold text-text-primary">
               {target === DEFAULT_TARGET ? '系統預設車輛模型' : `地圖 ${rows.find((r) => r.id === target)?.name ?? target}`}
             </h3>
             <label className="block space-y-1">

@@ -173,7 +173,7 @@ export function ScheduleAdjustDiffStep({
   return (
     <div className="flex flex-col px-6 pb-3">
       <section className="pb-5">
-        <h3 className="mb-3 text-body-s-bold text-text-primary">
+        <h3 className="mb-3 text-body-m-bold text-text-primary">
           {t('shiftDeployment.diff.applicationContent')}
         </h3>
         <div className="grid grid-cols-2 gap-8 text-body-s">
@@ -189,7 +189,7 @@ export function ScheduleAdjustDiffStep({
       </section>
 
       <section className="flex flex-col">
-        <h3 className="mb-3 text-body-s-bold text-text-primary">
+        <h3 className="mb-3 text-body-m-bold text-text-primary">
           {t('shiftDeployment.diff.impactSummary')}
         </h3>
         {missingCurrent ? (

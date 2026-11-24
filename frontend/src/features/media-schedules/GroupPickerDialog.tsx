@@ -4,7 +4,7 @@ import { ApiError, type GroupList, type MediaGroup } from '../media-groups/api';
 import { Dialog, ErrorLine, GhostButton, PrimaryButton } from '../media-groups/dialogs';
 import { Pagination, TypeBadge } from '../media-groups/widgets';
 import { listGroupOptions } from './api';
-import { IconButton, Radio } from '../../components/ui';
+import { IconButton, Radio, fieldClass, cn } from '../../components/ui';
 
 /**
  * 「套用媒體分組」：搜尋、分頁、單選；展開只是查看成員，跟選取無關。
@@ -89,7 +89,7 @@ export function GroupPickerDialog({ onClose, onApply }: { onClose: () => void; o
           onKeyDown={(event) => event.key === 'Enter' && search()}
           placeholder="請輸入關鍵字"
           aria-label="搜尋分組名稱"
-          className="w-full rounded-xl bg-surface-secondary py-3.5 pr-4 pl-12 text-headline-5 outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
+          className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pr-4 pl-12')}
         />
       </div>
       <div role="radiogroup" aria-label="媒體分組" className="mt-4">

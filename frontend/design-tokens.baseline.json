@@ -303,10 +303,6 @@
     "hex": 2,
     "arbitrary": 2
   },
-  "features/degraded-operation/DegradedPlanForm.tsx": {
-    "hex": 1,
-    "arbitrary": 1
-  },
   "features/degraded-operation/ExecutionScheduleFields.tsx": {
     "button": 1
   },
@@ -340,7 +336,6 @@
     "button": 1
   },
   "features/maintenance-tasks/components/MaintenanceTaskListPage.tsx": {
-    "palette": 2,
     "button": 1
   },
   "features/map-editor/components/AreaDragTrack.tsx": {
@@ -665,10 +660,6 @@
     "arbitrary": 11,
     "rgb": 5
   },
-  "features/shift-deployment/fallback.ts": {
-    "hex": 3,
-    "rgb": 3
-  },
   "features/shift-deployment/hooks/useDeploymentData.ts": {
     "hex": 1,
     "rgb": 1
@@ -722,7 +713,7 @@
     "hex": 3,
     "arbitrary": 4,
     "rgb": 1,
-    "palette": 4,
+    "palette": 3,
     "button": 2
   },
   "features/shift-list/components/StepShiftScheduleAdjust.tsx": {
@@ -742,12 +733,7 @@
   "features/shift-list/utils/scheduleEngineLastIssues.ts": {
     "hex": 21
   },
-  "features/shift-records/components/CustomDateTimePanel.tsx": {
-    "button": 2
-  },
   "features/shift-records/components/DateTimeRangePicker.tsx": {
-    "hex": 1,
-    "arbitrary": 1,
     "button": 3
   },
   "features/shift-records/components/DrivingCapabilityModal.tsx": {
@@ -783,7 +769,7 @@
   },
   "features/time-templates/components/CreateTimeTemplateModal.tsx": {
     "hex": 2,
-    "arbitrary": 4,
+    "arbitrary": 2,
     "button": 2
   },
   "features/time-templates/components/PanelNoData.tsx": {
@@ -817,8 +803,7 @@
     "arbitrary": 1
   },
   "features/time-templates/components/TimeOfDayPicker.tsx": {
-    "arbitrary": 2,
-    "button": 2
+    "button": 1
   },
   "features/time-templates/components/TimeRangeField.tsx": {
     "arbitrary": 2,
@@ -835,7 +820,6 @@
     "button": 3
   },
   "features/time-templates/components/TimeTemplateListPage.tsx": {
-    "palette": 2,
     "button": 2
   },
   "features/time-templates/components/TimeTemplatePanelHeader.tsx": {

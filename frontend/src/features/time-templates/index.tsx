@@ -6,5 +6,5 @@ type TimeTemplatesAppProps = {
 };
 
 export default function TimeTemplatesApp({ onBackToHome, embedded }: TimeTemplatesAppProps) {
-  return <TimeTemplateListPage onBackToHome={embedded ? undefined : onBackToHome} />;
+  return <TimeTemplateListPage onBackToHome={embedded ? undefined : onBackToHome} embedded={embedded} />;
 }

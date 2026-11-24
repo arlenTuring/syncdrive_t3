@@ -59,7 +59,7 @@ import {
   layerSortKey,
   resolveIssueDisplayLayerFromIssue,
 } from '../utils/scheduleAcceptance';
-import { Button, Dialog, IconButton, Tabs } from '../../../components/ui';
+import { Button, Dialog, IconButton, Tabs, tabPanelProps } from '../../../components/ui';
 import {
   resolveGeneratedBlockTripCode,
   type MaintenanceSectionCodeBySection,
@@ -1539,7 +1539,7 @@ export function StepShiftScheduleAdjust({
       <div className={`flex min-h-0 flex-1 flex-col rounded-xl border border-border-theme-light bg-surface-secondary p-4 ${isMaximized ? '' : 'min-h-[520px]'}`}>
       {/* 分頁、時段模式、工具列排成一行：模式標籤放不下時橫向捲動，不換行把工具列擠到第二行 */}
       <div className="mb-4 flex shrink-0 items-center gap-3">
-        <Tabs label="班表檢視" className="shrink-0" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.scheduleAdjust.tripPreview') }, { id: 'capacity', label: t('shiftList.scheduleAdjust.capacityTrend') }]} />
+        <Tabs idBase="schedule-adjust" label="班表檢視" className="shrink-0" value={activeTab} onChange={setActiveTab} items={[{ id: 'schedule', label: t('shiftList.scheduleAdjust.tripPreview') }, { id: 'capacity', label: t('shiftList.scheduleAdjust.capacityTrend') }]} />
 
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
           {periodLegends.map((item) => (
@@ -1554,7 +1554,7 @@ export function StepShiftScheduleAdjust({
         {renderToolbar()}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div {...tabPanelProps('schedule-adjust', activeTab)} className="flex min-h-0 flex-1 flex-col gap-4">
         {/* 保持掛載以免切換運能趨勢後橫移位置被重置 */}
         <div
           className={`flex min-h-0 flex-1 flex-col gap-4 ${

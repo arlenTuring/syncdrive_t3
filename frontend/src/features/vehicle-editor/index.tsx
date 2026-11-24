@@ -282,7 +282,7 @@ export default function VehicleEditor({
 
   if (view === 'list') {
     return (
-      <div className="flex h-full min-h-0 w-full flex-col bg-surface-sub-background">
+      <div className="flex h-full min-h-0 w-full flex-col">
         <VehicleList
           vehicles={vehicles}
           readOnly={readOnly}
@@ -339,7 +339,7 @@ export default function VehicleEditor({
 
   return (
     <VariableProvider variables={{}}>
-      <div className="flex h-full min-h-0 w-full flex-col bg-surface-sub-background">
+      <div className="flex h-full min-h-0 w-full flex-col">
         <header className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-sub-background px-4 py-2.5">
           <Button hierarchy="subordinate" variant="standard" onPress={() => {
               flushSave();

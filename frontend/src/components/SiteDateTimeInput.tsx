@@ -3,7 +3,7 @@ import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 're
 import { CustomDateTimePanel } from '../features/shift-records/components/CustomDateTimePanel';
 import { TimePickerPanel } from '../features/time-templates/components/TimeOfDayPicker';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
-import { cn, fieldClass, type FieldSize, MENU_OFFSET, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
+import { cn, fieldClass, type FieldSize, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 type Kind = 'date' | 'time' | 'datetime-local';
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> & {
@@ -124,9 +124,9 @@ export function SiteDateTimeInput({
         role="dialog"
         ariaLabel={ariaLabel || title || '選擇日期時間'}
         align="start"
-        offset={MENU_OFFSET}
+        // 面板頂端有 9px 的指向箭頭（DatePicker 規格 .picker-popup-arrow）
+        offset={12}
         autoFocus={false}
-        className={timeOnly ? undefined : 't3-picker-panel w-[min(468px,calc(100vw-24px))]'}
       >
         {timeOnly ? (
           <TimeOnlyPanel key={current} value={parse(current, type)} onConfirm={emit} />

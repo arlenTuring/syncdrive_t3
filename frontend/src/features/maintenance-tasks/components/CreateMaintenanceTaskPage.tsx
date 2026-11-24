@@ -32,7 +32,7 @@ import { StepPreTripParams } from './StepPreTripParams';
 import { StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 type CreateMaintenanceTaskPageProps = {
   onBack: () => void;
@@ -41,7 +41,7 @@ type CreateMaintenanceTaskPageProps = {
 };
 
 const INPUT_CLASS =
-  'h-[42px] w-full rounded-lg border border-border-quaternary bg-surface-primary px-3 text-body-s text-text-primary placeholder:text-text-quaternary focus:border-border-theme focus:outline-none focus:ring-1 focus:ring-border-theme-light-trn';
+  cn(fieldClass({ size: 'md', fullWidth: true }));
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 

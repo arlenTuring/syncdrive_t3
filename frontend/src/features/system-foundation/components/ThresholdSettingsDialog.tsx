@@ -9,7 +9,7 @@ import {
   type MonitoringThresholdSettings,
   type ThresholdMetricKey,
 } from '../thresholdSettings'
-import { Button, CheckboxIndicator, cn, Dialog, IconButton, MENU_PANEL_CLASS, menuItemClass, Tabs, TextInput, InputNumber } from '../../../components/ui';
+import { Button, CheckboxIndicator, cn, Dialog, IconButton, MENU_PANEL_CLASS, menuItemClass, Tabs, TextInput, InputNumber, tabPanelProps } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -208,13 +208,14 @@ export function ThresholdSettingsDialog({
       }
     >
       <Tabs
+        idBase="threshold-metric"
         className="border-b border-border-quaternary px-3"
         value={metricTab}
         onChange={setMetricTab}
         items={THRESHOLD_METRIC_TABS.map((tab) => ({ id: tab.id, label: t(METRIC_LABEL_KEYS[tab.id]) }))}
       />
 
-      <div className="min-h-0 space-y-5 overflow-auto px-6 py-5">
+      <div {...tabPanelProps('threshold-metric', metricTab)} className="min-h-0 space-y-5 overflow-auto px-6 py-5">
         <label className="block space-y-2">
           <span className="text-body-xs text-text-tertiary">
             {t('systemFoundation.threshold.notifyees')}

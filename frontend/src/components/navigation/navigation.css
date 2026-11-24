@@ -24,7 +24,12 @@
   .t3-nav__toggle { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--text-tertiary); cursor: pointer; }
   .t3-nav__toggle:hover { background: var(--link-standard); }
   .t3-nav__toggle svg { width: 24px; height: 24px; }
-  .t3-nav__menu { flex: 1; min-height: 0; padding: 0 16px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 8px; }
+  /* 規格「Scrollbar 與 Menu 寬度」：外層左右 16px；捲動容器向右延伸 16px 用掉右側留白放捲軸，
+     選單寬固定（展開 248、收合 48），捲軸出現與否都不改變項目寬度與位置 */
+  .t3-nav__menu { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0 16px; }
+  .t3-nav__scroll { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; width: calc(100% + 16px); align-self: flex-start; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+  .t3-nav__scroll > * { width: 248px; flex: none; }
+  .t3-nav[data-collapsed="true"] .t3-nav__scroll > * { width: 48px; }
   .t3-nav__item {
     --nav-bg: transparent; --nav-fg: var(--text-secondary); --nav-arrow: var(--text-tertiary);
     display: flex; align-items: center; gap: 8px; width: 100%; height: 48px; padding: 0 12px;
@@ -32,7 +37,7 @@
     font: 400 16px/20px var(--font-primary); text-align: left; cursor: pointer;
   }
   .t3-nav__item--sub { padding: 0 12px 0 40px; }
-  .t3-nav[data-collapsed="true"] .t3-nav__item { justify-content: center; width: 48px; padding: 0; }
+  .t3-nav[data-collapsed="true"] .t3-nav__item { justify-content: center; padding: 0; }
   .t3-nav__icon { display: flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; }
   .t3-nav__icon svg { width: 20px; height: 20px; }
   .t3-nav__label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

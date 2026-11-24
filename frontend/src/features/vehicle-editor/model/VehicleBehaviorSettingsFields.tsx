@@ -8,7 +8,7 @@ import {
   buildVehicleBehaviorActionRules,
   VEHICLE_BEHAVIOR_ACTION_CATALOG,
 } from '../constants/behaviorActionCatalog';
-import { Button } from '../../../components/ui';
+import { Button, cn, fieldClass } from '../../../components/ui';
 
 /** 車輛行為圖示的設定值（地圖車輛模型設定、儀表板獨立載具容器共用） */
 export type VehicleBehaviorSettings = {
@@ -18,8 +18,7 @@ export type VehicleBehaviorSettings = {
   behaviorIconSize?: number;
 };
 
-const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
-  focus:outline-none focus:border-border-theme focus:ring-1 focus:ring-border-theme-light transition-colors`;
+const inputCls = cn(fieldClass({ size: 'sm', fullWidth: true }));
 const selectCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2 py-1.5 text-text-primary text-body-xs
   focus:outline-none focus:border-border-theme transition-colors cursor-pointer`;
 

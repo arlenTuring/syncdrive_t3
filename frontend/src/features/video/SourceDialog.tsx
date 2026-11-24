@@ -6,7 +6,7 @@ import { ErrorLine } from '../media-groups/dialogs';
 import { LivePlayer, type PlayerStats } from './LivePlayer';
 import { videoApi, type ConnectionInput, type Protocol, type SourceTest, type VideoSourceItem } from './api';
 import { tagKey } from './layout';
-import { Button, Checkbox, Dialog, Field, IconButton, SegmentedControl, Switch, TextInput } from '../../components/ui';
+import { Button, Checkbox, Dialog, Field, IconButton, SegmentedControl, Switch, TextInput, fieldClass, cn } from '../../components/ui';
 
 const PROTOCOLS: Array<{ value: Protocol; label: string }> = [
   { value: 'rtsp', label: 'RTSP' },
@@ -89,7 +89,7 @@ function TagInput({ id, value, onChange, suggestions }: { id?: string; value: st
         placeholder={value.length ? '' : '請輸入（Enter 加入）'}
         id={id}
         aria-label="來源標籤"
-        className="h-7 min-w-[8rem] flex-1 bg-transparent text-body-s text-text-primary outline-none placeholder:text-text-quaternary"
+        className={cn(fieldClass({ size: 'sm', fullWidth: false }), 'min-w-[8rem] flex-1')}
         maxLength={TAG_LENGTH_MAX}
       />
       <datalist id={listId}>{suggestions.filter((s) => !value.some((v) => tagKey(v) === tagKey(s))).map((s) => <option key={s} value={s} />)}</datalist>

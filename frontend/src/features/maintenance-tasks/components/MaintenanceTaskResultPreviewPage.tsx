@@ -46,7 +46,7 @@ export function MaintenanceTaskResultPreviewPage({
   }, [taskId]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-sub-background text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col text-text-primary">
       <header className="flex shrink-0 items-center gap-3 border-b border-border-quaternary bg-surface-sub-background px-6 py-4">
         <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={onBack} title={t('maintenanceTasks.resultPreview.backToList')} label={t('maintenanceTasks.resultPreview.backToList')} icon={<ArrowLeft />} />
         <Wrench className="size-5 text-text-theme-light" aria-hidden />
