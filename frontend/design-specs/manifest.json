@@ -49,6 +49,100 @@
       "figma": "70:13852",
       "variants": 12,
       "playground": "design-specs/t3-switch-playground.html"
+    },
+    {
+      "name": "Dialog",
+      "spec": "design-specs/t3-dialog-engineering-spec.md",
+      "css": "src/components/ui/dialog/dialog.css",
+      "component": "src/components/ui/dialog/Dialog.tsx",
+      "figma": "240:23642",
+      "variants": 6,
+      "playground": "design-specs/t3-dialog-playground.html"
+    },
+    {
+      "name": "Tabs",
+      "spec": "design-specs/t3-tabs-engineering-spec.md",
+      "css": "src/components/ui/tabs/tabs.css",
+      "component": "src/components/ui/tabs/Tabs.tsx",
+      "figma": "251:75822",
+      "variants": 28,
+      "playground": "design-specs/t3-tabs-playground.html"
+    },
+    {
+      "name": "Pagination",
+      "spec": "design-specs/t3-pagination-engineering-spec.md",
+      "css": "src/components/ui/pagination/pagination.css",
+      "component": "src/components/ui/pagination/Pagination.tsx",
+      "figma": "240:23346",
+      "variants": 16,
+      "playground": "design-specs/t3-pagination-playground.html"
+    },
+    {
+      "name": "TextInput",
+      "spec": "design-specs/t3-text-field-engineering-spec.md",
+      "css": "src/components/ui/field/field.css",
+      "component": "src/components/ui/field/Field.tsx",
+      "figma": "240:23277",
+      "variants": 36,
+      "playground": "design-specs/t3-text-field-playground.html"
+    },
+    {
+      "name": "Dropdown",
+      "spec": "design-specs/t3-dropdown-engineering-spec.md",
+      "css": "src/components/ui/dropdown/dropdown.css",
+      "component": "src/components/ui/dropdown/Dropdown.tsx",
+      "figma": "249:11329",
+      "variants": 32,
+      "playground": "design-specs/t3-dropdown-playground.html"
+    },
+    {
+      "name": "InputNumber",
+      "spec": "design-specs/t3-input-number-engineering-spec.md",
+      "css": "src/components/ui/number/number.css",
+      "component": "src/components/ui/number/InputNumber.tsx",
+      "figma": "1384:8333",
+      "variants": 27,
+      "playground": "design-specs/t3-input-number-playground.html"
+    },
+    {
+      "name": "Header",
+      "spec": "design-specs/t3-header-engineering-spec.md",
+      "css": "src/components/ui/header/header.css",
+      "component": "src/components/ui/header/Header.tsx",
+      "figma": "1453:6406",
+      "variants": 6,
+      "playground": "design-specs/t3-header-playground.html"
     }
-  ]
+  ],
+  "pending": {
+    "$comment": "設計已交付、程式還沒照規格實作的元件（2026-11-24 交付）。實作完成一項就搬到 components，designSpecs.spec.ts 才會開始管它。",
+    "items": [
+      {
+        "name": "DatePicker",
+        "spec": "design-specs/t3-date-time-picker-engineering-spec.md",
+        "playground": "design-specs/t3-date-time-picker-playground.html",
+        "current": "SiteDateTimeInput：觸發欄位（.t3-input）與日期＋時間面板已照規格；週／月／季／年／區間面板沒有畫面使用，尚未做",
+        "css": "src/components/picker/datepicker.css"
+      }
+    ]
+  },
+  "styleSpecs": {
+    "$comment": "只有樣式規範、沒有參考 CSS 的規格（designSpecs.spec.ts 的逐字比對不適用）；實作位置與套用範圍記在這裡。",
+    "items": [
+      {
+        "name": "Table",
+        "spec": "design-specs/t3-table-style-spec.md",
+        "css": "src/components/table/table.css",
+        "usage": "<table className=\"t3-table\">；系統頁面 31 個表格已套用，儀表板 widget 的表格由使用者設定外觀、不套用。勾選列加 data-selected=\"true\"。",
+        "open": "未勾選列 Hover 用的 --surface-gray-light 定稿色票沒有，暫退回 --link-standard，待設計確認"
+      },
+      {
+        "name": "Navigation",
+        "spec": "design-specs/t3-navigation-style-spec.md",
+        "css": "src/components/navigation/navigation.css",
+        "usage": "側欄 ScheduleModuleSidebar：.t3-nav、.t3-nav__item[data-state]",
+        "open": "展開寬 280（原本 192）；Topbar 版面照規格的 74／106 高"
+      }
+    ]
+  }
 }

@@ -84,6 +84,43 @@ describe('pathOccupancy', () => {
     assert.ok(conflictsBetween(inbound, outbound, 0).some((item) => item.kind === 'head-on'));
   });
 
+  it('同一入口點的不同格位共用進出道：出 H5 與進 H2 同時在道上＝對開（2026-11-24 03:05 PMS03 × PMS11）', () => {
+    const slot = (visit: VehicleTrajectory['visits'][number]) => (['H2', 'H5'].includes(visit.nodeId) ? { ...visit, yardSlot: true } : visit);
+    // PMS11 IN110301：T3D 03:05:00 → MAT 03:05:50 → H2 03:06:40
+    const entry = trajectory('IN110301', 11, 'move', [['T3D', 10_980], ['MAT', 11_150], ['H2', 11_200]]);
+    // PMS03 OT030305：H5 03:05:50 → MAT 03:06:40 → T3D 03:07:30
+    const exit = trajectory('OT030305', 3, 'move', [['H5', 11_150], ['MAT', 11_200], ['T3D', 11_250]]);
+    entry.visits = entry.visits.map(slot);
+    exit.visits = exit.visits.map(slot);
+    const conflicts = conflictsBetween(exit, entry, 30);
+    const aisle = conflicts.find((item) => item.aisle);
+    assert.ok(aisle, JSON.stringify(conflicts.map((c) => c.kind)));
+    assert.equal(aisle.kind, 'head-on');
+    assert.equal(aisle.nodeId, 'MAT');
+    // 閃避候選要整段讓開：出格晚到進格車停好再加一個緩衝（03:07:10）
+    assert.ok(escapeShiftsFor([aisle], 30).includes(11_200 + 30 - 11_150));
+  });
+
+  it('共用進出道同向（兩台都進格、兩台都出格）不算對開', () => {
+    const asSlot = (t: VehicleTrajectory) => {
+      t.visits = t.visits.map((v) => (v.nodeId.startsWith('H') ? { ...v, yardSlot: true } : v));
+      return t;
+    };
+    const a = asSlot(trajectory('a', 1, 'move', [['MAT', 0], ['H2', 50]]));
+    const b = asSlot(trajectory('b', 2, 'move', [['MAT', 100], ['H5', 150]]));
+    assert.equal(conflictsBetween(a, b, 30).filter((c) => c.aisle).length, 0);
+  });
+
+  it('出格前一台進格車已停好再加緩衝，共用進出道就不衝突', () => {
+    const asSlot = (t: VehicleTrajectory) => {
+      t.visits = t.visits.map((v) => (v.nodeId.startsWith('H') ? { ...v, yardSlot: true } : v));
+      return t;
+    };
+    const entry = asSlot(trajectory('in', 11, 'move', [['MAT', 11_150], ['H2', 11_200]]));
+    const exit = asSlot(trajectory('out', 3, 'move', [['H5', 11_230], ['MAT', 11_280]]));
+    assert.equal(conflictsBetween(exit, entry, 30).filter((c) => c.aisle).length, 0);
+  });
+
   it('載客班次彼此不在這裡比（交給站位與班距）', () => {
     const a = trajectory('a', 1, 'passenger', [['T3u', 0, 40]]);
     const b = trajectory('b', 2, 'passenger', [['T3u', 10, 50]]);

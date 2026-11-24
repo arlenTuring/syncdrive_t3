@@ -264,7 +264,7 @@ export function DataManagementPanel() {
             {resultView === 'json' ? (
               <pre className="p-3 text-body-xs text-text-secondary">{JSON.stringify(result?.rows ?? [], null, 2)}</pre>
             ) : result?.columns.length ? (
-              <table className="min-w-full border-collapse text-body-xs">
+              <table className="t3-table min-w-full border-collapse text-body-xs">
                 <thead className="sticky top-0 bg-surface-primary"><tr>{result.columns.map((column) => <th key={column} className="border-b border-r border-border-quaternary px-2 py-1.5 text-left font-medium text-text-secondary">{column}</th>)}</tr></thead>
                 <tbody>{result.rows.map((row, index) => <tr key={index}>{result.columns.map((column) => <td key={column} className="max-w-72 truncate border-b border-r border-border-quaternary px-2 py-1 text-text-tertiary" title={displayValue(row[column])}>{displayValue(row[column])}</td>)}</tr>)}</tbody>
               </table>

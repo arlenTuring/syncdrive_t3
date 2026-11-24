@@ -267,7 +267,7 @@ export function ScheduleAnalysisReportPanel({
           {t('shiftList.analysisReport.fleetHint')}
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse">
+          <table className="t3-table w-full min-w-[560px] border-collapse">
             <thead>
               <tr className="border-b border-border-quaternary">
                 <th className={TH}>{t('shiftList.analysisReport.columns.interval')}</th>
@@ -350,7 +350,7 @@ export function ScheduleAnalysisReportPanel({
           <p className="text-body-xs text-text-quaternary">{t('shiftList.analysisReport.berthOk')}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] border-collapse">
+            <table className="t3-table w-full min-w-[520px] border-collapse">
               <thead>
                 <tr className="border-b border-border-quaternary">
                   <th className={TH}>{t('shiftList.analysisReport.berthColumns.station')}</th>

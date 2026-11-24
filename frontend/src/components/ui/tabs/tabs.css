@@ -1,0 +1,82 @@
+/*
+ * Tabs（design-specs/t3-tabs-engineering-spec.md §6 參考 CSS，逐字保留）。
+ * 下方「專案調整」只補規格沒涵蓋的兩件事，不改規格的色票與尺寸。
+ */
+@layer components {
+.t3-tabs { display:inline-flex; max-width:100%; flex-direction:column; gap:24px; font-family:var(--font-primary); }
+.t3-tabs[data-axis="vertical"] { flex-direction:row; align-items:flex-start; }
+.t3-tabs * { box-sizing:border-box; }
+.t3-tabs__list { display:flex; align-items:stretch; flex:none; width:max-content; gap:0; }
+.t3-tabs__list[data-axis="vertical"] { flex-direction:column; }
+.t3-tabs__list[data-style="tonal"] { gap:4px; padding:4px; border-radius:12px; background:var(--surface-popup); }
+.t3-tabs__list:is([data-style="fill-h"],[data-style="fill-v"]) { gap:4px; padding:6px; border-radius:12px; background:var(--surface-popup); box-shadow:inset 0 0 0 1px var(--border-quaternary); }
+.t3-tabs__list:is([data-style="left"],[data-style="right"]) { gap:12px; width:96px; }
+.t3-tabs__list:is([data-style="left"],[data-style="right"])[data-icons="false"] { width:68px; }
+.t3-tab { --tab-text:var(--text-quaternary); --tab-bg:transparent; --tab-line:var(--link-theme-filled); position:relative; display:flex; align-items:center; justify-content:center; flex:none; gap:4px; padding:0; border:0; border-radius:0; color:var(--tab-text); background:var(--tab-bg); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-tab[data-active="true"] { --tab-text:var(--text-theme); font-weight:500; }
+.t3-tab:is([data-style="top"],[data-style="bottom"]) { width:84px; height:32px; }
+.t3-tab:is([data-style="left"],[data-style="right"]) { min-width:0; height:24px; padding:0 20px; }
+.t3-tabs__list:is([data-style="left"],[data-style="right"])>.t3-tab { width:100%; }
+.t3-tab[data-context="unit"]:is([data-style="left"],[data-style="right"]) { width:max-content; }
+.t3-tab[data-style="tonal"] { height:32px; padding:0 8px; border-radius:8px; }
+.t3-tab[data-style="tonal"][data-context="unit"] { height:28px; }
+.t3-tab[data-style="tonal"][data-active="true"] { --tab-bg:var(--link-standard); }
+.t3-tab[data-style="fill-h"] { height:28px; padding:0 8px; border-radius:8px; }
+.t3-tabs__list[data-style="fill-h"][data-icons="false"]>.t3-tab { height:32px; }
+.t3-tab[data-style="fill-h"][data-context="unit"] { height:28px; }
+.t3-tab[data-style="fill-v"] { flex-direction:column; width:28px; padding:8px 6px; gap:2px; border-radius:8px; }
+.t3-tab:is([data-style="fill-h"],[data-style="fill-v"])[data-active="true"] { --tab-bg:var(--link-theme-filled); --tab-text:#fff; }
+.t3-tab__content { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:4px; min-width:0; max-width:100%; pointer-events:none; }
+.t3-tab[data-style="bottom"]>.t3-tab__content { padding:4px; border-radius:8px; }
+.t3-tab[data-style="fill-v"]>.t3-tab__content { flex-direction:column; gap:2px; max-width:none; }
+.t3-tab__icon { display:flex; align-items:center; justify-content:center; flex:none; width:16px; height:16px; }
+.t3-tab__icon svg { width:16px; height:16px; }
+.t3-tab__label { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.t3-tab[data-style="fill-v"] .t3-tab__label { width:16px; white-space:normal; word-break:break-all; text-align:center; overflow:visible; }
+.t3-tab__trigger { position:absolute; z-index:0; inset:0; width:100%; height:100%; padding:0; margin:0; border:0; border-radius:inherit; background:transparent; cursor:pointer; }
+.t3-tab__trigger:focus-visible,.t3-tab__more:focus-visible { outline:2px solid var(--border-theme); outline-offset:2px; }
+.t3-tab__badge { display:flex; align-items:center; justify-content:center; flex:none; min-width:16px; height:16px; padding:0 4px; border-radius:1000px; background:var(--text-theme); color:var(--text-invert); font:500 10px/14px var(--font-primary); letter-spacing:.5px; }
+.t3-tab:is([data-style="top"],[data-style="bottom"]) .t3-tab__badge { color:#fff; }
+.t3-tab:is([data-style="top"],[data-style="bottom"])[data-active="false"] .t3-tab__badge { background:var(--text-quaternary); }
+.t3-tab:is([data-style="fill-h"],[data-style="fill-v"]) .t3-tab__badge { background:var(--surface-theme); color:var(--text-theme); }
+.t3-tab:is([data-style="fill-h"],[data-style="fill-v"])[data-active="true"] .t3-tab__badge { background:rgb(255 255 255 / 20%); color:var(--text-invert); }
+.t3-tab__more { position:relative; z-index:2; display:flex; align-items:center; justify-content:center; flex:none; width:16px; height:16px; margin:0; padding:2px; border:0; border-radius:8px; background:transparent; color:var(--text-secondary); pointer-events:auto; cursor:pointer; }
+.t3-tab__more svg { flex:none; width:18px; height:18px; }
+.t3-tab__more:hover { background:var(--link-standard); }
+.t3-tab__more:active { background:var(--link-standard-hover); }
+.t3-tab:is([data-style="top"],[data-style="bottom"],[data-style="left"],[data-style="right"])[data-active="true"]::after { content:""; position:absolute; background:var(--tab-line); pointer-events:none; }
+.t3-tab[data-style="top"]::after { left:0; right:0; top:0; height:2px; }
+.t3-tab[data-style="bottom"]::after { left:0; right:0; bottom:0; height:2px; }
+.t3-tab[data-style="left"]::after { left:0; top:0; bottom:0; width:2px; }
+.t3-tab[data-style="right"]::after { right:0; top:0; bottom:0; width:2px; }
+/* Only Default and Hover are specified by Figma; no extra Pressed or animation is added. */
+.t3-tab:is([data-style="top"],[data-style="bottom"],[data-style="tonal"],[data-style="left"],[data-style="right"]):is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-text:var(--text-theme-light); --tab-line:var(--link-theme-filled-hover); }
+.t3-tab[data-style="bottom"]:is([data-hover="true"],:not([data-preview="true"]):hover)>.t3-tab__content { background:var(--link-standard); }
+.t3-tab[data-style="tonal"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-bg:var(--link-standard); }
+.t3-tab:is([data-style="fill-h"],[data-style="fill-v"])[data-active="true"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-bg:var(--link-theme-filled-hover); }
+.t3-tab:is([data-style="fill-h"],[data-style="fill-v"])[data-active="false"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-bg:var(--link-standard); }
+.t3-tabs__panel { min-width:200px; min-height:90px; padding:16px; border:1px solid var(--border-quaternary); border-radius:8px; color:var(--text-secondary); font:400 14px/20px var(--font-primary); }
+.t3-tabs__panel[hidden] { display:none; }
+.t3-tab__char { display:block; height:18px; line-height:18px; text-align:center; }
+
+/* Top indicator follows its text tokens in the revised Figma. */
+.t3-tab[data-style="top"][data-active="true"] { --tab-line:var(--text-theme); }
+.t3-tab[data-style="top"][data-active="true"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-line:var(--text-theme-light); }
+
+/* Revised unselected Hover applies to both the label and leading SVG through currentColor. */
+.t3-tab[data-style][data-active="false"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-text:var(--text-tertiary); }
+.t3-tab[data-style="right"][data-active="true"] { --tab-line:var(--text-theme); }
+.t3-tab[data-style="right"][data-active="true"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-line:var(--text-theme-light); }
+
+/* Bottom indicator now follows the same text tokens as its label. */
+.t3-tab[data-style="bottom"][data-active="true"] { --tab-line:var(--text-theme); }
+.t3-tab[data-style="bottom"][data-active="true"]:is([data-hover="true"],:not([data-preview="true"]):hover) { --tab-line:var(--text-theme-light); }
+
+/* ── 專案調整 ──
+ * 1. Top／Bottom 規格寬 84px：中文標題常超過（「系統監測狀態」約 87px），照規格會被截成「…」。
+ *    84px 改成最小寬，標題長就跟著變寬（左右各留 8px）；高度、字級、色票不變。
+ * 2. 規格沒有 Disabled 變體；少數畫面需要暫時不能切的頁籤：文字降成 disabled 色（Tabs.tsx 用 inline 的 --tab-text，蓋過 Hover）、不能點，不另做外觀。
+ */
+.t3-tab:is([data-style="top"],[data-style="bottom"]) { width:auto; min-width:84px; padding:0 8px; }
+.t3-tab[data-disabled="true"] .t3-tab__trigger { cursor:not-allowed; }
+}

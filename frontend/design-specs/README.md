@@ -16,6 +16,26 @@
 | `t3-checkbox-engineering-spec.md`＋`-playground.html` | Checkbox：2 Size × 2 Style × 3 Select × 4 State（42） | `src/components/ui/checkbox/` |
 | `t3-radio-engineering-spec.md`＋`-playground.html` | Radio Basic：2 Size × 2 Select × 4 State（16） | `src/components/ui/radio/` |
 | `t3-switch-engineering-spec.md`＋`-playground.html` | Switch：2 Configuration × 2 Select × 3 State（12） | `src/components/ui/switch/` |
+| `t3-dialog-engineering-spec.md`＋`-playground.html` | Dialog：Basic 提示（Info／Success／Error／Warning，寬 360）＋Overlay 容器（有／無操作列）。一般對話框寬度沿用各畫面需要（表單比 350 寬），其餘尺寸照規格 | `src/components/ui/dialog/` |
+
+### 2026-11-24 交付的 10 份（2026-11-24 已導入）
+
+| 檔案 | 程式實作 | 狀態 |
+|---|---|---|
+| `t3-dialog-engineering-spec.md` | `src/components/ui/dialog/`（`tone` 提示型、一般容器） | 已實作 |
+| `t3-tabs-engineering-spec.md` | `src/components/ui/tabs/` | 已實作（Top／Bottom 寬 84 改成最小寬） |
+| `t3-pagination-engineering-spec.md` | `src/components/ui/pagination/` | 已實作 |
+| `t3-text-field-engineering-spec.md` | `src/components/ui/field/`（`fieldClass` → `.t3-input`） | 已實作 |
+| `t3-dropdown-engineering-spec.md` | `src/components/ui/dropdown/`、`SiteSelect` 選單 | 已實作 |
+| `t3-input-number-engineering-spec.md` | `src/components/ui/number/` | 已實作 |
+| `t3-header-engineering-spec.md` | `src/components/ui/header/`、全站頂欄 | 已實作 |
+| `t3-date-time-picker-engineering-spec.md` | `src/components/picker/`、`SiteDateTimeInput` | 部分（manifest `pending`：週／月／季／年／區間面板未做） |
+| `t3-table-style-spec.md` | `src/components/table/table.css` | 已套用（manifest `styleSpecs`） |
+| `t3-navigation-style-spec.md` | `src/components/navigation/navigation.css`、側欄 | 已套用（manifest `styleSpecs`） |
+
+規格以 Ant Design Vue 為互動基底；本專案是 React，**照規格的尺寸、色票、狀態與 CSS 做，不引入 Ant Design**。
+
+已知設計稿問題（待設計確認）：Table「未勾選列 Hover 背景」用 `--surface-gray-light`，定稿色票沒有這個變數。
 
 ## 用設計的對照頁驗收實作
 

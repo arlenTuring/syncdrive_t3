@@ -72,46 +72,65 @@ export class OrderRouteService {
     }
   }
 
+  /**
+   * 車端 operation/update 的 task_group（營運任務狀態協議 §五）寫進 order_action_states。
+   *
+   * 有路線模板的舊訂單在建單時已具現化動作列，這裡對上後更新。調度引擎下的單沒有路線模板、沒有預建的列：
+   * 車端回報的動作直接新增一列（id＝task_id），不然運行紀錄的動作欄永遠是空的（2026-11-23 TNB1329）。
+   * 對列：task_id → 同站同動作 → 同節點同動作；只有回報沒帶站也沒帶節點時才退回「同動作」，
+   * 免得第二站的進站蓋掉第一站那一列。已完成的列不會被較舊的進行中／待辦狀態改回去；沒變就不寫。
+   */
   async applyTaskGroupUpdate(orderId: string, taskGroup: TaskGroupItem[]): Promise<void> {
     if (!Array.isArray(taskGroup) || taskGroup.length === 0) return;
 
+    const rows = await this.actionStateRepo.find({ where: { orderId } });
+    const text = (v: unknown) => (v == null ? null : String(v).trim() || null);
+    const epoch = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? String(Math.round(v)) : undefined);
+    const claimed = new Set<OrderActionState>();
+
     for (const task of taskGroup) {
-      const taskId = String(task.task_id ?? '').trim();
-      if (!taskId) continue;
-
+      const taskId = text(task.task_id);
+      const actionType = text(task.task_name);
       const status = this.normalizeActionStatus(task.status);
-      if (!status) continue;
+      if (!taskId || !status) continue;
+      const stationId = text(task.task_params?.station_id);
+      const nodeId = text(task.task_params?.node_id);
+      const free = (r: OrderActionState) => !claimed.has(r) && r.actionType === actionType;
 
-      let row = await this.actionStateRepo.findOne({ where: { id: taskId } });
-      if (!row && task.task_name) {
-        const actionType = String(task.task_name).trim();
-        const nodeId = task.task_params?.node_id
-          ? String(task.task_params.node_id).trim()
-          : null;
-        const stationId = task.task_params?.station_id
-          ? String(task.task_params.station_id).trim()
-          : null;
-        if (stationId) {
-          row = await this.actionStateRepo.findOne({ where: { orderId, actionType, stationId } });
-        }
-        if (!row && nodeId) {
-          row = await this.actionStateRepo.findOne({ where: { orderId, actionType, nodeId } });
-        }
-        if (!row) {
-          row = await this.actionStateRepo.findOne({ where: { orderId, actionType } });
-        }
+      let row = rows.find((r) => r.id === taskId)
+        ?? (actionType && stationId ? rows.find((r) => free(r) && r.stationId === stationId) : undefined)
+        ?? (actionType && nodeId ? rows.find((r) => free(r) && r.nodeId === nodeId) : undefined)
+        ?? (actionType && !stationId && !nodeId ? rows.find(free) : undefined);
+      let created = false;
+      if (!row) {
+        if (!actionType) continue;
+        created = true;
+        row = this.actionStateRepo.create({
+          id: taskId,
+          orderId,
+          stationId: stationId ?? nodeId ?? 'UNKNOWN',
+          actionType,
+          actionStatus: RouteActionStatus.PENDING,
+          triggerOffsetM: 0,
+          nodeId: nodeId ?? undefined,
+        });
+        rows.push(row);
       }
-      if (!row) continue;
+      claimed.add(row);
 
-      row.actionStatus = status;
-      if (task.actual_start_time != null) {
-        row.actualStartTime = String(task.actual_start_time);
-      }
-      if (task.actual_end_time != null) {
-        row.actualEndTime = String(task.actual_end_time);
-      }
-      if (task.note != null) row.note = String(task.note);
-      if (task.task_params?.node_id) row.nodeId = task.task_params.node_id;
+      const finished = row.actionStatus === RouteActionStatus.COMPLETED || row.actionStatus === RouteActionStatus.FAILED;
+      if (finished && status !== RouteActionStatus.COMPLETED && status !== RouteActionStatus.FAILED) continue;
+
+      const next = {
+        actionStatus: status,
+        actualStartTime: epoch(task.actual_start_time) ?? row.actualStartTime,
+        actualEndTime: epoch(task.actual_end_time) ?? row.actualEndTime,
+        note: task.note != null ? String(task.note) : row.note,
+        nodeId: nodeId ?? row.nodeId,
+      };
+      const changed = (Object.keys(next) as Array<keyof typeof next>).some((k) => String(next[k] ?? '') !== String(row[k] ?? ''));
+      if (!changed && !created) continue;
+      Object.assign(row, next);
       await this.actionStateRepo.save(row);
     }
   }

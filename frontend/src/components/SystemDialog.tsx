@@ -1,7 +1,7 @@
 import { useRef, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { settleSystemDialog, subscribeSystemDialogs, systemDialogSnapshot } from '../lib/systemDialog'
-import { Button, Dialog } from './ui'
+import { Dialog, DialogEventActions, type DialogTone } from './ui'
 
 /**
  * 系統樣式的確認／提示對話框（顯示端）。呼叫端用 lib/systemDialog 的 systemConfirm／systemAlert。
@@ -19,41 +19,30 @@ export function SystemDialogHost() {
   // 取消（或提示框的關閉）：確認框回 false，提示框視為看過
   const dismiss = () => settleSystemDialog(current.id, current.kind === 'alert')
 
+  const tone: DialogTone = current.tone === 'danger' ? 'error' : current.tone === 'default' ? 'info' : current.tone
+
   return (
     <Dialog
       key={current.id}
       role="alertdialog"
       layer="system"
-      size="md"
+      tone={tone}
       title={title}
       onClose={dismiss}
       hideClose
       initialFocusRef={primaryRef}
       footer={
-        <>
-          {isConfirm ? (
-            <Button hierarchy="subordinate" variant="tonal" onClick={() => settleSystemDialog(current.id, false)}>
-              {current.cancelLabel ?? t('common.cancel')}
-            </Button>
-          ) : null}
-          <Button
-            ref={primaryRef}
-            hierarchy={current.tone === 'danger' ? 'danger' : 'superior'}
-            variant="filled"
-            onClick={() => settleSystemDialog(current.id, true)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                settleSystemDialog(current.id, true)
-              }
-            }}
-          >
-            {current.confirmLabel ?? (isConfirm ? t('common.confirm') : t('common.ok'))}
-          </Button>
-        </>
+        <DialogEventActions
+          tone={tone}
+          cancelLabel={current.cancelLabel ?? t('common.cancel')}
+          confirmLabel={current.confirmLabel ?? (isConfirm ? t('common.confirm') : t('common.ok'))}
+          onCancel={isConfirm ? () => settleSystemDialog(current.id, false) : undefined}
+          onConfirm={() => settleSystemDialog(current.id, true)}
+          confirmRef={primaryRef}
+        />
       }
     >
-      <p className="max-h-[50vh] whitespace-pre-line break-words">{current.message}</p>
+      <p className="whitespace-pre-line break-words">{current.message}</p>
     </Dialog>
   )
 }

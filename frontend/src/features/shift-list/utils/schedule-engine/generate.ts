@@ -12,6 +12,7 @@ import { extractFacilityMapCodes } from '../maintenanceFirstTripOrigins';
 import { insertMaintenanceEntryServiceTrips } from '../insertMaintenanceEntryServiceTrips';
 import { insertMaintenanceTransferCards } from '../insertMaintenanceTransferCards';
 import { annotateMoveStops } from '../annotateMoveStops';
+import { convertMainlineMovesToService } from './convertMainlineMovesToService';
 import { mergeMidnightSplitYardCards, remapMergedBlockIds } from '../mergeMidnightSplitYardCards';
 import { computeScheduleGateOk, PUBLISH_BLOCKING_CODES } from '../scheduleAcceptance';
 import type {
@@ -640,6 +641,39 @@ export function selectShiftScheduleVariant(
     altKey,
     safetyNotWorse,
   });
+}
+
+/**
+ * 離線檢查用：拿生成時同一份輸入，建出最終驗證用的評估脈絡（不跑排班）。
+ * 用在對已產生的班表單獨重跑某一道收尾處理（例如 convertMainlineMovesToService）。
+ */
+export function evaluationContextForInput(input: GenerateShiftScheduleInput): {
+  ctx: PlanEvaluationContext;
+  selectedRoutes: NonNullable<ReturnType<typeof normalizeEngineInput>>['selectedRoutes'];
+  pointTopology: NonNullable<ReturnType<typeof normalizeEngineInput>>['pointTopology'];
+  maintenanceEntrySlackBySection: NonNullable<ReturnType<typeof normalizeEngineInput>>['maintenanceEntrySlackBySection'];
+} | null {
+  const engineInput = normalizeEngineInput(normalizeArgsOf(input, false, []), [], []);
+  if (!engineInput) return null;
+  const routesForBerth = [...engineInput.selectedRoutes, ...engineInput.backupRoutes];
+  return {
+    ctx: {
+      selectedRoutes: routesForBerth,
+      routeById: new Map(routesForBerth.map((route) => [route.routeId, route] as const)),
+      passengerRoutes: engineInput.passengerRoutes,
+      successorPolicy: engineInput.successorPolicy,
+      minimumRecoveryTimeSeconds: engineInput.minimumRecoveryTimeSeconds,
+      collisionProtectionSeconds: engineInput.collisionProtectionSeconds,
+      intervals: engineInput.intervals,
+      attributes: engineInput.attributes,
+      scheduleRowCount: engineInput.scheduleRowCount,
+      topology: engineInput.pointTopology,
+      yardExitStationOptionsByTaskType: engineInput.yardExitStationOptionsByTaskType,
+    },
+    selectedRoutes: routesForBerth,
+    pointTopology: engineInput.pointTopology,
+    maintenanceEntrySlackBySection: engineInput.maintenanceEntrySlackBySection,
+  };
 }
 
 function generateShiftScheduleOnce(
@@ -2726,6 +2760,17 @@ function generateShiftScheduleOnce(
       },
     });
   }
+
+  // 移動卡開在正線上的那一段改成載客（照路線停站；整份班表驗證不變差才採用，見 convertMainlineMovesToService）
+  progress({ stage: 'validate', message: '正線移動改載客', fraction: 0.93 });
+  timelines = convertMainlineMovesToService({
+    timelines,
+    topology: engineInput.pointTopology,
+    selectedRoutes: routesForBerth,
+    maintenanceEntrySlackBySection: engineInput.maintenanceEntrySlackBySection,
+    ctx: evaluationContext,
+    warnings,
+  }).timelines;
 
   // 移動卡走的不是唯一最短路時，記下途經點，讓訂單帶著它（見 annotateMoveStops）
   annotateMoveStops(timelines, engineInput.pointTopology);

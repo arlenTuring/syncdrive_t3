@@ -201,9 +201,15 @@ const enUS: DeepStringify<typeof zhTW> = {
       mqtt: "External messaging (MQTT)",
       globalParams: "Global & module parameters",
       operation: "Operation mode & approval",
+      version: "Version",
     },
     operation: {
       hint: "Applies to this browser only and takes effect immediately; no save needed.",
+    },
+    version: {
+      number: "System version",
+      date: "Version date",
+      hint: "Format: major.minor.patch, digits only.",
     },
     locale: {
       uiLocale: "Default UI language",

@@ -1,7 +1,7 @@
-import { X } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { IconButton } from '../button/Button';
+import { Button, IconButton } from '../button/Button';
+import { DialogCloseIcon, DialogErrorIcon, DialogInfoIcon, DialogSuccessIcon, DialogWarningIcon } from './DialogIcons';
 import { cn } from '../cn';
 import { DIALOG_OVERLAY_CLASS, DIALOG_PANEL_CLASS, DIALOG_WIDTHS, type DialogSize } from '../variants';
 
@@ -9,6 +9,16 @@ import { DIALOG_OVERLAY_CLASS, DIALOG_PANEL_CLASS, DIALOG_WIDTHS, type DialogSiz
 const openDialogs: symbol[] = [];
 
 const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+/** Basic Usage（Dialog_Event）的四種提示：主圖示與按鈕組合照 Dialog 工程規範 */
+export type DialogTone = 'info' | 'success' | 'error' | 'warning';
+
+const TONE_ICON: Record<DialogTone, ReactNode> = {
+  info: <DialogInfoIcon className="text-text-tertiary" />,
+  success: <DialogSuccessIcon className="text-status-success" />,
+  error: <DialogErrorIcon className="text-status-error" />,
+  warning: <DialogWarningIcon className="text-status-warning-emphasis" />,
+};
 
 export type DialogProps = {
   title: ReactNode;
@@ -47,7 +57,54 @@ export type DialogProps = {
   heightClassName?: string;
   /** 給了就把內容與底部按鈕包成一個 <form>：底部的 type="submit" 按鈕直接送出 */
   onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
+  /**
+   * 給了就是提示型（Basic Usage｜Dialog_Event）：寬 360、主圖示＋標題＋內文，只有內文捲動。
+   * 不給是一般容器（Overlay｜Dialog_Container）。
+   */
+  tone?: DialogTone;
 };
+
+/** 提示型對話框的取消／確定按鈕：Error 用 Subordinate／Danger，其他用 Superior（Dialog 工程規範「各類型的操作元件」） */
+export function DialogEventActions({
+  tone,
+  cancelLabel,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+  confirmRef,
+}: {
+  tone: DialogTone;
+  cancelLabel?: ReactNode;
+  confirmLabel: ReactNode;
+  onCancel?: () => void;
+  onConfirm: () => void;
+  confirmRef?: React.Ref<HTMLButtonElement>;
+}) {
+  const error = tone === 'error';
+  return (
+    <>
+      {onCancel ? (
+        <Button hierarchy={error ? 'subordinate' : 'superior'} variant="standard" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+      ) : null}
+      <Button
+        ref={confirmRef}
+        hierarchy={error ? 'danger' : 'superior'}
+        variant="filled"
+        onClick={onConfirm}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            onConfirm();
+          }
+        }}
+      >
+        {confirmLabel}
+      </Button>
+    </>
+  );
+}
 
 /**
  * 系統對話框：遮罩、外框、標題列、內容、底部按鈕列。焦點鎖在框內，關閉後還原。
@@ -73,6 +130,7 @@ export function Dialog({
   widthClassName,
   heightClassName,
   onSubmit,
+  tone,
 }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const previous = useRef<HTMLElement | null>(null);
@@ -129,19 +187,37 @@ export function Dialog({
     }
   };
 
-  const content = (
+  const closeButton = hideClose ? null : (
+    <IconButton label="關閉" icon={<DialogCloseIcon />} hierarchy="subordinate" variant="standard" onClick={onClose} disabled={busy} />
+  );
+  const actions = footer ? <footer className="t3-dialog-actions">{footer}</footer> : null;
+
+  const content = tone ? (
+    <>
+      <div className="t3-dialog-event-content">
+        <div className="t3-dialog-event-header">
+          {icon ?? TONE_ICON[tone]}
+          <h2 id={titleId} className="text-body-m-bold text-text-primary">{title}</h2>
+        </div>
+        <div data-dialog-body className={cn('t3-dialog-copy-wrap text-body-s text-text-tertiary', bodyClassName)}>
+          {description ? <p id={descriptionId}>{description}</p> : null}
+          {children}
+        </div>
+      </div>
+      {closeButton ? <div className="t3-dialog-event-close">{closeButton}</div> : null}
+      {actions}
+    </>
+  ) : (
     <>
       <div
         data-dialog-body
         className={padded
-          ? cn('min-h-0 flex-1 overflow-auto px-6 pb-5 text-body-s text-text-secondary', bodyClassName)
+          ? cn('t3-dialog-content text-body-s text-text-secondary', bodyClassName)
           : cn('flex min-h-0 flex-1 flex-col', bodyClassName)}
       >
         {children}
       </div>
-      {footer ? (
-        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-quaternary px-6 py-4">{footer}</footer>
-      ) : null}
+      {actions}
     </>
   );
 
@@ -162,23 +238,28 @@ export function Dialog({
         onKeyDown={onKeyDown}
         className={cn(
           DIALOG_PANEL_CLASS,
-          // 呼叫端自己給 w-* 時不再加 w-full（兩個寬度 class 會互相覆蓋，誰贏看 CSS 順序）
-          /(^|\s)w-/.test(widthClassName ?? '') ? null : 'w-full',
-          widthClassName ?? DIALOG_WIDTHS[size],
+          tone
+            ? 't3-dialog-event'
+            : cn(
+              !headerless && 't3-dialog-container',
+              // 呼叫端自己給 w-* 時不再加 w-full（兩個寬度 class 會互相覆蓋，誰贏看 CSS 順序）
+              /(^|\s)w-/.test(widthClassName ?? '') ? null : 'w-full',
+              widthClassName ?? DIALOG_WIDTHS[size],
+            ),
           heightClassName,
         )}
       >
-        {headerless ? (
+        {tone ? null : headerless ? (
           <h2 id={titleId} className="sr-only">{title}</h2>
         ) : (
-          <header className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-5">
-            <div className="min-w-0 flex-1">
+          <>
+            <header className="t3-dialog-header">
               {icon}
-              <h2 id={titleId} className="text-headline-4 text-text-primary">{title}</h2>
-              {description ? <p id={descriptionId} className="mt-1 text-body-s text-text-tertiary">{description}</p> : null}
-            </div>
-            {hideClose ? null : <IconButton label="關閉" icon={<X />} size="small" hierarchy="subordinate" variant="standard" onClick={onClose} disabled={busy} />}
-          </header>
+              <h2 id={titleId} className="min-w-0 flex-1 text-body-m-bold text-text-primary">{title}</h2>
+              {closeButton}
+            </header>
+            {description ? <p id={descriptionId} className="px-5 pt-1 text-body-s text-text-tertiary">{description}</p> : null}
+          </>
         )}
         {onSubmit ? (
           <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>

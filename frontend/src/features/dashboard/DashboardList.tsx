@@ -172,7 +172,7 @@ export function DashboardList({ planes, onSelect, onCreate, onDelete, onImportTe
       {/* 表格 */}
       <div className="flex min-h-0 flex-1 flex-col px-3">
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[960px] border-separate border-spacing-0">
+          <table className="t3-table w-full min-w-[960px] border-separate border-spacing-0">
             <thead className="sticky top-0 z-20 bg-surface-primary">
               <tr>
                 <th className={`${headCellClass} ${fixedLeftClass} z-30`}>

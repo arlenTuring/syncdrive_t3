@@ -27,7 +27,7 @@ import {
   type ShuntOrder,
   type StepStatus,
 } from './rotationData';
-import { Button, Dialog, IconButton, SegmentedControl } from '../../components/ui';
+import { Button, Dialog, IconButton, InputNumber, SegmentedControl } from '../../components/ui';
 
 const clock = (ms: number) =>
   new Date(ms).toLocaleTimeString('zh-TW', { hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
@@ -102,12 +102,13 @@ function RulesDialog(props: {
           <label className="flex flex-col gap-2">
             每多少里程需要接替
             <span className="flex items-center gap-2">
-              <input
-                type="number"
+              <InputNumber
+                ariaLabel="每多少里程需要接替"
                 min={1}
                 value={draft.intervalKm}
-                onChange={(event) => patch({ intervalKm: Number(event.target.value) })}
-                className={`${DIALOG_FIELD} tabular-nums`}
+                onChange={(next) => patch({ intervalKm: next ?? 1 })}
+                fluid={false}
+                className="w-40"
               />
               公里
             </span>
@@ -265,7 +266,7 @@ function ShuntChanges({ order }: { order: ShuntOrder }) {
         其餘 {counts.unaffected} 筆不受影響
       </p>
       <div className="max-h-[320px] overflow-auto">
-        <table className="w-full min-w-[720px] border-collapse text-body-s">
+        <table className="t3-table w-full min-w-[720px] border-collapse text-body-s">
           <thead className="sticky top-0 bg-[#111114]">
             <tr className="border-b border-border-quaternary text-left text-body-xs text-text-quaternary">
               <th className="py-2 pl-4 pr-3 font-medium">時間</th>
@@ -468,7 +469,7 @@ function TodayTab(props: {
 function FleetTab(props: { cars: FleetCar[]; onHold: (code: string, hold: HoldState) => void }) {
   return (
     <section className={`${PANEL} overflow-x-auto`}>
-      <table className="w-full min-w-[920px] border-collapse text-body-s">
+      <table className="t3-table w-full min-w-[920px] border-collapse text-body-s">
         <thead>
           <tr className="border-b border-border-quaternary text-left text-body-xs text-text-quaternary">
             <th className="py-2.5 pl-5 pr-3 font-medium">車輛</th>
@@ -529,7 +530,7 @@ const RESULT_VIEW: Record<RotationRecord['result'], { label: string; className: 
 function RecordsTab({ records }: { records: RotationRecord[] }) {
   return (
     <section className={`${PANEL} overflow-x-auto`}>
-      <table className="w-full min-w-[720px] border-collapse text-body-s">
+      <table className="t3-table w-full min-w-[720px] border-collapse text-body-s">
         <thead>
           <tr className="border-b border-border-quaternary text-left text-body-xs text-text-quaternary">
             <th className="py-2.5 pl-5 pr-3 font-medium">時間</th>

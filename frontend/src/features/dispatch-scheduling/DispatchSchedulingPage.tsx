@@ -293,7 +293,7 @@ export function DispatchSchedulingPage() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
-        <table className="w-full min-w-[960px] border-collapse text-body-s">
+        <table className="t3-table w-full min-w-[960px] border-collapse text-body-s">
           <thead>
             <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="py-3 pr-4 font-medium">{t('dispatchScheduling.columns.dispatchCode')}</th>

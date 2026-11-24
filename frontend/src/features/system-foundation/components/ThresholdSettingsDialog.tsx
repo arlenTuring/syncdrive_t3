@@ -9,7 +9,7 @@ import {
   type MonitoringThresholdSettings,
   type ThresholdMetricKey,
 } from '../thresholdSettings'
-import { Button, CheckboxIndicator, cn, Dialog, IconButton, MENU_PANEL_CLASS, menuItemClass, Tabs, TextInput } from '../../../components/ui';
+import { Button, CheckboxIndicator, cn, Dialog, IconButton, MENU_PANEL_CLASS, menuItemClass, Tabs, TextInput, InputNumber } from '../../../components/ui';
 
 type Props = {
   open: boolean
@@ -43,42 +43,19 @@ function NumberStepper({
   step: number
   onChange: (n: number) => void
 }) {
-  const { t } = useTranslation()
-  const clamp = (n: number) => Math.min(max, Math.max(min, n))
+  // InputNumber 規格：Enter／失焦套用、超出範圍收斂、右側增減鈕
   return (
-    <div className="flex h-[34px] min-w-[96px] items-stretch overflow-hidden rounded-lg border border-border-quaternary bg-surface-secondary focus-within:border-border-theme">
-      <input
-        type="number"
-        value={Number.isFinite(value) ? value : 0}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          onChange(Number.isFinite(n) ? clamp(n) : 0)
-        }}
-        className="w-14 bg-transparent px-2 text-center text-body-s text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      />
-      <span className="flex items-center pr-1 text-body-xs text-text-quaternary">{unit}</span>
-      <div className="flex w-6 flex-col border-l border-border-quaternary">
-        <button
-          type="button"
-          className="flex flex-1 items-center justify-center text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary"
-          onClick={() => onChange(clamp(value + step))}
-          aria-label={t('systemFoundation.threshold.increment')}
-        >
-          <span className="text-caption-2">▴</span>
-        </button>
-        <button
-          type="button"
-          className="flex flex-1 items-center justify-center border-t border-border-quaternary text-text-tertiary hover:bg-link-standard-hover hover:text-text-primary"
-          onClick={() => onChange(clamp(value - step))}
-          aria-label={t('systemFoundation.threshold.decrement')}
-        >
-          <span className="text-caption-2">▾</span>
-        </button>
-      </div>
-    </div>
+    <InputNumber
+      ariaLabel={unit}
+      value={Number.isFinite(value) ? value : 0}
+      unit={unit}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(next) => onChange(next ?? min)}
+      fluid={false}
+      className="w-32"
+    />
   )
 }
 

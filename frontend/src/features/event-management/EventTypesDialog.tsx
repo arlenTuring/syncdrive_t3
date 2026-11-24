@@ -96,7 +96,7 @@ export function EventTypesDialog({ onClose, onSaved }: { onClose: () => void; on
 
         {loadError ? <ErrorLine text={`載入失敗：${loadError}`} /> : null}
         <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[56rem] table-fixed text-left text-body-s">
+          <table className="t3-table w-full min-w-[56rem] table-fixed text-left text-body-s">
             <thead className="text-text-tertiary">
               <tr className="border-b border-border-quaternary">
                 <th className="w-36 px-4 py-3 font-normal">嚴重等級</th>

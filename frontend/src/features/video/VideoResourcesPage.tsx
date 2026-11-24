@@ -201,7 +201,7 @@ export function VideoResourcesPage() {
             </div>
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-            <table className="w-full min-w-[56rem] table-fixed text-left text-body-m">
+            <table className="t3-table w-full min-w-[56rem] table-fixed text-left text-body-m">
               <colgroup>
                 <col className="w-[18%]" />
                 <col className="w-[18%]" />

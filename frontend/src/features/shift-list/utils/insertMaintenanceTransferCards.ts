@@ -5,7 +5,7 @@ import {
   type MaintenanceEntrySlackBySection,
 } from './resolveMaintenanceEntrySlackSeconds';
 import { diagnoseJunctionBlock, hasPreferredBerthClearance, junctionClashKey, junctionOvertakes, occupanciesClash, occupancyGapSeconds, occupancyStops, solveJunctionShift, type JunctionShiftQuery } from './junctionShift';
-import { collectTrajectories, movePassBufferSeconds } from './pathOccupancy';
+import { collectTrajectories, movePassBufferSeconds, yardAisleOf, yardSlotNodeIds } from './pathOccupancy';
 import type { PointTopology, PointTopologyEdge } from '../../map-editor/types/pointTopology';
 import type { MapAreaObject } from '../../map-editor/types/area';
 import { facilityDockingTopologyNodeId } from '../../map-editor/utils/pointTopology';
@@ -1282,8 +1282,15 @@ export function insertMaintenanceTransferCards(args: {
    * 差開保護時間，卻在路段中間迎面撞上（2026-11-09 實錄：入口點 ↔ NW下發1 對開 7 筆）。
    * 路段用「進入～離開」整段時間預約；同向跟車允許區間重疊，但必須先進先出。
    */
+  /**
+   * 格位 ↔ 入口點的路段：同一入口點底下的格位共用一條進出道（見 pathOccupancy.yardAisleOf），
+   * 預約鍵只看入口點與方向，H5 出格跟進 H2 才會互相看到。
+   */
+  const yardSlotNodes = topology ? yardSlotNodeIds(topology) : new Set<string>();
   /** 有向路段的進出區間。雙向路段查反向佔用，所有路段都查同向先進先出。 */
   function segmentKey(fromNodeId: string, toNodeId: string): string {
+    const aisle = yardAisleOf(fromNodeId, yardSlotNodes.has(fromNodeId), toNodeId, yardSlotNodes.has(toNodeId));
+    if (aisle) return `seg:aisle|${aisle.entrance}${aisle.outbound ? '#f' : '#r'}`;
     return fromNodeId < toNodeId ? `seg:${fromNodeId}|${toNodeId}#f` : `seg:${toNodeId}|${fromNodeId}#r`;
   }
   function segmentPassesOf(

@@ -1,0 +1,104 @@
+/* DatePicker／TimePicker（design-specs/t3-date-time-picker-engineering-spec.md §5 參考 CSS，逐字保留） */
+@layer components {
+.picker { max-width: 100%; width: 240px; color: var(--text-primary); }
+.picker-label { display: block; margin: 0 0 4px; padding: 0 8px; color: var(--text-tertiary); }
+.picker-label b { color: var(--status-error-emphasis); }
+.picker-help { padding: 4px 12px; margin: 0; color: var(--text-tertiary); }
+.picker-field {
+  --picker-bg: var(--surface-theme);
+  --picker-border: transparent;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; width: 100%; height: 34px; padding: 6px 12px; border: 0; border-radius: 8px;
+  background: var(--picker-bg); box-shadow: inset 0 0 0 .5px var(--picker-border);
+  color: var(--text-primary); text-align: left;
+}
+.picker-field[data-style="tonal-gray"] { --picker-bg: var(--surface-secondary); }
+.picker-field[data-style="outlined"] { --picker-bg: transparent; --picker-border: var(--border-primary); }
+.picker-field[data-state="focus"] { --picker-border: var(--border-theme); }
+.picker-field[data-style="tonal-gray"][data-state="focus"] { --picker-border: var(--link-standard); }
+.picker-field[data-style="outlined"][data-state="focus"] { --picker-bg: var(--link-standard); }
+.picker-field:disabled { --picker-bg: var(--surface-disabled); color: var(--text-disabled); cursor: not-allowed; }
+.picker-field .placeholder { color: var(--text-tertiary); }
+.picker-field[data-state="focus"]:not(:disabled) .field-value { color: var(--text-primary); }
+.picker-field:disabled .placeholder { color: var(--text-disabled); }
+.picker-field:focus-visible, .picker-panel button:focus-visible { outline: 2px solid var(--border-theme); outline-offset: 1px; }
+.picker-panel {
+  position: relative; width: max-content; max-width: 100%; border-radius: 12px;
+  background: var(--surface-background); color: var(--text-secondary);
+  box-shadow: 0 4px 12px var(--surface-disabled); font: 400 14px/18px var(--font-primary);
+}
+.picker-panel .panes { display: flex; flex-wrap: wrap; }
+.picker-panel header { height: 40px; padding: 0 8px; border-bottom: 1px solid var(--border-quaternary); display: flex; align-items: center; justify-content: space-between; gap: 0; }
+.picker-panel .calendar { width: 304px; max-width: 100%; }
+.picker-panel .calendar + .calendar { box-shadow: inset 1px 0 var(--border-quaternary); }
+.picker-panel .grid { display: grid; padding: 12px; }
+.picker-panel .days { grid-template-columns: repeat(7, minmax(0, 40px)); }
+.picker-panel .units { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 12px; }
+.picker-panel .quarter { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.picker-panel .week-name { height: 40px; display: grid; place-items: center; padding-bottom: 8px; }
+.picker-panel .cell { padding: 4px; height: 40px; background: transparent; border: 0; color: inherit; }
+.picker-panel .cell span { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 1000px; }
+.picker-panel .unit { height: 70px; padding: 16px 8px; }
+.picker-panel .unit span { border-radius: 20px; }
+.picker-panel .cell:hover span { background: var(--link-standard-hover); }
+.picker-panel .cell[data-other="true"] { color: var(--text-disabled); }
+.picker-panel .days .cell[data-today="true"] span { border: 1px dashed var(--text-tertiary); }
+.picker-panel .cell[data-tone="middle"] span { background: var(--link-tonal); color: var(--text-theme); }
+.picker-panel .cell[data-tone="active"] span { background: var(--link-theme-filled); color: var(--text-invert); }
+.picker-panel .time { width: 190px; padding: 4px; display: flex; gap: 0; }
+.picker-panel .time-column { position: relative; flex: none; width: 60px; box-sizing: content-box; }
+.picker-panel .time-column + .time-column { border-left: 1px solid var(--border-quaternary); }
+.picker-panel .time-list {
+  box-sizing: border-box; width: 60px; height: 264px; padding: 4px 8px 4px 4px;
+  overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
+}
+.picker-panel .time-list::-webkit-scrollbar { display: none; }
+.picker-panel .time-scroller { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; overflow: hidden; touch-action: none; }
+.picker-panel .time-scrollbar { position: absolute; left: 0; top: 0; width: 4px; height: var(--time-thumb-height); border-radius: 100px; background: var(--border-disabled); }
+.picker-panel .time-column[data-part="0"] { --time-thumb-height: 123px; }
+.picker-panel .time-column[data-part="1"], .picker-panel .time-column[data-part="2"] { --time-thumb-height: 68px; }
+.picker-panel[data-mode="dateTime"] .time-column[data-part="1"] .time-scrollbar,
+.picker-panel[data-mode="dateTime"] .time-column[data-part="2"] .time-scrollbar { background: var(--color-black-5); }
+.picker-panel .time-list button { width: 48px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: inherit; }
+.picker-panel .time-list button:hover { background: var(--link-tonal-hover); }
+.picker-panel .time-list button[aria-pressed="true"] { background: var(--link-tonal); }
+.picker-panel footer { height: 35px; border-top: 1px solid var(--border-quaternary); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
+.picker-panel[data-mode="time"] footer, .picker-panel[data-mode="dateTime"] footer { height: 51px; justify-content: flex-end; }
+.picker-panel[data-mode="time"] footer { justify-content: space-between; }
+.picker-panel[data-mode="dateTime"] .time { width: 183px; }
+.picker-panel[data-mode="dateRange"], .picker-panel[data-mode="monthRange"], .picker-panel[data-mode="yearRange"], .picker-panel[data-mode="month"], .picker-panel[data-mode="year"] { border-bottom: 1px solid var(--border-quaternary); }
+.picker-nav {
+  display: grid; place-items: center; flex: none;
+  width: 24px; height: 24px; padding: 0; border: 0;
+  border-radius: 8px; background: transparent; color: var(--text-secondary);
+}
+.picker-nav-icon { display: block; flex: none; }
+.picker-header-titles { display: flex; flex: 1; min-width: 0; justify-content: space-around; }
+.picker-header-title { display: flex; flex: 1; align-items: center; justify-content: center; }
+.picker-heading-button { padding: 0 4px; border: 0; background: transparent; color: var(--text-secondary); font: 500 14px/18px var(--font-primary); letter-spacing: .5px; }
+.picker-datetime-header { display: flex; }
+.picker-datetime-header header { width: 304px; flex: none; }
+.picker-time-heading { flex: 1; border-bottom: 1px solid var(--border-quaternary); }
+.picker-suffix { display: block; flex: none; }
+.picker-popup-arrow { position: absolute; top: -9px; left: 24px; display: block; pointer-events: none; }
+
+/* ── 專案調整：SiteDateTimeInput 的日期時間面板（Date + Time）用的面板內元件 ──
+ * 觸發欄位沿用 field.css 的 .t3-input（同一組色票）；面板與格子照本規格 §3「面板內的元件」。
+ */
+.t3-picker-shadow { box-shadow:0 4px 24px var(--surface-disabled); }
+.t3-picker-panel { overflow:hidden; border-radius:12px; background:var(--surface-background); box-shadow:0 4px 24px var(--surface-disabled); }
+.t3-picker-header { display:flex; align-items:center; justify-content:space-between; height:40px; padding:0 8px; border-bottom:1px solid var(--border-quaternary); }
+.t3-picker-week { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding-bottom:8px; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-picker-date { display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:4px; border:0; background:transparent; cursor:pointer; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-picker-date > span { display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; }
+.t3-picker-date:hover > span { background:var(--link-standard-hover); }
+.t3-picker-date[aria-current="date"] > span { outline:1px dashed var(--text-tertiary); outline-offset:-1px; }
+.t3-picker-date[data-other="true"] { color:var(--text-disabled); }
+.t3-picker-date[data-active="true"] > span { background:var(--link-theme-filled); color:var(--text-invert); outline:0; }
+.t3-picker-time-col { height:264px; padding:4px 8px 4px 4px; overflow-y:auto; scroll-behavior:smooth; scrollbar-width:none; border-left:1px solid var(--border-quaternary); }
+.t3-picker-time-col:first-child { border-left:0; }
+.t3-picker-time-col::-webkit-scrollbar { display:none; }
+.t3-picker-time { display:flex; align-items:center; justify-content:center; width:48px; height:32px; border:0; border-radius:8px; background:transparent; cursor:pointer; color:var(--text-secondary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; font-variant-numeric:tabular-nums; }
+.t3-picker-time:hover { background:var(--link-tonal-hover); }
+.t3-picker-time[data-active="true"] { background:var(--link-tonal); color:var(--text-theme); }
+}

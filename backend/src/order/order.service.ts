@@ -968,6 +968,17 @@ export class OrderService {
       return { order: await this.applyPendingOperationRefresh(order, payload), outcome: 'pending_refreshed' };
     }
     if (order.status !== OrderStatus.PROCESSING) {
+      /*
+       * 車端結案前最後一筆 operation/update 跟 REST END 是兩條路，END 可能先到：終點的開門、關門那時才定案。
+       * 已結案的單仍收下站點動作（只寫 order_action_states，不動訂單狀態與進度）。不設時間窗：結案時刻是營運時鐘，
+       * 加速重播時跟伺服器時間對不上；車端送的是整張單的累計狀態，晚到也不會把較新的結果改舊。
+       */
+      if (Array.isArray(payload.task_group) && payload.task_group.length > 0 && order.completedAt) {
+        await this.orderRouteService.applyTaskGroupUpdate(
+          orderId,
+          payload.task_group as Parameters<OrderRouteService['applyTaskGroupUpdate']>[1],
+        );
+      }
       return { order, outcome: 'not_processing' };
     }
 

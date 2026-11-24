@@ -54,6 +54,8 @@ var GROUP_TITLE = {
   MOVE_JUNCTION_CONFLICT: "\u8ECA\u8F1B\u901A\u904E\u8DEF\u53E3\u7684\u9593\u9694\u4E0D\u8DB3",
   MOVE_PATH_CONFLICT: "\u79FB\u52D5\u5361\u9014\u7D93\u7684\u6708\u53F0\u6216\u8DEF\u6BB5\u6709\u5225\u5217\u8ECA",
   MOVE_PATH_SHIFTED: "\u5DF2\u632A\u52D5\u79FB\u52D5\u5361\u6642\u523B\uFF0C\u907F\u958B\u9014\u7D93\u7684\u5225\u5217\u8ECA",
+  MOVE_MAINLINE_SERVICE: "\u79FB\u52D5\u5361\u958B\u5728\u6B63\u7DDA\u4E0A\u7684\u90A3\u4E00\u6BB5\u5DF2\u6539\u6210\u8F09\u5BA2",
+  MOVE_MAINLINE_EMPTY: "\u79FB\u52D5\u5361\u6709\u4E00\u6BB5\u958B\u5728\u6B63\u7DDA\u4E0A\u4ECD\u662F\u7A7A\u8ECA",
   MAINTENANCE_FACILITY_UNAVAILABLE: "\u672A\u627E\u5230\u53EF\u7528\u6574\u5099\u4F4D\u7F6E",
   MAINTENANCE_FACILITY_YIELDED: "\u5DF2\u8ABF\u6574\u505C\u653E\u4F4D\u7F6E",
   MAINTENANCE_ENTRY_EARLY_BLOCKED: "\u63D0\u65E9\u9032\u5EE0\u88AB\u64CB\uFF0C\u8ECA\u5728\u7AD9\u4F4D\u4E0A\u591A\u7B49",
@@ -114,6 +116,8 @@ var DOC_ANCHOR = {
   MOVE_JUNCTION_CONFLICT: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MOVE_PATH_CONFLICT: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MOVE_PATH_SHIFTED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
+  MOVE_MAINLINE_SERVICE: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
+  MOVE_MAINLINE_EMPTY: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_FACILITY_UNAVAILABLE: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_FACILITY_YIELDED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
   MAINTENANCE_ENTRY_EARLY_BLOCKED: { id: "s10", label: "\xA710.5 \u6574\u5099\u8F49\u5834\u5C0F\u5361" },
@@ -345,6 +349,14 @@ var DEFAULT_META = {
   MOVE_PATH_CONFLICT: {
     kind: "limit",
     guidance: "\u79FB\u52D5\u5361\uFF08\u51FA\u5165\u5834\u3001\u6574\u5099\u8F49\u5834\uFF09\u662F\u8ECA\u771F\u7684\u958B\u5728\u8DEF\u7DB2\u4E0A\uFF0C\u6574\u689D\u8DEF\u5F91\u90FD\u8981\u6AA2\u67E5\uFF1A\u9014\u7D93\u7684\u8F49\u6298\u9EDE\u8DDF\u5225\u5217\u8ECA\u81F3\u5C11\u5DEE\u958B 1 \xD7 \u78B0\u649E\u4FDD\u8B77\u6642\u9593\uFF08\u6708\u53F0\u7AD9\u4F4D\u53E6\u7167 \xA78\uFF1A\u5F8C\u8ECA\u9032\u7AD9\u8981\u5728\u524D\u8ECA\u96E2\u7AD9 2 \xD7 \u78B0\u649E\u4FDD\u8B77\u6642\u9593\u4E4B\u5F8C\uFF09\uFF1B\u540C\u4E00\u6BB5\u8DEF\u540C\u5411\u884C\u99DB\uFF0C\u5148\u9032\u7684\u8ECA\u8981\u5148\u51FA\uFF08\u4E0D\u80FD\u8981\u6C42\u5F8C\u8ECA\u7A7F\u904E\u524D\u8ECA\uFF09\uFF1B\u5834\u5340\u806F\u7D61\u7DDA\u5169\u500B\u65B9\u5411\u4E0D\u80FD\u540C\u6642\u6709\u8ECA\u3002\u6392\u73ED\u6642\u6703\u5148\u81EA\u52D5\u632A\u79FB\u52D5\u5361\u7684\u6642\u523B\u89E3\u6389\uFF0C\u9019\u4E00\u5247\u4EE3\u8868\u5728\u53EF\u632A\u7BC4\u570D\u5167\u627E\u4E0D\u5230\u89E3\u3002"
+  },
+  MOVE_MAINLINE_SERVICE: {
+    kind: "policy",
+    guidance: "\u9032\u51FA\u5834\u3001\u6574\u5099\u9593\u8F49\u5834\u7684\u8ECA\u958B\u5728\u6B63\u7DDA\u4E0A\u90A3\u4E00\u6BB5\uFF0C\u8DDF\u8F09\u5BA2\u8DEF\u7DDA\u540C\u4E00\u6BB5\u8DEF\uFF0C\u5DF2\u7167\u8A72\u8DEF\u7DDA\u7684\u505C\u7AD9\u8A2D\u5B9A\u6539\u6210\u8F09\u5BA2\uFF08\u8ABF\u5EA6\u8F09\u5BA2\u73ED\u6B21\uFF0C\u8DDF\u6574\u5099\u5F8C\u7684\u8ABF\u5EA6\u71DF\u904B\u73ED\u6B21\u540C\u4E00\u5957\u898F\u5247\uFF1A\u4E0D\u53D7\u540C\u65B9\u5411\u73ED\u8DDD\u7D04\u675F\u3001\u7167\u7AD9\u4F4D\u8207\u78B0\u649E\u4FDD\u8B77\uFF09\u3002\u591A\u51FA\u7684\u505C\u7AD9\u6642\u9593\u53D6\u81EA\u8ECA\u81EA\u5DF1\u7684\u5F85\u547D\u3001\u66AB\u505C\uFF0C\u6216\u4E0B\u4E00\u6BB5\u6574\u5099\u7684\u8B93\u6E21\u9918\u88D5\uFF1B\u6574\u4EFD\u73ED\u8868\u9A57\u8B49\u4E0D\u8B8A\u5DEE\u624D\u63A1\u7528\u3002"
+  },
+  MOVE_MAINLINE_EMPTY: {
+    kind: "policy",
+    guidance: "\u9019\u5E7E\u8D9F\u79FB\u52D5\u6709\u4E00\u6BB5\u958B\u5728\u6B63\u7DDA\u4E0A\uFF0C\u4F46\u6539\u6210\u8F09\u5BA2\u6703\u8B93\u73ED\u8868\u591A\u51FA\u885D\u7A81\u3001\u6642\u9593\u653E\u4E0D\u4E0B\uFF0C\u6216\u524D\u5F8C\u8981\u7A7F\u904E\u5834\u5340\u5165\u53E3\u62C6\u4E0D\u6210\u51FA\u5834\uFF0B\u8F09\u5BA2\uFF0B\u5165\u5EE0\uFF0C\u6240\u4EE5\u7DAD\u6301\u7A7A\u8ECA\u3002"
   },
   MOVE_PATH_SHIFTED: {
     kind: "policy",
@@ -1666,6 +1678,7 @@ function indexTopology(topology) {
     topology.nodes.map((node) => [node.id, labelById.get(node.id) ?? node.id])
   );
   const berthNodes = new Set(topology.nodes.filter((node) => node.kind === "docking").map((node) => node.id));
+  const yardSlotNodes = yardSlotNodeIds(topology);
   const index = {
     labelById,
     nodeIdByLabel,
@@ -1675,7 +1688,8 @@ function indexTopology(topology) {
     resourceOf,
     resourceLabel,
     zeroLinked,
-    berthNodes
+    berthNodes,
+    yardSlotNodes
   };
   indexCache.set(topology, index);
   return index;
@@ -1693,7 +1707,13 @@ function toResources(visits, index) {
       last.departSecond = Math.max(last.departSecond, visit.departSecond);
       continue;
     }
-    out.push({ ...visit, nodeId: resource, nodeLabel: label, ...index.berthNodes.has(resource) ? { berth: true } : {} });
+    out.push({
+      ...visit,
+      nodeId: resource,
+      nodeLabel: label,
+      ...index.berthNodes.has(resource) ? { berth: true } : {},
+      ...index.yardSlotNodes.has(resource) ? { yardSlot: true } : {}
+    });
   }
   return out;
 }
@@ -1857,7 +1877,8 @@ function traversals(trajectory) {
     const a = trajectory.visits[i - 1];
     const b = trajectory.visits[i];
     if (a.nodeId === b.nodeId) continue;
-    out.push({ from: a.nodeId, to: b.nodeId, enter: a.departSecond, exit: b.arriveSecond });
+    const aisle = yardAisleOf(a.nodeId, a.yardSlot === true, b.nodeId, b.yardSlot === true);
+    out.push({ from: a.nodeId, to: b.nodeId, enter: a.departSecond, exit: b.arriveSecond, ...aisle ? { aisle } : {} });
   }
   return out;
 }
@@ -1921,7 +1942,9 @@ function conflictsBetween(mine, other, bufferSeconds) {
             toNodeId: a.to,
             toNodeLabel: labelOf(a.to),
             mineSecond: a.enter,
-            otherSecond: b.enter
+            otherSecond: b.enter,
+            mineExitSecond: a.exit,
+            otherExitSecond: b.exit
           });
         }
       } else if (a.from === b.to && a.to === b.from) {
@@ -1935,7 +1958,26 @@ function conflictsBetween(mine, other, bufferSeconds) {
             toNodeId: a.to,
             toNodeLabel: labelOf(a.to),
             mineSecond: a.enter,
-            otherSecond: b.enter
+            otherSecond: b.enter,
+            mineExitSecond: a.exit,
+            otherExitSecond: b.exit
+          });
+        }
+      } else if (a.aisle && b.aisle && a.aisle.entrance === b.aisle.entrance && a.aisle.outbound !== b.aisle.outbound) {
+        if (a.enter < b.exit + bufferSeconds && b.enter < a.exit + bufferSeconds) {
+          out.push({
+            kind: "head-on",
+            mine,
+            other,
+            nodeId: a.aisle.entrance,
+            nodeLabel: labelOf(a.aisle.entrance),
+            toNodeId: a.aisle.outbound ? a.from : a.to,
+            toNodeLabel: labelOf(a.aisle.outbound ? a.from : a.to),
+            mineSecond: a.enter,
+            otherSecond: b.enter,
+            mineExitSecond: a.exit,
+            otherExitSecond: b.exit,
+            aisle: true
           });
         }
       }
@@ -1984,7 +2026,17 @@ function describePathConflict(conflict, formatSecond) {
   if (conflict.kind === "overtake") {
     return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u540C\u5411\u8D70\u300C${conflict.nodeLabel}\u300D\u2192\u300C${conflict.toNodeLabel}\u300D\uFF0C\u5F8C\u9032\u7684\u8ECA\u8981\u5148\u51FA\uFF0C\u7B49\u65BC\u8981\u7A7F\u904E\u524D\u8ECA`;
   }
+  if (conflict.aisle) {
+    return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u5728\u300C${conflict.nodeLabel}\u300D\u7684\u683C\u4F4D\u9032\u51FA\u9053\u4E0A\u4E00\u9032\u4E00\u51FA\u3001\u5C0D\u5411\u540C\u6642\u901A\u904E\uFF08\u540C\u4E00\u5165\u53E3\u9EDE\u7684\u683C\u4F4D\u5171\u7528\u4E00\u689D\u9032\u51FA\u9053\uFF09`;
+  }
   return `${who(conflict.mine)} \u8207 ${who(conflict.other)} \u5728\u300C${conflict.nodeLabel}\u300D\u2014\u300C${conflict.toNodeLabel}\u300D\u5C0D\u5411\u540C\u6642\u901A\u904E`;
+}
+function yardSlotNodeIds(topology) {
+  return new Set(topology.nodes.filter((node) => node.kind === "facility").map((node) => node.id));
+}
+function yardAisleOf(fromNodeId, fromIsSlot, toNodeId, toIsSlot) {
+  if (fromIsSlot === toIsSlot) return null;
+  return fromIsSlot ? { entrance: toNodeId, outbound: true } : { entrance: fromNodeId, outbound: false };
 }
 function resolveMoveViaNodeIds(block, topology, aliases) {
   const labels = block.yardMoveViaLabels ?? [];

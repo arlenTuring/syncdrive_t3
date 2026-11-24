@@ -1,0 +1,56 @@
+/*
+ * Navigation（design-specs/t3-navigation-style-spec.md；樣式規範，數值逐項照文件）。
+ * 側欄 ScheduleModuleSidebar 用這些 class，選單狀態用 data-state：
+ *   off-close／on-close／off-open／on-open（第一層群組；on＝所在群組）、on（目前選取的頁面）、off（未選取的頁面）。
+ */
+@layer components {
+  .t3-nav {
+    position: relative; isolation: isolate; display: flex; flex-direction: column; flex-shrink: 0;
+    width: 280px; padding-bottom: 12px; overflow: hidden;
+    background: var(--surface-sub-background);
+    transition: width 200ms ease-out;
+  }
+  .t3-nav[data-collapsed="true"] { width: 80px; }
+  /* 左下角橘色放射漸層，整層 20%；固定在容器上，不跟選單捲動（色值為本元件局部設計值） */
+  .t3-nav::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .2;
+    background: radial-gradient(80.7142857% 43.4970703% at 0% 100%, rgb(243.693372 101.538904 0) 0%, #000 100%);
+  }
+  .t3-nav__top { flex: none; height: 74px; padding: 24px 16px 6px; }
+  .t3-nav__logo-row { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; }
+  .t3-nav[data-collapsed="true"] .t3-nav__top { height: 106px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .t3-nav__brand { display: flex; align-items: center; gap: 8px; min-width: 0; border: 0; background: transparent; cursor: pointer; padding: 0; }
+  .t3-nav__brand-text { font: 500 16px/24px Poppins, var(--font-primary); color: #c4cac4; }
+  .t3-nav__toggle { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--text-tertiary); cursor: pointer; }
+  .t3-nav__toggle:hover { background: var(--link-standard); }
+  .t3-nav__toggle svg { width: 24px; height: 24px; }
+  .t3-nav__menu { flex: 1; min-height: 0; padding: 0 16px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 8px; }
+  .t3-nav__item {
+    --nav-bg: transparent; --nav-fg: var(--text-secondary); --nav-arrow: var(--text-tertiary);
+    display: flex; align-items: center; gap: 8px; width: 100%; height: 48px; padding: 0 12px;
+    border: 0; border-radius: 12px; background: var(--nav-bg); color: var(--nav-fg);
+    font: 400 16px/20px var(--font-primary); text-align: left; cursor: pointer;
+  }
+  .t3-nav__item--sub { padding: 0 12px 0 40px; }
+  .t3-nav[data-collapsed="true"] .t3-nav__item { justify-content: center; width: 48px; padding: 0; }
+  .t3-nav__icon { display: flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; }
+  .t3-nav__icon svg { width: 20px; height: 20px; }
+  .t3-nav__label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .t3-nav__arrow { display: flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; color: var(--nav-arrow); }
+  .t3-nav__arrow svg { width: 20px; height: 20px; }
+  /* 非所在群組（Off-Close／Off-Open） */
+  .t3-nav__item:is([data-state="off-close"],[data-state="off-open"],[data-state="off"]):hover { --nav-bg: var(--link-standard); }
+  .t3-nav__item[data-state="off-close"]:hover { --nav-arrow: var(--text-secondary); }
+  .t3-nav__item:is([data-state="off-close"],[data-state="off-open"],[data-state="off"]):active { --nav-bg: var(--link-standard-hover); --nav-fg: var(--text-primary); --nav-arrow: var(--text-primary); }
+  /* 所在群組（On-Close／On-Open） */
+  .t3-nav__item:is([data-state="on-close"],[data-state="on-open"]) { --nav-fg: var(--text-theme); --nav-arrow: var(--text-theme); }
+  .t3-nav__item:is([data-state="on-close"],[data-state="on-open"]):hover { --nav-bg: var(--link-standard); }
+  .t3-nav__item:is([data-state="on-close"],[data-state="on-open"]):active { --nav-bg: var(--link-standard-hover); --nav-fg: var(--text-theme-light); --nav-arrow: var(--text-theme-light); }
+  /* 目前選取的頁面（On） */
+  .t3-nav__item[data-state="on"] { --nav-bg: var(--link-tonal); --nav-fg: var(--text-primary); }
+  .t3-nav__item[data-state="on"]:hover { --nav-bg: var(--link-tonal-hover); }
+  .t3-nav__item[data-state="on"]:active { --nav-bg: var(--link-tonal-pressed); }
+  .t3-nav__item:disabled { --nav-fg: var(--text-disabled); cursor: not-allowed; }
+  .t3-nav__item:focus-visible { outline: 2px solid var(--border-theme); outline-offset: -2px; }
+  .t3-nav__divider { flex: none; height: 1px; background: var(--border-quaternary); }
+}

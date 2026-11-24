@@ -24,35 +24,29 @@ export function buttonAttributes(hierarchy: ButtonHierarchy = 'superior', varian
 }
 
 
-/* ───────────── 輸入框 ───────────── */
+/* ───────────── 輸入框（TextField 規格；樣式在 field/field.css） ───────────── */
 
 export type FieldSize = 'sm' | 'md';
+/** 欄位三種 Style（TextField／Dropdown／DatePicker／InputNumber 共用）；預設 Tonal-Theme */
+export type FieldStyle = 'tonal-theme' | 'tonal-gray' | 'outlined';
 
-const FIELD_BASE =
-  'min-w-0 rounded-lg border border-border-quaternary bg-surface-secondary text-text-primary outline-none transition-colors '
-  + 'placeholder:text-text-quaternary hover:border-border-tertiary focus:border-border-theme '
-  + 'disabled:cursor-not-allowed disabled:border-border-disabled disabled:bg-surface-disabled disabled:text-text-disabled';
-
-/** md 跟 T3 按鈕同高（34），同一列的欄位與按鈕對齊；輸入框規格到了再依規格調整 */
-const FIELD_SIZES: Record<FieldSize, string> = {
-  sm: 'h-8 px-2.5 text-body-s',
-  md: 'h-[34px] px-3 text-body-s',
-};
-
-/** 文字、數字、日期、select 共用的輸入框外觀；invalid 時框線轉錯誤色。fullWidth=false 時寬度由呼叫端決定 */
-export function fieldClass(options: { size?: FieldSize; invalid?: boolean; multiline?: boolean; fullWidth?: boolean } = {}): string {
-  const { size = 'md', invalid = false, multiline = false, fullWidth = true } = options;
+/** 文字、數字、日期、select 共用的輸入框外觀；invalid 時描邊轉錯誤色。fullWidth=false 時寬度由呼叫端決定 */
+export function fieldClass(options: { size?: FieldSize; invalid?: boolean; multiline?: boolean; fullWidth?: boolean; style?: FieldStyle } = {}): string {
+  const { size = 'md', invalid = false, multiline = false, fullWidth = true, style = 'tonal-theme' } = options;
   return cn(
-    FIELD_BASE,
+    't3-input',
+    invalid && 't3-input--error',
+    style !== 'tonal-theme' && `t3-input--${style}`,
     fullWidth && 'w-full',
-    multiline ? 'min-h-24 px-3 py-2 text-body-s' : FIELD_SIZES[size],
-    invalid && 'border-border-danger-light focus:border-status-error',
+    !multiline && size === 'sm' && 't3-input--sm',
   );
 }
 
-export const LABEL_CLASS = 'text-caption-1 text-text-secondary';
-export const HINT_CLASS = 'text-body-xs text-text-tertiary';
-export const ERROR_TEXT_CLASS = 'text-body-xs text-status-error-emphasis';
+/** 欄位標題：14/18、500、text-tertiary，左右 8px，跟欄位距 4px */
+export const LABEL_CLASS = 'block px-2 text-body-s-bold text-text-tertiary';
+/** 輔助文字：12/16、text-tertiary，上下 4px 左右 12px */
+export const HINT_CLASS = 'px-3 py-1 text-body-xs text-text-tertiary';
+export const ERROR_TEXT_CLASS = 'px-3 py-1 text-body-xs text-status-error';
 
 /* ───────────── 面板（卡片） ───────────── */
 
@@ -110,24 +104,30 @@ export const DIALOG_WIDTHS: Record<DialogSize, string> = {
 };
 
 export const DIALOG_OVERLAY_CLASS = 'fixed inset-0 flex items-center justify-center bg-black-50 p-4 backdrop-blur-sm';
-export const DIALOG_PANEL_CLASS = 'flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-popup shadow-2xl';
+/** 外框：圓角 16、四層陰影、底色 surface-popup（dialog/dialog.css 的 .t3-dialog-surface，取自 Dialog 工程規範） */
+export const DIALOG_PANEL_CLASS = 't3-dialog-surface flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden';
 
 /* ───────────── 浮層選單（下拉、選項清單、日期選擇器） ───────────── */
 
-export const MENU_PANEL_CLASS = 'overflow-y-auto rounded-lg border border-border-quaternary bg-surface-popup py-1 shadow-xl shadow-black-50';
+/** 下拉選單：底色 surface-background、圓角 8、上下 4px、最高 312px（Dropdown 規格 §4） */
+export const MENU_PANEL_CLASS = 'max-h-78 overflow-y-auto rounded-lg bg-surface-background py-1';
 export const MENU_GROUP_LABEL_CLASS = 'px-3 py-2 text-caption-1 text-text-quaternary';
 export const MENU_EMPTY_CLASS = 'px-3 py-2 text-body-s text-text-quaternary';
 export const MENU_BADGE_CLASS = 'shrink-0 text-body-xs text-text-quaternary';
 export const MENU_CHECK_CLASS = 'size-4 shrink-0 text-text-theme';
 
-/** 選單的一個選項；active＝目前選取 */
+/** 選單的一個選項（高 40、左右 20、hover link-standard）；active＝目前選取，文字用主題色（Dropdown 規格 §4） */
 export function menuItemClass(active = false): string {
   return cn(
-    'flex min-h-10 w-full items-center gap-2 px-3 text-left text-body-s transition-colors disabled:cursor-not-allowed disabled:text-text-disabled',
-    active ? 'bg-surface-theme text-text-theme' : 'text-text-primary hover:bg-link-standard',
+    'flex min-h-10 w-full items-center gap-2 px-5 text-left text-body-s transition-colors hover:bg-link-standard focus-visible:bg-link-standard focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-disabled',
+    active ? 'text-text-theme' : 'text-text-primary',
   );
 }
 
+/** 下拉選單跟欄位的距離（Tonal 樣式 7px） */
+export const MENU_OFFSET = 7;
+
 /** 觸發浮層的按鈕（select、日期）未選值時的提示字色、箭頭圖示色 */
-export const PLACEHOLDER_TEXT_CLASS = 'text-text-quaternary';
-export const TRIGGER_ICON_CLASS = 'size-4 shrink-0 text-text-quaternary';
+/** 「請選擇」：未展開 text-tertiary（展開時呼叫端改 text-primary）；箭頭 20×20、text-tertiary（Dropdown 規格 §2、§3） */
+export const PLACEHOLDER_TEXT_CLASS = 'text-text-tertiary';
+export const TRIGGER_ICON_CLASS = 'size-5 shrink-0 text-text-tertiary';

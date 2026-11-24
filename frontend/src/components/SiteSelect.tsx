@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   Children,
   isValidElement,
@@ -10,7 +10,7 @@ import {
   type SelectHTMLAttributes,
 } from 'react';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
-import { cn, fieldClass, type FieldSize, MENU_BADGE_CLASS, MENU_CHECK_CLASS, MENU_EMPTY_CLASS, MENU_GROUP_LABEL_CLASS, MENU_PANEL_CLASS, menuItemClass, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
+import { cn, fieldClass, type FieldSize, MENU_BADGE_CLASS, MENU_EMPTY_CLASS, MENU_GROUP_LABEL_CLASS, MENU_OFFSET, MENU_PANEL_CLASS, menuItemClass, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 export type SiteSelectOption = {
   value: string;
@@ -113,7 +113,7 @@ export function SiteSelect({
           }
         }}
       >
-        <span className={cn('min-w-0 flex-1 truncate', !selected && PLACEHOLDER_TEXT_CLASS)}>
+        <span className={cn('min-w-0 flex-1 truncate', !selected && (open ? 'text-text-primary' : PLACEHOLDER_TEXT_CLASS))}>
           {selected?.label ?? (selectedValue || placeholder)}
         </span>
         <ChevronDown className={cn(TRIGGER_ICON_CLASS, 'transition-transform', open && 'rotate-180')} aria-hidden />
@@ -125,7 +125,8 @@ export function SiteSelect({
         role="listbox"
         ariaLabel={ariaLabel || title}
         align="start"
-        className={cn(MENU_PANEL_CLASS, 'max-h-80')}
+        offset={MENU_OFFSET}
+        className={MENU_PANEL_CLASS}
         style={{ width: panelWidth ?? Math.max(anchorRef.current?.getBoundingClientRect().width ?? 0, 140) }}
       >
         {(groups ?? [{ label: null, options: flatOptions }]).map((group, groupIndex) => (
@@ -146,7 +147,6 @@ export function SiteSelect({
                 >
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
                   {option.badge ? <span className={MENU_BADGE_CLASS}>{option.badge}</span> : null}
-                  {active ? <Check className={MENU_CHECK_CLASS} aria-hidden /> : null}
                 </button>
               );
             })}

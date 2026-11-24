@@ -357,8 +357,18 @@ function parseGeneratedSchedulePlan(raw: unknown): ShiftScheduleStoredOutput['pl
       : 0;
   if (scheduleRowCount <= 0) return null;
 
+  // 產生時記下的應開服務明細、演算法標記要原樣留著：少了明細，發布前核對會判成
+  // SERVICE_DEMAND_UNVERIFIABLE（2026-11-24 草稿重新開啟後再存檔就被擋下）
+  type StoredPlan = NonNullable<ShiftScheduleStoredOutput['plan']>;
   return {
     ...(typeof o.shiftId === 'string' ? { shiftId: o.shiftId } : {}),
+    ...(Array.isArray(o.servicePulses) ? { servicePulses: o.servicePulses as StoredPlan['servicePulses'] } : {}),
+    ...(o.routeAssignmentAlgorithm != null
+      ? { routeAssignmentAlgorithm: o.routeAssignmentAlgorithm as StoredPlan['routeAssignmentAlgorithm'] }
+      : {}),
+    ...(o.timetableGenerationAlgorithm != null
+      ? { timetableGenerationAlgorithm: o.timetableGenerationAlgorithm as StoredPlan['timetableGenerationAlgorithm'] }
+      : {}),
     generatedAt: typeof o.generatedAt === 'string' ? o.generatedAt : '',
     scheduleRowCount,
     timelines: o.timelines as ShiftScheduleStoredOutput['plan'] extends infer P

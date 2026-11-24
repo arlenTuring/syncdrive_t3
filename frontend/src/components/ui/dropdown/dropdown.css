@@ -1,0 +1,67 @@
+/* Dropdown／Text-Dropdown（design-specs/t3-dropdown-engineering-spec.md §6 參考 CSS，逐字保留）。
+ * 單選下拉 SiteSelect 的觸發鈕沿用 field.css 的 .t3-input（同一組色票與尺寸），選單照本規格 §4（variants.ts 的 MENU_*）。 */
+@layer components {
+.t3-dropdown { position: relative; width: 240px; max-width: 100%; font: 400 14px/18px var(--font-primary); letter-spacing: .5px; }
+.t3-dropdown__label { display: block; padding: 0 8px; margin-bottom: 4px; color: var(--text-tertiary); font-weight: 500; }
+.t3-dropdown__required { color: var(--status-error-emphasis); }
+.t3-dropdown__help { margin: 0; padding: 4px 12px; color: var(--text-tertiary); font: 400 12px/16px var(--font-primary); letter-spacing: 0; }
+.t3-dropdown__field {
+  --dropdown-bg: var(--surface-theme);
+  --dropdown-stroke: transparent;
+  position: relative; display: flex; align-items: center; width: 100%; min-height: 34px;
+  padding: 2px 12px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--dropdown-bg); box-shadow: inset 0 0 0 .5px var(--dropdown-stroke);
+  color: var(--text-primary); font: inherit;
+}
+.t3-dropdown[data-style="tonal-gray"] .t3-dropdown__field { --dropdown-bg: var(--surface-secondary); }
+.t3-dropdown[data-style="outlined"] .t3-dropdown__field { --dropdown-bg: transparent; --dropdown-stroke: var(--border-primary); }
+.t3-dropdown[data-state="focus"] .t3-dropdown__field { --dropdown-stroke: var(--border-theme); }
+.t3-dropdown[data-style="tonal-gray"][data-state="focus"] .t3-dropdown__field { --dropdown-stroke: var(--link-standard); }
+.t3-dropdown[data-style="outlined"][data-state="focus"] .t3-dropdown__field { --dropdown-bg: var(--link-standard-focus, var(--link-standard)); }
+.t3-dropdown[data-state="disabled"] .t3-dropdown__field { --dropdown-bg: var(--surface-disabled); color: var(--text-disabled); cursor: not-allowed; }
+.t3-dropdown[data-style="outlined"][data-multiple="true"][data-state="disabled"] .t3-dropdown__field { --dropdown-stroke: var(--border-disabled); }
+.t3-dropdown__trigger { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: inherit; }
+.t3-dropdown__trigger:focus-visible { outline: 2px solid var(--border-theme); outline-offset: 2px; }
+.t3-dropdown__value { flex: 1; min-width: 0; padding: 2px 0; pointer-events: none; }
+.t3-dropdown__single { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.t3-dropdown__value[data-placeholder="true"] { color: var(--text-tertiary); }
+.t3-dropdown[data-state="focus"] .t3-dropdown__value[data-placeholder="true"] { color: var(--text-primary); }
+.t3-dropdown[data-state="disabled"] .t3-dropdown__value { color: var(--text-disabled); }
+.t3-dropdown__arrow { display: block; flex: none; pointer-events: none; }
+.t3-dropdown[data-multiple="true"][data-has-value="true"] .t3-dropdown__field { padding-left: 4px; }
+.t3-dropdown__chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.t3-dropdown__chip { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 26px; max-width: 100%; padding: 4px 8px 4px 16px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border-secondary); font-weight: 500; pointer-events: auto; }
+.t3-dropdown__chip-text { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.t3-dropdown__remove { display: grid; place-items: center; padding: 0; border: 0; background: transparent; width: 18px; height: 18px; flex: none; cursor: pointer; }
+.t3-dropdown__remove img { display: block; }
+.t3-dropdown[data-state="disabled"] .t3-dropdown__chip { box-shadow: inset 0 0 0 1px var(--border-disabled); }
+.t3-dropdown[data-state="disabled"] .t3-dropdown__remove { cursor: not-allowed; }
+.t3-dropdown__menu { position: absolute; z-index: 10; top: calc(100% + 7px); left: 0; width: 100%; max-height: 312px; padding: 4px 0; border-radius: 8px; background: var(--surface-background); }
+.t3-dropdown[data-style="outlined"] .t3-dropdown__menu { top: calc(100% + 16px); }
+.t3-dropdown__list { max-height: 304px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.t3-dropdown__list::-webkit-scrollbar { display: none; }
+.t3-dropdown__option { display: block; width: 100%; height: 40px; padding: 0 20px; border: 0; border-radius: 0; background: transparent; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t3-dropdown__option:hover, .t3-dropdown__option:focus-visible { background: var(--link-standard); outline: none; }
+.t3-dropdown__option[aria-selected="true"] { color: var(--text-theme); }
+.t3-dropdown__option:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.t3-dropdown__scroller { position: absolute; width: 12px; right: 0; top: 4px; bottom: 4px; touch-action: none; }
+.t3-dropdown__scrollbar { position: absolute; top: 0; right: 8px; width: 4px; height: 164px; border-radius: 100px; background: var(--border-disabled); }
+.t3-dropdown[data-kind="text"] { width: max-content; }
+.t3-dropdown[data-kind="text"] .t3-dropdown__field { min-height: 24px; width: max-content; padding: 0 4px 0 8px; border-radius: 4px; background: transparent; box-shadow: none; color: var(--text-quaternary); font-weight: 500; }
+.t3-dropdown[data-kind="text"] .t3-dropdown__value { padding: 0; }
+.t3-dropdown[data-kind="text"][data-state="active"] .t3-dropdown__field { color: var(--text-tertiary); }
+.t3-dropdown[data-kind="text"][data-state="hover"] .t3-dropdown__field { background: var(--link-standard-hover); color: var(--text-secondary); }
+.t3-dropdown[data-kind="text"][data-hierarchy="superior"] .t3-dropdown__field { color: var(--link-theme-filled); }
+.t3-dropdown[data-kind="text"][data-hierarchy="superior"][data-state="active"] .t3-dropdown__field { color: var(--text-theme); }
+.t3-dropdown[data-kind="text"][data-hierarchy="superior"][data-state="hover"] .t3-dropdown__field { background: transparent; color: var(--link-theme-filled-hover); }
+.t3-dropdown[data-kind="text"][data-state="disabled"] .t3-dropdown__field { color: var(--text-disabled); }
+.t3-dropdown[data-kind="text"] .t3-dropdown__menu { top: calc(100% + 4px); left: -20px; width: 120px; min-width: 120px; border-radius: 8px; background: var(--surface-popup); box-shadow: 0 4px 24px var(--surface-disabled); }
+.t3-dropdown[data-kind="text"] .t3-dropdown__menu::before { content: ""; position: absolute; top: -4px; left: 0; right: 0; height: 4px; }
+.t3-dropdown [hidden] { display: none !important; }
+
+/* ── 專案調整 ──
+ * 規格用 var(--link-standard-focus, var(--link-standard))；定稿色票沒有 link-standard-focus，
+ * Figma 值是 12% 灰＝link-standard，在元件內定義成同值。
+ */
+.t3-dropdown { --link-standard-focus: var(--link-standard); }
+}

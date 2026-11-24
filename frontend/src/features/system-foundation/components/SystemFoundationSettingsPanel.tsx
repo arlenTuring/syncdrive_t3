@@ -44,6 +44,7 @@ import { DataRetentionSettings } from './DataRetentionSettings'
 import { useAdminModePreference } from '../../schedule-management/utils/adminModePreference'
 import { useSupervisorApprovalPreference } from '../../schedule-management/utils/supervisorApprovalPreference'
 import { Button } from '../../../components/ui';
+import { APP_VERSION, APP_VERSION_DATE } from '../../../config/appVersion';
 
 /** 一組全域參數：標題與用途放在上方，讓人知道這些值給哪裡用 */
 function ParamGroup({ title, usage, children }: { title: string; usage: string; children: ReactNode }) {
@@ -863,10 +864,26 @@ export function SystemFoundationSettingsPanel() {
                   </div>
                 </>
               ) : null}
+              {section === 'version' ? (
+                <>
+                  <SectionTitle>{sectionLabel}</SectionTitle>
+                  <div className="max-w-xl rounded-xl border border-border-quaternary bg-surface-sub-background px-4 py-3 text-body-s">
+                    <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <span className="text-text-tertiary">{t('systemFoundation.version.number')}</span>
+                      <span className="tabular-nums text-text-primary">{APP_VERSION}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <span className="text-text-tertiary">{t('systemFoundation.version.date')}</span>
+                      <span className="tabular-nums text-text-primary">{APP_VERSION_DATE}</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-body-xs text-text-quaternary">{t('systemFoundation.version.hint')}</p>
+                </>
+              ) : null}
             </div>
 
-            {/* 操作模式是這台瀏覽器的偏好、切換即生效，不走系統設定的儲存流程 */}
-            {section === 'operation' || section === 'dataRetention' || section === 'backup' ? null : (
+            {/* 操作模式是這台瀏覽器的偏好、切換即生效，不走系統設定的儲存流程；版本資訊只供查看 */}
+            {section === 'operation' || section === 'dataRetention' || section === 'backup' || section === 'version' ? null : (
               <SettingsFooter
                 saving={saving}
                 error={error}

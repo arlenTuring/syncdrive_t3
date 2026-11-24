@@ -3,7 +3,7 @@ import { SiteSelect } from '../../../components/SiteSelect';
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, UserRound, X } from 'lucide-react'
-import { Button, Checkbox, CheckboxIndicator, cn, MENU_PANEL_CLASS, menuItemClass, Switch, TextInput } from '../../../components/ui'
+import { Button, Checkbox, CheckboxIndicator, cn, InputNumber, MENU_PANEL_CLASS, menuItemClass, Switch, TextInput } from '../../../components/ui'
 import { IconButton } from '../../../components/ui';
 
 export function FieldLabel({ children }: { children: ReactNode }) {
@@ -79,53 +79,17 @@ export function NumberStepperField({
   step?: number
   onChange: (value: number) => void
 }) {
-  const clamp = (n: number) => {
-    let next = n
-    if (min != null) next = Math.max(min, next)
-    if (max != null) next = Math.min(max, next)
-    return next
-  }
+  // InputNumber 規格：Enter／失焦套用、超出範圍收斂、右側增減鈕
   return (
-    <label className="block min-w-0">
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex h-[34px] items-stretch overflow-hidden rounded-lg border border-border-quaternary bg-surface-secondary focus-within:border-border-theme">
-        <input
-          type="number"
-          value={Number.isFinite(value) ? value : 0}
-          min={min}
-          max={max}
-          step={step}
-          onChange={(e) => {
-            const n = Number(e.target.value)
-            onChange(Number.isFinite(n) ? clamp(n) : 0)
-          }}
-          className="min-w-0 flex-1 bg-transparent px-3 text-body-s text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
-        {unit ? (
-          <span className="flex items-center pr-2 text-body-xs text-text-quaternary">
-            {unit}
-          </span>
-        ) : null}
-        <div className="flex w-7 flex-col border-l border-border-quaternary">
-          <button
-            type="button"
-            className="flex flex-1 items-center justify-center text-text-tertiary hover:bg-link-standard-hover"
-            onClick={() => onChange(clamp(value + step))}
-            aria-label="增加"
-          >
-            <span className="text-caption-2">▴</span>
-          </button>
-          <button
-            type="button"
-            className="flex flex-1 items-center justify-center border-t border-border-quaternary text-text-tertiary hover:bg-link-standard-hover"
-            onClick={() => onChange(clamp(value - step))}
-            aria-label="減少"
-          >
-            <span className="text-caption-2">▾</span>
-          </button>
-        </div>
-      </div>
-    </label>
+    <InputNumber
+      label={label}
+      value={Number.isFinite(value) ? value : 0}
+      unit={unit}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(next) => onChange(next ?? min ?? 0)}
+    />
   )
 }
 

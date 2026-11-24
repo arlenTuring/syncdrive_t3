@@ -42,6 +42,8 @@ export type TrajectoryVisit = {
   departSecond: number;
   /** 這個節點是月台（停靠點）：有一方在這裡停就套站位規則（見 junctionShift.occupancyGapSeconds） */
   berth?: boolean;
+  /** 這個節點是場區格位（路網上的設施點）：格位與入口點之間的路段屬於共用進出道，見 {@link yardAisleOf} */
+  yardSlot?: boolean;
 };
 
 export type VehicleTrajectory = {
@@ -69,6 +71,11 @@ export type PathConflict = {
   /** mine 在衝突處的時刻（秒） */
   mineSecond: number;
   otherSecond: number;
+  /** overtake／head-on：兩方離開這段路的時刻（秒，other 已對齊到 mine 的那一天） */
+  mineExitSecond?: number;
+  otherExitSecond?: number;
+  /** head-on：發生在場區共用進出道（入口點 ↔ 不同格位），nodeId 是入口點 */
+  aisle?: boolean;
   /** node：兩段佔用之間的間隔（秒，負數＝重疊） */
   gapSeconds?: number;
   /** node：這個點要求的間隔（月台有一方停靠＝兩倍碰撞保護，其餘＝碰撞保護） */
@@ -90,6 +97,8 @@ type TopologyIndex = {
   zeroLinked: Set<string>;
   /** 月台（停靠點）節點 */
   berthNodes: Set<string>;
+  /** 場區格位（設施）節點 */
+  yardSlotNodes: Set<string>;
 };
 
 const indexCache = new WeakMap<PointTopology, TopologyIndex>();
@@ -130,9 +139,10 @@ function indexTopology(topology: PointTopology): TopologyIndex {
     topology.nodes.map((node) => [node.id, labelById.get(node.id) ?? node.id]),
   );
   const berthNodes = new Set(topology.nodes.filter((node) => node.kind === 'docking').map((node) => node.id));
+  const yardSlotNodes = yardSlotNodeIds(topology);
   const index = {
     labelById, nodeIdByLabel, ambiguousLabels, nodeIdByStationId, edgeByPair, resourceOf, resourceLabel, zeroLinked,
-    berthNodes,
+    berthNodes, yardSlotNodes,
   };
   indexCache.set(topology, index);
   return index;
@@ -155,7 +165,13 @@ function toResources(visits: TrajectoryVisit[], index: TopologyIndex): Trajector
       last.departSecond = Math.max(last.departSecond, visit.departSecond);
       continue;
     }
-    out.push({ ...visit, nodeId: resource, nodeLabel: label, ...(index.berthNodes.has(resource) ? { berth: true } : {}) });
+    out.push({
+      ...visit,
+      nodeId: resource,
+      nodeLabel: label,
+      ...(index.berthNodes.has(resource) ? { berth: true } : {}),
+      ...(index.yardSlotNodes.has(resource) ? { yardSlot: true } : {}),
+    });
   }
   return out;
 }
@@ -398,7 +414,14 @@ function alignDay(aSecond: number, bSecond: number): number {
   return days * DAY_SECONDS;
 }
 
-type EdgeTraversal = { from: string; to: string; enter: number; exit: number };
+type EdgeTraversal = {
+  from: string;
+  to: string;
+  enter: number;
+  exit: number;
+  /** 格位 ↔ 入口點這一段：走的是哪個入口點的共用進出道、往外（出格）還是往裡（進格） */
+  aisle?: { entrance: string; outbound: boolean };
+};
 
 function traversals(trajectory: VehicleTrajectory): EdgeTraversal[] {
   const out: EdgeTraversal[] = [];
@@ -406,7 +429,8 @@ function traversals(trajectory: VehicleTrajectory): EdgeTraversal[] {
     const a = trajectory.visits[i - 1]!;
     const b = trajectory.visits[i]!;
     if (a.nodeId === b.nodeId) continue;
-    out.push({ from: a.nodeId, to: b.nodeId, enter: a.departSecond, exit: b.arriveSecond });
+    const aisle = yardAisleOf(a.nodeId, a.yardSlot === true, b.nodeId, b.yardSlot === true);
+    out.push({ from: a.nodeId, to: b.nodeId, enter: a.departSecond, exit: b.arriveSecond, ...(aisle ? { aisle } : {}) });
   }
   return out;
 }
@@ -481,6 +505,7 @@ export function conflictsBetween(
           out.push({
             kind: 'overtake', mine, other, nodeId: a.from, nodeLabel: labelOf(a.from),
             toNodeId: a.to, toNodeLabel: labelOf(a.to), mineSecond: a.enter, otherSecond: b.enter,
+            mineExitSecond: a.exit, otherExitSecond: b.exit,
           });
         }
       } else if (a.from === b.to && a.to === b.from) {
@@ -489,6 +514,20 @@ export function conflictsBetween(
           out.push({
             kind: 'head-on', mine, other, nodeId: a.from, nodeLabel: labelOf(a.from),
             toNodeId: a.to, toNodeLabel: labelOf(a.to), mineSecond: a.enter, otherSecond: b.enter,
+            mineExitSecond: a.exit, otherExitSecond: b.exit,
+          });
+        }
+      } else if (
+        a.aisle && b.aisle
+        && a.aisle.entrance === b.aisle.entrance
+        && a.aisle.outbound !== b.aisle.outbound
+      ) {
+        // 對向（場區共用進出道）：一台出格往入口點、一台從入口點進別的格，走的是同一條通道
+        if (a.enter < b.exit + bufferSeconds && b.enter < a.exit + bufferSeconds) {
+          out.push({
+            kind: 'head-on', mine, other, nodeId: a.aisle.entrance, nodeLabel: labelOf(a.aisle.entrance),
+            toNodeId: a.aisle.outbound ? a.from : a.to, toNodeLabel: labelOf(a.aisle.outbound ? a.from : a.to),
+            mineSecond: a.enter, otherSecond: b.enter, mineExitSecond: a.exit, otherExitSecond: b.exit, aisle: true,
           });
         }
       }
@@ -579,6 +618,11 @@ export function escapeShiftsFor(conflicts: readonly PathConflict[], bufferSecond
       const delta = conflict.otherSecond - conflict.mineSecond;
       out.add(Math.floor(delta - bufferSeconds));
       out.add(Math.ceil(delta + bufferSeconds));
+      if (conflict.kind === 'head-on' && conflict.mineExitSecond != null && conflict.otherExitSecond != null) {
+        // 對向要整段讓開：我出這段比對方進來早一個緩衝，或我進這段比對方出去晚一個緩衝
+        out.add(Math.floor(conflict.otherSecond - bufferSeconds - conflict.mineExitSecond));
+        out.add(Math.ceil(conflict.otherExitSecond + bufferSeconds - conflict.mineSecond));
+      }
     }
   }
   return [...out];
@@ -597,7 +641,36 @@ export function describePathConflict(conflict: PathConflict, formatSecond: (seco
     return `${who(conflict.mine)} 與 ${who(conflict.other)} 同向走「${conflict.nodeLabel}」→「${conflict.toNodeLabel}」，`
       + '後進的車要先出，等於要穿過前車';
   }
+  if (conflict.aisle) {
+    return `${who(conflict.mine)} 與 ${who(conflict.other)} 在「${conflict.nodeLabel}」的格位進出道上一進一出、`
+      + '對向同時通過（同一入口點的格位共用一條進出道）';
+  }
   return `${who(conflict.mine)} 與 ${who(conflict.other)} 在「${conflict.nodeLabel}」—「${conflict.toNodeLabel}」對向同時通過`;
+}
+
+/** 路網上的場區格位（設施點）。排卡與最終驗證都用這一份判斷哪些路段屬於格位進出道 */
+export function yardSlotNodeIds(topology: PointTopology): Set<string> {
+  return new Set(topology.nodes.filter((node) => node.kind === 'facility').map((node) => node.id));
+}
+
+/**
+ * 格位 ↔ 入口點這段路屬於哪一條共用進出道。
+ *
+ * 路網把每個格位畫成各自一條邊接到入口點（星狀），但實體上同一個入口點底下的格位排在
+ * 同一條通道兩側：出格的車往入口點開、進格的車從入口點往裡開，走的是同一條軌道。
+ * 只看「同一對節點」的話，H5 → 入口 與 入口 → H2 看起來是兩條路，可以同時對開，
+ * 實際上兩台車在通道裡迎面卡死（2026-11-18、11-23、11-24 凌晨 03:05 PMS03 出 H5、PMS11 進 H2）。
+ * 所以同一入口點的格位聯絡線一律當成同一條雙向路段：一進一出不能重疊，同向照樣先進先出。
+ * 格位 ↔ 格位（區內換格）不算。
+ */
+export function yardAisleOf(
+  fromNodeId: string,
+  fromIsSlot: boolean,
+  toNodeId: string,
+  toIsSlot: boolean,
+): { entrance: string; outbound: boolean } | null {
+  if (fromIsSlot === toIsSlot) return null;
+  return fromIsSlot ? { entrance: toNodeId, outbound: true } : { entrance: fromNodeId, outbound: false };
 }
 
 /**

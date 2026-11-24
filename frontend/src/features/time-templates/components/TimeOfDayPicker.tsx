@@ -72,11 +72,9 @@ function TimeColumn({
             className="mb-0 flex h-8 w-12 items-center justify-center"
           >
             <span
-              className={`flex h-8 w-12 items-center justify-center rounded-lg text-body-s tracking-[0.5px] ${
-                selected
-                  ? 'bg-link-tonal font-medium text-text-secondary'
-                  : 'font-normal text-text-secondary hover:bg-link-standard'
-              }`}
+              // DatePicker 規格 Time Button：48×32、圓角 8；Hover link-tonal-hover、Active link-tonal
+              className="t3-picker-time"
+              data-active={selected ? 'true' : undefined}
             >
               {pad2(n)}
             </span>
@@ -114,7 +112,7 @@ export function TimePickerPanel({
 }: TimePickerPanelProps) {
   return (
     <div
-      className={`relative rounded-xl bg-surface-primary shadow-[0px_4px_24px_rgba(98,116,142,0.2)] ${
+      className={`t3-picker-shadow relative rounded-xl bg-surface-background ${
         showSeconds ? 'w-[190px]' : 'w-[136px]'
       }`}
     >

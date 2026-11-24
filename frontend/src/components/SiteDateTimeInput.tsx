@@ -1,9 +1,9 @@
-import { CalendarClock, Clock } from 'lucide-react';
+import { CalendarDays, Clock } from 'lucide-react';
 import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
 import { CustomDateTimePanel } from '../features/shift-records/components/CustomDateTimePanel';
 import { TimePickerPanel } from '../features/time-templates/components/TimeOfDayPicker';
 import { AnchoredPopover } from '../lib/AnchoredPopover';
-import { cn, fieldClass, type FieldSize, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
+import { cn, fieldClass, type FieldSize, MENU_OFFSET, PLACEHOLDER_TEXT_CLASS, TRIGGER_ICON_CLASS } from './ui';
 
 type Kind = 'date' | 'time' | 'datetime-local';
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> & {
@@ -115,7 +115,7 @@ export function SiteDateTimeInput({
         className={cn(size ? fieldClass({ size, fullWidth: false }) : 'disabled:cursor-not-allowed disabled:opacity-50', 'flex min-w-0 items-center justify-between gap-2 text-left', className)}
       >
         <span className={cn('min-w-0 whitespace-nowrap tabular-nums', !current && PLACEHOLDER_TEXT_CLASS)}>{displayDateTimeValue(current, type) || placeholder || (type === 'time' ? '--:--' : '請選擇日期時間')}</span>
-        {hideIcon ? null : timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarClock className={TRIGGER_ICON_CLASS} aria-hidden />}
+        {hideIcon ? null : timeOnly ? <Clock className={TRIGGER_ICON_CLASS} aria-hidden /> : <CalendarDays className={TRIGGER_ICON_CLASS} aria-hidden />}
       </button>
       <AnchoredPopover
         open={open}
@@ -124,9 +124,9 @@ export function SiteDateTimeInput({
         role="dialog"
         ariaLabel={ariaLabel || title || '選擇日期時間'}
         align="start"
-        offset={8}
+        offset={MENU_OFFSET}
         autoFocus={false}
-        className={timeOnly ? undefined : 'w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border-quaternary bg-surface-popup shadow-2xl shadow-black-50'}
+        className={timeOnly ? undefined : 't3-picker-panel w-[min(468px,calc(100vw-24px))]'}
       >
         {timeOnly ? (
           <TimeOnlyPanel key={current} value={parse(current, type)} onConfirm={emit} />

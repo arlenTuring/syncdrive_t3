@@ -450,7 +450,7 @@ export function TimeSlotIntervalsPanel({
           <DayTimeline intervals={intervals} attributes={attributes} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border-quaternary">
-          <table className="w-full shrink-0 table-fixed text-left text-body-s">
+          <table className="t3-table w-full shrink-0 table-fixed text-left text-body-s">
             <colgroup>
               <col style={{ width: 400 }} />
               <col style={{ width: 212 }} />
@@ -492,7 +492,7 @@ export function TimeSlotIntervalsPanel({
             <PanelNoData className="flex-1" />
           ) : (
             <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full table-fixed text-left text-body-s">
+              <table className="t3-table w-full table-fixed text-left text-body-s">
                 <colgroup>
                   <col style={{ width: 400 }} />
                   <col style={{ width: 212 }} />

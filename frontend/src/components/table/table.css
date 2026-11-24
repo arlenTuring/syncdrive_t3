@@ -1,0 +1,31 @@
+/*
+ * Table（design-specs/t3-table-style-spec.md；規範只有尺寸、色票、列狀態，沒有參考 CSS）。
+ *
+ * 故意不放進 @layer：各頁表格的儲存格原本自帶 padding／字色等 utility class，
+ * 不分層的規則優先於分層的 utility，<table className="t3-table"> 一加就照規範，不必逐格改 class。
+ * 寬度、對齊、sticky 這類排版 class 不受影響（這裡不設定）。
+ *
+ * 未勾選列 Hover：規範寫 --surface-gray-light，但定稿色票沒有這個變數（已回報設計）；
+ * 先退回 --link-standard（12% 灰），設計補上變數後自動改用。
+ */
+.t3-table { background: var(--surface-background); }
+.t3-table > thead > tr > th,
+.t3-table > tbody > tr > td,
+.t3-table > tfoot > tr > td {
+  padding: 2px 12px;
+  font-family: var(--font-primary);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: .5px;
+}
+.t3-table > thead > tr > th { height: 48px; color: var(--text-tertiary); background: var(--surface-background); }
+.t3-table > tbody > tr > td { height: 52px; color: var(--text-primary); }
+.t3-table > tbody > tr:hover > td { background: var(--surface-gray-light, var(--link-standard)); }
+/* Checkbox 勾選後整列 Highlight；已勾選列 Hover */
+.t3-table > tbody > tr[data-selected="true"] > td { background: var(--surface-theme-light); }
+.t3-table > tbody > tr[data-selected="true"]:hover > td { background: var(--surface-theme); }
+/* 同一格內文字與元件的間距 4px（格內是 flex 時） */
+.t3-table .t3-table__cell { display: flex; align-items: center; gap: 4px; }
+/* 中間欄位水平捲動：外層包 .t3-table-scroll；內容沒超出時不出捲軸 */
+.t3-table-scroll { overflow-x: auto; }

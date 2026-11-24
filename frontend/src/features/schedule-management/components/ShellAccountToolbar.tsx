@@ -16,7 +16,7 @@ import {
   type AppLocale,
 } from '../../../i18n/localePreference';
 import { useAuth } from '../../access-control/AuthContext';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, HeaderAvatar, HeaderDivider, HeaderIconButton, IconButton } from '../../../components/ui';
 
 type ShellAccountToolbarProps = {
   notificationCount?: number;
@@ -60,47 +60,40 @@ export function ShellAccountToolbar({
 
   return (
     <>
-      <div ref={rootRef} className="relative flex items-center gap-2">
-        <Button hierarchy="subordinate" variant="tonal" className="min-w-8" onPress={cycleLocale} title={t('shell.language')} aria-label={t('shell.language')}>{localeToolbarCode(currentLocale)}</Button>
-        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
-        <button
-          type="button"
-          className="relative inline-flex size-8 items-center justify-center rounded-full bg-surface-secondary text-text-secondary transition hover:bg-link-standard-hover hover:text-text-primary"
-          title={t('shell.notifications')}
-          aria-label={t('shell.notificationsCount', { count: notificationCount })}
-        >
-          <Bell className="size-4" />
-          {notificationCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-error px-1 text-caption-2 text-text-primary">
-              {notificationCount > 99 ? '99+' : notificationCount}
-            </span>
-          ) : null}
-        </button>
-        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
+      {/* Header 規格 Web-Header 右側：語言、通知、使用者、設定，間距 16、分隔線 1×20 */}
+      <div ref={rootRef} className="t3-header__actions relative gap-4">
+        <button type="button" className="t3-header__button t3-header__button--standard" onClick={cycleLocale} title={t('shell.language')} aria-label={t('shell.language')}>{localeToolbarCode(currentLocale)}</button>
+        <HeaderDivider />
+        <HeaderAvatar
+          label={t('shell.notificationsCount', { count: notificationCount })}
+          icon={<Bell />}
+          badge={notificationCount > 0 ? (notificationCount > 99 ? '99+' : notificationCount) : undefined}
+        />
+        <HeaderDivider />
         <button
           type="button"
           onClick={() => setSettingsOpen((open) => !open)}
           aria-expanded={settingsOpen}
           aria-controls={panelId}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-secondary pl-2 pr-2.5 text-body-s text-text-primary transition hover:bg-link-standard-hover hover:text-text-primary"
+          className="t3-header__user"
           aria-label={auth.user ? `登入帳號 ${auth.user.display_name}` : '登入'}
         >
-          <span className="inline-flex size-6 items-center justify-center rounded-full bg-surface-secondary text-text-secondary">
-            <User className="size-3.5" />
+          <span className="t3-header__user-info">
+            <span className="t3-header__avatar" aria-hidden><User /></span>
+            <span className="max-w-[7rem] truncate">
+              {auth.loading ? '讀取中…' : auth.user?.display_name ?? '登入'}
+            </span>
           </span>
-          <span className="max-w-[7rem] truncate font-medium">
-            {auth.loading ? '讀取中…' : auth.user?.display_name ?? '登入'}
-          </span>
-          <ChevronDown className="size-3.5 text-text-quaternary" />
+          <span className="t3-header__user-arrow" aria-hidden><ChevronDown /></span>
         </button>
         {/* 沒有系統基礎模組權限的帳號（例如廠商）看不到齒輪，不是點了才說權限不足 */}
         {auth.can('system.health.view') ? (
         <>
-        <span className="h-4 w-px bg-border-tertiary" aria-hidden />
-        <IconButton size="small" hierarchy="subordinate" variant="tonal" onPress={() => {
-      setSettingsOpen(false);
-      onOpenSystemFoundation();
-     }} title={t('shell.settings')} label={t('shell.settings')} icon={<Settings />} />
+        <HeaderDivider />
+        <HeaderIconButton settings label={t('shell.settings')} icon={<Settings />} onPress={() => {
+          setSettingsOpen(false);
+          onOpenSystemFoundation();
+        }} />
         </>
         ) : null}
 

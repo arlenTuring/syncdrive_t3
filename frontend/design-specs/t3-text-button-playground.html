@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>T3 UI Kit｜Button Component Playground（60 Variants）</title>
+<meta name="description" content="T3 Button 工程規格完整互動測試頁：3 Hierarchy × 5 Style × 4 State，共 60 variants。"/>
+<style id="t3-tokens">
+/* T3 Design Tokens (2026-11-12): Button component dependencies */
+:root {
+  --font-primary: 'Noto Sans TC', sans-serif;
+  --color-white-100: #FFFFFF;
+  --color-blue-400: #51A2FF;
+  --color-blue-500: #2B7FFF;
+  --color-blue-600: #155DFC;
+  --color-gray-300: #D1D5DC;
+  --color-gray-500: #6A7282;
+  --color-gray-600: #4A5565;
+  --color-gray-700: #364153;
+  --color-slate-500: #62748E;
+  --color-neutral-300: #D4D4D4;
+  --color-red-400: #FF6467;
+  --color-red-500: #FB2C36;
+  --color-red-600: #E7000B;
+  --color-zinc-900: #18181B;
+
+  --surface-disabled: rgb(from var(--color-slate-500) r g b / 20%);
+  --text-secondary: var(--color-gray-300);
+  --text-disabled: var(--color-gray-600);
+  --text-theme: var(--color-blue-400);
+  --border-tertiary: rgb(from var(--color-neutral-300) r g b / 25%);
+  --border-disabled: rgb(from var(--color-neutral-300) r g b / 10%);
+  --border-theme: var(--color-blue-400);
+  --border-theme-light: rgb(from var(--color-blue-400) r g b / 50%);
+  --border-danger-light: rgb(from var(--color-red-400) r g b / 50%);
+  --link-theme-filled: var(--color-blue-500);
+  --link-theme-filled-hover: var(--color-blue-400);
+  --link-theme-filled-pressed: var(--color-blue-600);
+  --link-black-filled: var(--color-gray-700);
+  --link-black-filled-hover: var(--color-gray-600);
+  --link-black-filled-pressed: var(--color-gray-500);
+  --link-tonal: rgb(from var(--color-blue-400) r g b / 24%);
+  --link-tonal-hover: rgb(from var(--color-blue-400) r g b / 32%);
+  --link-tonal-pressed: rgb(from var(--color-blue-400) r g b / 40%);
+  --link-standard: rgb(from var(--color-gray-300) r g b / 12%);
+  --link-standard-hover: rgb(from var(--color-gray-300) r g b / 20%);
+  --link-standard-pressed: rgb(from var(--color-gray-300) r g b / 28%);
+  --link-danger-filled: var(--color-red-500);
+  --link-danger-filled-hover: var(--color-red-400);
+  --link-danger-filled-pressed: var(--color-red-600);
+  --link-danger-tonal: rgb(from var(--color-red-600) r g b / 8%);
+  --link-danger-tonal-hover: rgb(from var(--color-red-600) r g b / 12%);
+  --link-danger-tonal-pressed: rgb(from var(--color-red-600) r g b / 28%);
+  --status-error: var(--color-red-500);
+  --status-error-emphasis: var(--color-red-400);
+}
+.text-body-s-bold {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0.5px;
+}
+
+</style>
+<style id="t3-button-component">
+.t3-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  background-color: var(--button-bg, transparent);
+  box-shadow: inset 0 0 0 1px var(--button-stroke, transparent);
+  color: var(--button-fg, inherit);
+}
+.t3-button[data-style="text"] {
+  padding: 0 4px;
+  gap: 4px;
+  border-radius: 0;
+}
+.t3-button__icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 14px;
+  block-size: 18px;
+}
+.t3-button__icon > svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.t3-button:focus-visible {
+  outline: 2px solid var(--border-theme);
+  outline-offset: 2px;
+}
+
+/* Default */
+.t3-button[data-hierarchy="superior"][data-style="filled"] {
+  --button-bg: var(--link-theme-filled);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="superior"][data-style="tonal"] {
+  --button-bg: var(--link-tonal);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="outlined"] {
+  --button-bg: transparent;
+  --button-stroke: var(--border-theme-light);
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="standard"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="text"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="filled"] {
+  --button-bg: var(--link-black-filled);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="tonal"] {
+  --button-bg: var(--link-standard);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="outlined"] {
+  --button-bg: transparent;
+  --button-stroke: var(--border-tertiary);
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="standard"],
+.t3-button[data-hierarchy="subordinate"][data-style="text"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="danger"][data-style="filled"] {
+  --button-bg: var(--link-danger-filled);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="danger"][data-style="tonal"] {
+  --button-bg: var(--link-danger-tonal);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="outlined"] {
+  --button-bg: transparent;
+  --button-stroke: var(--border-danger-light);
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="standard"],
+.t3-button[data-hierarchy="danger"][data-style="text"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+
+/* Hover */
+@media (hover: hover) {
+  .t3-button[data-hierarchy="superior"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-theme-filled-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--color-white-100);
+  }
+  .t3-button[data-hierarchy="superior"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-button[data-hierarchy="superior"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-tonal-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--text-theme);
+  }
+  .t3-button[data-hierarchy="superior"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-tonal-hover);
+    --button-stroke: var(--border-theme-light);
+    --button-fg: var(--text-theme);
+  }
+  .t3-button[data-hierarchy="superior"][data-style="text"]:where(:hover:not(:disabled)),
+  .t3-button[data-hierarchy="subordinate"][data-style="text"]:where(:hover:not(:disabled)) {
+    --button-bg: transparent;
+    --button-stroke: transparent;
+    --button-fg: var(--link-theme-filled-hover);
+  }
+  .t3-button[data-hierarchy="subordinate"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-black-filled-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--color-white-100);
+  }
+  .t3-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-button[data-hierarchy="subordinate"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-standard-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--text-secondary);
+  }
+  .t3-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-standard-hover);
+    --button-stroke: var(--border-tertiary);
+    --button-fg: var(--text-secondary);
+  }
+  .t3-button[data-hierarchy="danger"][data-style="filled"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-danger-filled-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--color-white-100);
+  }
+  .t3-button[data-hierarchy="danger"][data-style="tonal"]:where(:hover:not(:disabled)),
+  .t3-button[data-hierarchy="danger"][data-style="standard"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-danger-tonal-hover);
+    --button-stroke: transparent;
+    --button-fg: var(--status-error-emphasis);
+  }
+  .t3-button[data-hierarchy="danger"][data-style="outlined"]:where(:hover:not(:disabled)) {
+    --button-bg: var(--link-danger-tonal-hover);
+    --button-stroke: var(--border-danger-light);
+    --button-fg: var(--status-error-emphasis);
+  }
+  .t3-button[data-hierarchy="danger"][data-style="text"]:where(:hover:not(:disabled)) {
+    --button-bg: transparent;
+    --button-stroke: transparent;
+    --button-fg: var(--status-error);
+  }
+}
+
+/* Pressed */
+.t3-button[data-hierarchy="superior"][data-style="filled"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-theme-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="superior"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-button[data-hierarchy="superior"][data-style="standard"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-tonal-pressed);
+  --button-stroke: var(--border-theme-light);
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="text"]:where(:active:not(:disabled)),
+.t3-button[data-hierarchy="subordinate"][data-style="text"]:where(:active:not(:disabled)) {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled-pressed);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="filled"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-black-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-button[data-hierarchy="subordinate"][data-style="standard"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-standard-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-standard-pressed);
+  --button-stroke: var(--border-tertiary);
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="danger"][data-style="filled"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-danger-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="danger"][data-style="tonal"]:where(:active:not(:disabled)),
+.t3-button[data-hierarchy="danger"][data-style="standard"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-danger-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="outlined"]:where(:active:not(:disabled)) {
+  --button-bg: var(--link-danger-tonal-pressed);
+  --button-stroke: var(--border-danger-light);
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="text"]:where(:active:not(:disabled)) {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+
+/* Disabled */
+.t3-button[data-hierarchy="superior"][data-style="filled"]:where(:disabled),
+.t3-button[data-hierarchy="superior"][data-style="tonal"]:where(:disabled),
+.t3-button[data-hierarchy="subordinate"][data-style="filled"]:where(:disabled),
+.t3-button[data-hierarchy="subordinate"][data-style="tonal"]:where(:disabled),
+.t3-button[data-hierarchy="danger"][data-style="filled"]:where(:disabled) {
+  --button-bg: var(--surface-disabled);
+  --button-stroke: transparent;
+  --button-fg: var(--text-disabled);
+}
+.t3-button[data-hierarchy="superior"][data-style="outlined"]:where(:disabled),
+.t3-button[data-hierarchy="subordinate"][data-style="outlined"]:where(:disabled),
+.t3-button[data-hierarchy="danger"][data-style="outlined"]:where(:disabled) {
+  --button-bg: transparent;
+  --button-stroke: var(--border-disabled);
+  --button-fg: var(--text-disabled);
+}
+.t3-button[data-hierarchy="superior"][data-style="standard"]:where(:disabled),
+.t3-button[data-hierarchy="superior"][data-style="text"]:where(:disabled),
+.t3-button[data-hierarchy="subordinate"][data-style="standard"]:where(:disabled),
+.t3-button[data-hierarchy="subordinate"][data-style="text"]:where(:disabled),
+.t3-button[data-hierarchy="danger"][data-style="tonal"]:where(:disabled),
+.t3-button[data-hierarchy="danger"][data-style="standard"]:where(:disabled),
+.t3-button[data-hierarchy="danger"][data-style="text"]:where(:disabled) {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--text-disabled);
+}
+
+</style>
+<style id="t3-matrix-preview">
+/* Spec matrix preview only. Original component CSS above is not changed. */
+.t3-button[data-hierarchy="superior"][data-style="filled"][data-preview-state="hover"] {
+  --button-bg: var(--link-theme-filled-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="superior"][data-style="filled"][data-preview-state="pressed"] {
+  --button-bg: var(--link-theme-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="superior"][data-style="tonal"][data-preview-state="hover"] {
+  --button-bg: var(--link-tonal-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="tonal"][data-preview-state="pressed"] {
+  --button-bg: var(--link-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="outlined"][data-preview-state="hover"] {
+  --button-bg: var(--link-tonal-hover);
+  --button-stroke: var(--border-theme-light);
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="outlined"][data-preview-state="pressed"] {
+  --button-bg: var(--link-tonal-pressed);
+  --button-stroke: var(--border-theme-light);
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="standard"][data-preview-state="hover"] {
+  --button-bg: var(--link-tonal-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="standard"][data-preview-state="pressed"] {
+  --button-bg: var(--link-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-theme);
+}
+.t3-button[data-hierarchy="superior"][data-style="text"][data-preview-state="hover"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled-hover);
+}
+.t3-button[data-hierarchy="superior"][data-style="text"][data-preview-state="pressed"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled-pressed);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="filled"][data-preview-state="hover"] {
+  --button-bg: var(--link-black-filled-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="filled"][data-preview-state="pressed"] {
+  --button-bg: var(--link-black-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="tonal"][data-preview-state="hover"] {
+  --button-bg: var(--link-standard-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="tonal"][data-preview-state="pressed"] {
+  --button-bg: var(--link-standard-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="outlined"][data-preview-state="hover"] {
+  --button-bg: var(--link-standard-hover);
+  --button-stroke: var(--border-tertiary);
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="outlined"][data-preview-state="pressed"] {
+  --button-bg: var(--link-standard-pressed);
+  --button-stroke: var(--border-tertiary);
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="standard"][data-preview-state="hover"] {
+  --button-bg: var(--link-standard-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="standard"][data-preview-state="pressed"] {
+  --button-bg: var(--link-standard-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--text-secondary);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="text"][data-preview-state="hover"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled-hover);
+}
+.t3-button[data-hierarchy="subordinate"][data-style="text"][data-preview-state="pressed"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--link-theme-filled-pressed);
+}
+.t3-button[data-hierarchy="danger"][data-style="filled"][data-preview-state="hover"] {
+  --button-bg: var(--link-danger-filled-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="danger"][data-style="filled"][data-preview-state="pressed"] {
+  --button-bg: var(--link-danger-filled-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--color-white-100);
+}
+.t3-button[data-hierarchy="danger"][data-style="tonal"][data-preview-state="hover"] {
+  --button-bg: var(--link-danger-tonal-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="tonal"][data-preview-state="pressed"] {
+  --button-bg: var(--link-danger-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="outlined"][data-preview-state="hover"] {
+  --button-bg: var(--link-danger-tonal-hover);
+  --button-stroke: var(--border-danger-light);
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="outlined"][data-preview-state="pressed"] {
+  --button-bg: var(--link-danger-tonal-pressed);
+  --button-stroke: var(--border-danger-light);
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="standard"][data-preview-state="hover"] {
+  --button-bg: var(--link-danger-tonal-hover);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="standard"][data-preview-state="pressed"] {
+  --button-bg: var(--link-danger-tonal-pressed);
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+.t3-button[data-hierarchy="danger"][data-style="text"][data-preview-state="hover"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--status-error);
+}
+.t3-button[data-hierarchy="danger"][data-style="text"][data-preview-state="pressed"] {
+  --button-bg: transparent;
+  --button-stroke: transparent;
+  --button-fg: var(--status-error-emphasis);
+}
+
+</style>
+<style id="t3-playground-ui">
+
+*{box-sizing:border-box}
+:root{color-scheme:dark;--page:#0E1117;--panel:#161C26;--line:#2A3443;--subtle:#96A4B7;--white:#F5F8FC;--control:#222C3B}
+html{scroll-behavior:smooth}body{margin:0;background:var(--page);font-family:'Noto Sans TC',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--white);font-size:14px;line-height:1.5}
+button,input,select{font:inherit}button,select{cursor:pointer}a{color:#87C5FF;text-decoration:none}a:hover{text-decoration:underline}
+.page{width:min(1620px,calc(100% - 52px));margin:0 auto;padding:32px 0 76px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.identity{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:.3px;color:#E0E9F7}
+.brand-icon{display:grid;place-items:center;background:#2B7FFF;border-radius:10px;width:32px;height:32px;box-shadow:0 0 20px #2B7FFF40;font-weight:900}
+.top-links{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12px}
+.hero{border:1px solid #2B3850;background:linear-gradient(130deg,#1A2B46 0%,#172238 45%,#161B27 100%);border-radius:18px;padding:30px 32px;display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:800;color:#80B9FF;margin:0 0 10px}
+h1{font-size:31px;letter-spacing:-.8px;line-height:1.23;margin:0 0 12px}h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:0}.lead{color:#ABBBD1;margin:0;font-size:13px;max-width:790px}
+.stat-panel{display:grid;grid-template-columns:repeat(3,minmax(86px,1fr));border:1px solid #46516A;border-radius:14px;overflow:hidden;flex-shrink:0}
+.stat-panel div{padding:15px 22px;text-align:center;border-right:1px solid #46516A}.stat-panel div:last-child{border-right:0}.stat-panel strong{display:block;font-size:27px;font-weight:700;line-height:1.3}.stat-panel small{display:block;color:#A9BDD5;white-space:nowrap;font-size:11px}
+.layout{display:grid;grid-template-columns:310px minmax(0,1fr);gap:18px;align-items:start}
+.side{position:sticky;top:18px;display:grid;gap:16px}
+.panel,.matrix-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.panel{padding:20px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}.kicker{color:var(--subtle);font-size:12px}
+.field{margin-bottom:16px}.field:last-child{margin-bottom:0}.field label,.field>.field-label{display:block;font-size:12px;font-weight:600;color:#B9C7D9;margin-bottom:7px}
+.field input[type=text],.field select{width:100%;background:#0E1522;color:#F2F6FF;border:1px solid #354154;border-radius:8px;padding:10px 11px;outline:0;min-height:39px}
+.field input[type=text]:focus,.field select:focus{border-color:#76B4FF;box-shadow:0 0 0 2px #2B7FFF33}
+.toggle-line{display:flex;align-items:center;justify-content:space-between;padding:8px 0;gap:16px;color:#D8E4F2;font-size:13px}.toggle-line input{width:17px;height:17px;accent-color:#2B7FFF}
+.checkbox-pair{display:flex;gap:10px;flex-wrap:wrap}
+.tiny-btn{background:#202C3D;border:1px solid #3D4C61;border-radius:8px;padding:7px 10px;color:#D3E5FA;font-size:12px;cursor:pointer}
+.tiny-btn:hover{background:#2B394E}
+.tiny-btn:focus-visible{outline:2px solid #8CC8FF;outline-offset:2px}
+.small-note{color:#93A3B7;font-size:11px;margin:9px 0 0;line-height:1.7}
+.live-stage{background:#18181B;border:1px solid #3B3F4D;border-radius:12px;min-height:112px;display:grid;place-items:center;padding:14px;margin-bottom:14px}
+.live-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:7px;color:#ADB9C9;font-size:11px}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#49D7A0;margin-right:5px}
+.secondary-line{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:8px;color:#C4D1E0;font-size:11px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:11px;word-break:break-word}
+.inspector{background:#0E1520;border:1px solid #2D3C4E;border-radius:9px;padding:12px;color:#BFD0E4;font-size:11px;margin-top:12px;line-height:1.8;min-height:112px}
+.inspector b{color:#F1F6FF;font-weight:600}.inspector .data-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid #263140;padding:4px 0}.inspector .data-row:last-child{border-bottom:0}.inspector code{font-size:10px;text-align:right}
+.log{max-height:120px;overflow-y:auto;display:grid;gap:6px;min-height:20px}.log-entry{font-size:11px;padding:5px 8px;border-radius:6px;background:#121D2B;color:#CAD9ED}.log-empty{color:#7D90A8;font-size:12px}
+.main{min-width:0}.matrix-intro{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}.matrix-intro p{font-size:12px;color:#A8B7C9;margin:2px 0 0}.legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:#A9B9CB;font-size:11px}.legend span{white-space:nowrap}
+.matrix-card{margin-bottom:18px}.matrix-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 19px;border-bottom:1px solid var(--line)}.group-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700}.group-icon{width:8px;height:24px;background:#2B7FFF;border-radius:4px}.group-icon.subordinate{background:#A7B9D2}.group-icon.danger{background:#FB2C36}.group-desc{font-size:11px;color:#91A5BA}.group-count{color:#8FA8C6;font-size:11px;font-family:ui-monospace,monospace}
+.matrix-scroll{overflow-x:auto}.variants{width:100%;border-collapse:collapse;table-layout:fixed;min-width:760px}.variants th{font-size:11px;font-weight:600;text-align:center;letter-spacing:.4px;color:#9EB2CA;background:#1B2534;padding:10px 8px;border-bottom:1px solid #2D3C4E}.variants th:first-child{text-align:left;padding-left:20px;width:145px}
+.variants td{border-bottom:1px solid #263244;padding:15px 9px;text-align:center;vertical-align:middle;background:#171C25}.variants tr:last-child td{border-bottom:0}.variants td:first-child{text-align:left;padding-left:20px;background:#1A2330}.variants tr:hover td{background:#1A2534}.variants tr:hover td:first-child{background:#202D3E}
+.style-name{font-weight:700;color:#F0F5FE;font-size:13px}.style-sub{color:#7F93AD;font-size:10px;margin-top:5px;font-family:ui-monospace,monospace}.variant-shell{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;min-height:55px}.variant-shell .t3-button{white-space:nowrap;max-width:100%}.variant-actions{display:flex;gap:7px;align-items:center;justify-content:center;min-height:14px}.variant-actions a{font-size:10px;color:#718DAE}.variant-actions a:hover{color:#B6D9FF}.variant-actions .state-hint{font-size:10px;color:#637991}.variant-shell.is-selected .t3-button{outline:1px dashed #8CBFFF;outline-offset:5px}
+.matrix-note{font-size:11px;line-height:1.65;color:#8297AF;padding:12px 20px;border-top:1px solid var(--line);background:#141B25}
+.tools-note{border:1px solid #2C3B50;padding:14px 17px;background:#151E2C;border-radius:12px;margin-top:5px;font-size:12px;color:#B2C5DA}.tools-note b{color:#E2EDFB}.tools-note p{margin:6px 0}
+.result-list{display:grid;gap:8px}.result-item{display:flex;gap:9px;align-items:flex-start;background:#101927;border:1px solid #2B3647;padding:9px 10px;border-radius:9px;font-size:11px;color:#C4D4E8}.result-item .mark{font-weight:800;width:16px;flex:none}.result-item.pass .mark{color:#3BD4A2}.result-item.fail .mark{color:#FF7F81}
+.result-summary{color:#B9CDE3;font-size:12px;margin:10px 0}.footer{color:#8697AA;font-size:11px;text-align:center;margin-top:24px}
+.t3-button{cursor:pointer;user-select:none}.t3-button:disabled{cursor:not-allowed}.t3-button__icon{pointer-events:none}.t3-button:focus-visible{position:relative;z-index:2}
+.hidden{display:none!important}
+@media(max-width:1100px){.layout{grid-template-columns:1fr}.side{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.side>.panel:last-child{grid-column:span 2}}
+@media(max-width:700px){.page{width:min(100% - 24px,660px);padding-top:17px}.hero{padding:22px;flex-direction:column;align-items:flex-start}h1{font-size:25px}.stat-panel{width:100%}.stat-panel div{flex:1;padding:12px}.side{grid-template-columns:1fr}.side>.panel:last-child{grid-column:span 1}.top-links{gap:8px}.matrix-header{padding:13px}.matrix-intro{align-items:flex-start}}
+
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="top-bar">
+    <div class="identity"><div class="brand-icon">T3</div><span>SYNC​DRIVE / DESIGN SYSTEM</span><span style="color:#647791">·</span><span style="color:#96A6BA;font-weight:500">COMPONENT SPECIFICATION</span></div>
+    <nav class="top-links" aria-label="設計規範連結"><a href="https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2151" target="_blank" rel="noopener noreferrer">Figma Component Set ↗</a><a href="https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=23-6766" target="_blank" rel="noopener noreferrer">Button 頁 ↗</a></nav>
+  </header>
+  <section class="hero">
+    <div><p class="eyebrow">UI KIT / ENGINEERING HANDOFF / 01</p><h1>Button <span style="color:#8CC2FF">Component Playground</span></h1><p class="lead">依 t3-button-engineering-spec(1).md 規格開發；同一頁展示所有組合，並保留原生按壓、鍵盤焦點、停用及點擊事件行為。</p></div>
+    <div class="stat-panel" aria-label="規格統計"><div><strong>3</strong><small>Hierarchy</small></div><div><strong>5</strong><small>Style</small></div><div><strong>60</strong><small>Variants</small></div></div>
+  </section>
+  <div class="layout">
+    <aside class="side" aria-label="Button 測試與設定">
+      <section class="panel"><div class="panel-head"><div><h2>互動測試台</h2><span class="kicker">LIVE COMPONENT</span></div><button id="reset-config" type="button" class="tiny-btn">重設</button></div>
+        <div class="field"><label for="label-input">按鈕文字 / label</label><input id="label-input" type="text" maxlength="60" placeholder="輸入自訂標籤" autocomplete="off"/></div>
+        <div class="field"><label for="hierarchy-select">Hierarchy</label><select id="hierarchy-select"><option value="superior">Superior</option><option value="subordinate">Subordinate</option><option value="danger">Danger</option></select></div>
+        <div class="field"><label for="style-select">Style / variant</label><select id="style-select"><option value="filled">Filled</option><option value="tonal">Tonal</option><option value="outlined">Outlined</option><option value="standard">Standard</option><option value="text">Text</option></select></div>
+        <div class="field"><span class="field-label">Icon Slots</span><label class="toggle-line" for="leading-toggle">Leading Icon <input type="checkbox" id="leading-toggle" checked/></label><label class="toggle-line" for="trailing-toggle">Trailing Icon <input type="checkbox" id="trailing-toggle" checked/></label><label class="toggle-line" for="disabled-toggle">Disabled <input type="checkbox" id="disabled-toggle"/></label></div>
+        <div class="field"><label for="type-select">原生 Button Type</label><select id="type-select"><option value="button">button</option><option value="submit">submit</option><option value="reset">reset</option></select></div>
+        <form id="test-form" aria-label="原生 type 行為測試"><div class="live-stage" id="live-stage"></div><div class="live-meta"><span><i class="status-dot"></i>狀態 <b id="live-state">Default</b></span><span id="live-size" class="mono">—</span></div><div class="secondary-line"><span>onPress 次數：<b id="live-clicks">0</b></span><button type="button" class="tiny-btn" id="focus-live">設定焦點</button></div></form>
+        <p class="small-note">Hover：移入滑鼠。Pressed：按住不要放。Focus：用 Tab 鍵移動焦點。Disabled：不可點擊或鍵盤啟用。</p>
+      </section>
+      <section class="panel"><div class="panel-head"><div><h3>樣式檢查器</h3><span class="kicker" id="inspector-label">Superior / Filled / Default</span></div></div><div class="inspector" id="inspector" aria-live="polite">讀取中...</div></section>
+      <section class="panel"><div class="panel-head"><div><h3>事件紀錄</h3><span class="kicker">onPress / DOM events</span></div><span class="mono"><b id="press-count">0</b> clicks</span></div><div id="event-log" class="log log-empty" aria-live="polite">尚無操作紀錄</div></section>
+    </aside>
+    <section class="main" aria-label="Button 60 Variants">
+      <div class="matrix-intro"><div><h2>元件狀態矩陣</h2><p>所有 Variant 集中在此頁 · 目前顯示 <b id="visible-count">60</b> / 60</p></div><div class="legend"><span>◌ Default 可互動</span><span>◉ Hover / Pressed 固定預覽</span><span>⊘ Disabled 原生停用</span></div></div>
+      <div class="panel" style="display:flex;gap:14px;align-items:flex-end;padding:13px 17px;margin-bottom:16px;flex-wrap:wrap"><div class="field" style="flex:1;min-width:170px;margin:0"><label for="matrix-hierarchy">篩選 Hierarchy</label><select id="matrix-hierarchy"><option value="all">全部 Hierarchy</option><option value="superior">Superior</option><option value="subordinate">Subordinate</option><option value="danger">Danger</option></select></div><div class="field" style="flex:1;min-width:170px;margin:0"><label for="matrix-style">篩選 Style</label><select id="matrix-style"><option value="all">全部 Style</option><option value="filled">Filled</option><option value="tonal">Tonal</option><option value="outlined">Outlined</option><option value="standard">Standard</option><option value="text">Text</option></select></div><div style="color:#94A9C2;font-size:11px;margin-bottom:9px">單一檔案 · 不需伺服器</div></div>
+      <div id="matrix-groups"></div>
+      <section class="panel" style="margin-top:16px"><div class="panel-head"><div><h2>工程驗收檢查</h2><span class="kicker">AUTOMATED SMOKE TESTS</span></div><button id="run-checks" type="button" class="tiny-btn">重新執行驗收</button></div><div id="test-summary" class="result-summary" role="status"></div><div id="test-results" class="result-list"></div></section>
+      <div class="tools-note"><b>原生狀態與固定預覽的差異</b><p>原元件 CSS 完整保留規格中的 <code>:hover</code>、<code>:active</code>、<code>:disabled</code>、<code>:focus-visible</code>。矩陣為並排展示，特別增加 <code>data-preview-state</code> 固定 Hover／Pressed 配色，此屬測試頁功能，不是正式 Button API。</p><p>配色採用 T3 Design Tokens（2026-11-12）中 Button 實際使用的變數；固定預覽與互動元件共用同一組變數。</p></div>
+    </section>
+  </div>
+  <div class="footer">T3 UI Kit · Button 83:2151 · Engineering handoff playground · 獨立離線 HTML</div>
+</main>
+<script>
+
+'use strict';
+const MATRIX = [{"hierarchy":"superior","style":"filled","states":{"default":{"bg":"link/theme-filled","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2150"},"hover":{"bg":"link/theme-filled-hover","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2147"},"pressed":{"bg":"link/theme-filled-pressed","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2143"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2138"}}},{"hierarchy":"superior","style":"tonal","states":{"default":{"bg":"link/tonal","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2094"},"hover":{"bg":"link/tonal-hover","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2142"},"pressed":{"bg":"link/tonal-pressed","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2149"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2140"}}},{"hierarchy":"superior","style":"outlined","states":{"default":{"bg":"—","stroke":"border/theme-light","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2139"},"hover":{"bg":"link/tonal-hover","stroke":"border/theme-light","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2135"},"pressed":{"bg":"link/tonal-pressed","stroke":"border/theme-light","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2133"},"disabled":{"bg":"—","stroke":"border/disabled","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2130"}}},{"hierarchy":"superior","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2127"},"hover":{"bg":"link/tonal-hover","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2128"},"pressed":{"bg":"link/tonal-pressed","stroke":"—","fg":"text/theme","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2125"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2120"}}},{"hierarchy":"superior","style":"text","states":{"default":{"bg":"—","stroke":"—","fg":"link/theme-filled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2108"},"hover":{"bg":"—","stroke":"—","fg":"link/theme-filled-hover","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2129"},"pressed":{"bg":"—","stroke":"—","fg":"link/theme-filled-pressed","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2119"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2118"}}},{"hierarchy":"subordinate","style":"filled","states":{"default":{"bg":"link/black-filled","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2115"},"hover":{"bg":"link/black-filled-hover","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2112"},"pressed":{"bg":"link/black-filled-pressed","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2111"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2124"}}},{"hierarchy":"subordinate","style":"tonal","states":{"default":{"bg":"link/standard","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2107"},"hover":{"bg":"link/standard-hover","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2106"},"pressed":{"bg":"link/standard-pressed","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2114"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2103"}}},{"hierarchy":"subordinate","style":"outlined","states":{"default":{"bg":"—","stroke":"border/tertiary","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2122"},"hover":{"bg":"link/standard-hover","stroke":"border/tertiary","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2102"},"pressed":{"bg":"link/standard-pressed","stroke":"border/tertiary","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2101"},"disabled":{"bg":"—","stroke":"border/disabled","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2100"}}},{"hierarchy":"subordinate","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2099"},"hover":{"bg":"link/standard-hover","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2098"},"pressed":{"bg":"link/standard-pressed","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2097"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2096"}}},{"hierarchy":"subordinate","style":"text","states":{"default":{"bg":"—","stroke":"—","fg":"text/secondary","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2095"},"hover":{"bg":"—","stroke":"—","fg":"link/theme-filled-hover","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2109"},"pressed":{"bg":"—","stroke":"—","fg":"link/theme-filled-pressed","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2093"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2092"}}},{"hierarchy":"danger","style":"filled","states":{"default":{"bg":"link/danger-filled","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2091"},"hover":{"bg":"link/danger-filled-hover","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-32701"},"pressed":{"bg":"link/danger-filled-pressed","stroke":"—","fg":"White/100%","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2090"},"disabled":{"bg":"surface/disabled","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2141"}}},{"hierarchy":"danger","style":"tonal","states":{"default":{"bg":"link/danger-tonal","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2089"},"hover":{"bg":"link/danger-tonal-hover","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2148"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2088"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2126"}}},{"hierarchy":"danger","style":"outlined","states":{"default":{"bg":"—","stroke":"border/danger-light","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-33106"},"hover":{"bg":"link/danger-tonal-hover","stroke":"border/danger-light","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-33112"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"border/danger-light","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-33118"},"disabled":{"bg":"—","stroke":"border/disabled","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-33130"}}},{"hierarchy":"danger","style":"standard","states":{"default":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-32660"},"hover":{"bg":"link/danger-tonal-hover","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-32666"},"pressed":{"bg":"link/danger-tonal-pressed","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-32672"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=611-32684"}}},{"hierarchy":"danger","style":"text","states":{"default":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2086"},"hover":{"bg":"—","stroke":"—","fg":"status/error","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2123"},"pressed":{"bg":"—","stroke":"—","fg":"status/error-emphasis","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2134"},"disabled":{"bg":"—","stroke":"—","fg":"text/disabled","figma":"https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=83-2132"}}}];
+const KEY_STATES = ['default','hover','pressed','disabled'];
+const HIERARCHIES = ['superior','subordinate','danger'];
+const STYLES = ['filled','tonal','outlined','standard','text'];
+const L = {superior:'Superior',subordinate:'Subordinate',danger:'Danger',filled:'Filled',tonal:'Tonal',outlined:'Outlined',standard:'Standard',text:'Text',default:'Default',hover:'Hover',pressed:'Pressed',disabled:'Disabled'};
+const state = {label:'按鈕',leading:true,trailing:true,disabled:false,hierarchy:'superior',style:'filled',type:'button',filterHierarchy:'all',filterStyle:'all',count:0,chosen:null};
+const $=(selector,root=document)=>root.querySelector(selector);
+const $$=(selector,root=document)=>Array.from(root.querySelectorAll(selector));
+const iconSvg=(direction)=>`<svg viewBox="0 0 24 24" width="14" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="${direction==='left'?'M19 12H5m7-7-7 7 7 7':'M5 12h14m-7-7 7 7-7 7'}"/></svg>`;
+function makeButton({hierarchy='superior',style='filled',label='按鈕',leadingIcon=false,trailingIcon=false,disabled=false,type='button',previewState=null,onPress=()=>{}}={}) {
+  const b=document.createElement('button');b.className='t3-button';b.type=type;b.dataset.hierarchy=hierarchy;b.dataset.style=style;
+  if(previewState && ['hover','pressed'].includes(previewState))b.dataset.previewState=previewState;
+  b.disabled=disabled;
+  if(leadingIcon){const slot=document.createElement('span');slot.className='t3-button__icon';slot.setAttribute('aria-hidden','true');slot.innerHTML=typeof leadingIcon==='string'?leadingIcon:iconSvg('left');b.append(slot)}
+  const t=document.createElement('span');t.className='text-body-s-bold';t.textContent=String(label).trim() || '按鈕';b.append(t);
+  if(trailingIcon){const slot=document.createElement('span');slot.className='t3-button__icon';slot.setAttribute('aria-hidden','true');slot.innerHTML=typeof trailingIcon==='string'?trailingIcon:iconSvg('right');b.append(slot)}
+  b.addEventListener('click',(event)=>{if(!b.disabled)onPress(event,b)});
+  return b;
+}
+// Reusable DOM component API, accessible to engineering integrations.
+window.T3Button={createButton:makeButton,matrix:MATRIX};
+function log(message){const el=$('#event-log');if(el.classList.contains('log-empty')){el.classList.remove('log-empty');el.textContent=''}const d=document.createElement('div');d.className='log-entry';d.textContent=`${new Date().toLocaleTimeString('zh-TW',{hour12:false})}  ${message}`;el.prepend(d);while(el.children.length>7)el.lastElementChild.remove();}
+function tokenString(name){return name==='—'?'transparent':name;}
+function formatColor(value){return value?.replace(/, /g,',')||'—'}
+function inspect(btn,info){const c=getComputedStyle(btn),d=info?.tokenInfo;const name=`${L[info.hierarchy]} / ${L[info.style]} / ${L[info.stateName]}`;
+  $('#inspector-label').textContent=name;
+  $('#inspector').innerHTML=`<div class="data-row"><span>尺寸（寬 × 高）</span><code>${Math.round(btn.getBoundingClientRect().width)} × ${Math.round(btn.getBoundingClientRect().height)} px</code></div><div class="data-row"><span>背景</span><code>${escapeHtml(d?.bg??'—')}</code></div><div class="data-row"><span>內描邊</span><code>${escapeHtml(d?.stroke??'—')}</code></div><div class="data-row"><span>字體／圖示</span><code>${escapeHtml(d?.fg??'—')}</code></div><div class="data-row"><span>Computed color</span><code>${escapeHtml(formatColor(c.color))}</code></div><div class="data-row"><span>Computed background</span><code>${escapeHtml(formatColor(c.backgroundColor))}</code></div>`;
+}
+function escapeHtml(str){return String(str).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function onPress(name,btn){state.count++;$('#press-count').textContent=state.count;$('#live-clicks').textContent=state.count;log(`onPress → ${name}`)}
+function renderPlayground(){const host=$('#live-stage');host.replaceChildren();const b=makeButton({hierarchy:state.hierarchy,style:state.style,label:state.label.trim()||'按鈕',leadingIcon:state.leading,trailingIcon:state.trailing,disabled:state.disabled,type:state.type,onPress:(e,btn)=>{onPress('Playground',btn);updateLive('click');}});
+  b.id='live-button';host.append(b);
+  const info=MATRIX.find(x=>x.hierarchy===state.hierarchy&&x.style===state.style);
+  const getStage=()=>b.disabled?'Disabled':b.matches(':active')?'Pressed':b.matches(':hover')?'Hover':'Default';
+  const update=()=>{const active=getStage();$('#live-state').textContent=active;$('#live-size').textContent=`${Math.round(b.getBoundingClientRect().width)} × ${Math.round(b.getBoundingClientRect().height)} px`;inspect(b,{hierarchy:state.hierarchy,style:state.style,stateName:active.toLowerCase(),tokenInfo:info.states[active.toLowerCase()]});};
+  ['mouseenter','mouseleave','pointerdown','pointerup','pointercancel','focus','blur','keydown','keyup'].forEach(evt=>b.addEventListener(evt,()=>requestAnimationFrame(update)));
+  b.addEventListener('click',()=>requestAnimationFrame(update));
+  update();
+}
+function updateLive(){const el=$('#live-button');if(!el)return;const active=el.disabled?'disabled':el.matches(':active')?'pressed':el.matches(':hover')?'hover':'default';const info=MATRIX.find(x=>x.hierarchy===state.hierarchy&&x.style===state.style);
+  $('#live-state').textContent=L[active];$('#live-size').textContent=`${Math.round(el.getBoundingClientRect().width)} × ${Math.round(el.getBoundingClientRect().height)} px`;
+  inspect(el,{hierarchy:state.hierarchy,style:state.style,stateName:active,tokenInfo:info.states[active]});}
+function createMatrix(){const target=$('#matrix-groups');target.replaceChildren();let visible=0;
+  HIERARCHIES.forEach(h=>{
+    if(state.filterHierarchy!=='all'&&state.filterHierarchy!==h)return;
+    const chosen=MATRIX.filter(row=>row.hierarchy===h&&(state.filterStyle==='all'||row.style===state.filterStyle));if(!chosen.length)return;
+    const section=document.createElement('section');section.className='matrix-card';
+    section.innerHTML=`<div class="matrix-header"><div><div class="group-title"><i class="group-icon ${h}"></i>${L[h]}</div><div class="group-desc">${h==='superior'?'主要操作／強調行為':h==='subordinate'?'次要操作／中性行為':'危險操作／破壞性行為'}</div></div><span class="group-count">${chosen.length*4} variants</span></div>`;
+    const scroll=document.createElement('div');scroll.className='matrix-scroll';
+    const table=document.createElement('table');table.className='variants';table.innerHTML='<thead><tr><th>STYLE</th><th>DEFAULT</th><th>HOVER</th><th>PRESSED</th><th>DISABLED</th></tr></thead>';
+    const tbody=document.createElement('tbody');
+    chosen.forEach(entry=>{
+      const tr=document.createElement('tr'),name=document.createElement('td');name.innerHTML=`<div class="style-name">${L[entry.style]}</div><div class="style-sub">${entry.style==='text'?'18px · 0/4px':'34px · 8/14px'}</div>`;tr.append(name);
+      KEY_STATES.forEach(st=>{
+        const td=document.createElement('td');const shell=document.createElement('div');shell.className='variant-shell';
+        const b=makeButton({hierarchy:h,style:entry.style,label:state.label.trim()||'按鈕',leadingIcon:state.leading,trailingIcon:state.trailing,disabled:st==='disabled',previewState:st,onPress:()=>{onPress(`${L[h]} / ${L[entry.style]} / ${L[st]}`);select(b,entry,st);}});
+        b.title=`${L[h]} / ${L[entry.style]} / ${L[st]}`;
+        // Disabled controls cannot fire onPress. The Figma link remains clickable.
+        if(st==='disabled') b.addEventListener('pointerdown',()=>{}, {passive:true});
+        shell.append(b);
+        const act=document.createElement('div');act.className='variant-actions';
+        const link=document.createElement('a');link.href=entry.states[st].figma;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Figma ↗';link.title='在 Figma 中檢視此 Variant';act.append(link);
+        const hint=document.createElement('span');hint.className='state-hint';hint.textContent=st==='default'?'可互動':st==='disabled'?'不可操作':'固定預覽';act.append(hint);
+        shell.append(act);td.append(shell);tr.append(td);
+      });tbody.append(tr);visible+=4;
+    });table.append(tbody);scroll.append(table);section.append(scroll);
+    const footer=document.createElement('div');footer.className='matrix-note';footer.textContent='Default 可用滑鼠測試原生 Hover / Pressed；Hover 與 Pressed 欄位為固定視覺預覽；Disabled 使用原生 disabled 屬性。';section.append(footer);target.append(section);
+  });
+  $('#visible-count').textContent=visible;
+  if(!visible)target.textContent='目前條件沒有符合的元件。';
+}
+function select(btn,entry,st){$$('.variant-shell.is-selected').forEach(el=>el.classList.remove('is-selected'));btn.closest('.variant-shell')?.classList.add('is-selected');inspect(btn,{hierarchy:entry.hierarchy,style:entry.style,stateName:st,tokenInfo:entry.states[st]});$('#inspector-label').scrollIntoView({block:'nearest',behavior:'smooth'});}
+function runChecks(){const all=$$('#matrix-groups .t3-button');const tests=[];const add=(name,pass,details)=>tests.push({name,pass,details});
+  const allKeys=new Set(MATRIX.flatMap(x=>KEY_STATES.map(st=>`${x.hierarchy}/${x.style}/${st}`)));
+  add('3 × 5 × 4 = 60 個規格項目',allKeys.size===60,`解析 ${allKeys.size} 項`);
+  add('目前篩選展示數量正確',all.length===Number($('#visible-count').textContent),`展示 ${all.length} 個`);
+  add('每種 Style／Hierarchy 的 Disabled 為原生 disabled',MATRIX.length===15&&MATRIX.every(x=>{const test=makeButton({hierarchy:x.hierarchy,style:x.style,disabled:true});return test.disabled;}),'15 組');
+  const probeHost=document.createElement('div');probeHost.style='position:absolute;left:-10000px;top:0;visibility:hidden';document.body.append(probeHost);
+  const standard=makeButton({label:'按鈕'}),textBtn=makeButton({style:'text',label:'按鈕'});probeHost.append(standard,textBtn);
+  add('Filled / Text 高度為 34px / 18px',standard.getBoundingClientRect().height===34&&textBtn.getBoundingClientRect().height===18,`${standard.getBoundingClientRect().height}px / ${textBtn.getBoundingClientRect().height}px`);
+  const oneIcon=makeButton({leadingIcon:true}),twoIcons=makeButton({leadingIcon:true,trailingIcon:true});probeHost.append(oneIcon,twoIcons);
+  add('圖示插槽為 14 × 18px',Array.from(twoIcons.querySelectorAll('.t3-button__icon')).every(i=>i.getBoundingClientRect().width===14&&i.getBoundingClientRect().height===18),'左右圖示獨立插槽');
+  add('插槽由 0 → 1 → 2，寬度依序增加',standard.getBoundingClientRect().width<oneIcon.getBoundingClientRect().width&&oneIcon.getBoundingClientRect().width<twoIcons.getBoundingClientRect().width,'Hug × Hug');
+  const special=makeButton({hierarchy:'superior',style:'outlined',disabled:true});probeHost.append(special);const css=getComputedStyle(special);
+  add('Superior / Outlined / Disabled：透明背景 + 內描邊',css.backgroundColor.includes('0)')&&css.boxShadow!=='none',`${css.backgroundColor} · ${css.boxShadow.slice(0,50)}`);
+  let fired=0;const noClick=makeButton({disabled:true,onPress:()=>fired++});probeHost.append(noClick);noClick.click();add('Disabled 不會觸發 onPress',fired===0,'原生 disabled 阻擋 click');
+  let activeCount=0;const yesClick=makeButton({onPress:()=>activeCount++});probeHost.append(yesClick);yesClick.click();add('啟用按鈕 click 僅呼叫一次 onPress',activeCount===1,`呼叫 ${activeCount} 次`);
+  const availableTokens=[...new Set(MATRIX.flatMap(x=>Object.values(x.states).flatMap(o=>[o.bg,o.stroke,o.fg]).filter(n=>n!=='—')))];
+  const rootCSS=getComputedStyle(document.documentElement);const unknown=availableTokens.filter(n=>{const p={'White/100%':'--color-white-100'}[n]||'--'+n.replace('/','-');return !rootCSS.getPropertyValue(p).trim()});
+  add('全部狀態矩陣所需 Design Tokens 已定義',unknown.length===0,unknown.length?'缺少：'+unknown.join(', '):`${availableTokens.length} 個語意色票`);
+  const noMissing=MATRIX.every(x=>KEY_STATES.every(st=>x.states[st].figma.startsWith('https://')));add('每個 Variant 均有對應 Figma 節點',noMissing,'60 個直接連結');
+  probeHost.remove();
+  const result=$('#test-results');result.replaceChildren();tests.forEach(t=>{const node=document.createElement('div');node.className=`result-item ${t.pass?'pass':'fail'}`;const ico=document.createElement('span');ico.className='mark';ico.textContent=t.pass?'✓':'✗';const detail=document.createElement('div');detail.textContent=`${t.name} — ${t.details}`;node.append(ico,detail);result.append(node)});
+  const passed=tests.filter(t=>t.pass).length;$('#test-summary').textContent=`${passed} / ${tests.length} 項通過 · Hover / Pressed / Keyboard Focus 請再進行人工互動驗收`;
+  log(`自動檢查：${passed}/${tests.length} 項通過`);
+}
+function init(){
+ $('#label-input').value=state.label;
+ $('#hierarchy-select').value=state.hierarchy;$('#style-select').value=state.style;$('#type-select').value=state.type;
+ $('#leading-toggle').checked=state.leading;$('#trailing-toggle').checked=state.trailing;$('#disabled-toggle').checked=state.disabled;
+ $('#label-input').addEventListener('input',e=>{state.label=e.target.value;renderPlayground();createMatrix()});
+ for(const [sel,key] of [['#hierarchy-select','hierarchy'],['#style-select','style'],['#type-select','type']])$(sel).addEventListener('change',e=>{state[key]=e.target.value;renderPlayground()});
+ for(const [sel,key] of [['#leading-toggle','leading'],['#trailing-toggle','trailing']])$(sel).addEventListener('change',e=>{state[key]=e.target.checked;renderPlayground();createMatrix()});
+ $('#disabled-toggle').addEventListener('change',e=>{state.disabled=e.target.checked;renderPlayground()});
+ $('#matrix-hierarchy').addEventListener('change',e=>{state.filterHierarchy=e.target.value;createMatrix()});
+ $('#matrix-style').addEventListener('change',e=>{state.filterStyle=e.target.value;createMatrix()});
+ $('#focus-live').addEventListener('click',()=>$('#live-button')?.focus());
+ $('#reset-config').addEventListener('click',()=>{Object.assign(state,{label:'按鈕',leading:true,trailing:true,disabled:false,hierarchy:'superior',style:'filled',type:'button',filterHierarchy:'all',filterStyle:'all'});$('#label-input').value=state.label;$('#hierarchy-select').value=state.hierarchy;$('#style-select').value=state.style;$('#type-select').value=state.type;$('#leading-toggle').checked=true;$('#trailing-toggle').checked=true;$('#disabled-toggle').checked=false;$('#matrix-hierarchy').value='all';$('#matrix-style').value='all';renderPlayground();createMatrix();log('設定已還原')});
+ $('#test-form').addEventListener('submit',e=>{e.preventDefault();log('HTML form submit（已攔截，避免離開測試頁）')});
+ $('#test-form').addEventListener('reset',()=>{log('HTML form reset（原生 reset 事件）')});
+ $('#run-checks').addEventListener('click',runChecks);
+ renderPlayground();createMatrix();runChecks();
+}
+document.addEventListener('DOMContentLoaded',init);
+
+</script>
+</body>
+</html>

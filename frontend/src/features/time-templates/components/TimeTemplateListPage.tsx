@@ -237,7 +237,7 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
             {error}
           </div>
         )}
-        <table className="w-full min-w-[960px] border-collapse text-body-s">
+        <table className="t3-table w-full min-w-[960px] border-collapse text-body-s">
           <thead>
             <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="w-10 py-3 pr-2">
@@ -270,7 +270,8 @@ export function TimeTemplateListPage({ onBackToHome }: TimeTemplateListPageProps
               items.map((row) => (
                 <tr
                   key={row.template_id}
-                  className="border-b border-border-quaternary hover:bg-surface-primary"
+                  data-selected={selected.has(row.template_id) ? 'true' : undefined}
+                  className="border-b border-border-quaternary"
                 >
                   <td className="py-3 pr-2">
                     <Checkbox checked={selected.has(row.template_id)} onCheckedChange={() => toggleRow(row.template_id)} />

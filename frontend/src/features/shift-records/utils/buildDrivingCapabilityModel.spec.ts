@@ -43,3 +43,23 @@ describe('運行紀錄：0 秒的過渡單（2026-11-23 OT040315 NWU → NWU）'
     expect(model.durationSeconds).toBe(310);
   });
 });
+
+describe('運行紀錄：車端 task_group 回報的站點動作（2026-11-23 NT1343）', () => {
+  it('小寫站點代號也對得到站名：停靠段寫「T3站」，不是「站點站」', () => {
+    const action = (id: string, type: string, station: string, at: number) => ({
+      action_id: id, station_id: station, action_type: type, action_status: 'COMPLETED',
+      node_id: station, actual_start_time: at, actual_end_time: at,
+    });
+    const model = buildDrivingCapabilityModel(detail({
+      route_label: 'N2W下行>T3下行',
+      planned_end: String(T + 210_000),
+      completed_at: String(T + 210_000),
+      actions: [
+        action('a', 'STATION_DEPARTURE', 'n2w_d', T),
+        action('b', 'PLATFORM_DOCKING', 't3_d', T + 160_000),
+        action('c', 'OPEN_DOORS', 't3_d', T + 170_000),
+      ],
+    }));
+    expect(model.statusSegments.map((s) => s.label)).toContain('T3站');
+  });
+});

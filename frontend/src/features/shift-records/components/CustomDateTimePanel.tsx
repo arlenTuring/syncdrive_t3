@@ -73,18 +73,16 @@ function TimeColumn({
   return (
     <div
       ref={ref}
-      className="h-[212px] w-11 overflow-y-auto scroll-smooth border-l border-border-quaternary first:border-l-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // DatePicker 規格：時間欄可視高 264、上下 4 左 4 右 8，選項 48×32、圓角 8
+      className="t3-picker-time-col"
     >
       {Array.from({ length: max + 1 }, (_, n) => (
         <button
           key={n}
           type="button"
           onClick={() => onChange(n)}
-          className={`flex h-8 w-full items-center justify-center font-mono text-body-s transition ${
-            value === n
-              ? 'bg-surface-theme font-medium text-text-theme'
-              : 'text-text-quaternary hover:bg-surface-secondary hover:text-text-secondary'
-          }`}
+          className="t3-picker-time"
+          data-active={value === n ? 'true' : undefined}
         >
           {String(n).padStart(2, '0')}
         </button>
@@ -140,30 +138,30 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between border-b border-border-quaternary px-3 py-2.5">
+      <div className="t3-picker-header">
         <div className="flex items-center gap-0.5">
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftYear(-1)} label={t('shiftRecords.datePicker.prevYear')} icon={<ChevronsLeft />} />
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(-1)} label={t('shiftRecords.datePicker.prevMonth')} icon={<ChevronLeft />} />
+          <IconButton hierarchy="subordinate" variant="standard" onPress={() => shiftYear(-1)} label={t('shiftRecords.datePicker.prevYear')} icon={<ChevronsLeft />} />
+          <IconButton hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(-1)} label={t('shiftRecords.datePicker.prevMonth')} icon={<ChevronLeft />} />
         </div>
-        <span className="text-body-s-bold text-text-primary">
+        <span className="text-body-s text-text-primary">
           {t(`shiftRecords.datePicker.months.m${viewMonth}`)} {viewYear}
         </span>
         <div className="flex items-center gap-0.5">
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(1)} label={t('shiftRecords.datePicker.nextMonth')} icon={<ChevronRight />} />
-          <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() => shiftYear(1)} label={t('shiftRecords.datePicker.nextYear')} icon={<ChevronsRight />} />
+          <IconButton hierarchy="subordinate" variant="standard" onPress={() => shiftMonth(1)} label={t('shiftRecords.datePicker.nextMonth')} icon={<ChevronRight />} />
+          <IconButton hierarchy="subordinate" variant="standard" onPress={() => shiftYear(1)} label={t('shiftRecords.datePicker.nextYear')} icon={<ChevronsRight />} />
         </div>
       </div>
 
       <div className="flex">
-        <div className="min-w-0 flex-1 p-3 pr-2">
-          <div className="mb-2 grid grid-cols-7 text-center text-body-xs text-text-quaternary">
+        <div className="min-w-0 flex-1 px-3 py-2">
+          <div className="grid grid-cols-7">
             {WEEKDAY_KEYS.map((w) => (
-              <div key={w} className="py-1">
+              <div key={w} className="t3-picker-week">
                 {t(`shiftRecords.datePicker.weekdays.${w}`)}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-y-1 text-center">
+          <div className="grid grid-cols-7">
             {cells.map((cell, idx) => {
               const selected =
                 cell.year === selYear && cell.month === selMonth && cell.day === selDay;
@@ -173,29 +171,26 @@ export function CustomDateTimePanel({ value, onConfirm }: CustomDateTimePanelPro
                   key={idx}
                   type="button"
                   onClick={() => pickDay(cell)}
-                  className={`mx-auto flex size-8 items-center justify-center rounded-full text-body-s transition ${
-                    selected
-                      ? 'bg-link-theme-filled font-medium text-text-primary'
-                      : cell.inMonth
-                        ? 'text-text-primary hover:bg-link-standard-hover'
-                        : 'text-text-disabled hover:bg-link-standard'
-                  } ${isToday && !selected ? 'ring-1 ring-dashed ring-zinc-400' : ''}`}
+                  className="t3-picker-date"
+                  data-active={selected ? 'true' : undefined}
+                  data-other={!cell.inMonth ? 'true' : undefined}
+                  aria-current={isToday ? 'date' : undefined}
                 >
-                  {cell.day}
+                  <span>{cell.day}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="flex shrink-0 border-l border-border-quaternary py-2">
+        <div className="flex shrink-0 border-l border-border-quaternary">
           <TimeColumn max={23} value={hour} onChange={setHour} />
           <TimeColumn max={59} value={minute} onChange={setMinute} />
           <TimeColumn max={59} value={second} onChange={setSecond} />
         </div>
       </div>
 
-      <div className="flex justify-end border-t border-border-quaternary px-3 py-2.5">
+      <div className="flex justify-end border-t border-border-quaternary px-3 py-2">
         <Button onPress={handleConfirm}>{t('shiftRecords.datePicker.confirm')}</Button>
       </div>
     </div>

@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>T3 UI Kit｜Header／Title</title><style>
+@charset "UTF-8";
+
+/* Syncdrive UI Design Kit → CSS custom properties(2026-11-12)
+ * Color inventory: Syncdrive UI Design Kit · 254 palette colors, 66 semantic colors.
+ * Existing T3 color overrides are retained.
+ * Typography inherits Noto Sans TC and Body XS Bold size from the verified typography handoff.
+ */
+
+/* Typography */
+:root {
+  --font-primary: 'Noto Sans TC', sans-serif;
+}
+
+/* Display L */
+.text-display-l {
+  font-family: var(--font-primary);
+  font-size: 57px;
+  font-weight: 900;
+  line-height: 68px;
+  letter-spacing: -0.5px;
+}
+
+/* Display M */
+.text-display-m {
+  font-family: var(--font-primary);
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 58px;
+  letter-spacing: -0.5px;
+}
+
+/* Display S */
+.text-display-s {
+  font-family: var(--font-primary);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 46px;
+  letter-spacing: -0.25px;
+}
+
+/* Headline 1 */
+.text-headline-1 {
+  font-family: var(--font-primary);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  letter-spacing: -0.25px;
+}
+
+/* Headline 2 */
+.text-headline-2 {
+  font-family: var(--font-primary);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 34px;
+  letter-spacing: 0px;
+}
+
+/* Headline 3 */
+.text-headline-3 {
+  font-family: var(--font-primary);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 30px;
+  letter-spacing: 0px;
+}
+
+/* Headline 4 */
+.text-headline-4 {
+  font-family: var(--font-primary);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 26px;
+  letter-spacing: 0px;
+}
+
+/* Headline 5 */
+.text-headline-5 {
+  font-family: var(--font-primary);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: 0px;
+}
+
+/* Body L */
+.text-body-l {
+  font-family: var(--font-primary);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 24px;
+  letter-spacing: 0px;
+}
+
+/* Body L Bold */
+.text-body-l-bold {
+  font-family: var(--font-primary);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: 0px;
+}
+
+/* Body M */
+.text-body-m {
+  font-family: var(--font-primary);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+/* Body M Bold */
+.text-body-m-bold {
+  font-family: var(--font-primary);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+/* Body S */
+.text-body-s {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: 0.5px;
+}
+
+/* Body S Bold */
+.text-body-s-bold {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0.5px;
+}
+
+/* Body XS */
+.text-body-xs {
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0px;
+}
+
+/* Body XS Bold */
+.text-body-xs-bold {
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0px;
+}
+
+/* Caption 1 */
+.text-caption-1 {
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 1px;
+}
+
+/* Caption 2 */
+.text-caption-2 {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: 0.5px;
+}
+
+/* Caption 3 */
+.text-caption-3 {
+  font-family: var(--font-primary);
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 10px;
+  letter-spacing: 0px;
+}
+
+
+/* Color System */
+:root {
+  /* --- surface --- */
+  --surface-primary: var(--color-zinc-900); /* surface/primary */
+  --surface-secondary: rgb(from var(--color-zinc-300) r g b / 10%); /* surface/secondary */
+  --surface-tertiary: var(--color-gray-500); /* surface/tertiary */
+  --surface-disabled: rgb(from var(--color-slate-500) r g b / 20%); /* surface/disabled */
+  --surface-invert: var(--color-gray-200); /* surface/invert */
+  --surface-theme: rgb(from var(--color-blue-300) r g b / 8%); /* surface/theme */
+  /* T3 value: blue-500. UI Kit source: blue-300 at 4%. */
+  --surface-theme-light: rgb(from var(--color-blue-500) r g b / 4%); /* surface/theme light */
+  --surface-background: var(--color-zinc-900); /* surface/background */
+  --surface-sub-background: var(--color-black-100); /* surface/sub background */
+  --surface-popup: var(--color-zinc-900); /* surface/popup */
+  --surface-sub-popup: #1F262F; /* surface/sub popup */
+ 
+  /* --- text --- */
+  --text-primary: var(--color-gray-100); /* text/primary */
+  --text-secondary: var(--color-gray-300); /* text/secondary */
+  --text-tertiary: var(--color-gray-400); /* text/tertiary */
+  --text-quaternary: var(--color-gray-500); /* text/quaternary */
+  --text-disabled: var(--color-gray-600); /* text/disabled */
+  --text-invert: var(--color-gray-950); /* text/invert */
+  --text-theme: var(--color-blue-400); /* text/theme */
+  --text-theme-light: var(--color-blue-500); /* text/theme-light */
+
+  /* --- border --- */
+  --border-primary: var(--color-gray-500); /* border/primary */
+  --border-secondary: var(--color-gray-400); /* border/secondary */
+  --border-tertiary: rgb(from var(--color-neutral-300) r g b / 25%); /* border/tertiary */
+  --border-quaternary: rgb(from var(--color-neutral-300) r g b / 15%); /* border/quaternary */
+  --border-disabled: rgb(from var(--color-neutral-300) r g b / 10%); /* border/disabled */
+  --border-invert: var(--color-black-30); /* border/invert */
+  --border-invert-light: rgb(from var(--color-neutral-300) r g b / 14%); /* border/invert-light */
+  --border-theme: var(--color-blue-400); /* border/theme */
+  --border-theme-light: rgb(from var(--color-blue-400) r g b / 50%); /* border/theme-light */
+  --border-theme-light-trn: rgb(from var(--color-blue-400) r g b / 25%); /* border/theme-light-trn */
+  --border-danger-light: rgb(from var(--color-red-400) r g b / 50%); /* border/danger-light */
+
+  /* --- link --- */
+  --link-theme-filled: var(--color-blue-500); /* link/theme-filled */
+  --link-theme-filled-hover: var(--color-blue-400); /* link/theme-filled-hover */
+  --link-theme-filled-pressed: var(--color-blue-600); /* link/theme-filled-pressed */
+  --link-black-filled: var(--color-gray-700); /* link/black-filled */
+  --link-black-filled-hover: var(--color-gray-600); /* link/black-filled-hover */
+  --link-black-filled-pressed: var(--color-gray-500); /* link/black-filled-pressed */
+  --link-tonal: rgb(from var(--color-blue-400) r g b / 24%); /* link/tonal */
+  --link-tonal-hover: rgb(from var(--color-blue-400) r g b / 32%); /* link/tonal-hover */
+  --link-tonal-pressed: rgb(from var(--color-blue-400) r g b / 40%); /* link/tonal-pressed */
+  --link-standard: rgb(from var(--color-gray-300) r g b / 12%); /* link/standard */
+  --link-standard-hover: rgb(from var(--color-gray-300) r g b / 20%); /* link/standard-hover */
+  --link-standard-pressed: rgb(from var(--color-gray-300) r g b / 28%); /* link/standard-pressed */
+  --link-danger-filled: var(--color-red-500); /* link/danger-filled */
+  --link-danger-filled-hover: var(--color-red-400); /* link/danger-filled-hover */
+  --link-danger-filled-pressed: var(--color-red-600); /* link/danger-filled-pressed */
+  --link-danger-tonal: rgb(from var(--color-red-600) r g b / 8%); /* link/danger-tonal */
+  --link-danger-tonal-hover: rgb(from var(--color-red-600) r g b / 12%); /* link/danger-tonal-hover */
+  --link-danger-tonal-pressed: rgb(from var(--color-red-600) r g b / 28%); /* link/danger-tonal-pressed */
+
+  /* --- cta --- */
+  --cta: var(--color-sky-500); /* CTA/CTA */
+  --cta-hover: var(--color-sky-400); /* CTA/CTA-hover */
+
+  /* --- status --- */
+  --status-error: var(--color-red-500); /* status/error */
+  --status-error-emphasis: var(--color-red-400); /* status/error-emphasis */
+  --status-error-light: rgb(from var(--color-red-400) r g b / 30%); /* status/error-light */
+  --status-warning: var(--color-amber-400); /* status/warning */
+  --status-warning-emphasis: var(--color-amber-500); /* status/warning-emphasis */
+  --status-warning-light: rgb(from var(--color-amber-400) r g b / 30%); /* status/warning-light */
+  --status-success: var(--color-emerald-500); /* status/success */
+  --status-success-emphasis: var(--color-emerald-600); /* status/success-emphasis */
+  --status-success-light: rgb(from var(--color-emerald-400) r g b / 30%); /* status/success-light */
+  --status-info: var(--color-indigo-400); /* status/info */
+  --status-info-emphasis: var(--color-indigo-300); /* status/info-emphasis */
+  --status-info-light: rgb(from var(--color-indigo-400) r g b / 30%); /* status/info-light */
+  --status-inactive: var(--color-gray-400); /* status/inactive */
+  --status-inactive-light: rgb(from var(--color-gray-400) r g b / 30%); /* status/inactive-light */
+
+  /* --- shadow and logo --- */
+  --shadow-airly: var(--surface-secondary); /* shadow/airly */
+
+  --logo: var(--color-logo-white); /* logo/Logo */
+
+  /* --- palette --- */
+  --color-white-40: rgb(from var(--color-white-100) r g b / 40%); /* White/40% */
+  --color-white-50: rgb(from var(--color-white-100) r g b / 50%); /* White/50% */
+  --color-white-80: rgb(from var(--color-white-100) r g b / 80%); /* White/80% */
+  --color-white-100: #FFFFFF; /* White/100% */
+  --color-black-5: rgb(from var(--color-black-100) r g b / 5%); /* Black/5% */
+  --color-black-10: rgb(from var(--color-black-100) r g b / 10%); /* Black/10% */
+  --color-black-16: rgb(from var(--color-black-100) r g b / 16%); /* Black/16% */
+  --color-black-30: rgb(from var(--color-black-100) r g b / 30%); /* Black/30% */
+  --color-black-50: rgb(from var(--color-black-100) r g b / 50%); /* Black/50% */
+  --color-black-100: #000000; /* Black/100% */
+  --color-slate-50: #F8FAFC; /* Colors/Slate/50 */
+  --color-slate-100: #F1F5F9; /* Colors/Slate/100 */
+  --color-slate-200: #E2E8F0; /* Colors/Slate/200 */
+  --color-slate-300: #CAD5E2; /* Colors/Slate/300 */
+  --color-slate-400: #90A1B9; /* Colors/Slate/400 */
+  --color-slate-500: #62748E; /* Colors/Slate/500 */
+  --color-slate-600: #45556C; /* Colors/Slate/600 */
+  --color-slate-700: #314158; /* Colors/Slate/700 */
+  --color-slate-800: #1D293D; /* Colors/Slate/800 */
+  --color-slate-900: #0F172B; /* Colors/Slate/900 */
+  --color-slate-950: #020618; /* Colors/Slate/950 */
+  --color-gray-50: #F9FAFB; /* Colors/Gray/50 */
+  --color-gray-100: #F3F4F6; /* Colors/Gray/100 */
+  --color-gray-200: #E5E7EB; /* Colors/Gray/200 */
+  --color-gray-300: #D1D5DC; /* Colors/Gray/300 */
+  --color-gray-400: #99A1AF; /* Colors/Gray/400 */
+  --color-gray-500: #6A7282; /* Colors/Gray/500 */
+  --color-gray-600: #4A5565; /* Colors/Gray/600 */
+  --color-gray-700: #364153; /* Colors/Gray/700 */
+  --color-gray-800: #1E2939; /* Colors/Gray/800 */
+  --color-gray-900: #101828; /* Colors/Gray/900 */
+  --color-gray-950: #030712; /* Colors/Gray/950 */
+  --color-zinc-50: #FAFAFA; /* Colors/Zinc/50 */
+  --color-zinc-100: #F4F4F5; /* Colors/Zinc/100 */
+  --color-zinc-200: #E4E4E7; /* Colors/Zinc/200 */
+  --color-zinc-300: #D4D4D8; /* Colors/Zinc/300 */
+  --color-zinc-400: #9F9FA9; /* Colors/Zinc/400 */
+  --color-zinc-500: #71717B; /* Colors/Zinc/500 */
+  --color-zinc-600: #52525C; /* Colors/Zinc/600 */
+  --color-zinc-700: #3F3F46; /* Colors/Zinc/700 */
+  --color-zinc-800: #27272A; /* Colors/Zinc/800 */
+  --color-zinc-900: #18181B; /* Colors/Zinc/900 */
+  --color-zinc-950: #09090B; /* Colors/Zinc/950 */
+  --color-neutral-50: #FAFAFA; /* Colors/Neutral/50 */
+  --color-neutral-100: #F5F5F5; /* Colors/Neutral/100 */
+  --color-neutral-200: #E5E5E5; /* Colors/Neutral/200 */
+  --color-neutral-300: #D4D4D4; /* Colors/Neutral/300 */
+  --color-neutral-400: #A1A1A1; /* Colors/Neutral/400 */
+  --color-neutral-500: #737373; /* Colors/Neutral/500 */
+  --color-neutral-600: #525252; /* Colors/Neutral/600 */
+  --color-neutral-700: #404040; /* Colors/Neutral/700 */
+  --color-neutral-800: #262626; /* Colors/Neutral/800 */
+  --color-neutral-900: #171717; /* Colors/Neutral/900 */
+  --color-neutral-950: #0A0A0A; /* Colors/Neutral/950 */
+  --color-stone-50: #FAFAF9; /* Colors/Stone/50 */
+  --color-stone-100: #F5F5F4; /* Colors/Stone/100 */
+  --color-stone-200: #E7E5E4; /* Colors/Stone/200 */
+  --color-stone-300: #D6D3D1; /* Colors/Stone/300 */
+  --color-stone-400: #A6A09B; /* Colors/Stone/400 */
+  --color-stone-500: #79716B; /* Colors/Stone/500 */
+  --color-stone-600: #57534D; /* Colors/Stone/600 */
+  --color-stone-700: #44403B; /* Colors/Stone/700 */
+  --color-stone-800: #292524; /* Colors/Stone/800 */
+  --color-stone-900: #1C1917; /* Colors/Stone/900 */
+  --color-stone-950: #0C0A09; /* Colors/Stone/950 */
+  --color-red-50: #FEF2F2; /* Colors/Red/50 */
+  --color-red-100: #FFE2E2; /* Colors/Red/100 */
+  --color-red-200: #FFC9C9; /* Colors/Red/200 */
+  --color-red-300: #FFA2A2; /* Colors/Red/300 */
+  --color-red-400: #FF6467; /* Colors/Red/400 */
+  --color-red-500: #FB2C36; /* Colors/Red/500 */
+  --color-red-600: #E7000B; /* Colors/Red/600 */
+  --color-red-700: #C10007; /* Colors/Red/700 */
+  --color-red-800: #9F0712; /* Colors/Red/800 */
+  --color-red-900: #82181A; /* Colors/Red/900 */
+  --color-red-950: #460809; /* Colors/Red/950 */
+  --color-orange-50: #FFF7ED; /* Colors/Orange/50 */
+  --color-orange-100: #FFEDD4; /* Colors/Orange/100 */
+  --color-orange-200: #FFD6A8; /* Colors/Orange/200 */
+  --color-orange-300: #FFB86A; /* Colors/Orange/300 */
+  --color-orange-400: #FF8904; /* Colors/Orange/400 */
+  --color-orange-500: #FF6900; /* Colors/Orange/500 */
+  --color-orange-600: #F54A00; /* Colors/Orange/600 */
+  --color-orange-700: #CA3500; /* Colors/Orange/700 */
+  --color-orange-800: #9F2D00; /* Colors/Orange/800 */
+  --color-orange-900: #7E2A0C; /* Colors/Orange/900 */
+  --color-orange-950: #441306; /* Colors/Orange/950 */
+  --color-amber-50: #FFFBEB; /* Colors/Amber/50 */
+  --color-amber-100: #FEF3C6; /* Colors/Amber/100 */
+  --color-amber-200: #FEE685; /* Colors/Amber/200 */
+  --color-amber-300: #FFD230; /* Colors/Amber/300 */
+  --color-amber-400: #FFBA00; /* Colors/Amber/400 */
+  --color-amber-500: #FD9A00; /* Colors/Amber/500 */
+  --color-amber-600: #E17100; /* Colors/Amber/600 */
+  --color-amber-700: #BB4D00; /* Colors/Amber/700 */
+  --color-amber-800: #973C00; /* Colors/Amber/800 */
+  --color-amber-900: #7B3306; /* Colors/Amber/900 */
+  --color-amber-950: #461901; /* Colors/Amber/950 */
+  --color-yellow-50: #FEFCE8; /* Colors/Yellow/50 */
+  --color-yellow-100: #FEF9C2; /* Colors/Yellow/100 */
+  --color-yellow-200: #FFF085; /* Colors/Yellow/200 */
+  --color-yellow-300: #FFDF20; /* Colors/Yellow/300 */
+  --color-yellow-400: #FCC800; /* Colors/Yellow/400 */
+  --color-yellow-500: #EFB100; /* Colors/Yellow/500 */
+  --color-yellow-600: #D08700; /* Colors/Yellow/600 */
+  --color-yellow-700: #A65F00; /* Colors/Yellow/700 */
+  --color-yellow-800: #894B00; /* Colors/Yellow/800 */
+  --color-yellow-900: #733E0A; /* Colors/Yellow/900 */
+  --color-yellow-950: #432004; /* Colors/Yellow/950 */
+  --color-lime-50: #F7FEE7; /* Colors/Lime/50 */
+  --color-lime-100: #ECFCCA; /* Colors/Lime/100 */
+  --color-lime-200: #D8F999; /* Colors/Lime/200 */
+  --color-lime-300: #BBF451; /* Colors/Lime/300 */
+  --color-lime-400: #9AE600; /* Colors/Lime/400 */
+  --color-lime-500: #7CCF00; /* Colors/Lime/500 */
+  --color-lime-600: #5EA500; /* Colors/Lime/600 */
+  --color-lime-700: #497D00; /* Colors/Lime/700 */
+  --color-lime-800: #3D6300; /* Colors/Lime/800 */
+  --color-lime-900: #35530E; /* Colors/Lime/900 */
+  --color-lime-950: #192E03; /* Colors/Lime/950 */
+  --color-green-50: #F0FDF4; /* Colors/Green/50 */
+  --color-green-100: #DCFCE7; /* Colors/Green/100 */
+  --color-green-200: #B9F8CF; /* Colors/Green/200 */
+  --color-green-300: #7BF1A8; /* Colors/Green/300 */
+  --color-green-400: #05DF72; /* Colors/Green/400 */
+  --color-green-500: #00C951; /* Colors/Green/500 */
+  --color-green-600: #00A63E; /* Colors/Green/600 */
+  --color-green-700: #008236; /* Colors/Green/700 */
+  --color-green-800: #016630; /* Colors/Green/800 */
+  --color-green-900: #0D542B; /* Colors/Green/900 */
+  --color-green-950: #032E15; /* Colors/Green/950 */
+  --color-emerald-50: #ECFDF5; /* Colors/Emerald/50 */
+  --color-emerald-100: #D0FAE5; /* Colors/Emerald/100 */
+  --color-emerald-200: #A4F4CF; /* Colors/Emerald/200 */
+  --color-emerald-300: #5EE9B5; /* Colors/Emerald/300 */
+  --color-emerald-400: #00D492; /* Colors/Emerald/400 */
+  --color-emerald-500: #00BC7D; /* Colors/Emerald/500 */
+  --color-emerald-600: #009966; /* Colors/Emerald/600 */
+  --color-emerald-700: #007A55; /* Colors/Emerald/700 */
+  --color-emerald-800: #006045; /* Colors/Emerald/800 */
+  --color-emerald-900: #004F3B; /* Colors/Emerald/900 */
+  --color-emerald-950: #002C22; /* Colors/Emerald/950 */
+  --color-teal-50: #F0FDFA; /* Colors/Teal/50 */
+  --color-teal-100: #CBFBF1; /* Colors/Teal/100 */
+  --color-teal-200: #96F7E4; /* Colors/Teal/200 */
+  --color-teal-300: #46ECD5; /* Colors/Teal/300 */
+  --color-teal-400: #00D5BE; /* Colors/Teal/400 */
+  --color-teal-500: #00BBA7; /* Colors/Teal/500 */
+  --color-teal-600: #009689; /* Colors/Teal/600 */
+  --color-teal-700: #00786F; /* Colors/Teal/700 */
+  --color-teal-800: #005F5A; /* Colors/Teal/800 */
+  --color-teal-900: #0B4F4A; /* Colors/Teal/900 */
+  --color-teal-950: #022F2E; /* Colors/Teal/950 */
+  --color-cyan-50: #ECFEFF; /* Colors/Cyan/50 */
+  --color-cyan-100: #CEFAFE; /* Colors/Cyan/100 */
+  --color-cyan-200: #A2F4FD; /* Colors/Cyan/200 */
+  --color-cyan-300: #53EAFD; /* Colors/Cyan/300 */
+  --color-cyan-400: #00D3F2; /* Colors/Cyan/400 */
+  --color-cyan-500: #00B8DB; /* Colors/Cyan/500 */
+  --color-cyan-600: #0092B8; /* Colors/Cyan/600 */
+  --color-cyan-700: #007595; /* Colors/Cyan/700 */
+  --color-cyan-800: #005F78; /* Colors/Cyan/800 */
+  --color-cyan-900: #104E64; /* Colors/Cyan/900 */
+  --color-cyan-950: #053345; /* Colors/Cyan/950 */
+  --color-sky-50: #F0F9FF; /* Colors/Sky/50 */
+  --color-sky-100: #DFF2FE; /* Colors/Sky/100 */
+  --color-sky-200: #B8E6FE; /* Colors/Sky/200 */
+  --color-sky-300: #74D4FF; /* Colors/Sky/300 */
+  --color-sky-400: #00BCFF; /* Colors/Sky/400 */
+  --color-sky-500: #00A6F4; /* Colors/Sky/500 */
+  --color-sky-600: #0084D1; /* Colors/Sky/600 */
+  --color-sky-700: #0069A8; /* Colors/Sky/700 */
+  --color-sky-800: #00598A; /* Colors/Sky/800 */
+  --color-sky-900: #024A70; /* Colors/Sky/900 */
+  --color-sky-950: #052F4A; /* Colors/Sky/950 */
+  --color-blue-50: #EFF6FF; /* Colors/Blue/50 */
+  --color-blue-100: #DBEAFE; /* Colors/Blue/100 */
+  --color-blue-200: #BEDBFF; /* Colors/Blue/200 */
+  --color-blue-300: #8EC5FF; /* Colors/Blue/300 */
+  --color-blue-400: #51A2FF; /* Colors/Blue/400 */
+  --color-blue-500: #2B7FFF; /* Colors/Blue/500 */
+  --color-blue-600: #155DFC; /* Colors/Blue/600 */
+  --color-blue-700: #1447E6; /* Colors/Blue/700 */
+  --color-blue-800: #193CB8; /* Colors/Blue/800 */
+  --color-blue-900: #1C398E; /* Colors/Blue/900 */
+  --color-blue-950: #162456; /* Colors/Blue/950 */
+  --color-indigo-50: #EEF2FF; /* Colors/Indigo/50 */
+  --color-indigo-100: #E0E7FF; /* Colors/Indigo/100 */
+  --color-indigo-200: #C6D2FF; /* Colors/Indigo/200 */
+  --color-indigo-300: #A3B3FF; /* Colors/Indigo/300 */
+  --color-indigo-400: #7C86FF; /* Colors/Indigo/400 */
+  --color-indigo-500: #615FFF; /* Colors/Indigo/500 */
+  --color-indigo-600: #4F39F6; /* Colors/Indigo/600 */
+  --color-indigo-700: #432DD7; /* Colors/Indigo/700 */
+  --color-indigo-800: #372AAC; /* Colors/Indigo/800 */
+  --color-indigo-900: #312C85; /* Colors/Indigo/900 */
+  --color-indigo-950: #1E1A4D; /* Colors/Indigo/950 */
+  --color-violet-50: #F5F3FF; /* Colors/Violet/50 */
+  --color-violet-100: #EDE9FE; /* Colors/Violet/100 */
+  --color-violet-200: #DDD6FF; /* Colors/Violet/200 */
+  --color-violet-300: #C4B4FF; /* Colors/Violet/300 */
+  --color-violet-400: #A684FF; /* Colors/Violet/400 */
+  --color-violet-500: #8E51FF; /* Colors/Violet/500 */
+  --color-violet-600: #7F22FE; /* Colors/Violet/600 */
+  --color-violet-700: #7008E7; /* Colors/Violet/700 */
+  --color-violet-800: #5D0EC0; /* Colors/Violet/800 */
+  --color-violet-900: #4D179A; /* Colors/Violet/900 */
+  --color-violet-950: #2F0D68; /* Colors/Violet/950 */
+  --color-purple-50: #FAF5FF; /* Colors/Purple/50 */
+  --color-purple-100: #F3E8FF; /* Colors/Purple/100 */
+  --color-purple-200: #E9D4FF; /* Colors/Purple/200 */
+  --color-purple-300: #DAB2FF; /* Colors/Purple/300 */
+  --color-purple-400: #C27AFF; /* Colors/Purple/400 */
+  --color-purple-500: #AD46FF; /* Colors/Purple/500 */
+  --color-purple-600: #9810FA; /* Colors/Purple/600 */
+  --color-purple-700: #8200DB; /* Colors/Purple/700 */
+  --color-purple-800: #6E11B0; /* Colors/Purple/800 */
+  --color-purple-900: #59168B; /* Colors/Purple/900 */
+  --color-purple-950: #3C0366; /* Colors/Purple/950 */
+  --color-fuchsia-50: #FDF4FF; /* Colors/Fuchsia/50 */
+  --color-fuchsia-100: #FAE8FF; /* Colors/Fuchsia/100 */
+  --color-fuchsia-200: #F6CFFF; /* Colors/Fuchsia/200 */
+  --color-fuchsia-300: #F4A8FF; /* Colors/Fuchsia/300 */
+  --color-fuchsia-400: #ED6BFF; /* Colors/Fuchsia/400 */
+  --color-fuchsia-500: #E12AFB; /* Colors/Fuchsia/500 */
+  --color-fuchsia-600: #C800DE; /* Colors/Fuchsia/600 */
+  --color-fuchsia-700: #A800B7; /* Colors/Fuchsia/700 */
+  --color-fuchsia-800: #8A0194; /* Colors/Fuchsia/800 */
+  --color-fuchsia-900: #721378; /* Colors/Fuchsia/900 */
+  --color-fuchsia-950: #4B004F; /* Colors/Fuchsia/950 */
+  --color-pink-50: #FDF2F8; /* Colors/Pink/50 */
+  --color-pink-100: #FCE7F3; /* Colors/Pink/100 */
+  --color-pink-200: #FCCEE8; /* Colors/Pink/200 */
+  --color-pink-300: #FDA5D5; /* Colors/Pink/300 */
+  --color-pink-400: #FB64B6; /* Colors/Pink/400 */
+  --color-pink-500: #F6339A; /* Colors/Pink/500 */
+  --color-pink-600: #E60076; /* Colors/Pink/600 */
+  --color-pink-700: #C6005C; /* Colors/Pink/700 */
+  --color-pink-800: #A3004C; /* Colors/Pink/800 */
+  --color-pink-900: #861043; /* Colors/Pink/900 */
+  --color-pink-950: #510424; /* Colors/Pink/950 */
+  --color-rose-50: #FFF1F2; /* Colors/Rose/50 */
+  --color-rose-100: #FFE4E6; /* Colors/Rose/100 */
+  --color-rose-200: #FFCCD3; /* Colors/Rose/200 */
+  --color-rose-300: #FFA1AD; /* Colors/Rose/300 */
+  --color-rose-400: #FF637E; /* Colors/Rose/400 */
+  --color-rose-500: #FF2056; /* Colors/Rose/500 */
+  --color-rose-600: #EC003F; /* Colors/Rose/600 */
+  --color-rose-700: #C70036; /* Colors/Rose/700 */
+  --color-rose-800: #A50036; /* Colors/Rose/800 */
+  --color-rose-900: #8B0836; /* Colors/Rose/900 */
+  --color-rose-950: #4D0218; /* Colors/Rose/950 */
+
+  /* --- logo palette --- */
+  --color-logo-blue: #005BAA; /* Logo / Figma 260:25887 */
+  --color-logo-white: #FFFFFF; /* Logo / Figma 260:25888 */
+}
+
+.t3-header { display:flex; align-items:center; gap:8px; width:100%; min-width:0; color:var(--text-primary); background:transparent; font-family:var(--font-primary); }
+.t3-header * { box-sizing:border-box; }
+.t3-header__title { display:flex; align-items:center; gap:8px; flex:1 1 0; min-width:0; height:100%; }
+.t3-header__heading { margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 18px/24px var(--font-primary); letter-spacing:0; color:var(--text-primary); }
+.t3-header__home { flex:0 0 20px; width:20px; display:flex; align-items:center; justify-content:center; }
+.t3-header__home svg { flex:none; width:24px; height:24px; }
+.t3-header--web { height:40px; }
+.t3-header--web .t3-header__title { padding:0 12px; }
+.t3-header--subheader,.t3-header--subtitle { height:34px; }
+.t3-header--title,.t3-header--edit { height:20px; }
+.t3-header--title .t3-header__heading,.t3-header--edit .t3-header__heading { font-size:16px; line-height:20px; }
+.t3-header--subtitle .t3-header__heading { font:400 16px/20px var(--font-primary); }
+.t3-header--title .t3-header__home,.t3-header--edit .t3-header__home,.t3-header--subtitle .t3-header__home { width:18px; flex-basis:18px; color:var(--text-tertiary); }
+.t3-header--title .t3-header__home svg,.t3-header--edit .t3-header__home svg,.t3-header--subtitle .t3-header__home svg { width:20px; height:20px; }
+.t3-header__actions,.t3-header__user { display:flex; align-items:center; flex:none; }
+.t3-header__actions { gap:8px; }
+.t3-header--web .t3-header__actions { gap:16px; }
+.t3-header__button,.t3-header__icon-button,.t3-header__avatar,.t3-header__user { border:0; margin:0; cursor:pointer; font-family:var(--font-primary); color:var(--text-secondary); background:transparent; }
+.t3-header__button { height:34px; border-radius:8px; padding:8px 14px; font-size:14px; line-height:18px; font-weight:500; letter-spacing:.5px; white-space:nowrap; }
+.t3-header__button--filled { color:#fff; background:var(--link-theme-filled); }
+.t3-header__button--filled:hover { background:var(--link-theme-filled-hover); }
+.t3-header__button--filled:active { background:var(--link-theme-filled-pressed); }
+.t3-header__button--standard { background:var(--link-standard); }
+.t3-header__button--standard:hover { background:var(--link-standard-hover); }
+.t3-header__button--standard:active { background:var(--link-standard-pressed); }
+.t3-header__icon-button { display:flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; padding:2px; border-radius:8px; }
+.t3-header__icon-button svg { width:24px; height:24px; }
+.t3-header__icon-button:hover,.t3-header__avatar:hover { background:var(--link-standard); }
+.t3-header__icon-button:active { background:var(--link-standard-hover); }
+.t3-header__icon-button[aria-pressed="true"] { color:var(--text-theme); background:var(--link-standard); }
+.t3-header__settings { background:var(--link-standard); }
+.t3-header__settings:hover { background:var(--link-standard-hover); }
+.t3-header__settings:active { background:var(--link-standard-pressed); }
+.t3-header :is(button,input):focus-visible { outline:2px solid var(--border-theme); outline-offset:2px; }
+.t3-header__divider { width:1px; height:18px; flex:none; background:var(--border-quaternary); }
+.t3-header--web .t3-header__divider { height:20px; }
+.t3-header__avatar { display:flex; align-items:center; justify-content:center; position:relative; flex:none; width:40px; height:40px; border-radius:50%; background:var(--link-standard); padding:8px; color:var(--text-tertiary); }
+.t3-header__avatar svg { width:24px; height:24px; }
+.t3-header__badge { position:absolute; top:-4px; right:-4px; display:flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 4px; border:1px solid var(--surface-primary); border-radius:1000px; background:#dc2626; color:#fff; font:500 10px/14px var(--font-primary); letter-spacing:.5px; }
+.t3-header__user { padding:0; gap:0; height:40px; font:400 16px/20px var(--font-primary); }
+.t3-header__user-info { display:flex; align-items:center; gap:4px; }
+.t3-header__user-arrow { display:flex; width:34px; height:36px; align-items:center; justify-content:center; }
+.t3-header__user-arrow svg { width:24px; height:24px; color:var(--text-quaternary); }
+.t3-header__edit { display:flex; min-width:0; flex:1; align-items:center; font:500 16px/20px var(--font-primary); color:var(--text-tertiary); }
+.t3-header__caret { flex:none; width:16px; }
+.t3-header__input { min-width:0; width:100%; height:20px; padding:0; border:0; border-radius:0; background:transparent; color:var(--text-primary); caret-color:var(--text-primary); font:inherit; outline:none; }
+.t3-header__input::placeholder { color:var(--text-tertiary); opacity:1; }
+.t3-header [hidden] { display:none!important; }
+.t3-header__svg { display:flex; align-items:center; justify-content:center; flex:none; }
+.t3-header__avatar:hover { background:var(--link-standard-hover); }
+.t3-header__user-arrow svg { color:var(--color-gray-400); }
+.t3-header--title { height:auto; min-height:20px; }
+.t3-header__heading-group { display:flex; align-items:center; gap:4px; min-width:0; }
+.t3-header__heading-group .t3-header__heading { flex:0 1 auto; }
+.t3-header__info { width:20px; height:20px; padding:0; border-radius:4px; color:var(--text-tertiary); }
+.t3-header__info svg { width:20px; height:20px; }
+.t3-header__time { flex:none; font:400 12px/16px var(--font-primary); color:var(--text-secondary); white-space:nowrap; }
+.t3-header__saved { display:flex; align-items:center; flex:none; gap:4px; font:400 12px/16px var(--font-primary); color:var(--text-tertiary); white-space:nowrap; }
+.t3-header__saved svg { width:18px; height:18px; }
+.t3-header__layout { display:flex; align-items:center; flex:none; gap:0; height:34px; }
+.t3-header__layout .t3-header__icon-button svg { width:18px; height:18px; }
+.t3-header__icon-button[aria-pressed="true"] { color:var(--text-theme); background:var(--link-standard); }
+.t3-header__button--outlined { border:1px solid var(--border-theme-light); background:transparent; color:var(--text-theme); }
+.t3-header__button--outlined:hover { background:var(--surface-theme); }
+.t3-header__button--outlined:active { background:var(--link-standard); }
+.t3-header__tag { flex:none; padding:3px 12px; height:26px; border:1px solid var(--color-gray-400); border-radius:8px; background:rgb(from var(--color-gray-400) r g b / 6%); color:var(--color-gray-400); font:500 14px/18px var(--font-primary); letter-spacing:.5px; white-space:nowrap; }
+.t3-header__value-group { display:flex; align-items:center; flex:none; gap:6px; height:34px; }
+.t3-header__value { display:flex; align-items:center; gap:4px; height:34px; font:400 18px/24px var(--font-primary); color:var(--text-secondary); white-space:nowrap; }
+.t3-header__unit { display:flex; align-items:center; gap:2px; font:400 12px/16px var(--font-primary); color:var(--text-tertiary); }
+.t3-header__unit svg { width:12px; height:12px; }
+.t3-header__switch { display:flex; align-items:center; flex:none; width:44px; height:26px; padding:4px; border:0; border-radius:1000px; background:var(--border-primary); cursor:pointer; }
+.t3-header__switch-thumb { display:block; width:18px; height:18px; border-radius:50%; background:#fff; }
+.t3-header__switch[aria-checked="true"] { background:var(--cta); }
+.t3-header__switch[aria-checked="true"] .t3-header__switch-thumb { margin-left:18px; }
+/* Name editing borrows only the TextField Focus border, without its surface, size or padding. */
+.t3-header__input { box-shadow:none; }
+.t3-header .t3-header__input:focus { outline:none; box-shadow:inset 0 0 0 .5px var(--border-theme); }
+/* Each SVG keeps currentColor; color is assigned to the actual icon rather than the whole text row. */
+.t3-header__saved>.t3-header__svg { color:var(--status-success); }
+.t3-header--subtitle .t3-header__unit>.t3-header__svg { color:var(--text-secondary); }
+.t3-header--label { height:auto; min-height:18px; }
+.t3-header--label .t3-header__title { gap:4px; height:auto; align-self:stretch; }
+.t3-header--label .t3-header__home { width:14px; flex-basis:14px; color:var(--text-tertiary); }
+.t3-header--label .t3-header__home svg { width:16px; height:16px; }
+.t3-header--label .t3-header__heading,.t3-header--label .t3-header__value { font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-header--label .t3-header__title>.t3-header__icon-button { width:24px; height:24px; }
+.t3-header--label .t3-header__title>.t3-header__icon-button svg { width:18px; height:18px; }
+.t3-header--label .t3-header__unit>.t3-header__svg { color:var(--text-primary); }
+
+
+* { box-sizing:border-box; } body { margin:0; background:#101828; color:var(--text-primary); font:400 14px/1.6 var(--font-primary); }
+main { max-width:1240px; margin:auto; padding:36px 32px 80px; } h1 { margin:0 0 8px; font-size:28px; } h2 { margin:0 0 20px; font-size:20px; } a { color:var(--text-theme); text-underline-offset:3px; }
+.lead,.note { color:var(--text-tertiary); } .note { font-size:12px; margin:8px 0 20px; }
+section,details { border:1px solid var(--border-quaternary); border-radius:12px; padding:24px; margin-top:20px; } summary { font-weight:500; cursor:pointer; } summary small { margin-left:12px; color:var(--text-tertiary); font-weight:400; }
+.stage,.sample-scroll { overflow-x:auto; padding:32px 8px; } .sample-scroll { padding-bottom:32px; } #demo { width:953px; } .sample { margin-top:24px; } .sample>a { font-size:12px; }
+.controls { display:flex; flex-wrap:wrap; gap:16px; margin-top:16px; } .controls label { display:flex; align-items:center; gap:6px; } .controls select,.controls input[type=text],#reset { background:var(--surface-primary); border:1px solid var(--border-primary); border-radius:6px; padding:6px 10px; color:var(--text-primary); font:inherit; } .controls input[type=checkbox] { accent-color:var(--link-theme-filled); } #reset { cursor:pointer; } #output { display:block; min-height:24px; color:var(--text-tertiary); font-size:12px; }
+.part-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:18px; } .part-option { display:grid; grid-template-columns:20px 1fr; gap:0 4px; align-items:center; cursor:pointer; } .part-option input { accent-color:var(--link-theme-filled); } .part-option small { grid-column:2; font-size:11px; color:var(--text-tertiary); } .part-option.is-dependent { opacity:.5; cursor:default; } .bulk-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .bulk-actions button { cursor:pointer; padding:6px 10px; border:1px solid var(--border-primary); border-radius:6px; background:var(--surface-primary); color:var(--text-primary); font:inherit; } .content-fields input { max-width:240px; }
+@media(max-width:600px) { main { padding:24px 16px; } section,details { padding:16px; } }
+</style></head><body><main><h1>T3 UI Kit｜Header／Title</h1><p class="lead">Title 區塊 · 6 種組合 · 可逐項檢視隱藏內容 ／ <a href="https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id=1453-6406" target="_blank" rel="noopener">Figma 設計來源 ↗</a></p>
+<section><h2>互動測試</h2><p class="note">切換類型後，下面會列出該類型實際綁定的顯示屬性。可全部顯示、逐項開關，或還原 Figma 預設；子項目需先開啟所屬群組。設定會按類型保留。</p><div class="controls"><label>類型 <select id="type"></select></label><label>展示寬度 <select id="width"><option value="953">953px（Figma）</option><option value="1200">1200px</option><option value="1600">1600px</option></select></label></div><div class="stage"><div id="demo"></div></div><output id="output" aria-live="polite">尚未操作</output><details open><summary>測試設定｜顯示項目</summary><div id="visibility-settings"></div></details></section>
+<details open><summary>Title 各類型 <small>6 個範例均有獨立的顯示設定</small></summary><p class="note">每個範例下方都能展開顯示設定。預設為 Figma 原樣；隱藏子項目仍保留自己的勾選值。寬度不足可橫向檢視。固定圖層（例如使用者箭頭、編輯名稱分隔符）不屬於顯示開關，會依原結構保留。操作按鈕回報事件，業務視窗由實際產品串接。</p><div id="current-samples"></div></details>
+</main><script>
+const HEADER_PARTS={"web": [{"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1234:57394"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1232:51546"}, {"key": "language", "figma": "Language", "label": "語言按鈕", "default": true, "parent": null, "source": "1232:51518"}, {"key": "notify", "figma": "Notify", "label": "通知", "default": true, "parent": null, "source": "1232:51526"}, {"key": "userImage", "figma": "UserImage", "label": "使用者頭像", "default": true, "parent": null, "source": "1232:51482"}, {"key": "userName", "figma": "UserName", "label": "使用者名稱", "default": true, "parent": null, "source": "1408:40803"}, {"key": "settings", "figma": "Set", "label": "設定按鈕", "default": true, "parent": null, "source": "1453:6324"}], "subheader": [{"key": "back", "figma": "Back", "label": "返回按鈕", "default": false, "parent": null, "source": "1232:51668"}, {"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1234:57390"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1659:5563"}, {"key": "info", "figma": "Info hover", "label": "資訊 Icon", "default": false, "parent": "showTitle", "source": "1659:5565"}, {"key": "refresh", "figma": "RefreshTime", "label": "更新時間", "default": false, "parent": null, "source": "1232:46556"}, {"key": "autosave", "figma": "Automatic storage", "label": "自動儲存", "default": false, "parent": null, "source": "1250:2769"}, {"key": "showActions", "figma": "Action", "label": "操作按鈕群組", "default": true, "parent": null, "source": "1232:46551"}, {"key": "button2", "figma": "Button 2", "label": "次要按鈕", "default": false, "parent": "showActions", "source": "1232:46553"}, {"key": "button1", "figma": "Button 1", "label": "主要按鈕", "default": true, "parent": "showActions", "source": "1232:46554"}, {"key": "add", "figma": "Add", "label": "新增按鈕", "default": false, "parent": null, "source": "1232:46557"}, {"key": "download", "figma": "Download", "label": "下載按鈕", "default": false, "parent": null, "source": "1232:51672"}, {"key": "close", "figma": "Close-Right", "label": "右側關閉", "default": false, "parent": null, "source": "1232:46559"}, {"key": "tag", "figma": "Tag", "label": "標籤", "default": false, "parent": null, "source": "1481:25230"}, {"key": "switch", "figma": "Switch", "label": "Switch", "default": false, "parent": null, "source": "1481:25255"}], "title": [{"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1234:57373"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1659:5470"}, {"key": "info", "figma": "Info hover", "label": "資訊 Icon", "default": false, "parent": "showTitle", "source": "1659:4627"}, {"key": "layout", "figma": "Layout", "label": "資料呈現群組", "default": false, "parent": null, "source": "1232:46564"}, {"key": "line", "figma": "Line Chart", "label": "折線圖", "default": true, "parent": "layout", "source": "1232:46565"}, {"key": "bar", "figma": "Bar Chart", "label": "長條圖", "default": true, "parent": "layout", "source": "1232:46566"}, {"key": "calendar", "figma": "Calendar", "label": "日曆", "default": true, "parent": "layout", "source": "1232:46568"}, {"key": "table", "figma": "Table", "label": "表格", "default": true, "parent": "layout", "source": "1232:46567"}, {"key": "card", "figma": "Card", "label": "卡片", "default": true, "parent": "layout", "source": "1232:46569"}, {"key": "refresh", "figma": "RefreshTime", "label": "更新時間", "default": false, "parent": null, "source": "1232:46570"}, {"key": "autosave", "figma": "Automatic storage", "label": "自動儲存", "default": false, "parent": null, "source": "1265:5620"}, {"key": "tag", "figma": "Tag", "label": "標籤", "default": false, "parent": null, "source": "1285:712"}, {"key": "download", "figma": "Download", "label": "下載按鈕", "default": false, "parent": null, "source": "1232:46571"}, {"key": "close", "figma": "Close-Right", "label": "右側關閉", "default": false, "parent": null, "source": "1232:46572"}], "edit": [{"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1239:1152"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1239:1166"}, {"key": "layout", "figma": "Layout", "label": "資料呈現群組", "default": false, "parent": null, "source": "1239:1155"}, {"key": "line", "figma": "Line Chart", "label": "折線圖", "default": true, "parent": "layout", "source": "1239:1156"}, {"key": "bar", "figma": "Bar Chart", "label": "長條圖", "default": true, "parent": "layout", "source": "1239:1157"}, {"key": "calendar", "figma": "Calendar", "label": "日曆", "default": true, "parent": "layout", "source": "1239:1158"}, {"key": "table", "figma": "Table", "label": "表格", "default": true, "parent": "layout", "source": "1239:1159"}, {"key": "card", "figma": "Card", "label": "卡片", "default": true, "parent": "layout", "source": "1239:1160"}, {"key": "refresh", "figma": "RefreshTime", "label": "更新時間", "default": false, "parent": null, "source": "1239:1161"}, {"key": "download", "figma": "Download", "label": "下載按鈕", "default": false, "parent": null, "source": "1239:1162"}, {"key": "close", "figma": "Close-Right", "label": "右側關閉", "default": false, "parent": null, "source": "1239:1163"}], "subtitle": [{"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1234:57386"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1659:5585"}, {"key": "info", "figma": "Info hover", "label": "資訊 Icon", "default": false, "parent": "showTitle", "source": "1659:5587"}, {"key": "tagInfo", "figma": "Taginfo", "label": "標籤／數值群組", "default": false, "parent": null, "source": "1232:46576"}, {"key": "tag", "figma": "Tag", "label": "標籤", "default": false, "parent": "tagInfo", "source": "1232:46577"}, {"key": "value", "figma": "Value", "label": "數值", "default": true, "parent": "tagInfo", "source": "1232:46578"}, {"key": "unit", "figma": "Show Unit", "label": "單位", "default": true, "parent": "value", "source": "1232:46580"}, {"key": "unitIcon", "figma": "Show Unit Icon", "label": "單位 Icon", "default": false, "parent": "unit", "source": "1232:46581"}, {"key": "button1", "figma": "Button 1", "label": "主要按鈕", "default": true, "parent": null, "source": "1234:56896"}, {"key": "switch", "figma": "Switch", "label": "Switch", "default": false, "parent": null, "source": "1394:30857"}], "label": [{"key": "back", "figma": "Back", "label": "返回按鈕", "default": false, "parent": null, "source": "1530:6256"}, {"key": "showIcon", "figma": "TextIcon", "label": "左側 Icon", "default": true, "parent": null, "source": "1490:498"}, {"key": "showTitle", "figma": "HeadingText", "label": "標題文字", "default": true, "parent": null, "source": "1659:5617"}, {"key": "info", "figma": "Info hover", "label": "資訊 Icon", "default": false, "parent": "showTitle", "source": "1659:5619"}, {"key": "tagInfo", "figma": "Taginfo", "label": "標籤／數值群組", "default": true, "parent": null, "source": "1490:501"}, {"key": "tag", "figma": "Tag", "label": "標籤", "default": false, "parent": "tagInfo", "source": "1490:502"}, {"key": "value", "figma": "Value", "label": "數值", "default": false, "parent": "tagInfo", "source": "1490:503"}, {"key": "unit", "figma": "Show Unit", "label": "單位", "default": true, "parent": "value", "source": "1490:505"}, {"key": "unitIcon", "figma": "Show Unit Icon", "label": "單位 Icon", "default": false, "parent": "unit", "source": "1490:506"}, {"key": "button1", "figma": "Button 1", "label": "主要按鈕", "default": true, "parent": null, "source": "1490:508"}, {"key": "switch", "figma": "Switch", "label": "Switch", "default": false, "parent": null, "source": "1490:509"}]};
+const HEADER_ICONS={"home24": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M6 19H9.34625V13.0577H14.6538V19H18V9.99996L12 5.48071L6 9.99996V19ZM4.5 20.5V9.24996L12 3.60571L19.5 9.24996V20.5H13.1538V14.5577H10.8463V20.5H4.5Z\" fill=\"currentColor\"/>\n</svg>\n", "home20": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M5 15.8334H7.78854V10.8816H12.2115V15.8334H15V8.33343L10 4.56738L5 8.33343V15.8334ZM3.75 17.0834V7.70843L10 3.00488L16.25 7.70843V17.0834H10.9615V12.1316H9.03854V17.0834H3.75Z\" fill=\"currentColor\"/>\n</svg>\n", "notify": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M5.25 18.8845C5.0375 18.8845 4.85942 18.8127 4.71575 18.669C4.57192 18.5252 4.5 18.3469 4.5 18.1343C4.5 17.9218 4.57192 17.7437 4.71575 17.6C4.85942 17.4565 5.0375 17.3848 5.25 17.3848H6.30775V9.923C6.30775 8.57817 6.72283 7.38908 7.553 6.35575C8.383 5.32242 9.44867 4.6615 10.75 4.373V3.75C10.75 3.40283 10.8714 3.10767 11.1143 2.8645C11.3571 2.6215 11.6519 2.5 11.9988 2.5C12.3458 2.5 12.641 2.6215 12.8845 2.8645C13.1282 3.10767 13.25 3.40283 13.25 3.75V4.373C14.5513 4.6615 15.617 5.32242 16.447 6.35575C17.2772 7.38908 17.6923 8.57817 17.6923 9.923V17.3848H18.75C18.9625 17.3848 19.1406 17.4566 19.2843 17.6003C19.4281 17.7441 19.5 17.9223 19.5 18.135C19.5 18.3475 19.4281 18.5256 19.2843 18.6693C19.1406 18.8128 18.9625 18.8845 18.75 18.8845H5.25ZM11.9983 21.6923C11.5008 21.6923 11.0754 21.5153 10.7223 21.1613C10.3689 20.8073 10.1923 20.3817 10.1923 19.8845H13.8077C13.8077 20.3833 13.6306 20.8093 13.2762 21.1625C12.9219 21.5157 12.4959 21.6923 11.9983 21.6923Z\" fill=\"currentColor\"/>\n</svg>\n", "avatar": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M17.1093 7.1498C17.1093 9.99395 14.8218 12.2996 12 12.2996C9.17823 12.2996 6.89073 9.99395 6.89073 7.1498C6.89073 4.30564 9.17823 2 12 2C14.8218 2 17.1093 4.30564 17.1093 7.1498ZM15.4062 7.1498C15.4062 9.0459 13.8812 10.583 12 10.583C10.1188 10.583 8.59382 9.0459 8.59382 7.1498C8.59382 5.25369 10.1188 3.7166 12 3.7166C13.8812 3.7166 15.4062 5.25369 15.4062 7.1498Z\" fill=\"currentColor\"/>\n<path d=\"M12 14.8745C6.48677 14.8745 1.78936 18.1604 0 22.764C0.435901 23.2003 0.895091 23.613 1.37552 24C2.70797 19.7734 6.88794 16.5911 12 16.5911C17.1121 16.5911 21.292 19.7734 22.6245 24C23.1049 23.613 23.5641 23.2003 24 22.764C22.2106 18.1604 17.5132 14.8745 12 14.8745Z\" fill=\"currentColor\"/>\n</svg>\n", "userDown": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M12 14.6537L7.59625 10.25H16.4038L12 14.6537Z\" fill=\"currentColor\"/>\n</svg>\n", "settings": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M10.8922 21.5C10.5512 21.5 10.2567 21.3868 10.0087 21.1605C9.76058 20.9343 9.60958 20.6558 9.55574 20.325L9.31149 18.4538C9.04366 18.3641 8.76899 18.2385 8.48749 18.077C8.20616 17.9153 7.95458 17.7422 7.73274 17.5577L5.99999 18.2943C5.68583 18.4328 5.37016 18.4462 5.05299 18.3345C4.73566 18.223 4.48916 18.0205 4.31349 17.727L3.18649 15.773C3.01083 15.4795 2.96024 15.1689 3.03474 14.8413C3.10908 14.5138 3.27958 14.2436 3.54624 14.0308L5.04424 12.9058C5.02124 12.7571 5.00491 12.6077 4.99524 12.4578C4.98558 12.3078 4.98074 12.1583 4.98074 12.0095C4.98074 11.8673 4.98558 11.7228 4.99524 11.576C5.00491 11.4292 5.02124 11.2686 5.04424 11.0943L3.54624 9.96925C3.27958 9.75642 3.11066 9.48458 3.03949 9.15375C2.96833 8.82308 3.02058 8.51092 3.19624 8.21725L4.31349 6.29225C4.48916 6.00508 4.73566 5.80417 5.05299 5.6895C5.37016 5.57467 5.68583 5.5865 5.99999 5.725L7.72299 6.452C7.96416 6.261 8.22158 6.08633 8.49524 5.928C8.76891 5.76967 9.03783 5.64242 9.30199 5.54625L9.55574 3.675C9.60958 3.34417 9.76058 3.06567 10.0087 2.8395C10.2567 2.61317 10.5512 2.5 10.8922 2.5H13.1077C13.4487 2.5 13.7432 2.61317 13.9912 2.8395C14.2394 3.06567 14.3904 3.34417 14.4442 3.675L14.6885 5.55575C14.9885 5.66475 15.2599 5.792 15.5027 5.9375C15.7457 6.083 15.991 6.2545 16.2385 6.452L18.0097 5.725C18.3237 5.5865 18.6394 5.57467 18.9567 5.6895C19.2741 5.80417 19.5205 6.00508 19.696 6.29225L20.8135 8.227C20.9892 8.5205 21.0397 8.83108 20.9652 9.15875C20.8909 9.48625 20.7204 9.75642 20.4537 9.96925L18.9172 11.123C18.9531 11.2845 18.9727 11.4355 18.976 11.576C18.9792 11.7163 18.9807 11.8577 18.9807 12C18.9807 12.1358 18.9775 12.274 18.971 12.4145C18.9647 12.5548 18.9417 12.7154 18.902 12.8963L20.4095 14.0308C20.6762 14.2436 20.8483 14.5138 20.926 14.8413C21.0035 15.1689 20.9544 15.4795 20.7787 15.773L19.646 17.7172C19.4705 18.0109 19.2225 18.2135 18.902 18.325C18.5815 18.4365 18.2642 18.423 17.95 18.2845L16.2385 17.548C15.991 17.7455 15.7384 17.9202 15.4807 18.072C15.2231 18.224 14.959 18.3481 14.6885 18.4443L14.4442 20.325C14.3904 20.6558 14.2394 20.9343 13.9912 21.1605C13.7432 21.3868 13.4487 21.5 13.1077 21.5H10.8922ZM11 20H12.9655L13.325 17.3212C13.8353 17.1879 14.3017 16.9985 14.724 16.753C15.1465 16.5073 15.5539 16.1916 15.9462 15.8057L18.4307 16.85L19.4155 15.15L17.2462 13.5155C17.3296 13.2565 17.3862 13.0026 17.4162 12.7537C17.4464 12.5051 17.4615 12.2538 17.4615 12C17.4615 11.7397 17.4464 11.4884 17.4162 11.2463C17.3862 11.0039 17.3296 10.7564 17.2462 10.5038L19.4345 8.85L18.45 7.15L15.9365 8.2095C15.6018 7.85183 15.2009 7.53583 14.7337 7.2615C14.2664 6.98717 13.7937 6.79292 13.3155 6.67875L13 4H11.0155L10.6845 6.66925C10.1743 6.78975 9.70324 6.97433 9.27124 7.223C8.83908 7.47183 8.42683 7.79233 8.03449 8.1845L5.54999 7.15L4.56549 8.85L6.72499 10.4595C6.64166 10.6968 6.58333 10.9437 6.54999 11.2C6.51666 11.4563 6.49999 11.7262 6.49999 12.0095C6.49999 12.2698 6.51666 12.525 6.54999 12.775C6.58333 13.025 6.63849 13.2718 6.71549 13.5155L4.56549 15.15L5.54999 16.85L8.02499 15.8C8.40449 16.1897 8.81024 16.5089 9.24224 16.7578C9.67441 17.0064 10.152 17.1974 10.675 17.3307L11 20ZM12.0115 15C12.8435 15 13.5515 14.708 14.1355 14.124C14.7195 13.54 15.0115 12.832 15.0115 12C15.0115 11.168 14.7195 10.46 14.1355 9.876C13.5515 9.292 12.8435 9 12.0115 9C11.1692 9 10.4586 9.292 9.87974 9.876C9.30091 10.46 9.01149 11.168 9.01149 12C9.01149 12.832 9.30091 13.54 9.87974 14.124C10.4586 14.708 11.1692 15 12.0115 15Z\" fill=\"currentColor\"/>\n</svg>\n", "back": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M7.373 12.75L13.0693 18.4462L12 19.5L4.5 12L12 4.5L13.0693 5.55375L7.373 11.25H19.5V12.75H7.373Z\" fill=\"currentColor\"/>\n</svg>\n", "add": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M11.25 12.75H5.5V11.25H11.25V5.5H12.75V11.25H18.5V12.75H12.75V18.5H11.25V12.75Z\" fill=\"currentColor\"/>\n</svg>\n", "download": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M11.6635 15.3538C11.5597 15.3154 11.4609 15.2494 11.3672 15.1558L8.25775 12.0463C8.10908 11.8974 8.03567 11.7233 8.0375 11.524C8.0395 11.3247 8.11292 11.1474 8.25775 10.9922C8.41292 10.8372 8.59108 10.7572 8.79225 10.752C8.99358 10.7468 9.17183 10.8218 9.327 10.977L11.25 12.9V5.25C11.25 5.03717 11.3218 4.859 11.4655 4.7155C11.609 4.57183 11.7872 4.5 12 4.5C12.2128 4.5 12.391 4.57183 12.5345 4.7155C12.6782 4.859 12.75 5.03717 12.75 5.25V12.9L14.673 10.977C14.8218 10.8283 14.9984 10.7549 15.2028 10.7568C15.4073 10.7588 15.5871 10.8372 15.7423 10.9922C15.8871 11.1474 15.9621 11.3231 15.9672 11.5192C15.9724 11.7154 15.8974 11.8911 15.7423 12.0463L12.6328 15.1558C12.5391 15.2494 12.4403 15.3154 12.3365 15.3538C12.2327 15.3923 12.1205 15.4115 12 15.4115C11.8795 15.4115 11.7673 15.3923 11.6635 15.3538ZM6.30775 19.5C5.80258 19.5 5.375 19.325 5.025 18.975C4.675 18.625 4.5 18.1974 4.5 17.6923V15.7308C4.5 15.5179 4.57183 15.3398 4.7155 15.1962C4.859 15.0526 5.03717 14.9808 5.25 14.9808C5.46283 14.9808 5.641 15.0526 5.7845 15.1962C5.92817 15.3398 6 15.5179 6 15.7308V17.6923C6 17.7692 6.03208 17.8398 6.09625 17.9038C6.16025 17.9679 6.23075 18 6.30775 18H17.6923C17.7692 18 17.8398 17.9679 17.9038 17.9038C17.9679 17.8398 18 17.7692 18 17.6923V15.7308C18 15.5179 18.0718 15.3398 18.2155 15.1962C18.359 15.0526 18.5372 14.9808 18.75 14.9808C18.9628 14.9808 19.141 15.0526 19.2845 15.1962C19.4282 15.3398 19.5 15.5179 19.5 15.7308V17.6923C19.5 18.1974 19.325 18.625 18.975 18.975C18.625 19.325 18.1974 19.5 17.6923 19.5H6.30775Z\" fill=\"currentColor\"/>\n</svg>\n", "close": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M12 13.0538L6.92701 18.127C6.78851 18.2653 6.61443 18.3362 6.40476 18.3395C6.19526 18.3427 6.01801 18.2718 5.87301 18.127C5.72818 17.982 5.65576 17.8063 5.65576 17.6C5.65576 17.3937 5.72818 17.218 5.87301 17.073L10.9463 12L5.87301 6.92701C5.73468 6.78851 5.66385 6.61443 5.66051 6.40476C5.65735 6.19526 5.72818 6.01801 5.87301 5.87301C6.01801 5.72818 6.19368 5.65576 6.40001 5.65576C6.60635 5.65576 6.78201 5.72818 6.92701 5.87301L12 10.9463L17.073 5.87301C17.2115 5.73468 17.3856 5.66385 17.5953 5.66051C17.8048 5.65735 17.982 5.72818 18.127 5.87301C18.2718 6.01801 18.3443 6.19368 18.3443 6.40001C18.3443 6.60635 18.2718 6.78201 18.127 6.92701L13.0538 12L18.127 17.073C18.2653 17.2115 18.3362 17.3856 18.3395 17.5953C18.3427 17.8048 18.2718 17.982 18.127 18.127C17.982 18.2718 17.8063 18.3443 17.6 18.3443C17.3937 18.3443 17.218 18.2718 17.073 18.127L12 13.0538Z\" fill=\"currentColor\"/>\n</svg>\n", "line": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M3 17.75C2.51417 17.75 2.101 17.5798 1.7605 17.2395C1.42017 16.899 1.25 16.4858 1.25 16C1.25 15.5142 1.42017 15.101 1.7605 14.7605C2.101 14.4202 2.51417 14.25 3 14.25C3.11283 14.25 3.21475 14.2548 3.30575 14.2645C3.39675 14.274 3.48717 14.3051 3.577 14.3577L8.35775 9.577C8.30508 9.48717 8.274 9.39675 8.2645 9.30575C8.25483 9.21475 8.25 9.11283 8.25 9C8.25 8.51417 8.42017 8.101 8.7605 7.7605C9.101 7.42017 9.51417 7.25 10 7.25C10.4858 7.25 10.899 7.42017 11.2395 7.7605C11.5798 8.101 11.75 8.51417 11.75 9C11.75 9.059 11.7205 9.24492 11.6615 9.55775L14.4423 12.3385C14.5321 12.2987 14.6193 12.274 14.7038 12.2645C14.7884 12.2548 14.8872 12.25 15 12.25C15.1128 12.25 15.2132 12.2548 15.301 12.2645C15.3888 12.274 15.4744 12.3051 15.5577 12.3577L19.3577 8.55775C19.3051 8.47442 19.274 8.38883 19.2645 8.301C19.2548 8.21317 19.25 8.11283 19.25 8C19.25 7.51417 19.4202 7.101 19.7605 6.7605C20.101 6.42017 20.5142 6.25 21 6.25C21.4858 6.25 21.899 6.42017 22.2395 6.7605C22.5798 7.101 22.75 7.51417 22.75 8C22.75 8.48583 22.5798 8.899 22.2395 9.2395C21.899 9.57983 21.4858 9.75 21 9.75C20.8872 9.75 20.7868 9.74517 20.699 9.7355C20.6112 9.726 20.5256 9.69492 20.4423 9.64225L16.6423 13.4423C16.6949 13.5256 16.726 13.6112 16.7355 13.699C16.7452 13.7868 16.75 13.8872 16.75 14C16.75 14.4858 16.5798 14.899 16.2395 15.2395C15.899 15.5798 15.4858 15.75 15 15.75C14.5142 15.75 14.101 15.5798 13.7605 15.2395C13.4202 14.899 13.25 14.4858 13.25 14C13.25 13.8872 13.2548 13.7852 13.2645 13.6942C13.274 13.6032 13.3051 13.5128 13.3577 13.423L10.577 10.6423C10.4872 10.6949 10.3968 10.726 10.3058 10.7355C10.2148 10.7452 10.1128 10.75 10 10.75C9.941 10.75 9.75508 10.7205 9.44225 10.6615L4.6615 15.4423C4.70133 15.5321 4.726 15.6192 4.7355 15.7037C4.74517 15.7884 4.75 15.8872 4.75 16C4.75 16.4858 4.57983 16.899 4.2395 17.2395C3.899 17.5798 3.48583 17.75 3 17.75Z\" fill=\"currentColor\"/>\n</svg>\n", "bar": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M16 19.5V13.5963H19.5V19.5H16ZM10.25 19.5V4.5H13.75V19.5H10.25ZM4.5 19.5V9.404H8V19.5H4.5Z\" fill=\"currentColor\"/>\n</svg>\n", "calendar": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M9 16.0578C8.35767 16.0578 7.8125 15.8337 7.3645 15.3855C6.91633 14.9375 6.69225 14.3923 6.69225 13.75C6.69225 13.1077 6.91633 12.5625 7.3645 12.1145C7.8125 11.6663 8.35767 11.4423 9 11.4423C9.64233 11.4423 10.1875 11.6663 10.6355 12.1145C11.0837 12.5625 11.3078 13.1077 11.3078 13.75C11.3078 14.3923 11.0837 14.9375 10.6355 15.3855C10.1875 15.8337 9.64233 16.0578 9 16.0578ZM5.30775 21.5C4.80258 21.5 4.375 21.325 4.025 20.975C3.675 20.625 3.5 20.1974 3.5 19.6923V6.30777C3.5 5.8026 3.675 5.37502 4.025 5.02502C4.375 4.67502 4.80258 4.50002 5.30775 4.50002H6.69225V3.15377C6.69225 2.9346 6.76567 2.7516 6.9125 2.60477C7.05933 2.4581 7.24233 2.38477 7.4615 2.38477C7.68083 2.38477 7.86383 2.4581 8.0105 2.60477C8.15733 2.7516 8.23075 2.9346 8.23075 3.15377V4.50002H15.8077V3.13477C15.8077 2.92193 15.8795 2.74368 16.023 2.60002C16.1667 2.45652 16.3449 2.38477 16.5577 2.38477C16.7706 2.38477 16.9487 2.45652 17.0922 2.60002C17.2359 2.74368 17.3077 2.92193 17.3077 3.13477V4.50002H18.6923C19.1974 4.50002 19.625 4.67502 19.975 5.02502C20.325 5.37502 20.5 5.8026 20.5 6.30777V19.6923C20.5 20.1974 20.325 20.625 19.975 20.975C19.625 21.325 19.1974 21.5 18.6923 21.5H5.30775ZM5.30775 20H18.6923C18.7692 20 18.8398 19.9679 18.9038 19.9038C18.9679 19.8398 19 19.7693 19 19.6923V10.3078H5V19.6923C5 19.7693 5.03208 19.8398 5.09625 19.9038C5.16025 19.9679 5.23075 20 5.30775 20ZM5 8.80777H19V6.30777C19 6.23077 18.9679 6.16026 18.9038 6.09626C18.8398 6.0321 18.7692 6.00002 18.6923 6.00002H5.30775C5.23075 6.00002 5.16025 6.0321 5.09625 6.09626C5.03208 6.16026 5 6.23077 5 6.30777V8.80777Z\" fill=\"currentColor\"/>\n</svg>\n", "table": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M18.6923 20.5H5.30775C4.80258 20.5 4.375 20.325 4.025 19.975C3.675 19.625 3.5 19.1974 3.5 18.6923V5.30775C3.5 4.80258 3.675 4.375 4.025 4.025C4.375 3.675 4.80258 3.5 5.30775 3.5H18.6923C19.1974 3.5 19.625 3.675 19.975 4.025C20.325 4.375 20.5 4.80258 20.5 5.30775V18.6923C20.5 19.1974 20.325 19.625 19.975 19.975C19.625 20.325 19.1974 20.5 18.6923 20.5ZM5 8.25H19V5.30775C19 5.23075 18.9679 5.16025 18.9038 5.09625C18.8398 5.03208 18.7692 5 18.6923 5H5.30775C5.23075 5 5.16025 5.03208 5.09625 5.09625C5.03208 5.16025 5 5.23075 5 5.30775V8.25ZM7.69225 9.75H5V18.6923C5 18.7692 5.03208 18.8398 5.09625 18.9038C5.16025 18.9679 5.23075 19 5.30775 19H7.69225V9.75ZM16.3077 9.75V19H18.6923C18.7692 19 18.8398 18.9679 18.9038 18.9038C18.9679 18.8398 19 18.7692 19 18.6923V9.75H16.3077ZM14.8077 9.75H9.19225V19H14.8077V9.75Z\" fill=\"currentColor\"/>\n</svg>\n", "card": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M3.5 11V3.5H11V11H3.5ZM3.5 20.5V13H11V20.5H3.5ZM13 11V3.5H20.5V11H13ZM13 20.5V13H20.5V20.5H13ZM5 9.5H9.5V5H5V9.5ZM14.5 9.5H19V5H14.5V9.5ZM14.5 19H19V14.5H14.5V19ZM5 19H9.5V14.5H5V19Z\" fill=\"currentColor\"/>\n</svg>\n", "info": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M11.25 16.75H12.75V11H11.25V16.75ZM12 9.2885C12.2288 9.2885 12.4207 9.21108 12.5755 9.05625C12.7303 8.90142 12.8077 8.70958 12.8077 8.48075C12.8077 8.25192 12.7303 8.06008 12.5755 7.90525C12.4207 7.75058 12.2288 7.67325 12 7.67325C11.7712 7.67325 11.5793 7.75058 11.4245 7.90525C11.2697 8.06008 11.1923 8.25192 11.1923 8.48075C11.1923 8.70958 11.2697 8.90142 11.4245 9.05625C11.5793 9.21108 11.7712 9.2885 12 9.2885ZM12.0017 21.5C10.6877 21.5 9.45267 21.2507 8.2965 20.752C7.14033 20.2533 6.13467 19.5766 5.2795 18.7218C4.42433 17.8669 3.74725 16.8617 3.24825 15.706C2.74942 14.5503 2.5 13.3156 2.5 12.0017C2.5 10.6877 2.74933 9.45267 3.248 8.2965C3.74667 7.14033 4.42342 6.13467 5.27825 5.2795C6.13308 4.42433 7.13833 3.74725 8.294 3.24825C9.44967 2.74942 10.6844 2.5 11.9983 2.5C13.3123 2.5 14.5473 2.74933 15.7035 3.248C16.8597 3.74667 17.8653 4.42342 18.7205 5.27825C19.5757 6.13308 20.2528 7.13833 20.7518 8.294C21.2506 9.44967 21.5 10.6844 21.5 11.9983C21.5 13.3123 21.2507 14.5473 20.752 15.7035C20.2533 16.8597 19.5766 17.8653 18.7218 18.7205C17.8669 19.5757 16.8617 20.2528 15.706 20.7518C14.5503 21.2506 13.3156 21.5 12.0017 21.5ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z\" fill=\"currentColor\"/>\n</svg>\n", "car": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M5.61525 18.5V19.75C5.61525 19.9625 5.54342 20.1406 5.39975 20.2843C5.25592 20.4281 5.07775 20.5 4.86525 20.5H4.25C4.0375 20.5 3.85942 20.4281 3.71575 20.2843C3.57192 20.1406 3.5 19.9625 3.5 19.75V12.077L5.54225 6.25C5.61675 6.0205 5.75333 5.83817 5.952 5.703C6.15067 5.56767 6.37183 5.5 6.6155 5.5H17.423C17.657 5.5 17.8695 5.56875 18.0605 5.70625C18.2513 5.84375 18.3837 6.025 18.4578 6.25L20.5 12.077V19.75C20.5 19.9625 20.4281 20.1406 20.2843 20.2843C20.1406 20.4281 19.9625 20.5 19.75 20.5H19.1348C18.9223 20.5 18.7441 20.4281 18.6003 20.2843C18.4566 20.1406 18.3848 19.9625 18.3848 19.75V18.5H5.61525ZM5.60775 10.577H18.3923L17.1307 7H6.86925L5.60775 10.577ZM7.46375 15.8463C7.82758 15.8463 8.13617 15.7188 8.3895 15.464C8.64267 15.2093 8.76925 14.9001 8.76925 14.5363C8.76925 14.1724 8.64192 13.8638 8.38725 13.6105C8.13242 13.3573 7.82308 13.2308 7.45925 13.2308C7.09542 13.2308 6.78692 13.3581 6.53375 13.6128C6.28042 13.8676 6.15375 14.1769 6.15375 14.5408C6.15375 14.9046 6.28117 15.2131 6.536 15.4663C6.79067 15.7196 7.09992 15.8463 7.46375 15.8463ZM16.5408 15.8463C16.9046 15.8463 17.2131 15.7188 17.4663 15.464C17.7196 15.2093 17.8462 14.9001 17.8462 14.5363C17.8462 14.1724 17.7188 13.8638 17.464 13.6105C17.2093 13.3573 16.9001 13.2308 16.5363 13.2308C16.1724 13.2308 15.8638 13.3581 15.6105 13.6128C15.3573 13.8676 15.2308 14.1769 15.2308 14.5408C15.2308 14.9046 15.3581 15.2131 15.6128 15.4663C15.8676 15.7196 16.1769 15.8463 16.5408 15.8463Z\" fill=\"currentColor\"/>\n</svg>\n", "saved": "<svg aria-hidden=\"true\" focusable=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n<path d=\"M7.39325 16.6085C6.13108 15.3477 5.5 13.8121 5.5 12.0018C5.5 10.1916 6.1305 8.65542 7.3915 7.39325C8.65233 6.13108 10.1879 5.5 11.9983 5.5C13.8084 5.5 15.3446 6.1305 16.6068 7.3915C17.8689 8.65233 18.5 10.1879 18.5 11.9983C18.5 13.8084 17.8695 15.3446 16.6085 16.6067C15.3477 17.8689 13.8121 18.5 12.0018 18.5C10.1916 18.5 8.65542 17.8695 7.39325 16.6085Z\" fill=\"currentColor\"/>\n</svg>\n"};
+const HEADER_TYPES = ['web','subheader','title','edit','subtitle','label'];
+// HEADER_PARTS records the visibility bindings on the six actual Figma sources.
+function createT3Header(host, options = {}) {
+  const {flags:initialFlags={},...initial}=options;
+  const state={type:'web',title:'Title',name:'',languageText:'EN',count:1,userNameText:'Luna',refreshText:'2027.05.01 10:00:00',autosaveText:'10:00:42',tagText:'Label',valueText:'123',unitText:'%',button1Text:'Button 1',button2Text:'Button 2',switchOn:true,selectedLayout:null,...initial};
+  if(!HEADER_TYPES.includes(state.type))throw new RangeError('Unknown Header type');
+  const visibility=Object.fromEntries(HEADER_TYPES.map(t=>[t,Object.fromEntries(HEADER_PARTS[t].map(p=>[p.key,p.default]))]));
+  Object.assign(visibility[state.type],initialFlags);
+  let committed=state.name;
+  const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!==undefined)n.textContent=text;return n;};
+  const svg=key=>{const n=el('span','t3-header__svg');n.innerHTML=HEADER_ICONS[key];return n;};
+  const report=(action,value)=>host.dispatchEvent(new CustomEvent('t3-header-action',{bubbles:true,detail:{action,value,type:state.type}}));
+  const part=key=>HEADER_PARTS[state.type].find(p=>p.key===key);
+  function on(key){const p=part(key);return !!p&&!!visibility[state.type][key]&&(!p.parent||on(p.parent));}
+  function mark(node,key){node.dataset.part=key;return node;}
+  function button(label,action,style='filled'){const b=el('button','t3-header__button t3-header__button--'+style,label);b.type='button';b.addEventListener('click',()=>typeof action==='function'?action():report(action));return b;}
+  function icon(key,label,action=key){const b=el('button','t3-header__icon-button');b.type='button';b.setAttribute('aria-label',label);b.append(svg(key));if(action)b.addEventListener('click',()=>report(action));return b;}
+  function divider(){const d=el('span','t3-header__divider');d.setAttribute('aria-hidden','true');return d;}
+  function tag(){return mark(el('span','t3-header__tag',state.tagText),'tag');}
+  function switchButton(){const b=mark(el('button','t3-header__switch'),'switch');b.type='button';b.setAttribute('role','switch');b.setAttribute('aria-label','切換狀態');b.setAttribute('aria-checked',String(state.switchOn));b.append(el('span','t3-header__switch-thumb'));b.addEventListener('click',()=>{state.switchOn=!state.switchOn;b.setAttribute('aria-checked',String(state.switchOn));report('switch',state.switchOn);});return b;}
+  function layout(){const g=mark(el('div','t3-header__layout'),'layout');g.setAttribute('role','group');g.setAttribute('aria-label','資料呈現方式');for(const [key,label] of [['line','折線圖'],['bar','長條圖'],['calendar','日曆'],['table','表格'],['card','卡片']]){if(!on(key))continue;const b=mark(icon(key,label,null),'layout-'+key);b.setAttribute('aria-pressed',String(state.selectedLayout===key));b.addEventListener('click',()=>{state.selectedLayout=key;for(const child of g.children)child.setAttribute('aria-pressed',String(child===b));report('layout',key);});g.append(b);}return g;}
+  function render(){
+    const root=el('header','t3-header t3-header--'+state.type),title=el('div','t3-header__title');host.replaceChildren(root);
+    if(on('back')){const back=mark(icon('back','返回'),'back');if(state.type==='label')title.append(back);else root.append(back);}
+    if(on('showIcon')){const home=mark(el('span','t3-header__home'),'showIcon');home.append(svg(['web','subheader'].includes(state.type)?'home24':'home20'));home.setAttribute('aria-hidden','true');title.append(home);}
+    if(on('showTitle')||state.type==='edit'){
+      if(state.type==='edit'){
+        const group=mark(el('div','t3-header__edit'),'editName'),caret=el('span','t3-header__caret','｜'),input=el('input','t3-header__input');caret.setAttribute('aria-hidden','true');mark(input,'showTitle');input.hidden=!on('showTitle');input.type='text';input.value=state.name;input.placeholder='請在此輸入名稱';input.setAttribute('aria-label','標題名稱');
+        const commit=()=>{if(input.value!==committed){committed=input.value;state.name=input.value;report('rename',state.name);}};
+        input.addEventListener('input',()=>state.name=input.value);input.addEventListener('focus',()=>caret.hidden=true);input.addEventListener('blur',()=>{caret.hidden=!!input.value;commit();});
+        input.addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Enter'){e.preventDefault();commit();input.blur();}if(e.key==='Escape'){e.preventDefault();input.value=committed;state.name=committed;input.blur();}});caret.hidden=on('showTitle')&&!!state.name;group.append(caret,input);title.append(group);
+      }else{
+        const group=mark(el('div','t3-header__heading-group'),'showTitle'),h=el('h2','t3-header__heading',state.title);h.title=state.title;group.append(h);
+        if(on('info')){const info=mark(icon('info','資訊說明'),'info');info.classList.add('t3-header__info');info.title='資訊說明';group.append(info);}title.append(group);
+      }
+    }
+    root.append(title);
+    if(state.type==='web'){
+      const actions=el('div','t3-header__actions');
+      if(on('language')){const b=mark(button(state.languageText,()=>{state.languageText=state.languageText==='EN'?'繁':'EN';b.textContent=state.languageText;report('language',state.languageText);},'standard'),'language');b.setAttribute('aria-label','切換語言（示範）');actions.append(b);}
+      // Divider visibility follows its actual Figma binding, including the shared switches.
+      if(on('notify'))actions.append(divider());
+      if(on('notify')){const b=mark(el('button','t3-header__avatar'),'notify');b.type='button';b.setAttribute('aria-label','通知，'+state.count+' 則未讀');b.append(svg('notify'));if(state.count>0)b.append(el('span','t3-header__badge',String(state.count)));b.addEventListener('click',()=>report('notifications',state.count));actions.append(b);}
+      if(on('language'))actions.append(divider());
+      const user=el('button','t3-header__user'),info=el('span','t3-header__user-info'),arrow=el('span','t3-header__user-arrow');user.type='button';user.setAttribute('aria-label','使用者選單：'+state.userNameText);
+      if(on('userImage')){const avatar=mark(el('span','t3-header__avatar'),'userImage');avatar.append(svg('avatar'));info.append(avatar);}
+      if(on('userName'))info.append(mark(el('span','',state.userNameText),'userName'));
+      arrow.append(svg('userDown'));user.append(info,arrow);user.addEventListener('click',()=>report('user-menu',state.userNameText));actions.append(user);
+      if(on('settings')){actions.append(divider());const b=mark(icon('settings','設定'),'settings');b.classList.add('t3-header__settings');actions.append(b);}root.append(actions);
+    }
+    if(on('layout'))root.append(layout());
+    if(on('refresh')){root.append(mark(el('time','t3-header__time',state.refreshText),'refresh'));if(state.type==='subheader')root.append(divider());}
+    if(on('autosave')){const saved=mark(el('span','t3-header__saved'),'autosave');saved.append(svg('saved'),el('span','','草稿已自動儲存（'+state.autosaveText+'）'));root.append(saved);}
+    if(state.type==='subheader'&&on('showActions')){const actions=mark(el('div','t3-header__actions'),'showActions');if(on('button2'))actions.append(mark(button(state.button2Text,'button-2','outlined'),'button2'));if(on('button1'))actions.append(mark(button(state.button1Text,'button-1'),'button1'));root.append(actions);}
+    if(on('add'))root.append(divider(),mark(icon('add','新增'),'add'));
+    if(state.type==='title'&&on('tag'))root.append(tag());
+    if(on('download'))root.append(mark(icon('download','下載'),'download'));
+    if(on('close'))root.append(mark(icon('close','關閉'),'close'));
+    if(state.type==='subheader'&&on('tag'))root.append(tag());
+    if(['subtitle','label'].includes(state.type)&&on('tagInfo')){const group=mark(el('div','t3-header__value-group'),'tagInfo');if(on('tag'))group.append(tag());if(on('value')){const value=mark(el('div','t3-header__value'),'value');value.append(el('span','',state.valueText));if(on('unit')){const unit=mark(el('span','t3-header__unit'),'unit');if(on('unitIcon'))unit.append(mark(svg('car'),'unitIcon'));unit.append(el('span','',state.unitText));value.append(unit);}group.append(value);}root.append(group);}
+    if(['subtitle','label'].includes(state.type)&&on('button1'))root.append(mark(button(state.button1Text==='Button 1'?'Button':state.button1Text,'button-1'),'button1'));
+    if(on('switch'))root.append(switchButton());
+  }
+  render();
+  return {
+    update(patch){if('type'in patch&&!HEADER_TYPES.includes(patch.type))throw new RangeError('Unknown Header type');const {flags:flagPatch={},...values}=patch;const flags={...flagPatch};Object.assign(state,values);for(const key of ['showIcon','showTitle','showActions'])if(key in values)flags[key]=values[key];for(const [key,value] of Object.entries(flags))if(part(key))visibility[state.type][key]=!!value;if('name'in patch)committed=patch.name;render();},
+    getState(){return {...state,flags:{...visibility[state.type]}};},
+    isVisible:key=>on(key),
+    setAllVisible(value){for(const p of HEADER_PARTS[state.type])visibility[state.type][p.key]=!!value;render();},
+    resetVisibility(){for(const p of HEADER_PARTS[state.type])visibility[state.type][p.key]=p.default;render();},
+    destroy(){host.replaceChildren();}
+  };
+}
+
+const typeNames=['Web-Header','Sub Header','Title','Title-EditName','Sub Title','Label'];
+const sourceIds=['1453:6524','1453:6525','1453:6526','1453:6527','1453:6528','1847:58290'];
+const sourceUrl=id=>'https://www.figma.com/design/OsaDhOsncK2eM8FE6aAMkF/Syncdrive-UI-Design-Kit?node-id='+id.replace(':','-');
+function attachVisibilityPanel(panel,api){
+  const state=api.getState(),controls=document.createElement('div');controls.className='part-controls';panel.replaceChildren();
+  const toolbar=document.createElement('div');toolbar.className='bulk-actions';
+  const refs=[];
+  function sync(){const current=api.getState();for(const {p,input,label} of refs){input.checked=!!current.flags[p.key];const blocked=p.parent&&!api.isVisible(p.parent);input.disabled=!!blocked;label.classList.toggle('is-dependent',!!blocked);label.title=blocked?'需先開啟「'+HEADER_PARTS[current.type].find(x=>x.key===p.parent).label+'」':p.figma;}}
+  for(const [label,fn] of [['全部顯示',()=>api.setAllVisible(true)],['全部隱藏',()=>api.setAllVisible(false)],['還原 Figma 預設',()=>api.resetVisibility()]]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{fn();sync();});toolbar.append(b);}
+  panel.append(toolbar);
+  for(const p of HEADER_PARTS[state.type]){const label=document.createElement('label'),input=document.createElement('input'),text=document.createElement('span'),code=document.createElement('small');label.className='part-option';label.dataset.key=p.key;input.type='checkbox';text.textContent=p.label;code.textContent=p.figma;input.addEventListener('change',()=>{api.update({flags:{[p.key]:input.checked}});sync();});label.append(input,text,code);controls.append(label);refs.push({p,input,label});}
+  panel.append(controls);sync();
+  const fields=document.createElement('div');fields.className='controls content-fields';
+  const addField=(key,label,type='text')=>{const l=document.createElement('label'),input=document.createElement('input');l.textContent=label+' ';input.type=type;input.value=state[key];if(type==='number'){input.min='0';input.max='99';}input.addEventListener('input',()=>api.update({[key]:type==='number'?Math.max(0,Math.min(99,Number(input.value)||0)):input.value}));l.append(input);fields.append(l);};
+  if(state.type!=='edit')addField('title','標題');
+  if(state.type==='web'){addField('userNameText','使用者名稱');addField('count','未讀數','number');}
+  if(HEADER_PARTS[state.type].some(p=>p.key==='refresh'))addField('refreshText','更新時間');
+  if(HEADER_PARTS[state.type].some(p=>p.key==='autosave'))addField('autosaveText','自動儲存時間');
+  if(HEADER_PARTS[state.type].some(p=>p.key==='tag'))addField('tagText','標籤文字');
+  if(['subtitle','label'].includes(state.type)){addField('valueText','數值');addField('unitText','單位');}
+  panel.append(fields);
+}
+const demo=createT3Header(document.getElementById('demo'));
+const type=document.getElementById('type');HEADER_TYPES.forEach((value,i)=>{const option=document.createElement('option');option.value=value;option.textContent=typeNames[i];type.append(option);});
+attachVisibilityPanel(document.getElementById('visibility-settings'),demo);
+type.addEventListener('change',()=>{demo.update({type:type.value});attachVisibilityPanel(document.getElementById('visibility-settings'),demo);});
+document.getElementById('width').addEventListener('change',e=>document.getElementById('demo').style.width=e.target.value+'px');
+for(let i=0;i<HEADER_TYPES.length;i++){
+  const sample=document.createElement('div');sample.className='sample';const link=document.createElement('a');link.href=sourceUrl(sourceIds[i]);link.target='_blank';link.rel='noopener';link.textContent=typeNames[i]+' ↗';
+  const stage=document.createElement('div');stage.className='sample-scroll';const host=document.createElement('div');host.style.width='953px';stage.append(host);sample.append(link,stage);
+  const details=document.createElement('details'),summary=document.createElement('summary'),panel=document.createElement('div');summary.textContent='顯示設定（'+HEADER_PARTS[HEADER_TYPES[i]].length+' 項）';details.append(summary,panel);sample.append(details);document.getElementById('current-samples').append(sample);
+  const api=createT3Header(host,{type:HEADER_TYPES[i]});attachVisibilityPanel(panel,api);
+}
+document.addEventListener('t3-header-action',e=>{document.getElementById('output').textContent='事件：'+e.detail.action+'　'+(e.detail.value===undefined?'':String(e.detail.value));});
+
+</script></body></html>

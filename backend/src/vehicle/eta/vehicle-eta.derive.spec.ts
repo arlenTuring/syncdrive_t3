@@ -63,6 +63,22 @@ describe('resolveArrivalState（規格書 7.7）', () => {
     ).toBe('UNKNOWN');
   });
 
+  it('整張單各站動作一起送：只看這一站的，上一站出站完成不算這一站已離站', () => {
+    const at = (station: string) => ({ task_params: { station_id: station } });
+    expect(
+      resolveArrivalState({
+        ...base,
+        etaSeconds: 5,
+        distanceM: 20,
+        taskGroup: [
+          { task_name: 'STATION_DEPARTURE', status: 'COMPLETED', ...at('station_3') },
+          { task_name: 'PLATFORM_DOCKING', status: 'IN_PROGRESS', ...at('station_4') },
+          { task_name: 'OPEN_DOORS', status: 'PENDING', ...at('station_4') },
+        ],
+      }),
+    ).toBe('DOCKING');
+  });
+
   it('PLATFORM_DOCKING 進行中 → DOCKING', () => {
     expect(
       resolveArrivalState({

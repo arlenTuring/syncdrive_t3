@@ -100,7 +100,7 @@ function AllowanceReport({
       ) : null}
       {flagged.length > 0 ? (
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[48rem] text-left text-body-s">
+          <table className="t3-table w-full min-w-[48rem] text-left text-body-s">
             <thead className="text-text-tertiary">
               <tr className="border-b border-border-quaternary">
                 <th className="px-3 py-2.5 font-normal">時間線</th>

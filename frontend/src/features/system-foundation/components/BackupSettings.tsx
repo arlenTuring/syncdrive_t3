@@ -7,7 +7,7 @@ import {
   type BackupLocation, type BackupRun, type BackupSettingsValue, type BackupStatus,
 } from '../api/dataAdminApi'
 import { systemConfirm } from '../../../lib/systemDialog'
-import { Button, Checkbox, Switch, fieldClass } from '../../../components/ui';
+import { Button, Checkbox, Switch, fieldClass, InputNumber } from '../../../components/ui';
 
 const POLL_MS = 3_000
 const OVERDUE_MS = 2 * 86_400_000
@@ -178,7 +178,7 @@ export function BackupSettings() {
               <div className="flex flex-wrap items-center gap-5 text-text-tertiary">
                 <label>每天<input aria-label="自動備份時間" type="time" value={draft.autoTime} onChange={(e) => update({ autoTime: e.target.value })} className={`${input} mx-1.5`} />執行</label>
                 <span className="inline-flex items-center gap-1.5">
-                  <label>保留最近<input aria-label="自動備份保留天數" type="number" min={1} max={365} value={draft.keepCount} onChange={(e) => update({ keepCount: Number(e.target.value) })} className={`${input} mx-1.5 w-20`} />天</label>
+                  <label>保留最近<InputNumber ariaLabel="自動備份保留天數" min={1} max={365} value={draft.keepCount} onChange={(next) => update({ keepCount: next ?? 1 })} fluid={false} className="mx-1.5 inline-block w-24 align-middle" />天</label>
                   <HelpTip label="保留天數說明" widthClass="w-72">
                     每天備份一份全部資料。設 {draft.keepCount} 天就能退回最近 {draft.keepCount} 天任一天當時的狀態。超過時，新備份成功後才刪最舊的一份，備份失敗不會刪。手動備份不算在內，也不會自動刪除。
                   </HelpTip>
@@ -205,7 +205,7 @@ export function BackupSettings() {
       <section className="space-y-2">
         <h3 className={sectionTitle}>備份紀錄</h3>
         <div className="overflow-auto rounded-lg border border-border-quaternary bg-surface-primary px-3 py-2 text-body-xs">
-          <table className="w-full text-left text-text-secondary">
+          <table className="t3-table w-full text-left text-text-secondary">
             <thead className="text-text-quaternary"><tr><th className="py-1 font-normal">開始時間</th><th className="font-normal">方式</th><th className="font-normal">狀態</th><th className="font-normal">大小</th><th className="font-normal">位置</th><th /></tr></thead>
             <tbody>
               {status.runs.map((run) => (

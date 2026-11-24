@@ -125,7 +125,7 @@ export function MediaSchedulesPage() {
       </div>
 
       <div className="mt-6 min-h-0 flex-1 overflow-auto">
-        <table className="w-full table-fixed text-left">
+        <table className="t3-table w-full table-fixed text-left">
           <thead className="text-text-tertiary">
             <tr className="border-b border-border-quaternary">
               <th className="w-[22%] px-4 py-4 font-normal">{header('排程名稱', 'name')}</th>

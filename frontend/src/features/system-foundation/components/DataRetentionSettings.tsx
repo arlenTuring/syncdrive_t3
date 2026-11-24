@@ -7,7 +7,7 @@ import {
   type CleanupCategory, type RetentionPolicy,
 } from '../api/dataAdminApi'
 import { systemConfirm } from '../../../lib/systemDialog'
-import { Button, Switch } from '../../../components/ui';
+import { Button, Switch, InputNumber } from '../../../components/ui';
 
 const DAY_MS = 86_400_000
 const HOUR_MS = 3_600_000
@@ -32,7 +32,6 @@ function Row({ title, note, children }: { title: string; note: ReactNode; childr
   )
 }
 
-const numberInput = 'w-20 rounded border border-border-quaternary bg-surface-primary px-2 py-1 text-text-primary'
 
 /**
  * 各種資料保存天數集中在這裡。資料庫類別寫 data_retention_policies（後端排程依此清理），
@@ -130,13 +129,13 @@ export function DataRetentionSettings() {
         {draft.enabled ? (
           <label className="text-text-tertiary">
             保存
-            <input
-              aria-label={`${info?.label ?? category}保存數量`}
-              type="number"
+            <InputNumber
+              ariaLabel={`${info?.label ?? category}保存數量`}
               min={1}
               value={draft.retentionValue}
-              onChange={(e) => update({ retentionValue: Number(e.target.value) })}
-              className={`${numberInput} mx-1.5`}
+              onChange={(next) => update({ retentionValue: next ?? 1 })}
+              fluid={false}
+              className="mx-1.5 inline-block w-24 align-middle"
             />
             {draft.retentionUnit === 'day' ? '天' : '小時'}
           </label>
@@ -162,15 +161,15 @@ export function DataRetentionSettings() {
         <Row title="監控錄影" note={videoError ? `無法取得影像設定：${videoError}` : '超過天數的錄影由影像儲存排程刪除；容量上限與儲存位置在影像管理設定。'}>
           <label className="text-text-tertiary">
             保存
-            <input
-              aria-label="監控錄影保存天數"
-              type="number"
+            <InputNumber
+              ariaLabel="監控錄影保存天數"
               min={1}
               max={3650}
               disabled={!video}
               value={videoDays}
-              onChange={(e) => setVideoDays(Number(e.target.value))}
-              className={`${numberInput} mx-1.5`}
+              onChange={(next) => setVideoDays(next ?? 1)}
+              fluid={false}
+              className="mx-1.5 inline-block w-24 align-middle"
             />
             天
           </label>

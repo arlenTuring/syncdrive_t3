@@ -136,7 +136,7 @@ export function LegacyVehicleModelPanel() {
           ) : entries.length === 0 ? (
             <p className="text-text-quaternary">此瀏覽器沒有快取的模型。</p>
           ) : (
-            <table className="w-full overflow-hidden rounded-xl border border-border-quaternary">
+            <table className="t3-table w-full overflow-hidden rounded-xl border border-border-quaternary">
               <thead className="bg-surface-sub-background text-caption-2 text-text-quaternary">
                 <tr>
                   <th className="px-3 py-2 text-left">此瀏覽器</th>

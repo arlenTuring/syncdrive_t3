@@ -122,7 +122,7 @@ export function LiveEventsPage({ refreshSignal, onChanged }: Props) {
       {error ? <div className="mt-4 flex items-center justify-between rounded-xl bg-status-error-light px-4 py-2 text-body-s text-status-error-emphasis" role="alert"><span>更新失敗：{error}</span><Button hierarchy="danger" variant="outlined" onPress={() => void load()}>重試</Button></div> : null}
 
       <div className="mt-4 min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[64rem] table-fixed text-left text-body-s">
+        <table className="t3-table w-full min-w-[64rem] table-fixed text-left text-body-s">
           <thead className="sticky top-0 z-10 bg-surface-primary text-text-tertiary">
             <tr className="border-b border-border-quaternary">
               <th className="w-48 px-4 py-3" aria-sort={ariaSort('occurred_at')}>{sortHeader('occurred_at', '發生時間')}</th>

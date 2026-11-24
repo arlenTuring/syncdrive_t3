@@ -29,6 +29,7 @@ export type DataQuality = 'OK' | 'DEGRADED' | 'DOWN';
 export type TaskGroupItem = {
   task_name?: string;
   status?: string;
+  task_params?: { station_id?: string; node_id?: string };
 };
 
 /**
@@ -61,7 +62,7 @@ export function resolveArrivalState(args: {
 
   // 任務狀態只描述車端「當前目標站」的進度，套到別站是錯的
   if (targetStationId === stationId) {
-    const byTask = resolveArrivalStateFromTasks(args.taskGroup);
+    const byTask = resolveArrivalStateFromTasks(args.taskGroup, stationId);
     if (byTask) return byTask;
   }
 
@@ -82,10 +83,19 @@ export function resolveArrivalState(args: {
  */
 function resolveArrivalStateFromTasks(
   taskGroup: TaskGroupItem[] | null | undefined,
+  stationId?: string,
 ): ArrivalState | null {
   if (!taskGroup?.length) return null;
+  /*
+   * 車端可能把整張單各站的動作一起送（含已經離開的上一站）：有標站點的只看這一站的，
+   * 不然上一站「出站完成」會讓這一站被判成已離站。都沒標站點的舊格式照舊整組看。
+   */
+  const tagged = taskGroup.some((task) => task.task_params?.station_id);
+  const tasks = tagged && stationId
+    ? taskGroup.filter((task) => task.task_params?.station_id === stationId)
+    : taskGroup;
   const statusOf = (name: string): string | null => {
-    const hit = taskGroup.find((task) => task.task_name === name);
+    const hit = tasks.find((task) => task.task_name === name);
     return hit?.status ?? null;
   };
 

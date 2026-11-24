@@ -1,0 +1,45 @@
+/* InputNumber（design-specs/t3-input-number-engineering-spec.md §6 參考 CSS，逐字保留） */
+@layer components {
+.t3-number { width:240px; max-width:100%; color:var(--text-primary); font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-number [hidden] { display:none!important; }
+.t3-number__label { display:block; margin:0 0 4px; padding:0 8px; color:var(--text-tertiary); font:500 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-number__label b { color:var(--status-error-emphasis); font-weight:500; }
+.t3-number__box { position:relative; display:flex; align-items:center; min-width:0; height:34px; padding:6px 30px 6px 12px; border-radius:8px; background:var(--surface-theme); }
+.t3-number[data-style="tonal-gray"] .t3-number__box { background:var(--surface-secondary); }
+.t3-number[data-style="outlined"] .t3-number__box { background:transparent; box-shadow:inset 0 0 0 .5px var(--border-primary); }
+.t3-number__content { display:flex; align-items:center; min-width:0; max-width:100%; gap:2px; overflow:hidden; }
+.t3-number__editor { position:relative; display:inline-flex; flex:0 1 auto; min-width:1ch; overflow:hidden; height:22px; }
+.t3-number__measure { visibility:hidden; white-space:pre; font:inherit; letter-spacing:inherit; padding:2px 0; }
+.t3-number__input { position:absolute; inset:0; display:block; width:100%; min-width:0; height:22px; padding:2px 0; border:0; outline:0; background:transparent; color:var(--text-primary); caret-color:var(--border-theme); font:inherit; letter-spacing:inherit; border-radius:0; }
+.t3-number__input::placeholder { color:var(--text-primary); opacity:1; }
+.t3-number__unit { color:var(--text-secondary); white-space:nowrap; flex-shrink:0; }
+.t3-number:not([data-focus-origin="pointer"]) .t3-number__box:has(.t3-number__input:focus-visible) { outline:2px solid var(--border-theme); outline-offset:2px; }
+.t3-number__box>.t3-handler { position:absolute; top:0; right:0; opacity:0; visibility:hidden; pointer-events:none; border-radius:0 8px 8px 0; overflow:hidden; }
+.t3-number[data-state="hover"] .t3-number__box>.t3-handler,.t3-number:focus-within .t3-number__box>.t3-handler,.t3-number[data-state="disabled"] .t3-number__box>.t3-handler { opacity:1; visibility:visible; pointer-events:auto; }
+.t3-number[data-state="disabled"] .t3-number__label { color:var(--text-disabled); }
+.t3-number[data-state="disabled"] .t3-number__input,.t3-number[data-state="disabled"] .t3-number__input::placeholder { color:var(--text-disabled); -webkit-text-fill-color:var(--text-disabled); opacity:1; cursor:not-allowed; }
+.t3-number[data-state="disabled"] .t3-number__unit { color:var(--text-disabled); }
+.t3-number[data-style="tonal-theme"][data-state="disabled"] .t3-number__box { background:var(--surface-disabled); }
+.t3-number[data-style="tonal-gray"][data-state="disabled"] .t3-number__box { background:var(--surface-disabled); }
+.t3-number[data-style="outlined"][data-state="disabled"] .t3-number__box { background:var(--surface-disabled); box-shadow:inset 0 0 0 .5px var(--border-disabled); }
+.t3-handler { --number-handler-theme:rgb(185.31654 215.18087 255 / 12%); --number-handler-gray:rgb(203.87358 203.87358 203.87358 / 12%); display:flex; flex-direction:column; width:22px; height:34px; gap:0; flex-shrink:0; }
+.t3-handler__button { display:flex; flex:none; align-items:center; justify-content:center; width:22px; height:17px; min-height:0; padding:0; border:0; border-radius:0; color:var(--text-tertiary); background:var(--number-handler-theme); cursor:pointer; overflow:hidden; }
+.t3-handler[data-style="tonal-gray"] .t3-handler__button { background:var(--number-handler-gray); }
+.t3-handler svg { display:block; width:16px; height:16px; flex-shrink:0; }
+.t3-handler[data-state^="up-"] .t3-handler__button[data-direction="up"],.t3-handler[data-state^="down-"] .t3-handler__button[data-direction="down"] { height:22px; }
+.t3-handler[data-state^="up-"] .t3-handler__button[data-direction="down"],.t3-handler[data-state^="down-"] .t3-handler__button[data-direction="up"] { height:12px; }
+.t3-handler[data-state="up-pressed"] .t3-handler__button[data-direction="up"],.t3-handler[data-state="down-pressed"] .t3-handler__button[data-direction="down"] { color:var(--text-theme); }
+.t3-handler[data-style="outlined"] { gap:0; }
+.t3-handler[data-style="outlined"] .t3-handler__button { height:17px; background:transparent; box-shadow:inset 0 0 0 .5px var(--text-quaternary); }
+.t3-handler[data-style="outlined"][data-state^="up-"] .t3-handler__button[data-direction="up"],.t3-handler[data-style="outlined"][data-state^="down-"] .t3-handler__button[data-direction="down"] { height:22px; }
+.t3-handler[data-style="outlined"][data-state^="up-"] .t3-handler__button[data-direction="down"],.t3-handler[data-style="outlined"][data-state^="down-"] .t3-handler__button[data-direction="up"] { height:12px; }
+.t3-handler__button:disabled { color:var(--text-disabled); cursor:not-allowed; }
+.t3-handler[data-state="disabled"][data-style="tonal-theme"] .t3-handler__button { background:transparent; }
+.t3-handler[data-state="disabled"][data-style="tonal-gray"] .t3-handler__button { background:transparent; }
+.t3-handler[data-state="disabled"][data-style="outlined"] .t3-handler__button { box-shadow:inset 0 0 0 .5px var(--border-disabled); }
+.t3-handler__button:focus-visible { outline:2px solid var(--border-theme); outline-offset:-2px; }
+@media(hover:none) { .t3-number .t3-number__box>.t3-handler { opacity:1; visibility:visible; pointer-events:auto; } }
+
+/* ── 專案調整：欄位寬度跟著版面（規格樣本 240px），給 data-fluid 時填滿父層 ── */
+.t3-number[data-fluid="true"] { width:100%; }
+}

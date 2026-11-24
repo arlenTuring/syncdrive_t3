@@ -1,0 +1,82 @@
+/*
+ * Dialog（design-specs/t3-dialog-engineering-spec.md）
+ * 陰影逐字取自文件「陰影」一節；尺寸、間距照文件的 Basic Usage（Dialog_Event）與 Overlay（Dialog_Container）表。
+ */
+@layer components {
+  .t3-dialog-surface {
+    background: var(--surface-popup);
+    border-radius: 16px;
+    box-shadow:
+      4px 4px 6px 0 rgba(10, 37, 75, 0.04),
+      -1px 1px 32px 0 rgba(10, 37, 75, 0.04),
+      -4px 4px 6px 0 rgba(16, 43, 80, 0.04),
+      -32px 32px 40px 0 rgba(8, 34, 69, 0.04);
+  }
+
+  /* Overlay｜Dialog_Container：容器上 20px；Header 左右 20px、gap 8px、高 34px */
+  .t3-dialog-container {
+    padding-top: 20px;
+  }
+  .t3-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 20px;
+    flex: none;
+  }
+  /* Content：上下 12px、左右 20px，只有這裡捲動 */
+  .t3-dialog-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px 20px;
+    overflow-y: auto;
+  }
+
+  /* 操作列：上 12px、下 20px、左右 20px，gap 12px 靠右；頂部 1px 分隔線畫在內側 */
+  .t3-dialog-actions {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 20px 20px;
+    box-shadow: inset 0 1px 0 var(--border-quaternary);
+  }
+
+  /* Basic Usage｜Dialog_Event：寬 360px（小視窗受可用寬度限制） */
+  .t3-dialog-event {
+    position: relative;
+    width: 360px;
+    max-width: 100%;
+  }
+  .t3-dialog-event-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    padding: 24px 20px 8px;
+    overflow: hidden;
+  }
+  .t3-dialog-event-header {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 34px;
+  }
+  .t3-dialog-copy-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 12px;
+    overflow-y: auto;
+  }
+  /* Close：容器右 20px、上 20px */
+  .t3-dialog-event-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+  }
+}

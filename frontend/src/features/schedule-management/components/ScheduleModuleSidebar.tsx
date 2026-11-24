@@ -3,7 +3,7 @@ import {
   AlertTriangle,
   CalendarDays,
   ChevronDown,
-  ChevronRight,
+  ChevronUp,
   ClipboardList,
   DoorOpen,
   FileText,
@@ -273,29 +273,22 @@ export function ScheduleModuleSidebar({
   const toggleCollapsed = () => setCollapsed((prev) => !prev);
 
   return (
-    <aside
-      className={`flex shrink-0 flex-col bg-surface-sub-background transition-[width] duration-200 ease-out ${
-        // 沒有＋號時收窄：最長的模組名稱＋箭頭剛好放得下（約 192px）；開啟模組編輯頁面模式才放寬留出＋號
-        collapsed ? "w-[64px]" : adminMode && moduleAddMode ? "w-[240px]" : "w-[192px]"
-      }`}
-    >
-      <div
-        className={`flex shrink-0 ${
-          collapsed
-            ? "flex-col items-center gap-3 px-2 pt-3 pb-2"
-            : "h-14 items-center gap-2 px-3"
-        }`}
-      >
+    // Navigation 規格：展開 280、收合 80；選單狀態見 components/navigation/navigation.css
+    <aside className="t3-nav" data-collapsed={collapsed ? "true" : undefined}>
+      <div className={collapsed ? "t3-nav__top" : "t3-nav__top"}>
+        <div className={collapsed ? "flex flex-col items-center gap-2" : "t3-nav__logo-row"}>
         {collapsed ? (
           <>
-            <IconButton hierarchy="subordinate" variant="standard" onPress={toggleCollapsed} title={t("shell.expandSidebar")} label={t("shell.expandSidebar")} aria-expanded={false} icon={<PanelLeftOpen />} />
+            <button type="button" className="t3-nav__toggle" onClick={toggleCollapsed} title={t("shell.expandSidebar")} aria-label={t("shell.expandSidebar")} aria-expanded={false}>
+              <PanelLeftOpen />
+            </button>
             <button
               type="button"
               onClick={() => onViewChange("shift-records")}
-              className="inline-flex size-9 items-center justify-center rounded-md transition hover:bg-link-standard"
+              className="t3-nav__brand"
               title="SyncDrive VTMS"
             >
-              <VtmsMark className="size-7" />
+              <VtmsMark className="size-6" />
             </button>
           </>
         ) : (
@@ -303,24 +296,21 @@ export function ScheduleModuleSidebar({
             <button
               type="button"
               onClick={() => onViewChange("shift-records")}
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1 text-left transition hover:bg-link-standard"
+              className="t3-nav__brand"
               title="SyncDrive VTMS"
             >
-              <VtmsMark className="size-7 shrink-0" />
-              <span className="truncate text-headline-5 text-text-primary">
-                VTMS
-              </span>
+              <VtmsMark className="size-6 shrink-0" />
+              <span className="t3-nav__brand-text">VTMS</span>
             </button>
-            <IconButton hierarchy="subordinate" variant="standard" className="shrink-0" onPress={toggleCollapsed} title={t("shell.collapseSidebar")} label={t("shell.collapseSidebar")} aria-expanded icon={<PanelLeftClose />} />
+            <button type="button" className="t3-nav__toggle" onClick={toggleCollapsed} title={t("shell.collapseSidebar")} aria-label={t("shell.collapseSidebar")} aria-expanded>
+              <PanelLeftClose />
+            </button>
           </>
         )}
+        </div>
       </div>
 
-      <nav
-        className={`min-h-0 flex-1 overflow-y-auto py-2 ${
-          collapsed ? "px-1.5" : "px-2"
-        }`}
-      >
+      <nav className="t3-nav__menu">
         {SIDEBAR_MODULE_GROUPS.map((group) => {
           const groupLabel = t(group.label);
           const isOpen = expanded[group.id] ?? false;
@@ -354,20 +344,8 @@ export function ScheduleModuleSidebar({
           const rowInteractive = group.enabled || hasDashPages || adminMode;
 
           return (
-            <div key={group.id} className="mb-0.5">
-              <div
-                className={`flex w-full items-center rounded-lg text-body-s transition ${
-                  collapsed ? "justify-center" : "gap-1"
-                } ${
-                  !rowInteractive
-                    ? "text-text-disabled"
-                    : groupActive && (!hasChildren || collapsed)
-                      ? "bg-link-tonal font-medium text-text-theme"
-                      : groupActive
-                        ? "text-text-theme"
-                        : "text-text-primary"
-                }`}
-              >
+            <div key={group.id} className="flex flex-col gap-2">
+              <div className={`flex w-full items-center ${collapsed ? "justify-center" : "gap-1"}`}>
                 <button
                   type="button"
                   disabled={!rowInteractive}
@@ -402,33 +380,21 @@ export function ScheduleModuleSidebar({
                       onViewChange(group.navigateTo);
                     }
                   }}
-                  className={`flex min-w-0 flex-1 items-center rounded-lg text-left transition ${
-                    collapsed
-                      ? "justify-center px-0 py-2.5"
-                      : "gap-2.5 px-3 py-2.5"
-                  } ${
-                    !rowInteractive ? "cursor-not-allowed" : "hover:bg-link-standard"
-                  }`}
+                  className="t3-nav__item"
+                  // 沒有子選單、或收合時：所在群組就是目前選取（On）；有子選單時是所在群組（On-Open／On-Close）
+                  data-state={
+                    groupActive && (!hasChildren || collapsed)
+                      ? "on"
+                      : `${groupActive ? "on" : "off"}-${isOpen && canExpand ? "open" : "close"}`
+                  }
                   title={groupLabel}
                 >
-                  <GroupIcon
-                    className={`size-[18px] shrink-0 ${
-                      groupActive && rowInteractive
-                        ? "opacity-100"
-                        : "opacity-80"
-                    }`}
-                  />
+                  <span className="t3-nav__icon"><GroupIcon /></span>
                   {!collapsed ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate">
-                        {groupLabel}
-                      </span>
+                      <span className="t3-nav__label">{groupLabel}</span>
                       {canExpand ? (
-                        isOpen ? (
-                          <ChevronDown className="size-3.5 shrink-0 text-text-quaternary" />
-                        ) : (
-                          <ChevronRight className="size-3.5 shrink-0 text-text-quaternary" />
-                        )
+                        <span className="t3-nav__arrow" aria-hidden>{isOpen ? <ChevronUp /> : <ChevronDown />}</span>
                       ) : null}
                     </>
                   ) : null}
@@ -447,7 +413,7 @@ export function ScheduleModuleSidebar({
               </div>
 
               {!collapsed && canExpand && isOpen && (
-                <div className="mt-0.5 space-y-0.5 pb-1 pl-3">
+                <div className="flex flex-col gap-2">
                   {group.enabled && visibleItems.length
                     ? visibleItems.map((item) => {
                         const Icon = SUB_ICONS[item.id] ?? ClipboardList;
@@ -461,19 +427,14 @@ export function ScheduleModuleSidebar({
                             onClick={() =>
                               item.enabled && onViewChange(item.id)
                             }
-                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-body-s transition ${
-                              !item.enabled
-                                ? "cursor-not-allowed text-text-disabled"
-                                : active
-                                  ? "bg-link-tonal font-medium text-text-primary"
-                                  : "text-text-tertiary hover:bg-link-standard hover:text-text-primary"
-                            }`}
+                            className="t3-nav__item t3-nav__item--sub"
+                            data-state={active ? "on" : "off"}
                             title={
                               !item.enabled ? t("shell.comingSoon") : itemLabel
                             }
                           >
-                            <Icon className="size-3.5 shrink-0 opacity-80" />
-                            <span className="truncate">{itemLabel}</span>
+                            <span className="t3-nav__icon"><Icon /></span>
+                            <span className="t3-nav__label">{itemLabel}</span>
                           </button>
                         );
                       })
@@ -525,11 +486,8 @@ export function ScheduleModuleSidebar({
                               event.preventDefault();
                               startRename(page);
                             }}
-                            className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-body-s transition ${
-                              active
-                                ? "bg-link-tonal font-medium text-text-primary"
-                                : "text-text-tertiary hover:bg-link-standard hover:text-text-primary"
-                            }`}
+                            className="t3-nav__item t3-nav__item--sub min-w-0 flex-1"
+                            data-state={active ? "on" : "off"}
                             title={
                               canEditPages
                                 ? t("shell.renamePageHint", {
@@ -538,8 +496,8 @@ export function ScheduleModuleSidebar({
                                 : page.label
                             }
                           >
-                            <LayoutDashboard className="size-3.5 shrink-0 opacity-80" />
-                            <span className="truncate">{page.label}</span>
+                            <span className="t3-nav__icon"><LayoutDashboard /></span>
+                            <span className="t3-nav__label">{page.label}</span>
                           </button>
                         )}
                         {canEditPages && !isRenaming ? (
@@ -562,11 +520,7 @@ export function ScheduleModuleSidebar({
         })}
       </nav>
 
-      <div
-        className={`shrink-0 space-y-0.5 border-t border-border-quaternary py-3 ${
-          collapsed ? "px-1.5" : "px-2"
-        }`}
-      >
+      <div className="shrink-0 border-t border-border-quaternary px-4 pt-3">
         <ShellClock compact={collapsed} />
       </div>
     </aside>

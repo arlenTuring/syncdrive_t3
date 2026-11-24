@@ -131,7 +131,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                 <p className="text-body-s text-text-quaternary">{t('shiftRecords.detail.noTaskGroup')}</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border-quaternary">
-                  <table className="w-full min-w-[640px] text-left text-body-s">
+                  <table className="t3-table w-full min-w-[640px] text-left text-body-s">
                     <thead className="bg-surface-primary text-text-quaternary">
                       <tr>
                         <th className="px-3 py-2 font-medium">task_id</th>
@@ -165,7 +165,7 @@ export function ShiftRecordDetailPage({ orderId, onBack }: ShiftRecordDetailPage
                 <p className="text-body-s text-text-quaternary">{t('shiftRecords.detail.noStationActions')}</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border-quaternary">
-                  <table className="w-full min-w-[640px] text-left text-body-s">
+                  <table className="t3-table w-full min-w-[640px] text-left text-body-s">
                     <thead className="bg-surface-primary text-text-quaternary">
                       <tr>
                         <th className="px-3 py-2 font-medium">{t('shiftRecords.detail.colStation')}</th>

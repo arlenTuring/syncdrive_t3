@@ -107,7 +107,7 @@ export function VehicleList({
 
         {banner}
         <div className="overflow-hidden rounded-xl border border-border-quaternary bg-surface-primary">
-          <table className="w-full text-left text-body-s">
+          <table className="t3-table w-full text-left text-body-s">
             <thead>
               <tr className="border-b border-border-quaternary bg-surface-sub-background text-caption-2 uppercase text-text-quaternary">
                 <th className="px-4 py-3">預覽</th>

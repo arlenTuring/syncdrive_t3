@@ -194,9 +194,15 @@ const zhTW = {
       mqtt: "外部通訊 (MQTT)",
       globalParams: "全域與模組參數管理",
       operation: "操作模式與簽核",
+      version: "版本資訊",
     },
     operation: {
       hint: "只影響這台瀏覽器，切換後立即生效，不需儲存。",
+    },
+    version: {
+      number: "系統版本",
+      date: "版本日期",
+      hint: "版號格式為「主版號.次版號.修正號」，只用數字。",
     },
     locale: {
       uiLocale: "預設使用者介面語系",

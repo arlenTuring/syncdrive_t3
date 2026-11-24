@@ -351,6 +351,8 @@ export type FeasibilityViolationCode =
   | 'MOVE_JUNCTION_CONFLICT'
   | 'MOVE_PATH_CONFLICT'
   | 'MOVE_PATH_SHIFTED'
+  | 'MOVE_MAINLINE_SERVICE'
+  | 'MOVE_MAINLINE_EMPTY'
   /**
    * 整備設施不足：這一段整備的<strong>整段時間內，該類設施沒有任何一台是空的</strong>
    * ——車沒地方停。這跟轉場卡排不出來（路徑問題）是兩回事，處置也不同：

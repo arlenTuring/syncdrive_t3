@@ -1,0 +1,92 @@
+/* Header／Title（design-specs/t3-header-engineering-spec.md §7 參考 CSS，逐字保留）。
+ * 通知 Badge 的 #DC2626 是規格指定的元件色值（不是 --status-error），照原值保留。 */
+@layer components {
+.t3-header { display:flex; align-items:center; gap:8px; width:100%; min-width:0; color:var(--text-primary); background:transparent; font-family:var(--font-primary); }
+.t3-header * { box-sizing:border-box; }
+.t3-header__title { display:flex; align-items:center; gap:8px; flex:1 1 0; min-width:0; height:100%; }
+.t3-header__heading { margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 18px/24px var(--font-primary); letter-spacing:0; color:var(--text-primary); }
+.t3-header__home { flex:0 0 20px; width:20px; display:flex; align-items:center; justify-content:center; }
+.t3-header__home svg { flex:none; width:24px; height:24px; }
+.t3-header--web { height:40px; }
+.t3-header--web .t3-header__title { padding:0 12px; }
+.t3-header--subheader,.t3-header--subtitle { height:34px; }
+.t3-header--title,.t3-header--edit { height:20px; }
+.t3-header--title .t3-header__heading,.t3-header--edit .t3-header__heading { font-size:16px; line-height:20px; }
+.t3-header--subtitle .t3-header__heading { font:400 16px/20px var(--font-primary); }
+.t3-header--title .t3-header__home,.t3-header--edit .t3-header__home,.t3-header--subtitle .t3-header__home { width:18px; flex-basis:18px; color:var(--text-tertiary); }
+.t3-header--title .t3-header__home svg,.t3-header--edit .t3-header__home svg,.t3-header--subtitle .t3-header__home svg { width:20px; height:20px; }
+.t3-header__actions,.t3-header__user { display:flex; align-items:center; flex:none; }
+.t3-header__actions { gap:8px; }
+.t3-header--web .t3-header__actions { gap:16px; }
+.t3-header__button,.t3-header__icon-button,.t3-header__avatar,.t3-header__user { border:0; margin:0; cursor:pointer; font-family:var(--font-primary); color:var(--text-secondary); background:transparent; }
+.t3-header__button { height:34px; border-radius:8px; padding:8px 14px; font-size:14px; line-height:18px; font-weight:500; letter-spacing:.5px; white-space:nowrap; }
+.t3-header__button--filled { color:#fff; background:var(--link-theme-filled); }
+.t3-header__button--filled:hover { background:var(--link-theme-filled-hover); }
+.t3-header__button--filled:active { background:var(--link-theme-filled-pressed); }
+.t3-header__button--standard { background:var(--link-standard); }
+.t3-header__button--standard:hover { background:var(--link-standard-hover); }
+.t3-header__button--standard:active { background:var(--link-standard-pressed); }
+.t3-header__icon-button { display:flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; padding:2px; border-radius:8px; }
+.t3-header__icon-button svg { width:24px; height:24px; }
+.t3-header__icon-button:hover,.t3-header__avatar:hover { background:var(--link-standard); }
+.t3-header__icon-button:active { background:var(--link-standard-hover); }
+.t3-header__icon-button[aria-pressed="true"] { color:var(--text-theme); background:var(--link-standard); }
+.t3-header__settings { background:var(--link-standard); }
+.t3-header__settings:hover { background:var(--link-standard-hover); }
+.t3-header__settings:active { background:var(--link-standard-pressed); }
+.t3-header :is(button,input):focus-visible { outline:2px solid var(--border-theme); outline-offset:2px; }
+.t3-header__divider { width:1px; height:18px; flex:none; background:var(--border-quaternary); }
+.t3-header--web .t3-header__divider { height:20px; }
+.t3-header__avatar { display:flex; align-items:center; justify-content:center; position:relative; flex:none; width:40px; height:40px; border-radius:50%; background:var(--link-standard); padding:8px; color:var(--text-tertiary); }
+.t3-header__avatar svg { width:24px; height:24px; }
+.t3-header__badge { position:absolute; top:-4px; right:-4px; display:flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 4px; border:1px solid var(--surface-primary); border-radius:1000px; background:#dc2626; color:#fff; font:500 10px/14px var(--font-primary); letter-spacing:.5px; }
+.t3-header__user { padding:0; gap:0; height:40px; font:400 16px/20px var(--font-primary); }
+.t3-header__user-info { display:flex; align-items:center; gap:4px; }
+.t3-header__user-arrow { display:flex; width:34px; height:36px; align-items:center; justify-content:center; }
+.t3-header__user-arrow svg { width:24px; height:24px; color:var(--text-quaternary); }
+.t3-header__edit { display:flex; min-width:0; flex:1; align-items:center; font:500 16px/20px var(--font-primary); color:var(--text-tertiary); }
+.t3-header__caret { flex:none; width:16px; }
+.t3-header__input { min-width:0; width:100%; height:20px; padding:0; border:0; border-radius:0; background:transparent; color:var(--text-primary); caret-color:var(--text-primary); font:inherit; outline:none; }
+.t3-header__input::placeholder { color:var(--text-tertiary); opacity:1; }
+.t3-header [hidden] { display:none!important; }
+.t3-header__svg { display:flex; align-items:center; justify-content:center; flex:none; }
+.t3-header__avatar:hover { background:var(--link-standard-hover); }
+.t3-header__user-arrow svg { color:var(--color-gray-400); }
+.t3-header--title { height:auto; min-height:20px; }
+.t3-header__heading-group { display:flex; align-items:center; gap:4px; min-width:0; }
+.t3-header__heading-group .t3-header__heading { flex:0 1 auto; }
+.t3-header__info { width:20px; height:20px; padding:0; border-radius:4px; color:var(--text-tertiary); }
+.t3-header__info svg { width:20px; height:20px; }
+.t3-header__time { flex:none; font:400 12px/16px var(--font-primary); color:var(--text-secondary); white-space:nowrap; }
+.t3-header__saved { display:flex; align-items:center; flex:none; gap:4px; font:400 12px/16px var(--font-primary); color:var(--text-tertiary); white-space:nowrap; }
+.t3-header__saved svg { width:18px; height:18px; }
+.t3-header__layout { display:flex; align-items:center; flex:none; gap:0; height:34px; }
+.t3-header__layout .t3-header__icon-button svg { width:18px; height:18px; }
+.t3-header__icon-button[aria-pressed="true"] { color:var(--text-theme); background:var(--link-standard); }
+.t3-header__button--outlined { border:1px solid var(--border-theme-light); background:transparent; color:var(--text-theme); }
+.t3-header__button--outlined:hover { background:var(--surface-theme); }
+.t3-header__button--outlined:active { background:var(--link-standard); }
+.t3-header__tag { flex:none; padding:3px 12px; height:26px; border:1px solid var(--color-gray-400); border-radius:8px; background:rgb(from var(--color-gray-400) r g b / 6%); color:var(--color-gray-400); font:500 14px/18px var(--font-primary); letter-spacing:.5px; white-space:nowrap; }
+.t3-header__value-group { display:flex; align-items:center; flex:none; gap:6px; height:34px; }
+.t3-header__value { display:flex; align-items:center; gap:4px; height:34px; font:400 18px/24px var(--font-primary); color:var(--text-secondary); white-space:nowrap; }
+.t3-header__unit { display:flex; align-items:center; gap:2px; font:400 12px/16px var(--font-primary); color:var(--text-tertiary); }
+.t3-header__unit svg { width:12px; height:12px; }
+.t3-header__switch { display:flex; align-items:center; flex:none; width:44px; height:26px; padding:4px; border:0; border-radius:1000px; background:var(--border-primary); cursor:pointer; }
+.t3-header__switch-thumb { display:block; width:18px; height:18px; border-radius:50%; background:#fff; }
+.t3-header__switch[aria-checked="true"] { background:var(--cta); }
+.t3-header__switch[aria-checked="true"] .t3-header__switch-thumb { margin-left:18px; }
+/* Name editing borrows only the TextField Focus border, without its surface, size or padding. */
+.t3-header__input { box-shadow:none; }
+.t3-header .t3-header__input:focus { outline:none; box-shadow:inset 0 0 0 .5px var(--border-theme); }
+/* Each SVG keeps currentColor; color is assigned to the actual icon rather than the whole text row. */
+.t3-header__saved>.t3-header__svg { color:var(--status-success); }
+.t3-header--subtitle .t3-header__unit>.t3-header__svg { color:var(--text-secondary); }
+.t3-header--label { height:auto; min-height:18px; }
+.t3-header--label .t3-header__title { gap:4px; height:auto; align-self:stretch; }
+.t3-header--label .t3-header__home { width:14px; flex-basis:14px; color:var(--text-tertiary); }
+.t3-header--label .t3-header__home svg { width:16px; height:16px; }
+.t3-header--label .t3-header__heading,.t3-header--label .t3-header__value { font:400 14px/18px var(--font-primary); letter-spacing:.5px; }
+.t3-header--label .t3-header__title>.t3-header__icon-button { width:24px; height:24px; }
+.t3-header--label .t3-header__title>.t3-header__icon-button svg { width:18px; height:18px; }
+.t3-header--label .t3-header__unit>.t3-header__svg { color:var(--text-primary); }
+}

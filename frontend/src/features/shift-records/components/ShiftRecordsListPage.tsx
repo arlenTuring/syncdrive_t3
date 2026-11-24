@@ -280,7 +280,7 @@ export function ShiftRecordsListPage({
             {error}
           </div>
         )}
-        <table className="w-full min-w-[900px] border-collapse text-body-s">
+        <table className="t3-table w-full min-w-[900px] border-collapse text-body-s">
           <thead>
             <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="w-10 py-3 pr-2">
@@ -313,7 +313,8 @@ export function ShiftRecordsListPage({
               items.map((row) => (
                 <tr
                   key={row.order_id}
-                  className="border-b border-border-quaternary hover:bg-surface-primary"
+                  data-selected={selected.has(row.order_id) ? 'true' : undefined}
+                  className="border-b border-border-quaternary"
                 >
                   <td className="py-3 pr-2">
                     <Checkbox checked={selected.has(row.order_id)} onCheckedChange={() => toggleRow(row.order_id)} />

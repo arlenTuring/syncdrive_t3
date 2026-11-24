@@ -1,7 +1,7 @@
 import { SiteSelect } from '../../components/SiteSelect';
 /* eslint-disable react-refresh/only-export-components -- draft helpers are the form's shared validation contract */
 import type { DegradedOperationPlan, DegradedOperationPlanInput } from "./api";
-import { Button, Radio } from '../../components/ui';
+import { Button, Radio, InputNumber } from '../../components/ui';
 
 export type PlanDraft = {
   name: string;
@@ -132,21 +132,15 @@ export function DegradedPlanForm({
               }>{speed}</Button>
           ))}
         </div>
-        <div className="relative">
-          <input
-            type="number"
-            min="0"
-            step="any"
-            disabled={disabled || value.speedMode === "stopped"}
-            value={value.speedMode === "stopped" ? "0" : value.customSpeed}
-            onChange={(event) => patch({ customSpeed: event.target.value })}
-            className={`${inputClass} pr-20`}
-            aria-label="速限數值"
-          />
-          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-body-s text-text-tertiary">
-            km/h
-          </span>
-        </div>
+        <InputNumber
+          ariaLabel="速限數值"
+          min={0}
+          step={0.1}
+          unit="km/h"
+          disabled={disabled || value.speedMode === "stopped"}
+          value={value.speedMode === "stopped" ? 0 : value.customSpeed.trim() === "" ? null : Number(value.customSpeed)}
+          onChange={(next) => patch({ customSpeed: next == null ? "" : String(next) })}
+        />
         {value.speedMode === "custom" &&
         (!Number.isFinite(Number(value.customSpeed)) ||
           Number(value.customSpeed) <= 0) ? (

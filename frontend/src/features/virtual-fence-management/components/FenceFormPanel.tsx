@@ -5,7 +5,7 @@ import {
   type FenceBehaviorKind,
   type FenceDraft,
 } from '../types';
-import { Button, Checkbox, IconButton, Switch } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Switch, InputNumber } from '../../../components/ui';
 
 type FenceFormPanelProps = {
   mode: 'edit' | 'create';
@@ -173,19 +173,14 @@ export function FenceFormPanel({
           <div>
             <RequiredLabel>{t('virtualFence.form.speedLimit')}</RequiredLabel>
             <div className="flex items-center gap-2">
-              <input
-                type="number"
+              <InputNumber
+                ariaLabel={t('virtualFence.form.speedLimit')}
                 min={0}
                 step={1}
-                value={draft.speedLimitKmh ?? ''}
-                onChange={(e) => {
-                  const n = Number(e.target.value);
-                  onChange({
-                    ...draft,
-                    speedLimitKmh: Number.isFinite(n) ? n : null,
-                  });
-                }}
-                className="h-9 w-24 rounded-lg border border-border-quaternary bg-surface-secondary px-3 text-body-s text-text-primary outline-none focus:border-border-theme-light"
+                value={draft.speedLimitKmh ?? null}
+                onChange={(next) => onChange({ ...draft, speedLimitKmh: next })}
+                fluid={false}
+                className="w-32"
               />
               <span className="text-body-s text-text-tertiary">
                 {t('virtualFence.form.speedUnit')}

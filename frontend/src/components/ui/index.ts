@@ -22,14 +22,17 @@ export {
   type CheckboxVariant,
 } from './checkbox/Checkbox';
 export { cn } from './cn';
-export { Dialog, type DialogProps } from './dialog/Dialog';
-export { Field, TextArea, TextInput, type TextAreaProps, type TextInputProps } from './field/Field';
+export { Dialog, DialogEventActions, type DialogProps, type DialogTone } from './dialog/Dialog';
+export { Dropdown, type DropdownOption, type DropdownProps } from './dropdown/Dropdown';
+export { Header, HeaderAvatar, HeaderDivider, HeaderIconButton, type HeaderType } from './header/Header';
+export { InputNumber } from './number/InputNumber';
+export { Field, SelectField, TextArea, TextInput, type SelectFieldConfig, type TextAreaProps, type TextInputProps } from './field/Field';
 export { Pagination } from './pagination/Pagination';
 export { Panel } from './panel/Panel';
 export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } from './radio/Radio';
 export { headerCheckState } from './checkbox/selection';
 export { Switch, type SwitchConfiguration, type SwitchProps } from './switch/Switch';
-export { SegmentedControl, Tabs, type TabItem } from './tabs/Tabs';
+export { SegmentedControl, Tabs, type TabItem, type TabsVariant } from './tabs/Tabs';
 export {
   buttonAttributes,
   badgeToneColors,
@@ -41,6 +44,7 @@ export {
   LABEL_CLASS,
   MENU_BADGE_CLASS,
   MENU_CHECK_CLASS,
+  MENU_OFFSET,
   MENU_EMPTY_CLASS,
   MENU_GROUP_LABEL_CLASS,
   MENU_PANEL_CLASS,
@@ -51,5 +55,6 @@ export {
   type BadgeTone,
   type DialogSize,
   type FieldSize,
+  type FieldStyle,
   type SurfaceLevel,
 } from './variants';

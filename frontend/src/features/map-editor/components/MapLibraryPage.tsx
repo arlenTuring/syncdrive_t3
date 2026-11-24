@@ -736,7 +736,7 @@ export function MapLibraryPage({ onOpenMap, onBackToHome }: MapLibraryPageProps)
             ) : error ? (
               <p className="py-4 text-body-s text-status-error-emphasis">{error}</p>
             ) : (
-              <table className="w-full min-w-[1040px] border-separate border-spacing-0">
+              <table className="t3-table w-full min-w-[1040px] border-separate border-spacing-0">
                 <thead className="sticky top-0 z-20 bg-surface-primary">
                   <tr>
                     <th className={`${headCellClass} ${fixedLeftClass} z-30`}>

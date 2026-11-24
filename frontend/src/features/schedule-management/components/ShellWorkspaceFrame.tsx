@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Header } from '../../../components/ui';
 import { ShellAccountToolbar } from './ShellAccountToolbar';
 
 type ShellWorkspaceFrameProps = {
@@ -23,13 +24,14 @@ export function ShellWorkspaceFrame({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-primary p-3">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-quaternary bg-surface-sub-background ring-1 ring-black-30">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border-quaternary px-5">
-          <div className="flex min-w-0 items-center gap-2.5 text-text-primary">
-            {titleIcon}
-            <h1 className="truncate text-body-m-bold">{title}</h1>
-          </div>
-          <ShellAccountToolbar
-            onOpenSystemFoundation={onOpenSystemFoundation}
+        {/* Header 規格 Web-Header：高 40、標題 18/24/500、左側 Icon 24（上下各留 8，整列 56 跟以前一樣） */}
+        <header className="shrink-0 border-b border-border-quaternary px-3 py-2">
+          <Header
+            type="web"
+            as="h1"
+            icon={titleIcon}
+            title={title}
+            actions={<ShellAccountToolbar onOpenSystemFoundation={onOpenSystemFoundation} />}
           />
         </header>
         <div

@@ -208,7 +208,7 @@ export function ScheduleAdjustDiffStep({
               {error}
             </div>
           ) : (
-            <table className="w-full min-w-[860px] border-collapse text-body-s">
+            <table className="t3-table w-full min-w-[860px] border-collapse text-body-s">
               <thead>
                 <tr className="border-b border-border-quaternary bg-surface-popup text-left text-text-tertiary">
                   <ColumnFilter

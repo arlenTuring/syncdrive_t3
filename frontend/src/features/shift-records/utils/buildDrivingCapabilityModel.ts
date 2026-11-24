@@ -231,10 +231,11 @@ function actionChannel(
 function stationLabel(action: ShiftRecordAction): string | undefined {
   const named = String(action.station_display_name ?? '').trim();
   if (named) return named;
-  const id = String(action.station_id ?? '');
-  if (id.includes('N2W') || id === 'station_1' || id === 'station_2') return 'N2W';
-  if (id.includes('S2W') || id === 'station_5' || id === 'station_6') return 'S2W';
-  if (id.includes('T3') || id === 'station_3' || id === 'station_4') return 'T3';
+  // 站點代號有大寫（N2W_U）也有小寫（t3_d，車端 task_group 帶的）
+  const id = String(action.station_id ?? '').toUpperCase();
+  if (id.includes('N2W') || id === 'STATION_1' || id === 'STATION_2') return 'N2W';
+  if (id.includes('S2W') || id === 'STATION_5' || id === 'STATION_6') return 'S2W';
+  if (id.includes('T3') || id === 'STATION_3' || id === 'STATION_4') return 'T3';
   return undefined;
 }
 

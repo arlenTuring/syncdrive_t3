@@ -115,7 +115,7 @@ export function MediaPickerDialog({
           className="w-full rounded-xl bg-surface-secondary py-3.5 pr-4 pl-12 text-headline-5 outline-none placeholder:text-text-quaternary focus:ring-1 focus:ring-border-theme"
         />
       </div>
-      <table className="mt-4 w-full table-fixed text-left">
+      <table className="t3-table mt-4 w-full table-fixed text-left">
         <thead className="text-text-tertiary">
           <tr className="border-b border-border-quaternary">
             <th className="w-14 py-4 pl-3">
@@ -137,7 +137,7 @@ export function MediaPickerDialog({
             const selectable = !item.included && item.available;
             const checked = selection.order.includes(item.id);
             return (
-              <tr key={item.id} className="border-b border-border-quaternary">
+              <tr key={item.id} data-selected={checked || item.included ? 'true' : undefined} className="border-b border-border-quaternary">
                 <td className="py-4 pl-3">
                   <Checkbox
                     checked={checked || item.included}

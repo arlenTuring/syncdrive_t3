@@ -49,7 +49,7 @@ export function VehicleRealtimePage() {
       {error ? <div className="mt-5 flex items-center justify-between rounded-lg border border-border-danger-light bg-status-error-light px-4 py-3 text-body-s text-status-error-emphasis"><span>{error}</span><Button hierarchy="danger" variant="outlined" onPress={() => retry()}>重試</Button></div> : null}
 
       <div className="mt-6 min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[1050px] table-fixed text-left text-body-s">
+        <table className="t3-table w-full min-w-[1050px] table-fixed text-left text-body-s">
           <thead className="sticky top-0 z-10 bg-surface-primary text-text-quaternary">
             <tr className="border-b border-border-quaternary">
               <Sortable label="載具名稱" active={sortBy === 'name'} direction={sortDirection} onClick={() => sort('name')} />

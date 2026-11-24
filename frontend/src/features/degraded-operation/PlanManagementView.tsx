@@ -124,7 +124,7 @@ export function PlanManagementView({
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left text-body-s">
+        <table className="t3-table w-full min-w-[640px] border-collapse text-left text-body-s">
           <thead className="sticky top-0 bg-[#15161a] text-text-tertiary">
             <tr className="border-b border-border-quaternary">
               <th className="px-4 py-3">

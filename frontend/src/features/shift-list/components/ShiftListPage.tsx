@@ -204,7 +204,7 @@ export function ShiftListPage({
             {error}
           </div>
         )}
-        <table className="w-full min-w-[1080px] border-collapse text-body-s">
+        <table className="t3-table w-full min-w-[1080px] border-collapse text-body-s">
           <thead>
             <tr className="border-b border-border-quaternary text-left text-text-quaternary">
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.name')}</th>

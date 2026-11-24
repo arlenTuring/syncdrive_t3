@@ -12,7 +12,8 @@
  * 畫面由 components/SystemDialog.tsx 的 <SystemDialogHost />（main.tsx 已掛）顯示；同時有好幾個請求就依序一個一個顯示。
  */
 
-export type SystemDialogTone = 'default' | 'danger'
+/** default＝一般提示（Info 圖示）；danger＝刪除、清除這類無法復原的動作（Error 圖示、紅色主要按鈕）；success、warning 照 Dialog 規範的同名類型 */
+export type SystemDialogTone = 'default' | 'danger' | 'success' | 'warning'
 
 export type SystemDialogRequest = {
   id: number

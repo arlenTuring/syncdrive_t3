@@ -625,7 +625,7 @@
     "button": 1
   },
   "features/schedule-management/components/ScheduleModuleSidebar.tsx": {
-    "button": 5
+    "button": 7
   },
   "features/schedule-management/components/ShellAccountToolbar.tsx": {
     "button": 2
@@ -743,7 +743,6 @@
     "hex": 21
   },
   "features/shift-records/components/CustomDateTimePanel.tsx": {
-    "palette": 1,
     "button": 2
   },
   "features/shift-records/components/DateTimeRangePicker.tsx": {
@@ -769,13 +768,13 @@
     "arbitrary": 1
   },
   "features/system-foundation/components/SettingsFormControls.tsx": {
-    "button": 4
+    "button": 2
   },
   "features/system-foundation/components/SystemFoundationSettingsPanel.tsx": {
     "button": 1
   },
   "features/system-foundation/components/ThresholdSettingsDialog.tsx": {
-    "button": 4
+    "button": 2
   },
   "features/time-templates/components/AttributeColorPalette.tsx": {
     "hex": 2,
@@ -818,7 +817,7 @@
     "arbitrary": 1
   },
   "features/time-templates/components/TimeOfDayPicker.tsx": {
-    "arbitrary": 4,
+    "arbitrary": 2,
     "button": 2
   },
   "features/time-templates/components/TimeRangeField.tsx": {

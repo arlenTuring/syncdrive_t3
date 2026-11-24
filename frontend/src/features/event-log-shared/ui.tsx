@@ -121,7 +121,7 @@ export function DataTable<T extends { id: string }>({
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border-quaternary">
-      <table className="w-full min-w-[56rem] table-fixed text-left text-body-s">
+      <table className="t3-table w-full min-w-[56rem] table-fixed text-left text-body-s">
         <thead className="sticky top-0 z-10 bg-surface-primary text-text-tertiary">
           <tr className="border-b border-border-quaternary">
             {columns.map((column) => {
