@@ -293,31 +293,57 @@ WHERE created_at >= ${DAY_MS}
   AND (order_id LIKE 'DEMO-%' OR vehicle_code LIKE 'PMS%')
 `.trim();
 
-/** 班表部署管理 — 目前模式卡（示意；之後可改綁營運模式狀態） */
+/** 班表部署管理 — 目前模式：有執行中的降級運轉就顯示降級與等級，否則正常營運 */
 export const DEPLOYMENT_CURRENT_MODE_SQL = `
 SELECT
-  '正常營運'::text AS mode_label,
-  'Level 1'::text AS mode_level
+  CASE WHEN d.level IS NULL THEN '正常營運' ELSE '降級運轉' END AS mode_label,
+  'Level ' || COALESCE(d.level, 1)::text AS mode_level
+FROM (SELECT 1) AS one
+LEFT JOIN LATERAL (
+  SELECT level FROM degraded_operation_executions
+  WHERE execution_status = 'active'
+  ORDER BY created_at DESC
+  LIMIT 1
+) AS d ON true
 `.trim();
 
-/** 班表部署管理 — 數據統計卡（示意數值；之後可改綁真實彙總表） */
+/**
+ * 班表部署管理 — 數據統計卡：當天（營運日）的載客班次。
+ * 總共＝今天排定的班次；完成＝已結案；延遲＝目前或結案時晚發；異常＝故障（不含中心端取消）；
+ * 取消＝中心端取消；準點率＝完成裡沒有延遲的比例；達成進度＝完成／總共。
+ */
 export const DEPLOYMENT_DATA_STATS_SQL = `
+WITH t AS (
+  SELECT
+    status,
+    COALESCE(delay_minutes, 0) AS delay_min,
+    (COALESCE(payload->'cancel_requested_at', 'null'::jsonb) <> 'null'::jsonb) AS cancelled
+  FROM operation_orders
+  WHERE payload->>'operating_day' = operating_day()
+    AND payload->>'task_type' = 'passenger'
+),
+c AS (
+  SELECT
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE status = 'END')::int AS done,
+    COUNT(*) FILTER (WHERE status = 'END' AND delay_min = 0)::int AS done_ontime,
+    COUNT(*) FILTER (WHERE delay_min > 0 AND status IN ('PROCESSING', 'END'))::int AS delayed,
+    COUNT(*) FILTER (WHERE status = 'FAULTED' AND NOT cancelled)::int AS abnormal,
+    COUNT(*) FILTER (WHERE status = 'FAULTED' AND cancelled)::int AS cancelled_n
+  FROM t
+)
 SELECT
-  92.3::float AS ontime_pct,
-  ('準點率 ' || TO_CHAR(92.3::numeric, 'FM990.0') || '%') AS ontime_badge,
-  16.9::float AS achievement_pct,
-  313::int AS total_count,
-  53::int AS completed_count,
-  (
-    SELECT COUNT(*)::int FROM operation_orders
-    WHERE payload->>'operating_day' = operating_day()
-      AND payload->>'task_type' = 'passenger'
-      AND COALESCE(delay_minutes, 0) > 0
-  ) AS delayed_count,
-  0::int AS abnormal_count,
-  0::int AS cancelled_count,
-  ('總共 ' || 313::text) AS total_pill,
-  ('完成 ' || 53::text) AS completed_pill
+  CASE WHEN done > 0 THEN ROUND(done_ontime * 1000.0 / done) / 10 ELSE 0 END::float AS ontime_pct,
+  ('準點率 ' || TO_CHAR(CASE WHEN done > 0 THEN ROUND(done_ontime * 1000.0 / done) / 10 ELSE 0 END, 'FM990.0') || '%') AS ontime_badge,
+  CASE WHEN total > 0 THEN ROUND(done * 1000.0 / total) / 10 ELSE 0 END::float AS achievement_pct,
+  total AS total_count,
+  done AS completed_count,
+  delayed AS delayed_count,
+  abnormal AS abnormal_count,
+  cancelled_n AS cancelled_count,
+  ('總共 ' || total::text) AS total_pill,
+  ('完成 ' || done::text) AS completed_pill
+FROM c
 `.trim();
 
 /** 班表部署管理 — 執行班表卡（示意） */
@@ -333,14 +359,19 @@ SELECT
   '尖峰時段 班距 180 秒 運量 1,200 pphp'::text AS period_3
 `.trim();
 
-/** 班表部署管理 — 重大事件卡（示意） */
+/** 班表部署管理 — 重大事件卡：今天（營運日）最新一筆嚴重事件；沒有就不回傳 */
 export const DEPLOYMENT_MAJOR_EVENTS_SQL = `
 SELECT
-  '降級運轉事件'::text AS event_title,
-  'Level 2'::text AS event_level,
-  '2027.05.01'::text AS event_date,
-  '10:00:00'::text AS event_time,
+  COALESCE(NULLIF(display_message, ''), NULLIF(category_label, ''), event_code::text) AS event_title,
+  COALESCE(vehicle_code, '') || ' 嚴重' AS event_level,
+  TO_CHAR(to_timestamp(created_at / 1000) AT TIME ZONE 'Asia/Taipei', 'YYYY.MM.DD') AS event_date,
+  TO_CHAR(to_timestamp(created_at / 1000) AT TIME ZONE 'Asia/Taipei', 'HH24:MI:SS') AS event_time,
   '無更多事件'::text AS empty_hint
+FROM security_event_logs
+WHERE severity = 'CRITICAL'
+  AND created_at >= operating_day_start_ms()
+ORDER BY created_at DESC
+LIMIT 1
 `.trim();
 
 /** 班表部署管理 — 載具操作群組（每列一台車，供畫布群組迭代） */

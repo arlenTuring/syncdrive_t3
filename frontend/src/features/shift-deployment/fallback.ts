@@ -1,3 +1,6 @@
+/**
+ * 班表部署管理的初始值：讀到真資料前顯示空白，不放示範數字（2026-11-22：畫面曾一直顯示寫死的 92.3%、313 班、2027.05.01 降級事件）。
+ */
 import type {
   CurrentModeData,
   DataStatsData,
@@ -7,92 +10,34 @@ import type {
 } from './types';
 
 export const FALLBACK_MODE: CurrentModeData = {
-  modeLabel: '正常營運',
-  modeLevel: 'Level 1',
+  modeLabel: '—',
+  modeLevel: '',
 };
 
 export const FALLBACK_STATS: DataStatsData = {
-  ontimePct: 92.3,
-  achievementPct: 16.9,
-  totalCount: 313,
-  completedCount: 53,
-  delayedCount: 1,
+  ontimePct: 0,
+  achievementPct: 0,
+  totalCount: 0,
+  completedCount: 0,
+  delayedCount: 0,
   abnormalCount: 0,
   cancelledCount: 0,
 };
 
 export const FALLBACK_SCHEDULE: ExecutingScheduleData = {
-  scheduleMeta: '當前班表 執行於 00:00',
-  statusLabel: '進行中',
-  scheduleName: '高運量班表',
-  reviewerName: 'Jack',
-  periods: [
-    '凌晨時段 班距 540 秒 運量 400 pphp',
-    '離峰時段 班距 360 秒 運量 600 pphp',
-    '尖峰時段 班距 180 秒 運量 1,200 pphp',
-  ],
+  scheduleMeta: '目前沒有使用中的班表',
+  statusLabel: '',
+  scheduleName: '—',
+  reviewerName: '—',
+  periods: [],
   pending: false,
 };
 
-export const FALLBACK_EVENT: MajorEventData = {
-  title: '降級運轉事件',
-  level: 'Level 2',
-  date: '2027.05.01',
-  time: '10:00:00',
-};
+/** 沒有重大事件時是 null（畫面只顯示「無重大事件」） */
+export const FALLBACK_EVENT: MajorEventData | null = null;
 
-export const FALLBACK_VEHICLES = Array.from({ length: 12 }, (_, i) =>
-  `PMS${String(i + 1).padStart(2, '0')}`,
-);
+export const FALLBACK_VEHICLES: string[] = [];
 
-export const FALLBACK_MAINLINE: ShiftRow[] = [
-  {
-    shiftKey: 'D0954',
-    tripCode: 'D0954',
-    directionLabel: '下行',
-    vehicleCode: 'PMS01',
-    routeStations: '[{"name":"S2W"},{"name":"T3"},{"name":"N2W"}]',
-    legDistanceMax: {},
-    segmentIndex: 0,
-    segmentRemainPct: 30,
-    statusLabel: '延遲+5分',
-    statusBg: 'rgba(249,115,22,0.2)',
-    statusColor: '#FB923C',
-    departTime: '09:54 → 09:59',
-    orderStatus: 'PROCESSING',
-  },
-  {
-    shiftKey: 'U1000',
-    tripCode: 'U1000',
-    directionLabel: '上行',
-    vehicleCode: 'PMS02',
-    routeStations: '[{"name":"S2W"},{"name":"T3"},{"name":"N2W"}]',
-    legDistanceMax: {},
-    segmentIndex: 1,
-    segmentRemainPct: 40,
-    statusLabel: '準點',
-    statusBg: 'rgba(34,197,94,0.2)',
-    statusColor: '#4ADE80',
-    departTime: '10:00 → 10:00',
-    orderStatus: 'PENDING',
-  },
-];
+export const FALLBACK_MAINLINE: ShiftRow[] = [];
 
-export const FALLBACK_MAINTENANCE: ShiftRow[] = [
-  {
-    shiftKey: 'M-01',
-    tripCode: 'M-01',
-    directionLabel: '—',
-    vehicleCode: 'PMS08',
-    routeStations: '[{"name":"S2W"},{"name":"W1"}]',
-    legDistanceMax: {},
-    segmentIndex: 0,
-    segmentRemainPct: 50,
-    statusLabel: '整備中',
-    statusBg: 'rgba(59,130,246,0.2)',
-    statusColor: '#60A5FA',
-    departTime: '11:20',
-    maintTypeLabel: '洗車',
-    orderStatus: '',
-  },
-];
+export const FALLBACK_MAINTENANCE: ShiftRow[] = [];

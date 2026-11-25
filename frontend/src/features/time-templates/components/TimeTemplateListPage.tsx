@@ -31,6 +31,7 @@ import {
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 import { Button, Checkbox, IconButton, Pagination, Header, fieldClass, cn } from '../../../components/ui';
+import { useAuth } from '../../access-control/AuthContext';
 
 type TimeTemplateListPageProps = {
   onBackToHome?: () => void;
@@ -42,6 +43,13 @@ const PAGE_SIZE = 20;
 
 export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTemplateListPageProps) {
   const { t } = useTranslation();
+  // 權限表「班表管理模組 → 時間模板」：沒有的動作就不顯示（後端同一組權限擋）
+  const { can } = useAuth();
+  const canCreate = can('schedule.time-template.create');
+  const canEdit = can('schedule.time-template.edit');
+  const canDuplicate = can('schedule.time-template.duplicate');
+  const canDelete = can('schedule.time-template.delete');
+  const canExport = can('schedule.time-template.export');
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [publishStatus, setPublishStatus] = useState<PublishStatusKey | 'all'>('all');
@@ -231,8 +239,8 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
         </SiteSelect>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RotateCcw />} onPress={resetFilters} title={t('common.resetFiltersTitle')}>{t('common.resetFilters')}</Button>
-        <Button hierarchy="subordinate" variant="outlined" className="ml-auto shrink-0" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button>
-        <Button className="w-fit shrink-0" leadingIcon={<Plus />} onPress={() => setCreateOpen(true)}>{t('timeTemplates.create')}</Button>
+        {canExport ? <Button hierarchy="subordinate" variant="outlined" className="ml-auto shrink-0" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button> : null}
+        {canCreate ? <Button className={cn('w-fit shrink-0', !canExport && 'ml-auto')} leadingIcon={<Plus />} onPress={() => setCreateOpen(true)}>{t('timeTemplates.create')}</Button> : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
@@ -299,17 +307,17 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
                   <td className="py-3 pr-4 font-mono text-text-tertiary">{row.created_at}</td>
                   <td className="py-3 pr-4 font-mono text-text-tertiary">{row.updated_at}</td>
                   <td className="relative py-3">
-                    <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
+                    {canExport || canEdit || canDuplicate || canDelete ? <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
             setOpenMenuId((prev) => (prev === row.template_id ? null : row.template_id))
-           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
+           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} /> : null}
                     {openMenuId === row.template_id && (
                       <div
                         ref={menuRef}
                         className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
                       >
-                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Download />} onPress={() => void handleDownload([row.template_id])}>{t('common.download')}</Button>
-                        <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => handleEdit(row)}>{t('common.edit')}</Button>
-                        <button
+                        {canExport ? <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Download />} onPress={() => void handleDownload([row.template_id])}>{t('common.download')}</Button> : null}
+                        {canEdit ? <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => handleEdit(row)}>{t('common.edit')}</Button> : null}
+                        {canDuplicate ? <button
                           type="button"
                           onClick={() => void handleDuplicate(row)}
                           disabled={duplicatingId === row.template_id}
@@ -321,8 +329,8 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
                             <Copy className="size-4 text-text-tertiary" />
                           )}
                           {t('common.duplicate')}
-                        </button>
-                        <button
+                        </button> : null}
+                        {canDelete ? <button
                           type="button"
                           onClick={() => void handleDelete(row)}
                           disabled={row.usage_status === 'in_use' || deletingId === row.template_id}
@@ -343,7 +351,7 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
                             <Trash2 className="size-4 text-text-tertiary" />
                           )}
                           {t('common.delete')}
-                        </button>
+                        </button> : null}
                       </div>
                     )}
                   </td>

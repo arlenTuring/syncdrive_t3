@@ -31,6 +31,7 @@ import {
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 import { Button, IconButton, Pagination, Header, fieldClass, cn } from '../../../components/ui';
+import { useAuth } from '../../access-control/AuthContext';
 
 function resolveCreationMode(row: OperationShiftListItem): CreationModeKey {
   return row.creation_mode === 'manual' ? 'manual' : 'parametric';
@@ -56,6 +57,12 @@ export function ShiftListPage({
   onPreviewClick,
 }: ShiftListPageProps) {
   const { t } = useTranslation();
+  // 權限表「班表管理模組 → 班表清單」：沒有的動作就不顯示（後端同一組權限擋）
+  const { can } = useAuth();
+  const canCreate = can('schedule.shift-list.create');
+  const canEdit = can('schedule.shift-list.edit');
+  const canDelete = can('schedule.shift-list.delete');
+  const canDuplicate = can('schedule.shift-list.duplicate');
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [usageStatus, setUsageStatus] = useState<UsageStatusKey | 'all'>('all');
@@ -200,7 +207,7 @@ export function ShiftListPage({
           ))}
         </SiteSelect>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
-        <Button className="ml-auto w-fit shrink-0" leadingIcon={<Plus />} onPress={() => onCreateClick?.()}>{t('shiftList.create')}</Button>
+        {canCreate ? <Button className="ml-auto w-fit shrink-0" leadingIcon={<Plus />} onPress={() => onCreateClick?.()}>{t('shiftList.create')}</Button> : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-2">
@@ -278,22 +285,22 @@ export function ShiftListPage({
                   </td>
                   <td className="py-3 pr-4 font-mono text-text-tertiary">{row.version}</td>
                   <td className="relative py-3">
-                    <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
+                    {canEdit || canDelete || canDuplicate ? <IconButton size="small" hierarchy="subordinate" variant="standard" onPress={() =>
             setOpenMenuId((prev) => (prev === row.shift_id ? null : row.shift_id))
-           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} />
+           } title={t('common.moreActions')} label={t('common.moreActions')} icon={<MoreHorizontal />} /> : null}
                     {openMenuId === row.shift_id && (
                       <div
                         ref={menuRef}
                         className="absolute right-0 top-full z-20 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-border-quaternary bg-surface-primary py-1 shadow-xl"
                       >
                         {/* 只有使用中的班表不能編輯（要改先停用或部署別份）；草稿、已完成的都可以 */}
-                        {row.usage_status !== 'in_use' && (
+                        {canEdit && row.usage_status !== 'in_use' && (
                           <Button hierarchy="subordinate" variant="standard" className="w-full" leadingIcon={<Pencil />} onPress={() => {
                               setOpenMenuId(null);
                               onEditClick?.(row.shift_id);
                             }}>{t('common.edit')}</Button>
                         )}
-                        <button
+                        {canDelete ? <button
                           type="button"
                           onClick={() => void handleDelete(row)}
                           disabled={row.usage_status === 'in_use' || deletingId === row.shift_id}
@@ -314,8 +321,8 @@ export function ShiftListPage({
                             <Trash2 className="size-4 text-status-error-emphasis" />
                           )}
                           {t('common.delete')}
-                        </button>
-                        {creationMode === 'parametric' && (
+                        </button> : null}
+                        {canDuplicate && creationMode === 'parametric' && (
                           <button
                             type="button"
                             onClick={() => void handleDuplicate(row)}
@@ -330,7 +337,7 @@ export function ShiftListPage({
                             {t('shiftList.copyAsParametric')}
                           </button>
                         )}
-                        <button
+                        {canDuplicate ? <button
                           type="button"
                           onClick={() =>
                             void (creationMode === 'parametric'
@@ -350,7 +357,7 @@ export function ShiftListPage({
                             <FilePenLine className="size-4 text-text-tertiary" />
                           )}
                           {t('shiftList.copyAsManual')}
-                        </button>
+                        </button> : null}
                       </div>
                     )}
                   </td>

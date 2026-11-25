@@ -17,6 +17,7 @@ import type {
 } from '../types';
 import { RingProgress } from './RingProgress';
 import { Badge, Button } from '../../../components/ui';
+import { useAuth } from '../../access-control/AuthContext';
 
 const PERIOD_DOTS = ['#A78BFA', '#22C55E', '#F97316'] as const;
 
@@ -33,12 +34,14 @@ export function SummaryCards({
   mode: CurrentModeData;
   stats: DataStatsData;
   schedule: ExecutingScheduleData;
-  event: MajorEventData;
+  /** 今天最新一筆嚴重事件；沒有就是 null */
+  event: MajorEventData | null;
   /** 即時調度引擎目前有沒有在自動下訂單；null 表示還沒拉到、狀態未知 */
   dispatchEnabled: boolean | null;
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const { t } = useTranslation();
+  const canAdjust = useAuth().can('operations.shift-deployment.adjust');
 
   return (
     // 設計稿四張卡寬度不同（目前模式 278、數據統計 388、執行班表 718、重大事件 374），照這個比例分；
@@ -106,7 +109,8 @@ export function SummaryCards({
           <h2 className="text-body-m-bold text-text-primary">
             {t('shiftDeployment.summary.executingSchedule')}
           </h2>
-          <Button variant="outlined" onPress={() => onAction({ kind: 'schedule-adjust' })}>{t('shiftDeployment.summary.scheduleAdjust')}</Button>
+          {/* 權限表「班表部署 → 調整申請」 */}
+          {canAdjust ? <Button variant="outlined" onPress={() => onAction({ kind: 'schedule-adjust' })}>{t('shiftDeployment.summary.scheduleAdjust')}</Button> : null}
         </div>
         {/*
           * 照設計稿：一個內框，左邊綠色直線＋班表資訊、右上狀態標籤；分隔線下是三個時段。
@@ -155,7 +159,7 @@ export function SummaryCards({
         <h2 className="text-body-m-bold text-text-primary">
           {t('shiftDeployment.summary.majorEvent')}
         </h2>
-        <button
+        {event ? <button
           type="button"
           onClick={() => onAction({ kind: 'event-open' })}
           className="mt-3 flex items-start gap-3 rounded-xl border border-border-danger-light bg-status-error-light p-3 text-left transition hover:bg-status-error-light"
@@ -171,9 +175,9 @@ export function SummaryCards({
               <span className="shrink-0 text-body-xs text-text-tertiary">{event.time}</span>
             </div>
           </div>
-        </button>
+        </button> : null}
         <div className="mt-2 flex flex-1 items-center justify-center rounded-xl bg-surface-primary text-body-s text-text-quaternary">
-          {t('shiftDeployment.summary.noMoreEvents')}
+          {event ? t('shiftDeployment.summary.noMoreEvents') : '今天沒有重大事件'}
         </div>
       </section>
     </div>
@@ -199,6 +203,8 @@ function DispatchToggle({
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const { t } = useTranslation();
+  // 權限表「班表部署 → 部署／啟用」：沒有就不給暫停／開始部署（後端同一個權限擋）
+  if (!useAuth().can('operations.shift-deployment.deploy')) return null;
   return dispatchEnabled === true
     ? (
       <Button hierarchy="subordinate" variant="tonal" leadingIcon={<Pause />} className="whitespace-nowrap" onPress={() => onAction({ kind: 'dispatch-pause' })}>

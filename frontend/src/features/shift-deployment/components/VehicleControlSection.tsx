@@ -2,6 +2,7 @@ import { Bus, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import type { ShiftDeploymentAction } from '../types';
 import { Button } from '../../../components/ui';
+import { useAuth } from '../../access-control/AuthContext';
 
 
 export function VehicleControlSection({
@@ -12,6 +13,8 @@ export function VehicleControlSection({
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const [open, setOpen] = useState(true);
+  // 權限表「營運管理模組 → 載具控制 → 控制」：沒有就不顯示控制鈕（後端同一個權限擋）
+  const canControl = useAuth().can('operations.vehicle-control.control');
 
   return (
     <section className="rounded-xl bg-surface-popup">
@@ -40,11 +43,17 @@ export function VehicleControlSection({
                 <Bus className="size-4 shrink-0 text-text-primary" strokeWidth={1.75} />
                 <span className="truncate">{code}</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}>自駕停駛</Button>
-                <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}>自駕啟動</Button>
-              </div>
-              <Button block className="whitespace-nowrap" hierarchy="danger" variant="outlined" onPress={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}>系統重置</Button>
+              {canControl ? (
+                <>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-stop', vehicleCode: code })}>自駕停駛</Button>
+                    <Button block className="whitespace-nowrap" hierarchy="superior" variant="outlined" onPress={() => onAction({ kind: 'vehicle-start', vehicleCode: code })}>自駕啟動</Button>
+                  </div>
+                  <Button block className="whitespace-nowrap" hierarchy="danger" variant="outlined" onPress={() => onAction({ kind: 'vehicle-reset', vehicleCode: code })}>系統重置</Button>
+                </>
+              ) : (
+                <p className="text-body-xs text-text-quaternary">無控制權限</p>
+              )}
             </article>
           ))}
         </div>

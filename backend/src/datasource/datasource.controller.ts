@@ -70,7 +70,11 @@ export class DatasourceController {
 
   /** 執行 SELECT 查詢 */
   @Post('query')
-  @RequirePermission('system.datasource.manage')
+  /*
+   * 營運圖台（儀表板）與班表部署管理的畫面都靠這支讀資料：只有檢視權限的人也要看得到真資料，
+   * 不然畫面退回示範數字。只允許 SELECT，帳號、權限、登入等表另由 PROTECTED_TABLES 擋掉。
+   */
+  @RequirePermission('system.datasource.manage', 'system.datasource.view', 'dashboard.monitor.view', 'dashboard.dashboard.view', 'operations.shift-deployment.view')
   @ApiOperation({ summary: '執行 SELECT 查詢並回傳結果（限 SELECT）' })
   @ApiBody({
     schema: {

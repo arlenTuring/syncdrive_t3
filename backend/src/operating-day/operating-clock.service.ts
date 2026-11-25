@@ -12,6 +12,7 @@ import {
   type ClockUpdate,
 } from './operating-clock';
 import { operatingDayOf } from './operating-day';
+import { SYSTEM_FOUNDATION_SETTINGS_KEY } from '../system-health/system-foundation-settings';
 
 const SETTING_KEY = 'operation.operating_clock';
 
@@ -74,6 +75,20 @@ export class OperatingClockService implements OnModuleInit {
 
   snapshot(realNow = Date.now()) {
     return describeClock(this.state, realNow);
+  }
+
+  /**
+   * 系統時區（右上齒輪 → 系統基礎模組 → 語系與時區）。
+   * 給執行端（模擬器）照同一個時區顯示時間，不跟著看畫面那台電腦的時區走。
+   */
+  async timeZone(): Promise<string> {
+    try {
+      const row = await this.settings.findOne({ where: { settingKey: SYSTEM_FOUNDATION_SETTINGS_KEY } });
+      const tz = (row?.settingValue as { locale?: { timeZone?: unknown } } | undefined)?.locale?.timeZone;
+      return typeof tz === 'string' && tz ? tz : 'Asia/Taipei';
+    } catch {
+      return 'Asia/Taipei';
+    }
   }
 
   async update(update: ClockUpdate, realNow = Date.now()) {

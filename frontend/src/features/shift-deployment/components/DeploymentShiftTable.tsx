@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { ShiftDeploymentAction, ShiftListTab, ShiftRow } from '../types';
 import { ShiftRouteTrack } from './ShiftRouteTrack';
 import { Button, Tabs, tabPanelProps } from '../../../components/ui';
+import { useAuth } from '../../access-control/AuthContext';
 
 export function DeploymentShiftTable({
   scheduleName,
@@ -17,6 +18,8 @@ export function DeploymentShiftTable({
   onAction: (action: ShiftDeploymentAction) => void;
 }) {
   const { t } = useTranslation();
+  // 權限表「班表部署 → 撤銷申請」：取消班次（後端 order/cancel 同一個權限擋）
+  const canCancel = useAuth().can('operations.shift-deployment.revoke');
   const [tab, setTab] = useState<ShiftListTab>('mainline');
   const rows = tab === 'mainline' ? mainline : maintenance;
 
@@ -92,7 +95,7 @@ export function DeploymentShiftTable({
                   <Td>
                     <div className="flex items-center gap-3">
                       <Button variant="text" onPress={() => onAction({ kind: 'shift-detail', tab, row })}>{t('shiftDeployment.table.viewDetail')}</Button>
-                      {row.orderStatus === 'PENDING' || row.orderStatus === 'PROCESSING' ? (
+                      {canCancel && (row.orderStatus === 'PENDING' || row.orderStatus === 'PROCESSING') ? (
                         <Button hierarchy="danger" variant="text" onPress={() => onAction({ kind: 'shift-cancel', row })}>{t('shiftDeployment.table.cancel')}</Button>
                       ) : null}
                     </div>

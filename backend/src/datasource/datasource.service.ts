@@ -97,7 +97,21 @@ export class DatasourceService {
       ? resolved.trim()
       : `${resolved.trim()} LIMIT ${limit}`;
 
-    const rows = await this.dataSource.query(safeQuery);
+    // 一律在唯讀交易裡跑：「WITH x AS (DELETE …) SELECT …」這類會寫資料的 CTE 開頭也是 WITH，
+    // 字串檢查擋不住，交易設成 READ ONLY 由資料庫拒絕任何寫入
+    const runner = this.dataSource.createQueryRunner();
+    let rows: any[];
+    try {
+      await runner.connect();
+      await runner.query('BEGIN TRANSACTION READ ONLY');
+      try {
+        rows = await runner.query(safeQuery);
+      } finally {
+        await runner.query('ROLLBACK');
+      }
+    } finally {
+      await runner.release();
+    }
     const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
     return { rows, rowCount: rows.length, columns };

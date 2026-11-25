@@ -95,8 +95,9 @@ export class DispatchController {
       '目前營運日、營運時刻、倍速、是否暫停／中斷。正式營運時營運時間＝實際時間；加速重播時由執行端推進。' +
       '儀表板的班次狀態、延誤、ETA、倒數都以這個時鐘為準。',
   })
-  operatingClockSnapshot(): Record<string, unknown> {
-    return this.operatingClock.snapshot();
+  async operatingClockSnapshot(): Promise<Record<string, unknown>> {
+    // time_zone：系統時區，執行端照它顯示時間（與主系統畫面一致）
+    return { ...this.operatingClock.snapshot(), time_zone: await this.operatingClock.timeZone() };
   }
 
   @AuditAction('DISPATCH_CLOCK_SET', { detail: (req) => ({ ...(req.body ?? {}) }) })

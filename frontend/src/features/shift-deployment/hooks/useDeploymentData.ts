@@ -194,7 +194,7 @@ export function useDeploymentData() {
   const [mode, setMode] = useState<CurrentModeData>(FALLBACK_MODE);
   const [stats, setStats] = useState<DataStatsData>(FALLBACK_STATS);
   const [schedule, setSchedule] = useState<ExecutingScheduleData>(FALLBACK_SCHEDULE);
-  const [event, setEvent] = useState<MajorEventData>(FALLBACK_EVENT);
+  const [event, setEvent] = useState<MajorEventData | null>(FALLBACK_EVENT);
   const [vehicles, setVehicles] = useState<string[]>(FALLBACK_VEHICLES);
   const [mainline, setMainline] = useState<ShiftRow[]>(FALLBACK_MAINLINE);
   const [maintenance, setMaintenance] = useState<ShiftRow[]>(FALLBACK_MAINTENANCE);
@@ -240,25 +240,9 @@ export function useDeploymentData() {
         });
       }
 
-      const scheduleRow = scheduleRows[0];
-      const periods = [
-        str(scheduleRow, 'period_1', FALLBACK_SCHEDULE.periods[0]),
-        str(scheduleRow, 'period_2', FALLBACK_SCHEDULE.periods[1]),
-        str(scheduleRow, 'period_3', FALLBACK_SCHEDULE.periods[2]),
-      ];
-      let nextSchedule: ExecutingScheduleData = {
-        ...FALLBACK_SCHEDULE,
-        ...(scheduleRow
-          ? {
-              scheduleMeta: str(scheduleRow, 'schedule_meta', FALLBACK_SCHEDULE.scheduleMeta),
-              statusLabel: str(scheduleRow, 'status_label', FALLBACK_SCHEDULE.statusLabel),
-              scheduleName: str(scheduleRow, 'schedule_name', FALLBACK_SCHEDULE.scheduleName),
-              reviewerName: str(scheduleRow, 'reviewer_name', FALLBACK_SCHEDULE.reviewerName),
-              periods,
-            }
-          : {}),
-        pending: false,
-      };
+      // 執行班表卡只採用主系統「使用中」的班表；示範 SQL 的班表名、審核人與時段說明不是真資料，不用
+      void scheduleRows;
+      let nextSchedule: ExecutingScheduleData = { ...FALLBACK_SCHEDULE, pending: false };
 
       try {
         const inUse = await fetchOperationShiftList({
@@ -309,22 +293,18 @@ export function useDeploymentData() {
       if (!cancelled) setSchedule(nextSchedule);
 
       const eventRow = eventRows[0];
-      if (eventRow) {
-        setEvent({
-          title: str(eventRow, 'event_title', FALLBACK_EVENT.title),
-          level: str(eventRow, 'event_level', FALLBACK_EVENT.level),
-          date: str(eventRow, 'event_date', FALLBACK_EVENT.date),
-          time: str(eventRow, 'event_time', FALLBACK_EVENT.time),
-        });
-      }
+      setEvent(eventRow
+        ? {
+            title: str(eventRow, 'event_title'),
+            level: str(eventRow, 'event_level'),
+            date: str(eventRow, 'event_date'),
+            time: str(eventRow, 'event_time'),
+          }
+        : null);
 
-      const codes = vehicleRows
-        .map((row) => str(row, 'vehicle_code'))
-        .filter(Boolean);
-      if (codes.length > 0) setVehicles(codes);
-
-      if (mainRows.length > 0) setMainline(mainRows.map(mapShiftRow));
-      if (maintRows.length > 0) setMaintenance(maintRows.map(mapShiftRow));
+      setVehicles(vehicleRows.map((row) => str(row, 'vehicle_code')).filter(Boolean));
+      setMainline(mainRows.map(mapShiftRow));
+      setMaintenance(maintRows.map(mapShiftRow));
     })();
     return () => {
       cancelled = true;
