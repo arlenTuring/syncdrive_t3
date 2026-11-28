@@ -64,7 +64,7 @@ describe('scheduleAcceptance', () => {
       errors: [],
       warnings,
     });
-    // 2026-11-10 起沒車開的脈衝是載客服務不完整：品質不過，而且擋發布（硬閘不過）
+    // 2026-11-10 起沒車開的脈衝是載客服務不完整：品質不過，而且擋部署（硬閘不過）
     assert.equal(summary.gatePassed, false);
     assert.equal(summary.qualityPassed, false);
     assert.equal(summary.qualityFailByCode.UNSERVED_SERVICE_PULSE, 1);
@@ -84,11 +84,11 @@ describe('scheduleAcceptance', () => {
       warnings: [],
     });
     assert.equal(summary.gatePassed, false);
-    assert.ok(summary.criteria.some((line) => line.includes('禁止發布')));
+    assert.ok(summary.criteria.some((line) => line.includes('禁止部署')));
     assert.ok(summary.criteria.some((line) => line.includes('班距')));
   });
 
-  it('設施交接、轉折點、缺移動、必要轉場失敗都擋發布（不只站位）', () => {
+  it('設施交接、轉折點、缺移動、必要轉場失敗都擋部署（不只站位）', () => {
     for (const code of [
       'FACILITY_HANDOVER_GAP',
       'FACILITY_SLOT_COLLISION',
@@ -105,7 +105,7 @@ describe('scheduleAcceptance', () => {
         errors: severity === 'error' ? [issue] : [],
         warnings: severity === 'warning' ? [issue] : [],
       });
-      assert.equal(summary.publishSafe, false, `${code} 應擋發布`);
+      assert.equal(summary.publishSafe, false, `${code} 應擋部署`);
       assert.equal(summary.gatePassed, false, `${code} 不得顯示驗收通過`);
     }
   });
@@ -117,7 +117,7 @@ describe('scheduleAcceptance', () => {
     assert.equal(summary.publishSafe, false);
   });
 
-  it('「不需要轉場卡」的策略說明不擋發布', () => {
+  it('「不需要轉場卡」的策略說明不擋部署', () => {
     const summary = evaluateScheduleAcceptance({
       ok: true,
       errors: [],

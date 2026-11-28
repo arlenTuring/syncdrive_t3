@@ -15,7 +15,7 @@
  *   （{@link SearchBudget.memo}）；整段後處理也依輸入狀態快取（generate.ts）。
  *
  * 用盡時各段搜尋停下、回傳目前最好的結果；仍有安全問題時由呼叫端標成「搜尋未完成」並
- * 禁止發布。<strong>用盡不代表無解</strong>——只代表這次沒有搜完。
+ * 禁止部署。<strong>用盡不代表無解</strong>——只代表這次沒有搜完。
  */
 
 export type SearchBudgetLimits = {

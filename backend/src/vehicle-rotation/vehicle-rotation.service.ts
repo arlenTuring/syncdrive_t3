@@ -183,6 +183,63 @@ function nextDayConflicts(
 }
 
 /**
+ * 接替車那一列當天、接替車動身之後的任務。輪替隔天才生效，這些單照計畫還是派給接替車，
+ * 但它已經開去別列的位置：場內整備、0 秒占位要取消（停在原格的整備改由回來的被換車接），
+ * 真的移動或載客就不能換（報告階段已避開，這裡再擋一次）。
+ * 動身時還在做的整備由 releaseIncoming 結束，不算在取消清單，但一樣交給回來的被換車。
+ */
+function sameDaySpareTasks(
+  planned: readonly PlannedDispatch[],
+  order: ShuntOrder,
+  inLeg: PlannedDispatch,
+  back: PlannedDispatch,
+): { cancelled: string[]; blocking: string | null; tasks: PlannedDispatch[] } {
+  const spareRow = planned.find((item) => item.vehicleCode === order.incoming)?.timelineRow;
+  const rowTasks = planned.filter(
+    (item) => item.timelineRow === spareRow && !/^RT\d/.test(item.tripCode) && item.arriveAt > inLeg.departAt,
+  );
+  const later = rowTasks.filter((item) => item.departAt >= inLeg.departAt);
+  const blocking = later.find((item) => item.kind !== 'maintenance' && item.origin?.name !== item.destination?.name);
+  return {
+    cancelled: later.map((item) => item.orderId),
+    blocking: blocking?.tripCode ?? null,
+    tasks: rowTasks.filter((item) => item.kind === 'maintenance' && item.arriveAt > back.arriveAt),
+  };
+}
+
+/**
+ * 被換車那一列取消掉、在接手位置上的整備（收班進場：進場後那一格的充電、待命），
+ * 改發給到位的接替車（role 'stay'），從到位起做到原本的結束時刻。不改派的話接替車停在那一格
+ * 手上沒有單，主系統不知道那一格有車，充電也沒做。
+ */
+function stayLegsFor(order: ShuntOrder, inLeg: PlannedDispatch, planned: readonly PlannedDispatch[], day: string): ShuntLeg[] {
+  const cancelled = new Set(order.window.cancelled.map((task) => task.order_id));
+  return planned
+    .filter(
+      (task) =>
+        cancelled.has(task.orderId) &&
+        task.kind === 'maintenance' &&
+        task.origin?.name === order.window.meetAt &&
+        task.arriveAt > inLeg.arriveAt,
+    )
+    .map((task) => {
+      const departAt = Math.max(task.departAt, inLeg.arriveAt);
+      return {
+        ...task,
+        orderId: `${task.orderId}-ST`,
+        vehicleCode: order.incoming,
+        departAt,
+        origin: task.origin && { ...task.origin, departAt },
+        role: 'stay' as const,
+        phase: 'hold' as const,
+        attempt: 1,
+        planDay: day,
+        planDepartAt: task.departAt,
+      };
+    });
+}
+
+/**
  * 取消掉的備用列場內任務，改發給回到格位的被換車（role 'rest'）。
  *
  * 只取消不改派的話，被換車回到格位後手上一張單都沒有：主系統不知道那一格停著車，模擬器重開也只能把它當
@@ -383,7 +440,9 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     const rows: Array<{ setting_value: { rules?: Partial<RotationRules>; deployedAt?: number } }> =
       await this.dataSource.query('SELECT setting_value FROM system_settings WHERE setting_key = $1', [RULES_KEY]);
     const saved = rows[0]?.setting_value;
-    return { rules: { ...DEFAULT_ROTATION_RULES, ...saved?.rules }, deployedAt: saved?.deployedAt ?? null };
+    // 舊版規則用格位（takeoverSlots）判斷，改成時間線後要重新選線；舊欄位不帶出去
+    const { takeoverSlots: _legacy, ...stored } = (saved?.rules ?? {}) as Partial<RotationRules> & { takeoverSlots?: unknown };
+    return { rules: { ...DEFAULT_ROTATION_RULES, ...stored }, deployedAt: saved?.deployedAt ?? null };
   }
 
   /** 部署規則。今天還沒確認的項目依新規則重排 */
@@ -540,11 +599,18 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
       const now = Date.now();
       for (const order of report.orders) {
         const shunts = this.shuntsFor(day, order, plan.planned);
+        const todaySpare = sameDaySpareTasks(plan.planned, order, shunts[0], shunts[1]);
+        if (todaySpare.blocking) {
+          report.blocked.push({ code: order.outgoing, reason: `接替車那個運用今天還有 ${todaySpare.blocking}，今天不換` });
+          continue;
+        }
         const spareTasks = nextDayConflicts(nextPlan?.planned ?? [], order, shunts[1], plan.planned);
         if (spareTasks.blocking) {
           report.blocked.push({ code: order.outgoing, reason: `${spareTasks.blocking} 在回到格位之前就要開始，今天不換` });
           continue;
         }
+        shunts.push(...stayLegsFor(order, shunts[0], plan.planned, day));
+        shunts.push(...restLegsFor(todaySpare.tasks, order, shunts[1], day));
         shunts.push(...restLegsFor(spareTasks.tasks, order, shunts[1], nextDay(day)));
         const confirmed = rules.mode === 'auto';
         await manager.query(
@@ -556,7 +622,11 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
             randomUUID(), day, nextDay(day), order.outgoing, order.incoming,
             confirmed ? 'confirmed' : 'pending',
             JSON.stringify(order), JSON.stringify(shunts),
-            JSON.stringify([...order.window.cancelled.map((task) => task.order_id), ...spareTasks.cancelled]),
+            JSON.stringify([
+              ...order.window.cancelled.map((task) => task.order_id),
+              ...todaySpare.cancelled,
+              ...spareTasks.cancelled,
+            ]),
             now, confirmed ? now : null, confirmed ? '自動執行' : null,
             JSON.stringify(confirmed ? [{ at: this.now(), kind: 'confirm', text: '自動執行確認' }] : []),
           ],
@@ -753,42 +823,94 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    if (!inDone) {
-      const deadline = window.takeoverDepartAt + window.moveInMs + IN_LATE_OK_MS;
-      if (lastIn.phase === 'queued') {
-        // 重發單還在等舊單結案：等到來不及就中止
-        if (now + window.moveInMs > deadline) this.abort(run, states, '重發的接替調車等不到舊單取消', now, dayPlan);
-        return;
-      }
-      // 只排除接替調車自己的單：車手上其他在跑的單（例如先做完的待命）才算忙
-      const busy = await this.store.busyVehicles([item.incoming], ins.map((leg) => leg.orderId));
-      const failure = legFailure(lastIn, st(lastIn), now, busy.has(item.incoming));
-      if (!failure) {
-        run.release = true;
-        return;
-      }
-      if (ins.length < MAX_ATTEMPTS && now + ISSUE_LEAD_MS + window.moveInMs <= deadline) {
-        this.queueRetry(run, states, 'in', now);
-        run.note('retry', `${item.incoming} 接替調車${failure}，系統重發第 ${ins.length} 次`);
-      } else {
-        this.abort(run, states, failure, now, dayPlan);
-      }
-      return;
-    }
-
-    // 接替車到位（原本那張晚到也算）：還在排隊的重發單收掉
-    for (const leg of ins) {
-      if (isActive(st(leg))) {
-        run.cancel(st(leg)!.orderId);
-        leg.superseded = true;
-      } else if (leg.phase === 'queued' && !st(leg)) {
-        // 還沒發出去的重發不用再發
-        leg.superseded = true;
-      }
-    }
     const outs = run.role('out');
     const lastOut = outs.at(-1)!;
-    if (lastOut.phase === 'hold') {
+    /*
+     * 收班進場：被換車下了最後一班不能停在月台等接替車到位（會擋住後面進站的車），照原本進場的時刻
+     * 開去接替車的格位。接替車已經出發、格位正在空出來就發回場；發出之後接替車出問題也不中止輪替
+     * （被換車已經不在月台，回不去原計畫），重發幾次還不行就原地待命，輪替照樣生效，跟回場失敗一樣。
+     */
+    if (!inDone && window.entry && lastOut.phase === 'hold') {
+      const started = ins.some((leg) => {
+        const state = st(leg);
+        return state != null && (state.status === 'PROCESSING' || state.status === 'END' || state.startedAt != null);
+      });
+      if (started) {
+        Object.assign(lastOut, retimed(lastOut, Math.max(now + ISSUE_LEAD_MS, window.outAt ?? lastOut.departAt)), {
+          phase: 'queued',
+          queuedAt: now,
+          waitFor: [],
+        });
+        run.note('out', `${item.incoming} 已出發，${item.outgoing} 下了最後一班直接開往 ${item.incoming} 的格位`, false);
+      }
+    }
+    const committed = window.entry === true && lastOut.phase !== 'hold';
+    if (!inDone && lastIn.strandAt != null) {
+      // 已放棄接替調車：車端確認停下（單都結案）才算原地待命
+      if (ins.every((leg) => isClosed(st(leg)))) {
+        lastIn.gaveUp = true;
+        run.note('in-strand', `${item.incoming} 接替調車未完成，車端已確認停車，原地待命；輪替已生效，之後的任務從目前位置出發`);
+      }
+    }
+    if (!inDone && lastIn.gaveUp) inDone = true;
+
+    if (!inDone && lastIn.strandAt == null) {
+      // 收班進場還沒發回場時：被換車在月台等，最晚到它原本進場的時刻多一點；再晚就中止，讓它照原計畫進場
+      const deadline = committed
+        ? Infinity
+        : window.entry && window.outAt
+          ? window.outAt + ISSUE_LEAD_MS
+          : window.takeoverDepartAt + window.moveInMs + IN_LATE_OK_MS;
+      if (lastIn.phase === 'queued') {
+        // 重發單還在等舊單結案：等到來不及就中止
+        if (now + window.moveInMs > deadline) {
+          this.abort(run, states, '重發的接替調車等不到舊單取消', now, dayPlan);
+          return;
+        }
+        if (!committed) return;
+      } else if (window.entry && !committed && now > deadline) {
+        // 被換車已經在月台等過了它原本進場的時刻：不再等接替車出發
+        this.abort(run, states, '到了被換車該進場的時刻還沒出發', now, dayPlan);
+        return;
+      } else {
+        // 只排除接替調車自己的單：車手上其他在跑的單（例如先做完的待命）才算忙
+        const busy = await this.store.busyVehicles([item.incoming], ins.map((leg) => leg.orderId));
+        const failure = legFailure(lastIn, st(lastIn), now, busy.has(item.incoming));
+        if (!failure) {
+          run.release = true;
+          if (!committed) return;
+        } else if (ins.length < MAX_ATTEMPTS && now + ISSUE_LEAD_MS + window.moveInMs <= deadline) {
+          this.queueRetry(run, states, 'in', now);
+          run.note('retry', `${item.incoming} 接替調車${failure}，系統重發第 ${ins.length} 次`);
+          if (!committed) return;
+        } else if (committed) {
+          for (const leg of ins) {
+            const state = st(leg);
+            if (state && (isActive(state) || (state.status === 'FAULTED' && !state.cancelRequestedAt))) run.cancel(state.orderId, true);
+          }
+          lastIn.strandAt = now;
+          run.note('in-strand-request', `${item.incoming} 接替調車重發後仍${failure}，系統停止接替調車，等車端確認停車`);
+        } else {
+          this.abort(run, states, failure, now, dayPlan);
+          return;
+        }
+      }
+    }
+
+    if (inDone) {
+      // 接替車到位（原本那張晚到也算）：還在排隊的重發單收掉
+      for (const leg of ins) {
+        if (isActive(st(leg))) {
+          run.cancel(st(leg)!.orderId);
+          leg.superseded = true;
+        } else if (leg.phase === 'queued' && !st(leg)) {
+          // 還沒發出去的重發不用再發
+          leg.superseded = true;
+        }
+      }
+      if (!lastIn.gaveUp) this.releaseStay(run, now);
+    }
+    if (inDone && lastOut.phase === 'hold') {
       // 接替車到位、原格位空出來才發回場；接替車的重發單要先確認結案
       Object.assign(lastOut, retimed(lastOut, Math.max(now + ISSUE_LEAD_MS, lastOut.departAt)), {
         phase: 'queued',
@@ -796,7 +918,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
         waitFor: ins.map(st).filter(isActive).map((state) => state!.orderId),
       });
       run.note('out', `${item.incoming} 已到位，發出 ${item.outgoing} 回場調車`, false);
-    } else if (!outs.some((leg) => st(leg)?.status === 'END') && !lastOut.gaveUp) {
+    } else if (lastOut.phase !== 'hold' && !outs.some((leg) => st(leg)?.status === 'END') && !lastOut.gaveUp) {
       if (lastOut.strandAt != null) {
         // 已放棄回場：車端確認停下（單都結案）才算原地待命，不能把還在動的車當成已放掉入口
         if (outs.every((leg) => isClosed(st(leg)))) {
@@ -821,10 +943,31 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     }
 
     const outSettled = outs.some((leg) => st(leg)?.status === 'END') || outs.some((leg) => leg.gaveUp);
-    if (!outSettled) return;
+    if (!outSettled || !inDone) return;
     this.releaseRest(run, outs.some((leg) => st(leg)?.status === 'END'), now);
     const takeover = await this.takeover(item);
     if (takeover.done) run.finish = takeover;
+  }
+
+  /** 接替車到位：接手位置上的整備改發給它（stayLegsFor），已經過了結束時刻的就不發 */
+  private releaseStay(run: Run, now: number): void {
+    for (const leg of run.role('stay')) {
+      if (leg.phase !== 'hold' || leg.superseded) continue;
+      const departAt = Math.max(now + ISSUE_LEAD_MS, leg.departAt);
+      if (departAt >= leg.arriveAt) {
+        leg.superseded = true;
+        run.note('stay-skip', `${leg.vehicleCode} 到位時 ${leg.tripCode} 已經過了結束時間，不接`, false);
+        continue;
+      }
+      Object.assign(leg, {
+        departAt,
+        origin: leg.origin && { ...leg.origin, departAt },
+        phase: 'queued',
+        queuedAt: now,
+        waitFor: [],
+      });
+      run.note('stay', `${leg.vehicleCode} 到位，接手 ${leg.tripCode}（到原本的結束時刻）`, false);
+    }
   }
 
   /**
@@ -970,6 +1113,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     }
     // 輪替沒成：備用列的任務照原計畫由接替車（原備用車）做，不改派給被換車
     for (const leg of run.role('rest')) leg.superseded = true;
+    for (const leg of run.role('stay')) leg.superseded = true;
     // 派遣不要再發的：只剩這裡補發的那幾張（更晚的照原計畫）
     run.cancelledOrderIds = overdue.map((task) => task.orderId);
     run.status = 'aborted';
@@ -1191,7 +1335,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     const rowTasks = plan.planned
       .filter((task) => task.timelineRow === row && !/^RT\d/.test(task.tripCode))
       .sort((a, b) => a.departAt - b.departAt);
-    if (rowTasks.length === 0) return { done: true, detail: `第 ${row} 列 ${item.effective_day} 沒有任務`, at: null };
+    if (rowTasks.length === 0) return { done: true, detail: `第 ${row} 運用 ${item.effective_day} 沒有任務`, at: null };
     // 第一個有效的任務：被中心端取消、從沒開始過的不算（例如接班前被收掉的單）
     const head = rowTasks.slice(0, 8);
     const headStates = await this.store.ordersFor(head.map((task) => task.orderId));
@@ -1210,7 +1354,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     const first = own[0];
     return first
       ? { done: true, served: true, detail: `${item.incoming} 開始 ${target.tripCode}`, at: first.startedAt }
-      : { done: false, detail: `${item.incoming} 接第 ${row} 列，等 ${target.tripCode} 開始`, at: target.departAt };
+      : { done: false, detail: `${item.incoming} 接第 ${row} 運用，等 ${target.tripCode} 開始`, at: target.departAt };
   }
 
   /**
@@ -1300,7 +1444,7 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
       },
       {
         key: 'takeover', label: '承接班次',
-        detail: takeover?.detail ?? `${incoming} 接第 ${window.row} 列，${item.effective_day} 第一班開始`,
+        detail: takeover?.detail ?? `${incoming} 接第 ${window.row} 運用，${item.effective_day} 第一班開始`,
         ...(takeover && takeoverStatus === 'done' ? time(takeover.at, null) : time(null, takeover?.at ?? null)),
         status: takeoverStatus,
       },
@@ -1377,7 +1521,8 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
       report_generated_at: report ? Number(report.generated_at) : null,
       blocked: report?.blocked ?? [],
       items,
-      slot_options: [...new Set(tasks.filter((task) => task.kind === 'maintenance').map((task) => task.origin))].sort(),
+      // 規則視窗選時間線用：部署中班表的每一條時間線（當天沒任務的也列）；沒有部署中的班表時是 null
+      row_options: plan ? plan.rows : null,
     };
   }
 
@@ -1414,7 +1559,8 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
         return {
           ...view,
           next_rotation_km: nextRotationKm(car, rules),
-          blockers: takeoverBlockers(car, rules, view.location, start),
+          takeover_row: rules.takeoverRows.includes(car.row),
+          blockers: takeoverBlockers(car, rules, start),
         };
       }),
     };
@@ -1462,10 +1608,12 @@ function parseRules(input: unknown): RotationRules {
   const isTime = (text: unknown): text is string => typeof text === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(text);
   const intervalKm = Number(value.intervalKm);
   if (!Number.isFinite(intervalKm) || intervalKm < 1) throw new BadRequestException('里程基數至少要 1 公里');
-  const slots = Array.isArray(value.takeoverSlots) ? value.takeoverSlots.filter((slot) => typeof slot === 'string') : [];
-  if (slots.length === 0) throw new BadRequestException('至少要加入一個可接替格位');
+  const rows = Array.isArray(value.takeoverRows)
+    ? [...new Set(value.takeoverRows.map(Number).filter((row) => Number.isInteger(row) && row >= 1))].sort((a, b) => a - b)
+    : [];
+  if (rows.length === 0) throw new BadRequestException('至少要加入一條可接替的運用');
   if (!isTime(value.windowStart) || !isTime(value.windowEnd)) throw new BadRequestException('期望執行時段格式不對');
   if (value.mode !== 'confirm' && value.mode !== 'auto') throw new BadRequestException('執行方式不對');
   if (!isTime(value.reportBy)) throw new BadRequestException('報告產出時間格式不對');
-  return { intervalKm, takeoverSlots: slots, windowStart: value.windowStart, windowEnd: value.windowEnd, mode: value.mode, reportBy: value.reportBy };
+  return { intervalKm, takeoverRows: rows, windowStart: value.windowStart, windowEnd: value.windowEnd, mode: value.mode, reportBy: value.reportBy };
 }

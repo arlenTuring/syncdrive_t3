@@ -164,7 +164,7 @@ describe('planDispatches', () => {
     expect(skipped).toEqual([
       {
         tripCode: 'A09-0800',
-        reason: '時間線第 9 列沒有對應車輛（車隊只有 3 台）',
+        reason: '第 9 運用沒有對應車輛（車隊只有 3 台）',
       },
     ]);
   });

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   MaintenanceTask,
-  MaintenanceTaskPublishStatus,
   MaintenanceTaskUsageStatus,
 } from '../database/entities/maintenance-task.entity';
 
@@ -34,7 +33,6 @@ export class MaintenanceTaskSeedService implements OnApplicationBootstrap {
         this.repo.create({
           id: row.id,
           name: row.name,
-          publishStatus: MaintenanceTaskPublishStatus.PUBLISHED,
           usageStatus: row.usageStatus,
           body: {},
           createdAt: row.createdAt,

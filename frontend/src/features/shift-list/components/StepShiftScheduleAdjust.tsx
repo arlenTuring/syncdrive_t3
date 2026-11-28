@@ -554,7 +554,7 @@ function CheckReport({
             {t('shiftList.scheduleAdjust.qualityPassed')}
           </p>
         ) : (
-          // 品質（班距、班次數）沒達標不擋發布，是提醒不是錯誤：用警告色，紅色只留給安全檢查不通過
+          // 品質（班距、班次數）沒達標不擋部署，是提醒不是錯誤：用警告色，紅色只留給安全檢查不通過
           <p className="flex items-center gap-2 rounded-lg bg-status-warning-light px-4 py-2.5 text-body-s text-status-warning-emphasis">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />
             {t('shiftList.scheduleAdjust.qualityFailed')}
@@ -1302,7 +1302,7 @@ export function StepShiftScheduleAdjust({
     draft.routeGroups.collisionProtectionSeconds,
   ]);
 
-  // 發布前檢查：可重跑的動作。班表可以手動改，所以指紋對不上就回到「未檢查」
+  // 部署前檢查：可重跑的動作。班表可以手動改，所以指紋對不上就回到「未檢查」
   // 路線停靠、保護時間等設定改了，舊的檢查結果不能沿用（路網在發布時由後端重驗）
   const publishSettingsFingerprint = useMemo(
     () => buildSafetySettingsFingerprint({
@@ -1319,7 +1319,7 @@ export function StepShiftScheduleAdjust({
       draft.routeGroups.transitionCardCodes,
     ],
   );
-  // 班次代號檢查（設定＋展開後重複）：畫面即時列出；發布檢查時併進結果擋發布
+  // 班次代號檢查（設定＋展開後重複）：畫面即時列出；發布檢查時併進結果擋部署
   const cardCodeCheck = useMemo(
     () => checkPlanCardCodes({
       plan,
@@ -1353,7 +1353,7 @@ export function StepShiftScheduleAdjust({
         topology: catalog.pointTopology,
       });
       const checked = toPublishCheckRecord(result, new Date().toISOString());
-      // 設定指紋跟畫面上的比對值一致（含過渡卡代號）；代號衝突也擋發布
+      // 設定指紋跟畫面上的比對值一致（含過渡卡代號）；代號衝突也擋部署
       const codeProblems = cardCodeCheck.lines.length;
       const record = {
         ...checked,
@@ -1644,7 +1644,7 @@ export function StepShiftScheduleAdjust({
               data-card-code-issues={cardCodeCheck.lines.length}
             >
               <div className="mb-1 font-semibold text-status-error-emphasis">
-                班次代號檢查未通過（禁止發布／採用；草稿可保存）：請調整代號或計畫安排
+                班次代號檢查未通過（禁止部署／採用；仍可儲存）：請調整代號或計畫安排
               </div>
               <ul className="list-disc space-y-0.5 pl-4">
                 {cardCodeCheck.lines.map((line) => (

@@ -16,6 +16,7 @@ export const FACILITY_SECTION_BY_TASK_TYPE: Partial<
   charging: 'charging',
   inspection: 'preTrip',
   standby: 'mobile',
+  maneuver: 'maneuver',
   servicing: 'maintenance',
   washing: 'carWash',
 };
@@ -25,6 +26,7 @@ export const YARD_TASK_TYPES = new Set<string>([
   'charging',
   'inspection',
   'standby',
+  'maneuver',
   'servicing',
   'washing',
 ]);

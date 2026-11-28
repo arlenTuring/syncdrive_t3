@@ -854,7 +854,7 @@ describe('DispatchEngineService.planForShift（模擬器依班表 ID 載入）',
     expect(plan.skipped).toEqual([
       {
         tripCode: 'D0901',
-        reason: '時間線第 3 列沒有對應車輛（車隊只有 2 台）',
+        reason: '第 3 運用沒有對應車輛（車隊只有 2 台）',
       },
     ]);
   });

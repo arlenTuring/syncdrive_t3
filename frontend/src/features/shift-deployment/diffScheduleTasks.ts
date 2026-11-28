@@ -37,6 +37,7 @@ const TASK_LABEL: Partial<Record<ScheduleEngineTaskType, string>> = {
   servicing: '保養',
   washing: '洗車',
   standby: '待命',
+  maneuver: '機動',
   dispatch: '調度',
 };
 
@@ -47,6 +48,7 @@ const TASK_TAG_STYLE: Partial<Record<ScheduleEngineTaskType, StatusTagStyle>> = 
   servicing: { container: 'bg-[rgba(173,70,255,0.2)]', dot: 'bg-[#AD46FF]' },
   washing: { container: 'bg-[rgba(0,184,219,0.2)]', dot: 'bg-[#00B8DB]' },
   standby: { container: 'bg-surface-secondary', dot: 'bg-[#D4D4D8]' },
+  maneuver: { container: 'bg-orange-500/20', dot: 'bg-orange-500' },
   dispatch: { container: 'bg-[rgba(56,189,248,0.2)]', dot: 'bg-[#38BDF8]' },
   idle: { container: 'bg-surface-secondary', dot: 'bg-status-inactive' },
 };

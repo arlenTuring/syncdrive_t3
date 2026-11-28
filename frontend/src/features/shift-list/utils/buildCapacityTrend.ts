@@ -936,7 +936,7 @@ export function formatCapacityGapHint(args: {
   const actualHw = args.actualHeadwaySeconds;
   const targetHw = args.targetHeadwaySeconds;
   if (actualHw != null && targetHw != null && actualHw > targetHw) {
-    return `低於目標：等效班距 ${actualHw} 秒（目標 ${targetHw} 秒）。可增加時間線、減少整備佔用，或放寬該時段目標班距後重新生成。`;
+    return `低於目標：等效班距 ${actualHw} 秒（目標 ${targetHw} 秒）。可增加運用、減少整備佔用，或放寬該時段目標班距後重新生成。`;
   }
-  return '低於目標：此區間實際發車偏疏。可增加時間線、減少整備佔用，或調整該時段班距後重新生成。';
+  return '低於目標：此區間實際發車偏疏。可增加運用、減少整備佔用，或調整該時段班距後重新生成。';
 }

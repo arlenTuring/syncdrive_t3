@@ -1,6 +1,5 @@
 import {
   OperationShift,
-  OperationShiftPublishStatus,
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 
@@ -22,8 +21,8 @@ export const OPERATION_SHIFT_PUBLISH_CHECK_LABEL: Record<
   string
 > = {
   unchecked: '未檢查',
-  blocked: '禁止發布',
-  ready: '可發布',
+  blocked: '禁止部署',
+  ready: '可部署',
 };
 
 /**
@@ -77,11 +76,9 @@ export type OperationShiftListItem = {
   /** 建立方式：參數生成 / 手動製作 */
   creation_mode: 'parametric' | 'manual';
   creation_mode_label: string;
-  publish_status: OperationShiftPublishStatus;
-  publish_status_label: string;
   usage_status: OperationShiftUsageStatus;
   usage_status_label: string;
-  /** 發布前檢查狀態（站位重疊／碰撞保護）；與 publish_status 是兩件事 */
+  /** 部署前檢查狀態（站位重疊／碰撞保護） */
   publish_check_state: OperationShiftPublishCheckState;
   publish_check_label: string;
   created_at: string;
@@ -119,14 +116,9 @@ export function formatOperationShiftTimestamp(
 export function operationShiftUsageStatusLabel(
   status: OperationShiftUsageStatus,
 ): string {
-  return status === OperationShiftUsageStatus.IN_USE ? '使用中' : '閒置中';
+  return status === OperationShiftUsageStatus.IN_USE ? '使用中' : '未使用';
 }
 
-export function operationShiftPublishStatusLabel(
-  status: OperationShiftPublishStatus,
-): string {
-  return status === OperationShiftPublishStatus.PUBLISHED ? '已發布' : '草稿區';
-}
 
 export function operationShiftCreationModeLabel(
   mode: 'parametric' | 'manual',
@@ -192,8 +184,6 @@ export function toOperationShiftListItem(
     version: version || '—',
     creation_mode: creationMode,
     creation_mode_label: operationShiftCreationModeLabel(creationMode),
-    publish_status: row.publishStatus,
-    publish_status_label: operationShiftPublishStatusLabel(row.publishStatus),
     usage_status: row.usageStatus,
     usage_status_label: operationShiftUsageStatusLabel(row.usageStatus),
     publish_check_state: publishCheckState,

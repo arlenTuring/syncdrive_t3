@@ -141,7 +141,7 @@ describe('buildVehicleDistribution（營運分佈）', () => {
       ['STANDBY', 2, ['PMS07', 'PMS08']],
     ]);
     expect(rows.reduce((sum, row) => sum + row.vehicle_count, 0)).toBe(8);
-    expect(rows[1].vehicles[2].reason).toContain('班表時間線補算');
+    expect(rows[1].vehicles[2].reason).toContain('班表運用補算');
     expect(rows[2].vehicles[1].reason).toBe('此刻沒有有效任務');
     expect(rows.flatMap((row) => row.vehicles).filter((v) => v.dispatchable).map((v) => v.vehicle_code)).toEqual(['PMS07', 'PMS08']);
   });

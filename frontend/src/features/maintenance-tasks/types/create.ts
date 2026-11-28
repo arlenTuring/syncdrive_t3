@@ -4,17 +4,18 @@ import {
   isPositiveIntegerUpTo,
 } from '../utils/numericInput';
 
-export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CreateMaintenanceTaskStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-/** 目前步驟總數（第 7 步是任務檢視） */
-export const MAINTENANCE_STEP_COUNT = 7;
+/** 目前步驟總數（第 8 步是任務檢視） */
+export const MAINTENANCE_STEP_COUNT = 8;
 
 /**
  * 表單資料版本。
  * - 1：舊版。調度任務廢除前（2026-08-10，8 步）與之後（7 步）都寫 1，分不出步驟編號。
- * - 2：步驟號一律是目前的 7 步編號，讀回不換算。
+ * - 2：7 步編號（第 7 步是任務檢視）。2026-11-28 在待命後面加了機動，讀回時第 7 步換成第 8 步。
+ * - 3：步驟號一律是目前的 8 步編號，讀回不換算。
  */
-export const MAINTENANCE_EDITOR_VERSION = 2;
+export const MAINTENANCE_EDITOR_VERSION = 3;
 
 /**
  * 把舊草稿存的步驟號換算成現在的步驟號。
@@ -25,11 +26,13 @@ export const MAINTENANCE_EDITOR_VERSION = 2;
  * 舊 1–4 不動；舊 5（調度，已廢）落到現在的第 5 步（行檢）——那一步本來就是
  * 它的下一步；舊 6→5、7→6、8→7。
  */
-function migrateStoredStep(raw: unknown, legacyEightSteps: boolean): CreateMaintenanceTaskStep {
+function migrateStoredStep(raw: unknown, legacyEightSteps: boolean, sevenSteps: boolean): CreateMaintenanceTaskStep {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1;
   const old = Math.round(raw);
   if (old < 1) return 1;
-  const next = !legacyEightSteps || old <= 4 ? old : Math.max(5, old - 1);
+  const sevenStep = !legacyEightSteps || old <= 4 ? old : Math.max(5, old - 1);
+  // 7 步編號的第 7 步是任務檢視，現在任務檢視是第 8 步（第 7 步是新加的機動）
+  const next = sevenSteps && sevenStep >= 7 ? sevenStep + 1 : sevenStep;
   return Math.min(MAINTENANCE_STEP_COUNT, next) as CreateMaintenanceTaskStep;
 }
 
@@ -55,7 +58,8 @@ export const CREATE_MAINTENANCE_TASK_STEPS: Array<{
   { step: 4, label: '保養任務' },
   { step: 5, label: '行檢任務' },
   { step: 6, label: '待命任務' },
-  { step: 7, label: '任務檢視' },
+  { step: 7, label: '機動任務' },
+  { step: 8, label: '任務檢視' },
 ];
 
 export type MaintenanceTaskBasicDraft = {
@@ -134,6 +138,12 @@ export type StationDurationTaskDraft = {
 export type MaintenanceTaskPreTripDraft = StationDurationTaskDraft;
 
 export type MaintenanceTaskMobileDraft = StationDurationTaskDraft;
+
+/**
+ * 機動：備用車候用的專用停車格。排班規則跟待命一樣，只是設施（停車格）分開，
+ * 車輛輪替才分得出哪一條線是備用線。
+ */
+export type MaintenanceTaskManeuverDraft = StationDurationTaskDraft;
 
 /**
  * 調度任務：只負責<strong>載入調度設施</strong>，沒有觸發條件也沒有作業時長。
@@ -221,6 +231,7 @@ export type MaintenanceTaskCreateDraft = {
   maintenance: MaintenanceTaskMaintenanceDraft;
   preTrip: MaintenanceTaskPreTripDraft;
   mobile: MaintenanceTaskMobileDraft;
+  maneuver: MaintenanceTaskManeuverDraft;
   currentStep: CreateMaintenanceTaskStep;
   maxReachedStep: CreateMaintenanceTaskStep;
   /**
@@ -267,6 +278,14 @@ export function emptyMaintenanceTaskPreTripDraft(): MaintenanceTaskPreTripDraft 
 
 export function emptyMaintenanceTaskMobileDraft(): MaintenanceTaskMobileDraft {
   return emptyStationDurationTaskDraft();
+}
+
+/**
+ * 機動預設不啟用：舊的整備任務沒有這一步，模板沒排機動就不需要停車格。
+ * 時長一律照時間模板，沒有作業時長可填。
+ */
+export function emptyMaintenanceTaskManeuverDraft(): MaintenanceTaskManeuverDraft {
+  return { ...emptyStationDurationTaskDraft(), stepEnabled: false };
 }
 
 
@@ -413,6 +432,7 @@ export function emptyMaintenanceTaskCreateDraft(): MaintenanceTaskCreateDraft {
     maintenance: emptyMaintenanceTaskMaintenanceDraft(),
     preTrip: emptyMaintenanceTaskPreTripDraft(),
     mobile: emptyMaintenanceTaskMobileDraft(),
+    maneuver: emptyMaintenanceTaskManeuverDraft(),
     currentStep: 1,
     maxReachedStep: 1,
     editorCompletedAt: null,
@@ -630,7 +650,7 @@ function parseMaintenanceDraft(body: Record<string, unknown>): MaintenanceTaskMa
 
 function parseStationDurationDraft(
   body: Record<string, unknown>,
-  key: 'preTrip' | 'mobile',
+  key: 'preTrip' | 'mobile' | 'maneuver',
   empty: () => StationDurationTaskDraft,
 ): StationDurationTaskDraft {
   const section =
@@ -673,6 +693,12 @@ function parsePreTripDraft(body: Record<string, unknown>): MaintenanceTaskPreTri
 
 function parseMobileDraft(body: Record<string, unknown>): MaintenanceTaskMobileDraft {
   return parseStationDurationDraft(body, 'mobile', emptyMaintenanceTaskMobileDraft);
+}
+
+function parseManeuverDraft(body: Record<string, unknown>): MaintenanceTaskManeuverDraft {
+  // 沒有這一段（機動加入前的整備任務）＝不啟用
+  if (!body.maneuver || typeof body.maneuver !== 'object') return emptyMaintenanceTaskManeuverDraft();
+  return parseStationDurationDraft(body, 'maneuver', emptyMaintenanceTaskManeuverDraft);
 }
 
 export function serializeMaintenanceTaskBody(
@@ -752,6 +778,17 @@ export function serializeMaintenanceTaskBody(
       operationDurationMinutes: draft.mobile.operationDurationMinutes,
       durationFollowTemplate: draft.mobile.durationFollowTemplate !== false,
     },
+    maneuver: {
+      stepEnabled: draft.maneuver.stepEnabled,
+      equipmentRows: draft.maneuver.equipmentRows.map((row) => ({
+        id: row.id,
+        ...serializeEquipmentIdentity(row),
+        mapCode: row.mapCode,
+        ...(row.waypointCode ? { waypointCode: row.waypointCode } : {}),
+      })),
+      // 機動的時長一律照時間模板
+      durationFollowTemplate: true,
+    },
   };
 }
 
@@ -760,10 +797,11 @@ export function buildMaintenanceTaskDraftFromStored(
   body: Record<string, unknown>,
 ): MaintenanceTaskCreateDraft {
   const legacy = isLegacyEightStepBody(body);
-  const currentStep = migrateStoredStep(body.currentStep, legacy);
+  const sevenSteps = (typeof body.editorVersion === 'number' ? body.editorVersion : 1) < MAINTENANCE_EDITOR_VERSION;
+  const currentStep = migrateStoredStep(body.currentStep, legacy, sevenSteps);
   const maxReachedStepRaw =
     typeof body.maxReachedStep === 'number'
-      ? migrateStoredStep(body.maxReachedStep, legacy)
+      ? migrateStoredStep(body.maxReachedStep, legacy, sevenSteps)
       : currentStep;
   const editorCompletedAt =
     body.editorStatus === 'completed' && typeof body.editorCompletedAt === 'string' && body.editorCompletedAt
@@ -785,6 +823,7 @@ export function buildMaintenanceTaskDraftFromStored(
     maintenance: parseMaintenanceDraft(body),
     preTrip: parsePreTripDraft(body),
     mobile: parseMobileDraft(body),
+    maneuver: parseManeuverDraft(body),
     currentStep,
     maxReachedStep,
     editorCompletedAt,
@@ -893,7 +932,7 @@ export function isStationDurationStepComplete(task: StationDurationTaskDraft): b
  */
 export function stationDurationIncompleteReason(
   task: StationDurationTaskDraft,
-  options: { durationMayFollowTemplate?: boolean } = {},
+  options: { durationMayFollowTemplate?: boolean; durationAlwaysFollowsTemplate?: boolean } = {},
 ): string | null {
   const normalized = normalizeStationDurationDraft(task);
   if (!normalized.stepEnabled) return null;
@@ -902,7 +941,8 @@ export function stationDurationIncompleteReason(
   if (normalized.equipmentRows.some((row) => row.unresolved)) {
     return '有設施在目前地圖上找不到，請改選或刪除該列';
   }
-  const followsTemplate = options.durationMayFollowTemplate === true && normalized.durationFollowTemplate !== false;
+  const followsTemplate = options.durationAlwaysFollowsTemplate === true
+    || (options.durationMayFollowTemplate === true && normalized.durationFollowTemplate !== false);
   if (!followsTemplate && !isPositiveInteger(normalized.operationDurationMinutes)) {
     return '請填單次作業時長（正整數分鐘）';
   }
@@ -926,6 +966,7 @@ export function isCreateMaintenanceTaskStepComplete(
   if (step === 4) return isMaintenanceStepComplete(draft.maintenance);
   if (step === 5) return isPreTripStepComplete(draft.preTrip);
   if (step === 6) return isMobileStepComplete(draft.mobile);
+  if (step === 7) return stationDurationIncompleteReason(draft.maneuver, { durationAlwaysFollowsTemplate: true }) === null;
   return true;
 }
 
@@ -937,6 +978,7 @@ export function createMaintenanceTaskStepIncompleteReason(
 ): string | null {
   if (step === 5) return stationDurationIncompleteReason(draft.preTrip);
   if (step === 6) return stationDurationIncompleteReason(draft.mobile, { durationMayFollowTemplate: true });
+  if (step === 7) return stationDurationIncompleteReason(draft.maneuver, { durationAlwaysFollowsTemplate: true });
   if (isCreateMaintenanceTaskStepComplete(step, draft, options)) return null;
   if (step === 1) return '請填寫名稱與版本（名稱不可重複）';
   return '這一步還有必填欄位或設施沒有設定完成';

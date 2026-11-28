@@ -1175,6 +1175,71 @@ describe('insertMaintenanceTransferCards（入廠 MI／出廠 MO／整備間轉�
     });
   });
 
+  describe('機動：跟待命同一套規則，但只停機動自己的停車格', () => {
+    function topology(): PointTopology {
+      return {
+        ...emptyPointTopology(),
+        nodes: [
+          { id: 'n-t3', kind: 'docking', label: 'T3上行', stationId: 'station_t3', x: 0, y: 0, color: '#111' },
+          { id: 'M1', kind: 'facility', label: 'M1', x: 0, y: 0, color: '#222' },
+          { id: 'H2', kind: 'facility', label: 'H2', x: 0, y: 0, color: '#222' },
+        ],
+        edges: [edge('n-t3', 'M1', 60), edge('M1', 'n-t3', 60), edge('n-t3', 'H2', 60), edge('H2', 'n-t3', 60)],
+      };
+    }
+
+    it('待命停待命的格子，機動停機動的格子，彼此不借用', () => {
+      const timelines = [
+        { row: 1, blocks: [{
+          id: 'standby-1', timelineRow: 1, taskType: 'standby', label: '待命',
+          anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+          travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+        }] },
+        { row: 2, blocks: [{
+          id: 'maneuver-1', timelineRow: 2, taskType: 'maneuver', label: '機動',
+          anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+          travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+        }] },
+      ] as never as GeneratedSchedulePlan['timelines'];
+
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: {
+          mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'M1' }] },
+          maneuver: { stepEnabled: true, equipmentRows: [{ id: 'b', mapCode: 'H2' }] },
+        },
+        selectedRoutes: [],
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: { ...SECTION_CODES, maneuver: 'V' },
+      });
+
+      assert.equal(timelines[0]!.blocks.find((b) => b.id === 'standby-1')!.yardFacilityLabel, 'M1');
+      assert.equal(timelines[1]!.blocks.find((b) => b.id === 'maneuver-1')!.yardFacilityLabel, 'H2');
+    });
+
+    it('機動沒有設定停車格就排不進去，不會偷停待命的格子', () => {
+      const timelines = [{ row: 1, blocks: [{
+        id: 'maneuver-1', timelineRow: 1, taskType: 'maneuver', label: '機動',
+        anchorStartMinute: 8 * 60, plannedStartMinute: 8 * 60, plannedEndMinute: 11 * 60,
+        travelSeconds: 0, dwellSeconds: 0, source: 'template_bar',
+      }] }] as never as GeneratedSchedulePlan['timelines'];
+
+      insertMaintenanceTransferCards({
+        timelines,
+        topology: topology(),
+        maintenanceBody: { mobile: { stepEnabled: true, equipmentRows: [{ id: 'a', mapCode: 'M1' }] } },
+        selectedRoutes: [],
+        minimumRecoveryTimeSeconds: 0,
+        collisionProtectionSeconds: 0,
+        sectionCodes: SECTION_CODES,
+      });
+
+      assert.equal(timelines[0]!.blocks.find((b) => b.id === 'maneuver-1')!.yardFacilityLabel, undefined);
+    });
+  });
+
   describe('待命停在正線停靠站：真的把那一格佔住', () => {
     function topology(): PointTopology {
       return {

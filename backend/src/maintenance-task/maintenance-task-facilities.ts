@@ -22,6 +22,7 @@ export const EQUIPMENT_SECTION_KEYS = [
   'carWash',
   'maintenance',
   'mobile',
+  'maneuver',
 ] as const;
 
 export type MapFacilityRef = { id: string; name: string };

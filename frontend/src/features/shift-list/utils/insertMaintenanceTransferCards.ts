@@ -47,6 +47,7 @@ import {
   type GeneratedScheduleBlock,
   type GeneratedSchedulePlan,
 } from './schedule-engine/types';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 /**
  * 整備轉場卡（入廠／出廠／整備間轉場）
@@ -363,6 +364,8 @@ export type MaintenanceTransferCardsResult = {
   standbyRelocations: Array<{
     timelineRow: number;
     blockId: string;
+    /** 待命或機動 */
+    taskType: string;
     fromLabel: string;
     toLabel: string;
     /** 換過去的位置（節點 id）；呼叫端要「再換一個」時用來排除 */
@@ -543,7 +546,7 @@ export function insertMaintenanceTransferCards(args: {
     // 待命（standby）可以停在正線停靠站上候用，所以它的可用節點含 docking；
     // 其他整備任務一定要進實體設施格（充電要有充電樁、保養要有維修坑），
     // 不能佔著正線站位當工作區。整備任務 UI 也只有待命那一步會把停靠站列進來。
-    const allowDocking = taskType === 'standby';
+    const allowDocking = isStandbyLikeTaskType(taskType);
     return topology.nodes.filter(
       (node) =>
         (node.kind === 'facility' || (allowDocking && node.kind === 'docking'))
@@ -625,7 +628,7 @@ export function insertMaintenanceTransferCards(args: {
   }
   function describeBlocker(blocker: FacilityBlocker): string {
     const label = nodeById.get(blocker.nodeId)?.label || blocker.nodeId;
-    const who = `時間線 ${blocker.blockingRow}${blocker.blockingBlockId ? `（卡片 ${blocker.blockingBlockId}）` : ''}`;
+    const who = `運用 ${blocker.blockingRow}${blocker.blockingBlockId ? `（卡片 ${blocker.blockingBlockId}）` : ''}`;
     const occupied = `${formatSecondOfDay(blocker.occupiedFrom)}–${formatSecondOfDay(blocker.occupiedTo)}`;
     const wanted = `${formatSecondOfDay(blocker.wantedFrom)}–${formatSecondOfDay(blocker.wantedTo)}`;
     const what = blocker.kind === 'mainline-berth'
@@ -662,7 +665,7 @@ export function insertMaintenanceTransferCards(args: {
       const standbyBlockIds = new Set<string>();
       for (const timeline of timelines) {
         for (const block of timeline.blocks) {
-          if (block.taskType === 'standby') standbyBlockIds.add(block.id);
+          if (isStandbyLikeTaskType(block.taskType)) standbyBlockIds.add(block.id);
         }
       }
       const occupancies = collectStationBerthOccupancies(timelines, selectedRoutes, {
@@ -942,7 +945,7 @@ export function insertMaintenanceTransferCards(args: {
     for (const timeline of timelines) {
       for (const block of timeline.blocks) {
         if (block.id === standbyBlock.id) continue;
-        if (block.taskType === 'standby') continue;
+        if (isStandbyLikeTaskType(block.taskType)) continue;
         if (!YARD_TASK_TYPES.has(block.taskType)) continue;
         // 已經有地方停的不必替它保留——它的佔用本來就在 bookings 裡擋著了
         if (yardBlockFacility.has(block.id)) continue;
@@ -979,7 +982,7 @@ export function insertMaintenanceTransferCards(args: {
       return false;
     }
     // 設施優先：待命不准拿走真整備同一時間需要、而且還沒著落的格子
-    if (block.taskType === 'standby') {
+    if (isStandbyLikeTaskType(block.taskType)) {
       const reservedFor = facilityReservedForRealYardTask(facilityNodeId, block, startSecond, endSecond);
       if (reservedFor) {
         noteBlocker({
@@ -1100,7 +1103,7 @@ export function insertMaintenanceTransferCards(args: {
     const parts = diagnosis.points.map((point) => {
       const label = nodeById.get(point.nodeId)?.label || point.nodeId;
       const blockers = point.bookingsInWindow.map((booking) =>
-        `時間線 ${booking.timelineRow} ${formatSecondOfDay(booking.instant)}${booking.reserved ? '（保留）' : ''}`);
+        `運用 ${booking.timelineRow} ${formatSecondOfDay(booking.instant)}${booking.reserved ? '（保留）' : ''}`);
       return blockers.length > 0
         ? `${label} 檢查 ${formatSecondOfDay(point.instant)} 經過，搜尋窗內有 ${blockers.join('、')}`
         : `${label} 檢查 ${formatSecondOfDay(point.instant)} 經過`;
@@ -2347,7 +2350,7 @@ export function insertMaintenanceTransferCards(args: {
   for (const priorityPhase of ['facility-first', 'standby-last'] as const) {
     resetStayPickOccupancy();
     for (const slot of yardSlots) {
-      const isStandby = slot.block.taskType === 'standby';
+      const isStandby = isStandbyLikeTaskType(slot.block.taskType);
       if ((priorityPhase === 'facility-first') === isStandby) continue;
       if (yardBlockFacility.has(slot.block.id)) continue;
 
@@ -2541,7 +2544,7 @@ export function insertMaintenanceTransferCards(args: {
             const squatters: GeneratedScheduleBlock[] = [];
             for (const timelineItem of timelines) {
               for (const other of timelineItem.blocks) {
-                if (other.taskType !== 'standby') continue;
+                if (!isStandbyLikeTaskType(other.taskType)) continue;
                 if (other.yardFacilityNodeId?.trim() !== current!.nodeId) continue;
                 if (minuteToSecond(other.plannedEndMinute) <= idealArrive + 1e-9) continue;
                 if (minuteToSecond(other.plannedStartMinute) >= yardStartSec - 1e-9) continue;
@@ -2553,7 +2556,7 @@ export function insertMaintenanceTransferCards(args: {
               const row = timelines.find((item) => item.blocks.includes(squatter))?.row;
               if (row == null) break;
               let target: { id: string; label: string } | null = null;
-              for (const facility of facilityNodesFor('standby')) {
+              for (const facility of facilityNodesFor(squatter.taskType)) {
                 if (facility.id === current!.nodeId) continue;
                 if (nodeById.get(facility.id)?.kind !== 'facility') continue;
                 if (
@@ -2637,7 +2640,7 @@ export function insertMaintenanceTransferCards(args: {
        * 只對待命做：真整備的設施是「設備在哪就得去哪」，不能隨便換。
        */
       const pools: Array<typeof facilities> = [facilities];
-      if (assigned && yard.taskType === 'standby') {
+      if (assigned && isStandbyLikeTaskType(yard.taskType)) {
         const avoided = avoidedSpotsFor(yard.id);
         const alternatives = allFacilities
           .filter((item) => item.id !== assigned.nodeId && !avoided.has(item.id))
@@ -2656,7 +2659,7 @@ export function insertMaintenanceTransferCards(args: {
       const chargingCandidates: NonNullable<MaintenanceTransferCardsResult['skipped'][number]['chargingEntry']>['candidates'] = [];
       for (const [poolIndex, pool] of pools.entries()) {
         // 先找守交接間隔的候選；全滅才退一步只求排得出移動（缺移動比交接不足更糟，
-        // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋發布）
+        // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋部署）
         for (const enforceHandover of [true]) {
           handoverEnforced = enforceHandover;
           tally = newTally();
@@ -2863,6 +2866,7 @@ export function insertMaintenanceTransferCards(args: {
         standbyRelocations.push({
           timelineRow: timeline.row,
           blockId: yard.id,
+          taskType: yard.taskType,
           fromLabel: assigned.label,
           toLabel: chosen.label,
           toNodeId: chosen.nodeId,
@@ -3230,7 +3234,7 @@ export function insertMaintenanceTransferCards(args: {
     /** 只輸在轉折點時，原訂時刻要經過的節點（最先試的那組設施） */
     let transferReservation: Array<{ nodeId: string; instant: number }> | null = null;
     // 先找守交接間隔的候選；全滅才退一步只求排得出移動（缺移動比交接不足更糟，
-    // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋發布）
+    // 交接不足仍由最終驗證 FACILITY_HANDOVER_GAP 擋部署）
     /** 守交接間隔那一輪的淘汰紀錄：擋路者與時間窗照完整安全規則回報，不用放寬後那一輪的 */
     let strictTally: RejectTally | null = null;
     for (const enforceHandover of [true]) {
@@ -3419,7 +3423,7 @@ export function insertMaintenanceTransferCards(args: {
               if (limiter) {
                 tally.limitBlockers.push({ ...limiter, role: 'origin-next-occupant', adjustable: Boolean(limiter.blockingBlockId) });
                 latestReason = `原格「${exitFacility.label || exitFacility.id}」`
-                  + `時間線 ${limiter.blockingRow} 要進來（${formatSecondOfDay(limiter.occupiedFrom)}），交接要隔 ${collisionBufferSeconds} 秒`;
+                  + `運用 ${limiter.blockingRow} 要進來（${formatSecondOfDay(limiter.occupiedFrom)}），交接要隔 ${collisionBufferSeconds} 秒`;
                 latestFixed = false;
               }
             }
@@ -4257,7 +4261,7 @@ export function insertMaintenanceTransferCards(args: {
       const { timeline, sweepSorted, index: i } = candidate;
       if (
         (sweepPhase === 'facility-first')
-        === (candidate.block.taskType === 'standby')
+        === (isStandbyLikeTaskType(candidate.block.taskType))
       ) continue;
       const yard = candidate.block;
       if (yardBlockFacility.has(yard.id)) continue;
@@ -4404,7 +4408,7 @@ export function insertMaintenanceTransferCards(args: {
           if (!elsewhere) {
             allMoved = false;
             yieldNotes.push(
-              `${facility.label || facility.id} 上的時間線 ${occupant.timelineRow}`
+              `${facility.label || facility.id} 上的運用 ${occupant.timelineRow}`
               + `（${formatSecondOfDay(occupantStart)}–${formatSecondOfDay(occupantEnd)}）`
               + `找不到別台可以整段容納它的設施，請不走`,
             );
@@ -4474,7 +4478,7 @@ export function insertMaintenanceTransferCards(args: {
             ));
           holders.push(
             clash
-              ? `${facility.label || facility.id} 被時間線 ${clash.timelineRow} 佔著`
+              ? `${facility.label || facility.id} 被運用 ${clash.timelineRow} 佔著`
                 + `（${formatSecondOfDay(clash.startSecond)}–${formatSecondOfDay(clash.endSecond)}）`
               : `${facility.label || facility.id} 這段時間是空的，但這台車的整段停留`
                 + `（${formatSecondOfDay(startSecond)}–${formatSecondOfDay(endSecond)}）撐不完`,

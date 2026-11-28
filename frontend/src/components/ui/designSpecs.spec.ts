@@ -9,7 +9,11 @@ import { describe, it } from 'vitest';
 
 const root = new URL('../../../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
-type Entry = { name: string; spec: string; css: string; component: string; figma: string; variants: number; playground: string | null };
+type Entry = {
+  name: string; spec: string; css: string; component: string; figma: string; variants: number | null; playground: string | null;
+  /** playground-assets：規格沒有參考 CSS（例如 Slider），改檢查 CSS 用到的原始素材逐字取自 playground */
+  reference?: 'playground-assets';
+};
 const manifest = JSON.parse(read('design-specs/manifest.json')) as { tokens: { source: string; implementation: string }; components: Entry[] };
 const tokens = read(manifest.tokens.implementation);
 const index = read('src/components/ui/index.ts');
@@ -19,14 +23,21 @@ const normalize = (text: string) => text.split('\n').map((line) => line.trim()).
 
 describe('設計規格與實作一致', () => {
   for (const entry of manifest.components) {
-    describe(`${entry.name}（Figma ${entry.figma}，${entry.variants} 個 Variant）`, () => {
+    describe(`${entry.name}（Figma ${entry.figma}${entry.variants == null ? '' : `，${entry.variants} 個 Variant`}）`, () => {
       it('登記的檔案都存在', () => {
         for (const path of [entry.spec, entry.css, entry.component, entry.playground].filter(Boolean) as string[]) {
           assert.ok(existsSync(new URL(path, root)), `${path} 不存在`);
         }
       });
 
-      it('CSS 跟工程文件 §5 參考實作逐字一致', () => {
+      if (entry.reference === 'playground-assets') {
+        it('CSS 用到的原始素材都逐字取自 playground', () => {
+          const page = read(entry.playground!);
+          const assets = [...read(entry.css).matchAll(/data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+/g)].map((m) => m[0]);
+          assert.ok(assets.length > 0, `${entry.css} 沒有素材`);
+          for (const asset of assets) assert.ok(page.includes(asset), `${entry.css} 有一張素材不在 ${entry.playground}`);
+        });
+      } else it('CSS 跟工程文件 §5 參考實作逐字一致', () => {
         const block = read(entry.spec).match(/```css\n([\s\S]*?)```/)?.[1];
         assert.ok(block, `${entry.spec} 找不到 css 區塊`);
         assert.ok(normalize(read(entry.css)).includes(normalize(block)), `${entry.css} 跟 ${entry.spec} 不一致`);

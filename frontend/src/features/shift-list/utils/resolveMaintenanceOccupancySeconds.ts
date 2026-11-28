@@ -1,5 +1,6 @@
 import type { TaskTypeKey } from '../../time-templates/types/editor';
 import { isPositiveInteger } from '../../maintenance-tasks/utils/numericInput';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 function parsePositiveMinutesString(raw: string | undefined): number | null {
   if (!raw || !isPositiveInteger(raw)) return null;
@@ -27,7 +28,10 @@ export function resolveMaintenanceOccupancySeconds(
     return null;
   }
 
-  if (taskType === 'standby') {
+  // 機動：時長一律照時間模板（整備任務沒有作業時長可填），不可沿用待命的設定
+  if (taskType === 'maneuver') return null;
+
+  if (isStandbyLikeTaskType(taskType)) {
     const mobile =
       maintenanceBody.mobile && typeof maintenanceBody.mobile === 'object'
         ? (maintenanceBody.mobile as Record<string, unknown>)

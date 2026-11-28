@@ -334,19 +334,19 @@ export type FeasibilityViolationCode =
   | 'MAINTENANCE_TRANSFER_UNRESOLVED'
   /**
    * 必要的整備轉場卡排不出來：車下一段要去的地方跟它現在停的地方不同，卻沒有
-   * 合法移動可用（硬錯誤、擋發布）。「不需要轉場卡」的情形仍走
+   * 合法移動可用（硬錯誤、擋部署）。「不需要轉場卡」的情形仍走
    * MAINTENANCE_TRANSFER_UNRESOLVED（策略說明）。
    */
   | 'MAINTENANCE_TRANSFER_REQUIRED_MISSING'
   /**
    * 車的位置在時間軸上接不起來：前一張卡結束時車在某一格（或某一站），下一張卡
-   * 卻要它在另一個地方，中間沒有任何移動卡（硬錯誤、擋發布）。只看班表本身，
+   * 卻要它在另一個地方，中間沒有任何移動卡（硬錯誤、擋部署）。只看班表本身，
    * 手改過的班表重驗證也抓得到。
    */
   | 'VEHICLE_LOCATION_DISCONTINUITY'
   /**
    * 不同列車的移動卡（出入廠、讓站、轉場）經過同一個轉折點的時刻太近，不滿足
-   * 2 × 碰撞保護（警告、擋發布）。
+   * 2 × 碰撞保護（警告、擋部署）。
    */
   | 'MOVE_JUNCTION_CONFLICT'
   | 'MOVE_PATH_CONFLICT'
@@ -369,11 +369,11 @@ export type FeasibilityViolationCode =
   | 'ROUTE_ALIGNED_TO_MAINTENANCE_ENTRY'
   | 'ROUTE_ORIGIN_AWAY_FROM_VEHICLE'
   | 'GEOMETRY_NOT_CONVERGED'
-  /** 共用搜尋預算用盡、仍有安全問題：搜尋未完成（不是已證明無解），禁止發布 */
+  /** 共用搜尋預算用盡、仍有安全問題：搜尋未完成（不是已證明無解），禁止部署 */
   | 'SCHEDULE_SEARCH_INCOMPLETE'
   /** 系統為了排移動縮短了整備工作時間（晚開始／提早結束），逐筆揭露（警告） */
   | 'MAINTENANCE_WORK_SHORTENED'
-  /** 模板上的整備被刪掉，或剩下的工作時間低於最低工作時間（錯誤，禁止發布） */
+  /** 模板上的整備被刪掉，或剩下的工作時間低於最低工作時間（錯誤，禁止部署） */
   | 'MAINTENANCE_WORK_INSUFFICIENT'
   /** 生成前的必要資料不完整（沒選地圖、路網缺、站點或設施找不到、本次必要路段缺時間）：不生成 */
   | 'SCHEDULE_DATA_INCOMPLETE'
@@ -397,7 +397,7 @@ export type FeasibilityViolationCode =
   /** 已把發車相位推回等間隔，補償站位延後造成的班距歪斜（警告） */
   | 'HEADWAY_PHASE_EVENED'
   | 'UNSERVED_SERVICE_PULSE'
-  /** 班表沒有應開服務明細（舊產物或缺資料），無法核對載客服務是否完整：擋發布 */
+  /** 班表沒有應開服務明細（舊產物或缺資料），無法核對載客服務是否完整：擋部署 */
   | 'SERVICE_DEMAND_UNVERIFIABLE'
   | 'INSUFFICIENT_TIMELINES'
   | 'RECOVERY_INSUFFICIENT'
@@ -491,7 +491,7 @@ export type ServicePulseRecord = {
 export type ServicePulseStatus =
   /** 有車承接，已展開成載客班次 */
   | 'assigned'
-  /** 掛車時出了問題（路線不在執行順序、選上的那一列展不出整輪或會壓進整備）：擋發布 */
+  /** 掛車時出了問題（路線不在執行順序、選上的那一列展不出整輪或會壓進整備）：擋部署 */
   | 'unserved'
   /**
    * 車不夠：至少一列有正線視窗，但每一列都有硬性理由接不了（在整備、延遲超過上限、會吃掉
@@ -562,7 +562,7 @@ export type ShiftScheduleFeasibilityReport = {
       round: number;
       cuts: Array<{ pulseId: string; row: number; reason: string }>;
       adopted: boolean;
-      /** [擋發布的問題數, −載客班次, 班距低於目標] */
+      /** [擋部署的問題數, −載客班次, 班距低於目標] */
       before: number[];
       after: number[];
     }>;
@@ -634,7 +634,6 @@ export type ShiftScheduleMaintenanceTaskBinding = {
   entrySlackFingerprint?: string;
   /** 班表 Step 2 各整備區塊代號指紋 */
   sectionCodeFingerprint?: string;
-  publishStatus?: string;
   usageStatus?: string;
   sourceUpdatedAt?: string;
   boundAt: string;
@@ -668,7 +667,7 @@ export type ShiftScheduleStoredOutput = {
   planAdjustHistory?: PlanAdjustHistoryEntry[];
   planAdjustHistoryIndex?: number;
   /**
-   * 發布前檢查紀錄。班表可以手動改，所以檢查是<strong>可重跑的動作</strong>，
+   * 部署前檢查紀錄。班表可以手動改，所以檢查是<strong>可重跑的動作</strong>，
    * 不是生成時算一次就算數；`planFingerprint` 對不上目前的 plan
    * 就代表檢查後又被改過，狀態回到「未檢查」。詳見 schedulePublishCheck.ts。
    */

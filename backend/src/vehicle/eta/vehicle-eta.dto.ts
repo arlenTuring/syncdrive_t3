@@ -32,12 +32,12 @@ export class EtaMetaDto {
   shift_id!: string | null;
 
   @ApiProperty({
-    enum: ['published', 'draft_fallback', 'none'],
+    enum: ['in_use', 'latest_saved', 'none'],
     description:
-      'published＝已發布班表；draft_fallback＝草稿，計畫值僅供參考，不得作為正式時刻使用；' +
+      'in_use＝部署中的班表；latest_saved＝目前沒有部署中的班表，取最新儲存的那份，計畫值僅供參考，不得作為正式時刻使用；' +
       'none＝無班表，plan 全為 null',
   })
-  source!: 'published' | 'draft_fallback' | 'none';
+  source!: 'in_use' | 'latest_saved' | 'none';
 
   @ApiProperty({
     enum: ['OK', 'DEGRADED', 'DOWN'],

@@ -151,4 +151,5 @@ const SECTION_LABEL: Record<string, string> = {
   maintenance: '保養',
   carWash: '洗車',
   mobile: '待命',
+  maneuver: '機動',
 };

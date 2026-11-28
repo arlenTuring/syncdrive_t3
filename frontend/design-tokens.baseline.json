@@ -602,7 +602,7 @@
     "button": 1
   },
   "features/psd-control/components/DockTimeDialog.tsx": {
-    "arbitrary": 2
+    "arbitrary": 1
   },
   "features/psd-control/components/DoorDetailPage.tsx": {
     "arbitrary": 1
@@ -658,7 +658,8 @@
   "features/shift-deployment/diffScheduleTasks.ts": {
     "hex": 6,
     "arbitrary": 11,
-    "rgb": 5
+    "rgb": 5,
+    "palette": 2
   },
   "features/shift-deployment/hooks/useDeploymentData.ts": {
     "hex": 1,
@@ -829,13 +830,8 @@
     "arbitrary": 1,
     "palette": 2
   },
-  "features/time-templates/components/VehicleCapacitySlider.tsx": {
-    "hex": 1,
-    "arbitrary": 2,
-    "palette": 1
-  },
   "features/time-templates/types/editor.ts": {
-    "hex": 55,
+    "hex": 54,
     "rgb": 3,
     "palette": 6
   },
@@ -878,7 +874,7 @@
     "button": 1
   },
   "features/vehicle-editor/model/VehicleBehaviorSettingsFields.tsx": {
-    "palette": 2
+    "palette": 1
   },
   "features/vehicle-editor/NewVehicleDialog.tsx": {
     "button": 1

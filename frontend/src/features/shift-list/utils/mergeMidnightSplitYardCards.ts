@@ -36,6 +36,7 @@ const EPS = 1e-6;
 
 const MERGEABLE_TASK_TYPES: ReadonlySet<string> = new Set([
   'standby',
+  'maneuver',
   'charging',
   'servicing',
   'inspection',

@@ -489,7 +489,7 @@ function trySwapToBackupBerth(args: {
     severity: 'warning',
     kind: 'policy',
     message:
-      `時間線 ${parkBlock.timelineRow}：跑完後會停在「${parkedStationName}」擋住別台車，`
+      `運用 ${parkBlock.timelineRow}：跑完後會停在「${parkedStationName}」擋住別台車，`
       + `已改跑備用路線停到別的站位（${fromLabel} 改為 ${toLabel}；發車時刻不變）`,
     detail: {
       timelineRow: parkBlock.timelineRow,
@@ -624,7 +624,7 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
         severity: 'warning',
         kind: 'limit',
         message:
-          `時間線 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等 `
+          `運用 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等 `
           + `${Math.round((nextStartMinute - earlierBlock.plannedEndMinute) * 10) / 10} 分鐘，`
           + `已試過讓它先去別站等——但關聯圖上沒有從這裡出發、又能回得來的路線可用，`
           + `只能留在原地。要消掉這一則，得減少這個時段同時在線的車，`
@@ -653,7 +653,7 @@ export function relievePlatformIdleWithSecondaryEdge(args: {
       severity: 'warning',
       kind: 'policy',
       message:
-        `時間線 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等會撞到別列車，`
+        `運用 ${earlierBlock.timelineRow}：跑完一輪在「${hit.stationName}」空等會撞到別列車，`
         + `已沿次要邊「${pathLabel}」先繞去別站等`,
       detail: {
         timelineRow: earlierBlock.timelineRow,

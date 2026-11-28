@@ -147,7 +147,7 @@ function clonePlan(timelines: Plan): Plan {
 }
 
 /** 車停在格子裡做的整備（入廠卡提早時，整備可以從車到格子那一刻開始） */
-const YARD_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby']);
+const YARD_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby', 'maneuver']);
 
 function isTrip(block: GeneratedScheduleBlock): boolean {
   return block.taskType === 'passenger';
@@ -347,7 +347,7 @@ function buildShiftCandidate(
     return {
       row: trip.timelineRow,
       changes,
-      description: `時間線 ${trip.timelineRow} ${description}，入廠卡跟著提早（連動 ${pushed} 張相鄰卡片）`,
+      description: `運用 ${trip.timelineRow} ${description}，入廠卡跟著提早（連動 ${pushed} 張相鄰卡片）`,
     };
   }
 
@@ -380,7 +380,7 @@ function buildShiftCandidate(
   return {
     row: trip.timelineRow,
     changes,
-    description: `時間線 ${trip.timelineRow} ${description}${pushed > 0 ? `（連動 ${pushed} 張相鄰卡片）` : ''}`,
+    description: `運用 ${trip.timelineRow} ${description}${pushed > 0 ? `（連動 ${pushed} 張相鄰卡片）` : ''}`,
   };
 }
 
@@ -429,8 +429,8 @@ function stationConflictCandidates(
     counterpartBlockIds: [collision.earlier.blockId, collision.later.blockId],
     message:
       `「${collision.stationName}」站位${collision.kind === 'overlap' ? '重疊' : '碰撞保護不足'}：`
-      + `時間線 ${collision.earlier.timelineRow} 待到 ${formatClock(collision.earlier.actualDepartMinute)}、`
-      + `時間線 ${collision.later.timelineRow} ${formatClock(collision.later.startMinute)} 就到`,
+      + `運用 ${collision.earlier.timelineRow} 待到 ${formatClock(collision.earlier.actualDepartMinute)}、`
+      + `運用 ${collision.later.timelineRow} ${formatClock(collision.later.startMinute)} 就到`,
   };
   const out: TripCandidate[] = [];
   for (const trip of trips.values()) {
@@ -507,7 +507,7 @@ function stationConflictCandidates(
       counterpartBlockIds: [counterpart.blockId],
       message:
         `「${occupancy.stationName}」站位${collision.kind === 'overlap' ? '重疊' : '碰撞保護不足'}：`
-        + `原本 ${formatClock(occupancy.startMinute)} 到站，另一方（時間線 ${counterpart.timelineRow}）`
+        + `原本 ${formatClock(occupancy.startMinute)} 到站，另一方（運用 ${counterpart.timelineRow}）`
         + `要到 ${formatClock(counterpart.protectedUntilMinute)} 才讓出`,
     };
     out.push(candidate);

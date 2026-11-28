@@ -63,7 +63,6 @@ export async function buildMaintenanceTaskBinding(
     body: detail.body ?? {},
     entrySlackFingerprint,
     sectionCodeFingerprint,
-    publishStatus: detail.publish_status,
     usageStatus: detail.usage_status,
     sourceUpdatedAt: detail.updated_at,
     boundAt,
@@ -182,9 +181,6 @@ export function parseShiftScheduleStoredOutput(
     ...(typeof binding.sectionCodeFingerprint === 'string'
       ? { sectionCodeFingerprint: binding.sectionCodeFingerprint }
       : {}),
-    ...(typeof binding.publishStatus === 'string'
-      ? { publishStatus: binding.publishStatus }
-      : {}),
     ...(typeof binding.usageStatus === 'string'
       ? { usageStatus: binding.usageStatus }
       : {}),
@@ -233,7 +229,7 @@ export function parseShiftScheduleStoredOutput(
 }
 
 /**
- * 發布前檢查紀錄。欄位不完整就整筆丟掉——寧可回到「未檢查」重跑一次，
+ * 部署前檢查紀錄。欄位不完整就整筆丟掉——寧可回到「未檢查」重跑一次，
  * 也不要用半殘的紀錄推出「可發布」。
  */
 function parsePublishCheck(

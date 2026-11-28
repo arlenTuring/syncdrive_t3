@@ -29,7 +29,7 @@ import { StepChargingParams } from './StepChargingParams';
 import { StepCarWashParams } from './StepCarWashParams';
 import { StepMaintenanceParams } from './StepMaintenanceParams';
 import { StepPreTripParams } from './StepPreTripParams';
-import { StepMobileParams } from './StepMobileParams';
+import { StepManeuverParams, StepMobileParams } from './StepMobileParams';
 import { StepSchedulePreview } from './StepSchedulePreview';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
 import { Button, cn, fieldClass } from '../../../components/ui';
@@ -413,7 +413,7 @@ export function CreateMaintenanceTaskPage({
   }, [draft.basic.name, draft.currentStep, editTaskId, savedTaskId]);
 
   useEffect(() => {
-    if (draft.currentStep !== 7) {
+    if (draft.currentStep !== MAINTENANCE_STEP_COUNT) {
       setPreviewReachedBottom(false);
     }
   }, [draft.currentStep]);
@@ -439,6 +439,9 @@ export function CreateMaintenanceTaskPage({
     if (draft.currentStep === 6) {
       return isMobileStepComplete(draft.mobile);
     }
+    if (draft.currentStep === 7) {
+      return isCreateMaintenanceTaskStepComplete(7, draft);
+    }
     return true;
   }, [
     draft.basic.name,
@@ -448,6 +451,7 @@ export function CreateMaintenanceTaskPage({
     draft.maintenance,
     draft.preTrip,
     draft.mobile,
+    draft.maneuver,
     draft.currentStep,
     loadError,
     loading,
@@ -638,6 +642,12 @@ export function CreateMaintenanceTaskPage({
                   <StepMobileParams
                     draft={draft.mobile}
                     onChange={(mobile) => updateDraft((prev) => ({ ...prev, mobile }))}
+                  />
+                )}
+                {draft.currentStep === 7 && (
+                  <StepManeuverParams
+                    draft={draft.maneuver}
+                    onChange={(maneuver) => updateDraft((prev) => ({ ...prev, maneuver }))}
                   />
                 )}
                 {draft.currentStep === MAINTENANCE_STEP_COUNT && (

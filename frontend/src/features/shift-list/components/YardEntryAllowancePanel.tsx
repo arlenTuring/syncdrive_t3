@@ -103,7 +103,7 @@ function AllowanceReport({
           <table className="t3-table w-full min-w-[48rem] text-left text-body-s">
             <thead className="text-text-tertiary">
               <tr className="border-b border-border-quaternary">
-                <th className="px-3 py-2.5 font-normal">時間線</th>
+                <th className="px-3 py-2.5 font-normal">運用</th>
                 <th className="px-3 py-2.5 font-normal">項目</th>
                 <th className="px-3 py-2.5 font-normal">起算時間</th>
                 <th className="px-3 py-2.5 font-normal">目前作業時長</th>
@@ -114,7 +114,7 @@ function AllowanceReport({
             <tbody>
               {flagged.map((row) => (
                 <tr key={`${row.section}-${row.taskId}`} className="border-b border-border-quaternary" title={row.message}>
-                  <td className="whitespace-nowrap px-3 py-3 text-text-primary">時間線 {row.rowIndex}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-text-primary">運用 {row.rowIndex}</td>
                   <td className="px-3 py-3"><span className="rounded-md bg-zinc-700/70 px-2 py-0.5 text-text-primary">{row.label || row.sectionLabel}</span></td>
                   <td className="px-3 py-3 tabular-nums text-text-primary">{clockText(row.startMinute)}</td>
                   <td className="px-3 py-3 tabular-nums text-text-primary">{minutesText(row.durationSeconds)}</td>

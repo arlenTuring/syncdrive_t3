@@ -36,6 +36,7 @@ import type {
 import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/types';
 import { routeForJoinedBlock } from './joinedRouteSegment';
 import { resolveSameRowIdleOccupiedUntilMinute } from './stationBerthOccupancy';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 /** 單一路線為清站位可接受的最大延後（秒）；可被同列整備開頭再夾緊 */
 export const DEFAULT_STATION_BERTH_MAX_DELAY_SECONDS = 120;
@@ -623,7 +624,7 @@ function isYardBlockForContinuity(block: GeneratedScheduleBlock): boolean {
     block.taskType === 'charging'
     || block.taskType === 'servicing'
     || block.taskType === 'inspection'
-    || block.taskType === 'standby'
+    || isStandbyLikeTaskType(block.taskType)
   );
 }
 
@@ -836,7 +837,7 @@ export function enforceStationBerthConstraints(args: {
   // 只能報「撞了」而沒有任何調整的機會，等於有報沒有解。
   for (const timeline of timelines) {
     for (const block of timeline.blocks) {
-      if (block.taskType !== 'standby') continue;
+      if (!isStandbyLikeTaskType(block.taskType)) continue;
       const stationId = block.yardFacilityStationId?.trim();
       if (!stationId) continue;
       const startSecond = minuteToSecond(block.plannedStartMinute);
@@ -1109,7 +1110,7 @@ export function bookBerthWindowsExcept(
   for (const timeline of timelines) {
     for (const block of timeline.blocks) {
       if (block.id === exceptId) continue;
-      if (block.taskType === 'standby' && block.yardFacilityStationId) {
+      if (isStandbyLikeTaskType(block.taskType) && block.yardFacilityStationId) {
         const startSecond = minuteToSecond(block.plannedStartMinute);
         const naturalEndSecond = Math.max(
           minuteToSecond(block.plannedEndMinute),

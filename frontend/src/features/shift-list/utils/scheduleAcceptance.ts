@@ -1,7 +1,7 @@
 /**
  * 排班引擎驗收閘門與問題展示分層（P0）。
  *
- * 驗收（ok / gatePassed）：不可有排班錯誤或阻擋發布的安全警告。
+ * 驗收（ok / gatePassed）：不可有排班錯誤或阻擋部署的安全警告。
  * 品質目標（qualityPassed）：不阻擋 ok，但應用來判斷「是否還有可接受的殘留警告」。
  * 策略說明：正常求解日誌，預設摺疊、不計入失敗。
  */
@@ -60,7 +60,7 @@ export const QUALITY_BLOCKING_WARNING_CODES: ReadonlySet<FeasibilityViolationCod
   new Set(['UNSERVED_SERVICE_PULSE', 'HEADWAY_BELOW_TARGET']);
 
 /**
- * 安全閘：<strong>不擋生成、不擋編輯，但擋發布</strong>。
+ * 安全閘：<strong>不擋生成、不擋編輯，但擋部署</strong>。
  *
  * 這一層放的是「物理上做不到／有行車安全疑慮」的問題，
  * 跟 <code>QUALITY_BLOCKING_WARNING_CODES</code>（服務品質沒達標）本質不同：
@@ -120,7 +120,7 @@ export const DOCUMENTED_HARD_ERROR_CODES: readonly FeasibilityViolationCode[] = 
 ];
 
 export const ACCEPTANCE_CRITERIA_LINES = [
-  '碰撞、安全間隔不足或其他排班錯誤，皆不通過驗收且禁止發布。',
+  '碰撞、安全間隔不足或其他排班錯誤，皆不通過驗收且禁止部署。',
   '班距與班次數是否達標另列說明，不得以增加碰撞風險換取達標。',
   '已採取的調整可展開查看。',
 ] as const;
@@ -135,7 +135,7 @@ export type ScheduleAcceptanceSummary = {
   qualityFailByCode: Record<string, number>;
   /**
    * 安全閘：沒有任何站位重疊／碰撞保護不足。
-   * false 時班表仍可編輯、可儲存，但禁止發布。
+   * false 時班表仍可編輯、可儲存，但禁止部署。
    */
   publishSafe: boolean;
   publishBlockingCount: number;

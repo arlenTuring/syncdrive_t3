@@ -2,7 +2,6 @@ import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
-  MaintenanceTaskPublishStatus,
   MaintenanceTaskUsageStatus,
 } from '../database/entities/maintenance-task.entity';
 import { MaintenanceTaskService } from './maintenance-task.service';
@@ -19,7 +18,6 @@ export class MaintenanceTaskController {
   async listTasks(
     @Query('keyword') keyword?: string,
     @Query('usage_status') usage_status?: string,
-    @Query('publish_status') publish_status?: string,
     @Query('page') page?: string,
     @Query('page_size') page_size?: string,
   ) {
@@ -29,16 +27,9 @@ export class MaintenanceTaskController {
         ? usage_status
         : 'all';
 
-    const ps =
-      publish_status === MaintenanceTaskPublishStatus.DRAFT
-        || publish_status === MaintenanceTaskPublishStatus.PUBLISHED
-        ? publish_status
-        : 'all';
-
     return this.maintenanceTaskService.listTasks({
       keyword,
       usage_status: us,
-      publish_status: ps,
       page: page ? Number(page) : undefined,
       page_size: page_size ? Number(page_size) : undefined,
     });

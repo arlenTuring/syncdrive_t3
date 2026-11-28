@@ -1,6 +1,5 @@
 import {
   MaintenanceTask,
-  MaintenanceTaskPublishStatus,
   MaintenanceTaskUsageStatus,
 } from '../database/entities/maintenance-task.entity';
 
@@ -9,8 +8,6 @@ export const UNTITLED_MAINTENANCE_TASK_NAME = '未完成的整備任務';
 export type MaintenanceTaskListItem = {
   task_id: string;
   name: string;
-  publish_status: MaintenanceTaskPublishStatus;
-  publish_status_label: string;
   usage_status: MaintenanceTaskUsageStatus;
   usage_status_label: string;
   created_at: string;
@@ -31,19 +28,13 @@ export function formatMaintenanceTaskTimestamp(ms: string | number | null | unde
 }
 
 export function maintenanceUsageStatusLabel(status: MaintenanceTaskUsageStatus): string {
-  return status === MaintenanceTaskUsageStatus.IN_USE ? '使用中' : '閒置中';
-}
-
-export function maintenancePublishStatusLabel(status: MaintenanceTaskPublishStatus): string {
-  return status === MaintenanceTaskPublishStatus.PUBLISHED ? '已發布' : '草稿區';
+  return status === MaintenanceTaskUsageStatus.IN_USE ? '使用中' : '未使用';
 }
 
 export function toMaintenanceTaskListItem(row: MaintenanceTask): MaintenanceTaskListItem {
   return {
     task_id: row.id,
     name: row.name,
-    publish_status: row.publishStatus,
-    publish_status_label: maintenancePublishStatusLabel(row.publishStatus),
     usage_status: row.usageStatus,
     usage_status_label: maintenanceUsageStatusLabel(row.usageStatus),
     created_at: formatMaintenanceTaskTimestamp(row.createdAt),

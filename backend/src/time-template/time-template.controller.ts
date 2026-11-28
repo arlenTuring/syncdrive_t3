@@ -1,7 +1,6 @@
 import { AuditAction } from '../audit/audit-action.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { TimeTemplatePublishStatus } from '../database/entities/time-template.entity';
 import { TimeTemplateService } from './time-template.service';
 import { RequirePermission } from '../access-control/access.guard';
 
@@ -15,19 +14,11 @@ export class TimeTemplateController {
   @ApiOperation({ summary: '時間模板列表（分頁、篩選）' })
   async listTemplates(
     @Query('keyword') keyword?: string,
-    @Query('publish_status') publish_status?: string,
     @Query('page') page?: string,
     @Query('page_size') page_size?: string,
   ) {
-    const ps =
-      publish_status === TimeTemplatePublishStatus.DRAFT
-        || publish_status === TimeTemplatePublishStatus.PUBLISHED
-        ? publish_status
-        : 'all';
-
     return this.timeTemplateService.listTemplates({
       keyword,
-      publish_status: ps,
       page: page ? Number(page) : undefined,
       page_size: page_size ? Number(page_size) : undefined,
     });

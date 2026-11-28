@@ -740,7 +740,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
             severity: 'warning',
             kind: 'policy',
             message:
-              `時間線 ${timelineForRow.row}：跑完一趟在`
+              `運用 ${timelineForRow.row}：跑完一趟在`
               + `「${stationLabel}」等著進廠 ${idle.toFixed(1)} 分鐘，`
               + `擋住 ${count} 台後車——已改成跑完就開進「${plan.waitLabel}」`
               + (!isDirectEntry
@@ -1005,7 +1005,7 @@ export function relievePlatformIdleWithFacilityPark(args: {
         severity: 'warning',
         kind: 'policy',
         message:
-          `時間線 ${timeline.row}：跑完一趟在「${stationLabel}」空等 ${idle.toFixed(1)} 分鐘，`
+          `運用 ${timeline.row}：跑完一趟在「${stationLabel}」空等 ${idle.toFixed(1)} 分鐘，`
           + `擋住 ${count} 台後車——已改開進「${best.facilityLabel}」暫停放，`
           + `來回空駛 ${Math.round(best.inboundSeconds + best.outboundSeconds)} 秒，`
           + `下一趟發車時刻不變。`,

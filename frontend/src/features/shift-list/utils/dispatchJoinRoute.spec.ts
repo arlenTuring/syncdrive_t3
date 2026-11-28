@@ -228,7 +228,7 @@ describe('insertMaintenanceEntryServiceTrips：中途加入（整合）', () => 
   /**
    * 撞站位時要不要硬插，看位置不看名稱：另一台車 10:00 同時到 C，這一趟一定撞。
    * 路網上設施開得到 C（有不載客的退路）就不插；開不到（不插車就憑空出現在 C）才照插，
-   * 衝突交給最終驗證擋發布。
+   * 衝突交給最終驗證擋部署。
    */
   function conflictRun(withDeadheadPath: boolean) {
     const conflicted = timelines('inspection');

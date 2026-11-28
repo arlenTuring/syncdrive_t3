@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveDwellConflict, type DwellConflict } from '../resolveDwellConflict';
 import { fetchVehicleStopDwellSeconds } from '../fetchVehicleStopDwell';
-import { Button, Dialog, fieldClass } from '../../../components/ui';
+import { Button, Dialog, Slider, fieldClass } from '../../../components/ui';
 
 const MIN_SECONDS = 10;
 
@@ -92,7 +92,6 @@ export function DockTimeDialog({
 
   const dirty = initial != null && value !== initial;
   const showWarning = dirty && loaded && conflict != null;
-  const pct = ((value - MIN_SECONDS) / Math.max(1, maxSeconds - MIN_SECONDS)) * 100;
 
   const warningText = useMemo(() => {
     if (!conflict) return '';
@@ -127,16 +126,14 @@ export function DockTimeDialog({
           <p className="mb-8 text-body-s text-status-error-emphasis">{loadError ?? t('psdControl.dock.noData')}</p>
         ) : (
           <div className="mb-6 flex items-center gap-4">
-            <input
-              type="range"
+            <Slider
               min={MIN_SECONDS}
               max={maxSeconds}
               value={value}
-              onChange={(e) => setValue(Number(e.target.value))}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-link-theme-filled [&::-webkit-slider-thumb]:shadow-[0_0_0_6px_var(--link-tonal)] [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-link-theme-filled"
-              style={{
-                background: `linear-gradient(to right, var(--link-theme-filled) 0%, var(--link-theme-filled) ${pct}%, var(--link-standard-hover) ${pct}%, var(--link-standard-hover) 100%)`,
-              }}
+              onChange={setValue}
+              showLabel={false}
+              aria-label={t('psdControl.dock.seconds', { value })}
+              className="w-full"
             />
             <span className="w-14 shrink-0 text-right text-body-s text-text-primary">
               {t('psdControl.dock.seconds', { value })}

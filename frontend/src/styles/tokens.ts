@@ -12,7 +12,7 @@
 export const SEMANTIC_TOKENS = [
   'surface-primary', 'surface-secondary', 'surface-tertiary', 'surface-disabled', 'surface-invert',
   'surface-theme', 'surface-theme-light', 'surface-background', 'surface-sub-background', 'surface-popup',
-  'surface-sub-popup',
+  'surface-sub-popup', 'surface-gray', 'surface-gray-light',
   'text-primary', 'text-secondary', 'text-tertiary', 'text-quaternary', 'text-disabled', 'text-invert',
   'text-theme', 'text-theme-light',
   'border-primary', 'border-secondary', 'border-tertiary', 'border-quaternary', 'border-disabled',

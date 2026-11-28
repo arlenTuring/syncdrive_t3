@@ -73,7 +73,7 @@ function validateManualRecovery(
         pushIssue(errors, {
           code: 'RECOVERY_INSUFFICIENT',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${current.label} 與下一班之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
+          message: `運用 ${timeline.row}：${current.label} 與下一班之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
           detail: {
             timelineRow: timeline.row,
             blockId: current.id,
@@ -98,7 +98,7 @@ function validateManualClockAlign(
         pushIssue(errors, {
           code: 'CLOCK_ALIGN_VIOLATION',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${block.label} 計畫發車未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
+          message: `運用 ${timeline.row}：${block.label} 計畫發車未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
           detail: {
             timelineRow: timeline.row,
             blockId: block.id,

@@ -17,6 +17,7 @@ export type BusinessLineKind = 'MAINLINE' | 'TRANSITION' | 'MAINTENANCE';
 export const TRANSITION_TASK_TYPES: ReadonlySet<string> = new Set([
   'dispatch',
   'standby',
+  'maneuver',
   'idle',
 ]);
 
@@ -85,7 +86,7 @@ export function orderBusinessKindSql(o: string): string {
         OR (${o}.line_kind = 'TEST' AND ${o}.payload->>'source' = 'plan_replay') THEN
         CASE
           WHEN ${o}.payload->>'kind' = 'passenger' OR ${taskType} = 'passenger' THEN 'MAINLINE'
-          WHEN ${o}.payload->>'kind' = 'movement' OR ${taskType} IN ('dispatch', 'standby', 'idle') THEN 'TRANSITION'
+          WHEN ${o}.payload->>'kind' = 'movement' OR ${taskType} IN ('dispatch', 'standby', 'maneuver', 'idle') THEN 'TRANSITION'
           WHEN ${o}.payload->>'kind' = 'maintenance' AND ${taskType} IS NOT NULL THEN 'MAINTENANCE'
         END
       WHEN ${o}.line_kind = 'TEST' THEN 'TEST'

@@ -12,6 +12,7 @@ export type MaintenanceEntrySlackBySectionInput = {
   maintenance: string;
   preTrip: string;
   mobile: string;
+  maneuver: string;
 };
 
 /** 引擎用：各整備區塊讓渡餘裕（秒） */
@@ -21,6 +22,7 @@ export type MaintenanceEntrySlackBySection = {
   maintenance: number;
   preTrip: number;
   mobile: number;
+  maneuver: number;
 };
 
 export type MaintenanceEntrySlackSectionKey = keyof MaintenanceEntrySlackBySection;
@@ -48,6 +50,7 @@ export function emptyMaintenanceEntrySlackBySectionInput(): MaintenanceEntrySlac
     maintenance: value,
     preTrip: value,
     mobile: value,
+    maneuver: value,
   };
 }
 
@@ -64,6 +67,7 @@ export function normalizeMaintenanceEntrySlackBySectionInput(
     ),
     preTrip: normalizeMaintenanceEntrySlackSecondsInput(raw.preTrip ?? base.preTrip),
     mobile: normalizeMaintenanceEntrySlackSecondsInput(raw.mobile ?? base.mobile),
+    maneuver: normalizeMaintenanceEntrySlackSecondsInput(raw.maneuver ?? base.maneuver),
   };
 }
 
@@ -77,6 +81,7 @@ export function parseMaintenanceEntrySlackBySection(
     maintenance: Number(normalized.maintenance),
     preTrip: Number(normalized.preTrip),
     mobile: Number(normalized.mobile),
+    maneuver: Number(normalized.maneuver),
   };
 }
 
@@ -90,6 +95,8 @@ export function buildMaintenanceEntrySlackFingerprint(
     `maintenance:${n.maintenance}`,
     `preTrip:${n.preTrip}`,
     `mobile:${n.mobile}`,
+    // 機動是後來加的：預設值不寫進指紋，舊班表的指紋才不會變
+    ...(n.maneuver !== String(DEFAULT_MAINTENANCE_ENTRY_SLACK_SECONDS) ? [`maneuver:${n.maneuver}`] : []),
   ].join('|');
 }
 
@@ -109,6 +116,7 @@ export function resolveMaintenanceEntrySlackSeconds(
   if (taskType === 'charging') return slack.charging;
   if (taskType === 'inspection') return slack.preTrip;
   if (taskType === 'standby') return slack.mobile;
+  if (taskType === 'maneuver') return slack.maneuver;
   if (taskType === 'servicing') {
     return Math.max(slack.carWash, slack.maintenance);
   }

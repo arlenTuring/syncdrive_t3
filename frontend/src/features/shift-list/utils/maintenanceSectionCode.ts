@@ -4,7 +4,7 @@ import { cardCodeKind, cardDisplayCode, type TransitionCardCodes } from './cardC
 /**
  * 班表 Step 2 各整備區塊代號（1–2 個大寫英文字母；無預設）。
  *
- * 五種整備任務各一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
+ * 六種整備任務（含機動）各一個代號——入廠／出廠小卡的代號不是分開存，是這個代號
  * 自動加上 I（入廠）／O（出廠）尾綴組成，例：保養代號 M → 入廠 MI、出廠 MO。
  * 見 {@link resolveMoveCardPrefix}。
  */
@@ -14,6 +14,7 @@ export type MaintenanceSectionCodeBySection = {
   maintenance: string;
   preTrip: string;
   mobile: string;
+  maneuver: string;
 };
 
 export type MaintenanceSectionCodeKey = keyof MaintenanceSectionCodeBySection;
@@ -28,6 +29,7 @@ export function defaultMaintenanceSectionCardLabelBySection(): MaintenanceSectio
     maintenance: '保養',
     preTrip: '行檢',
     mobile: '待命',
+    maneuver: '機動',
   };
 }
 
@@ -46,6 +48,7 @@ export function normalizeMaintenanceSectionCardLabelBySection(
     maintenance: sanitizeMaintenanceSectionCardLabelInput(raw.maintenance) || defaults.maintenance,
     preTrip: sanitizeMaintenanceSectionCardLabelInput(raw.preTrip) || defaults.preTrip,
     mobile: sanitizeMaintenanceSectionCardLabelInput(raw.mobile) || defaults.mobile,
+    maneuver: sanitizeMaintenanceSectionCardLabelInput(raw.maneuver) || defaults.maneuver,
   };
 }
 
@@ -56,6 +59,7 @@ export function emptyMaintenanceSectionCodeBySection(): MaintenanceSectionCodeBy
     maintenance: '',
     preTrip: '',
     mobile: '',
+    maneuver: '',
   };
 }
 
@@ -83,6 +87,7 @@ export function normalizeMaintenanceSectionCodeBySection(
     maintenance: normalizeMaintenanceSectionCodeInput(raw.maintenance ?? base.maintenance),
     preTrip: normalizeMaintenanceSectionCodeInput(raw.preTrip ?? base.preTrip),
     mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile),
+    maneuver: normalizeMaintenanceSectionCodeInput(raw.maneuver ?? base.maneuver),
   };
 }
 
@@ -149,6 +154,8 @@ export function buildMaintenanceSectionCodeFingerprint(
     `maintenance:${n.maintenance}`,
     `preTrip:${n.preTrip}`,
     `mobile:${n.mobile}`,
+    // 機動是後來加的：沒填代號時不寫進指紋，舊班表的指紋才不會變
+    ...(n.maneuver ? [`maneuver:${n.maneuver}`] : []),
   ].join('|');
 }
 
@@ -165,6 +172,7 @@ export function resolveMaintenanceSectionCodeForTaskType(
   if (taskType === 'charging') return n.charging || null;
   if (taskType === 'inspection') return n.preTrip || null;
   if (taskType === 'standby') return n.mobile || null;
+  if (taskType === 'maneuver') return n.maneuver || null;
   if (taskType === 'servicing') return n.maintenance || null;
   if (taskType === 'washing') return n.carWash || null;
   return null;
@@ -181,6 +189,7 @@ export function resolveMaintenanceSectionLabelForTaskType(
   if (taskType === 'charging') return '充電';
   if (taskType === 'inspection') return '行檢';
   if (taskType === 'standby') return '待命';
+  if (taskType === 'maneuver') return '機動';
   if (taskType === 'servicing') return '保養';
   if (taskType === 'washing') return '洗車';
   return null;

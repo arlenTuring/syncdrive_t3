@@ -53,7 +53,7 @@ describe('scheduleEngineLastIssues', () => {
     });
 
     assert.equal(snapshot.items.length, 4);
-    // 2026-11-10 起沒車開的脈衝擋發布，跟其他硬問題同一層（排在最前面）
+    // 2026-11-10 起沒車開的脈衝擋部署，跟其他硬問題同一層（排在最前面）
     assert.deepEqual(
       snapshot.items.map((item) => [item.layer, item.code]),
       [

@@ -56,6 +56,17 @@ describe('maintenance / transition card codes', () => {
     expect(buildOrderId(tasks[0].tripCode, Date.UTC(2026, 9, 11, 10, 30))).toBe('261011-E021830');
   });
 
+  it('maneuver (機動) cards use their own section code and become standby-like transition orders', () => {
+    const maneuver: Block = {
+      id: 'mv-11-0', taskType: 'maneuver', source: 'template_bar', label: '機動', timelineRow: 11,
+      plannedStartMinute: 180, plannedEndMinute: 1440, yardFacilityNodeId: '152', yardFacilityLabel: 'H2',
+    };
+    const plan = { ...body([maneuver]), maintenanceSectionCodeBySection: { ...sectionCodes, maneuver: 'V' } };
+    expect(cardDisplayCode(maneuver, readCardCodeSettings(plan))).toBe('V110300');
+    const { tasks } = extractYardTasks(plan);
+    expect(tasks.map((t) => [t.tripCode, t.taskType, t.cardLabel])).toEqual([['V110300', 'maneuver', '機動']]);
+  });
+
   it('entry, exit and hold/stay cards follow the same rule with their own codes', () => {
     const plan = body([move(1, 600, 'yard_exit_move'), move(1, 700, 'yard_entry_move'), hold(1, 705), stay(1, 800)]);
     expect(extractYardMoves(plan).moves.map((m) => m.tripCode)).toEqual(['OU011000', 'IN011140']);

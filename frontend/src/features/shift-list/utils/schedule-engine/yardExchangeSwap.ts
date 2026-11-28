@@ -167,7 +167,7 @@ export function avoidYardExchangeSwap(args: {
         severity: 'warning',
         kind: 'policy',
         message:
-          `時間線 ${boundary.row}：時間線 ${partner.timelineRow} 的車同一段時間要從這個月台進同一個整備區（兩台車要去對方的位置），`
+          `運用 ${boundary.row}：運用 ${partner.timelineRow} 的車同一段時間要從這個月台進同一個整備區（兩台車要去對方的位置），`
           + `已把「${from}」改派為同終點、下游相同的「${to}」，從它的起點站發車；班次時刻不變。`,
         detail: {
           timelineRow: boundary.row,

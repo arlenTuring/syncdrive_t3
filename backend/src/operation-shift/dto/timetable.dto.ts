@@ -19,13 +19,13 @@ export class TimetableMetaDto {
   @ApiProperty({ example: '模擬正線' })
   name!: string;
 
-  @ApiProperty({ enum: ['draft', 'published'], description: '班表本身的發布狀態' })
-  publish_status!: string;
+  @ApiProperty({ enum: ['in_use', 'idle'], description: '班表的使用狀態（使用中＝部署中）' })
+  usage_status!: string;
 
   @ApiProperty({
-    enum: ['published', 'draft_fallback'],
+    enum: ['in_use', 'latest_saved'],
     description:
-      'published＝讀到已發布班表；draft_fallback＝庫內沒有已發布的，退而取用最新草稿，'
+      'in_use＝部署中的班表（正式時刻）；latest_saved＝目前沒有部署中的班表，取最新儲存的那份，'
       + '此時時刻僅供參考，不得作為正式時刻使用',
   })
   source!: string;

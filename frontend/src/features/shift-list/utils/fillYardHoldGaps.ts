@@ -58,7 +58,7 @@ import type {
  * 兩處修完之後與補卡前完全一致（同樣 11 次讓渡、0 對碰撞、班次與承接率不變）。
  *
  * <strong>掛 <code>idle</code> 而不是 <code>standby</code>。</strong>整備轉場機制以
- * <code>taskType === 'standby'</code> 認定「這是排定的待命，要幫它排進出廠卡」；掛成
+ * <code>taskType === 'standby'</code>（機動同）認定「這是排定的待命，要幫它排進出廠卡」；掛成
  * standby 會被重複服務（2026-08-18 實測：MAINTENANCE_TRANSFER_UNRESOLVED 13 → 22，
  * 且冒出前面根本沒有整備的孤兒出場卡）。
  */
@@ -69,6 +69,7 @@ const YARD_TASK_TYPES = new Set([
   'servicing',
   'inspection',
   'standby',
+  'maneuver',
   'washing',
 ]);
 

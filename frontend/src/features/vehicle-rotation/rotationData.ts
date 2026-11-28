@@ -10,7 +10,8 @@ export type PlanTaskKind = 'passenger' | 'movement' | 'maintenance';
 
 export type RotationRules = {
   intervalKm: number;
-  takeoverSlots: string[];
+  /** 擔任這些時間線（列號）的車才能接替；這些線上的車不會被排進需要被輪替的隊伍 */
+  takeoverRows: number[];
   windowStart: string;
   windowEnd: string;
   mode: RotationMode;
@@ -58,7 +59,7 @@ export type CarView = {
   state: string;
 };
 
-export type FleetCar = CarView & { next_rotation_km: number; blockers: string[] };
+export type FleetCar = CarView & { next_rotation_km: number; blockers: string[]; takeover_row?: boolean };
 
 export type MonitorStep = {
   key: string;
@@ -108,7 +109,8 @@ export type RotationToday = {
   report_generated_at: number | null;
   blocked: { code: string; reason: string }[];
   items: RotationItem[];
-  slot_options: string[];
+  /** 規則視窗選時間線用：部署中班表的每一條時間線列號；沒有部署中的班表時是 null */
+  row_options: number[] | null;
 };
 
 export type RotationRecord = {

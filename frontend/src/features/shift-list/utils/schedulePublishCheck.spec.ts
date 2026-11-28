@@ -67,7 +67,7 @@ it('缺少路線時不能略過站位檢查而通過發布', () => {
 });
 
 describe('schedulePublishCheck', () => {
-  it('充電卡改短後禁止發布，原定秒數也參與指紋', () => {
+  it('充電卡改短後禁止部署，原定秒數也參與指紋', () => {
     const plan = planWith([0]);
     const block = plan.timelines[0]!.blocks[0]!;
     block.taskType = 'charging';
@@ -112,7 +112,7 @@ describe('schedulePublishCheck', () => {
       assert.equal(result.publishBlockingByCode.UNSERVED_SERVICE_PULSE, undefined);
     });
 
-    it('有脈衝沒車承接：擋發布，訊息帶出各列原因', () => {
+    it('有脈衝沒車承接：擋部署，訊息帶出各列原因', () => {
       const plan = enginePlan([0, 60]);
       plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600), pulse('p3', 'unserved', 7200)];
       const result = check(plan);
@@ -124,7 +124,7 @@ describe('schedulePublishCheck', () => {
       assert.match(issue.message, /02:00:00/);
     });
 
-    it('產生時有掛車、班次後來被刪掉：重驗抓得到，擋發布', () => {
+    it('產生時有掛車、班次後來被刪掉：重驗抓得到，擋部署', () => {
       const plan = enginePlan([0, 60]);
       plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600)];
       plan.timelines[1]!.blocks = [];
@@ -135,7 +135,7 @@ describe('schedulePublishCheck', () => {
       assert.match(issue.message, /找不到/);
     });
 
-    it('車不夠仍保留應開需求並擋發布', () => {
+    it('車不夠仍保留應開需求並擋部署', () => {
       const plan = enginePlan([0, 60]);
       plan.servicePulses = [pulse('p1', 'assigned', 0), pulse('p2', 'assigned', 3600), pulse('p8', 'no_vehicle', 7200)];
       const result = check(plan);
@@ -150,7 +150,7 @@ describe('schedulePublishCheck', () => {
       assert.equal(check(plan).publishSafe, true);
     });
 
-    it('排班引擎產生、卻沒有應開明細的舊班表：核對不了，擋發布', () => {
+    it('排班引擎產生、卻沒有應開明細的舊班表：核對不了，擋部署', () => {
       const plan = enginePlan([0, 60]);
       const result = check(plan);
       assert.equal(result.publishSafe, false);
@@ -188,7 +188,7 @@ describe('schedulePublishCheck', () => {
     assert.equal(result.publishBlockingCount, 0);
   });
 
-  it('兩台車擠在同一個站位時擋發布', () => {
+  it('兩台車擠在同一個站位時擋部署', () => {
     // 兩列同時抵達 station_b，一個停靠點停不下兩台
     const result = check(planWith([0, 0]));
     assert.equal(result.publishSafe, false);
@@ -206,7 +206,7 @@ describe('schedulePublishCheck', () => {
     assert.equal(resolveSchedulePublishState(record, plan), 'ready');
   });
 
-  it('檢查有擋發布的問題＝不建議發布', () => {
+  it('檢查有擋部署的問題＝不建議發布', () => {
     const plan = planWith([0, 0]);
     const record = toPublishCheckRecord(check(plan), '2026-08-09T00:00:00.000Z');
     assert.equal(resolveSchedulePublishState(record, plan), 'blocked');
@@ -237,7 +237,7 @@ describe('schedulePublishCheck', () => {
     assert.equal(resolveSchedulePublishState(record, moved), 'unchecked');
   });
 
-  it('發布前重驗證也看設施格交接：兩車同格只隔 30 秒就擋發布', () => {
+  it('發布前重驗證也看設施格交接：兩車同格只隔 30 秒就擋部署', () => {
     const plan = {
       timelines: [
         {

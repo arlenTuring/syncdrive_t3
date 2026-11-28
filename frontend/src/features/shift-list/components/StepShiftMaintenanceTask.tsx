@@ -11,13 +11,10 @@ import type {
   ShiftScheduleMaintenanceTaskDraft,
 } from '../types/create';
 import {
-  emptyMaintenanceEntrySlackBySectionInput,
   normalizeMaintenanceEntrySlackBySectionInput,
   type MaintenanceEntrySlackSectionKey,
 } from '../utils/resolveMaintenanceEntrySlackSeconds';
 import {
-  emptyMaintenanceSectionCodeBySection,
-  defaultMaintenanceSectionCardLabelBySection,
   findMaintenanceSectionCodeIssues,
   normalizeMaintenanceSectionCardLabelBySection,
   normalizeMaintenanceSectionCodeBySection,
@@ -35,12 +32,16 @@ const SELECT_CLASS = fieldClass({ size: 'md', fullWidth: true });
 const CODE_INPUT_CLASS =
   cn(fieldClass({ size: 'md', fullWidth: true }), 'uppercase');
 
+/** 機動的整備代號（使用者指定 F，避開保養的 M） */
+const MANEUVER_DEFAULT_CODE = 'F';
+
 const SECTION_TITLE: Record<MaintenanceSectionCodeKey, string> = {
   charging: '充電任務',
   carWash: '洗車任務',
   maintenance: '保養任務',
   preTrip: '行檢任務',
   mobile: '待命任務',
+  maneuver: '機動任務',
 };
 
 type StepShiftMaintenanceTaskProps = {
@@ -63,6 +64,7 @@ function resolveSectionEnabled(
     maintenance: previewDraft.maintenance.stepEnabled,
     preTrip: previewDraft.preTrip.stepEnabled,
     mobile: previewDraft.mobile.stepEnabled,
+    maneuver: previewDraft.maneuver.stepEnabled,
   };
 }
 
@@ -154,11 +156,17 @@ export function StepShiftMaintenanceTask({
           && current.sectionEnabled.carWash === enabled.carWash
           && current.sectionEnabled.maintenance === enabled.maintenance
           && current.sectionEnabled.preTrip === enabled.preTrip
-          && current.sectionEnabled.mobile === enabled.mobile;
-        if (!same) {
+          && current.sectionEnabled.mobile === enabled.mobile
+          && current.sectionEnabled.maneuver === enabled.maneuver;
+        // 機動的代號固定用 F（使用者 2026-11-28 指定；保養已用 M）：啟用機動又還沒填時自動帶入
+        const fillManeuverCode = enabled.maneuver && !current.sectionCodeBySection.maneuver;
+        if (!same || fillManeuverCode) {
           onChange({
             ...current,
             sectionEnabled: enabled,
+            ...(fillManeuverCode
+              ? { sectionCodeBySection: { ...current.sectionCodeBySection, maneuver: MANEUVER_DEFAULT_CODE } }
+              : {}),
           });
         }
       })
@@ -180,20 +188,24 @@ export function StepShiftMaintenanceTask({
   }, [draft.taskId]);
 
   const handleSelect = (taskId: string) => {
+    if (taskId === draft.taskId) return;
     const item = items.find((row) => row.task_id === taskId);
+    // 整備代號、班次卡標籤、讓渡餘裕是依整備類別（充電、待命…）設定的，不是綁某一份整備任務：
+    // 換整備任務時保留已填的值（複製來的班表也不會被清掉）；哪幾類要填由新任務的啟用狀態決定。
     onChange({
       taskId,
       taskName: item?.name ?? '',
       skipped: false,
-      entrySlackBySection: emptyMaintenanceEntrySlackBySectionInput(),
-      sectionCodeBySection: emptyMaintenanceSectionCodeBySection(),
-      sectionCardLabelBySection: defaultMaintenanceSectionCardLabelBySection(),
+      entrySlackBySection: draft.entrySlackBySection,
+      sectionCodeBySection: draft.sectionCodeBySection,
+      sectionCardLabelBySection: draft.sectionCardLabelBySection,
       sectionEnabled: {
         charging: false,
         carWash: false,
         maintenance: false,
         preTrip: false,
         mobile: false,
+        maneuver: false,
       },
     });
   };
@@ -258,7 +270,7 @@ export function StepShiftMaintenanceTask({
             type="text"
             value={sectionCodeBySection[key]}
             onChange={(e) => patchSectionCode(key, e.target.value)}
-            placeholder="例：M"
+            placeholder={key === 'maneuver' ? `例：${MANEUVER_DEFAULT_CODE}` : '例：M'}
             maxLength={2}
             className={`${CODE_INPUT_CLASS} ${issue ? 'border-status-error focus:border-status-error focus:ring-status-error-light' : ''}`}
             autoComplete="off"
@@ -340,6 +352,13 @@ export function StepShiftMaintenanceTask({
         {creationMode === 'parametric' ? slackField('mobile') : null}
       </div>
     ),
+    maneuver: (
+      <div className="space-y-4">
+        {sectionCodeField('maneuver')}
+        {cardLabelField('maneuver')}
+        {creationMode === 'parametric' ? slackField('maneuver') : null}
+      </div>
+    ),
   };
 
   return (
@@ -369,7 +388,6 @@ export function StepShiftMaintenanceTask({
             {items.map((item) => (
               <option key={item.task_id} value={item.task_id}>
                 {item.name}
-                {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
               </option>
             ))}
           </SiteSelect>

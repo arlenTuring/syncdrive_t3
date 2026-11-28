@@ -120,6 +120,7 @@ export type TaskTypeKey =
   | 'charging'
   | 'inspection'
   | 'standby'
+  | 'maneuver'
   | 'servicing'
   | 'washing';
 
@@ -134,6 +135,7 @@ export const TASK_TYPE_OPTIONS: Array<{
   { key: 'charging', label: '充電' },
   { key: 'inspection', label: '行檢' },
   { key: 'standby', label: '待命' },
+  { key: 'maneuver', label: '機動' },
   { key: 'servicing', label: '保養' },
   { key: 'washing', label: '洗車' },
 ];
@@ -172,6 +174,14 @@ export const TASK_TYPE_DESCRIPTIONS: Record<
     bullets: [
       '於模板固定排待命／調度候用時段',
       '可參考整備任務「待命」的預估作業時間',
+      '占用以模板時段長度為準',
+    ],
+  },
+  maneuver: {
+    title: '機動',
+    bullets: [
+      '備用車候用時段，停在整備任務「機動」設定的專用停車格',
+      '排班規則跟待命相同，只是停車格、卡片代號分開',
       '占用以模板時段長度為準',
     ],
   },
@@ -224,6 +234,14 @@ export function resolveTaskTypeLabel(key: TaskTypeKey | null | undefined): strin
 
 export function isMainlineTaskType(key: TaskTypeKey | null | undefined): boolean {
   return key === 'passenger';
+}
+
+/**
+ * 待命與機動：車停著候用、沒有實際作業。排班引擎對兩者用同一套規則，
+ * 差別只在停車格（整備任務各自的設施）、卡片代號與顯示名稱。
+ */
+export function isStandbyLikeTaskType(key: string | null | undefined): boolean {
+  return key === 'standby' || key === 'maneuver';
 }
 
 export function isServicingWindowTaskType(key: TaskTypeKey | null | undefined): boolean {
@@ -792,6 +810,24 @@ export type ScheduleTask = {
   servicePulseId?: string;
 };
 
+/**
+ * 機動＝備用車候用；跟待命一樣是停著，但要一眼分得出是備用線。
+ * 顏色取屬性色票的橘色（色票 orange-400），底色是把它疊在待命的深灰上，不另外寫色碼。
+ */
+const ATTRIBUTE_STANDBY_BASE = '#3F3F46';
+const ATTRIBUTE_STANDBY_TEXT = '#F4F4F5';
+
+function maneuverColors(): { bar: string; base: string; bg: string; text: string } {
+  const bar = ATTRIBUTE_COLOR_PALETTE[15];
+  const tint = [1, 3, 5].map((at) => parseInt(bar.slice(at, at + 2), 16)) as [number, number, number];
+  return {
+    bar,
+    base: ATTRIBUTE_STANDBY_BASE,
+    bg: taskTypeBarBackground(ATTRIBUTE_STANDBY_BASE, tint),
+    text: ATTRIBUTE_STANDBY_TEXT,
+  };
+}
+
 /** Figma TaskBar colors — opaque bg so bars don't shift hue over the grid. */
 export const TASK_TYPE_COLORS: Record<
   TaskTypeKey,
@@ -824,10 +860,11 @@ export const TASK_TYPE_COLORS: Record<
   standby: {
     // 待命＝車在場內候用、沒有實際作業，用灰白色跟「正在做事」的任務區隔開
     bar: '#D4D4D8',
-    base: '#3F3F46',
-    bg: taskTypeBarBackground('#3F3F46', [212, 212, 216]),
-    text: '#F4F4F5',
+    base: ATTRIBUTE_STANDBY_BASE,
+    bg: taskTypeBarBackground(ATTRIBUTE_STANDBY_BASE, [212, 212, 216]),
+    text: ATTRIBUTE_STANDBY_TEXT,
   },
+  maneuver: maneuverColors(),
   washing: {
     bar: '#00B8DB',
     base: '#123C46',
@@ -1449,7 +1486,7 @@ export function formatSelectedIntervalHoverContent(
   });
   if (fleet) {
     lines.push(
-      `建議時間線　${fleet.recommended} 列`
+      `建議運用數　${fleet.recommended} 個`
       + (fleet.recommended !== fleet.theoreticalMin
         ? `（理論下限 ${fleet.theoreticalMin}）`
         : ''),

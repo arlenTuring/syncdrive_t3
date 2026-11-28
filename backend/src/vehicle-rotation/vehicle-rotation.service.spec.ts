@@ -357,6 +357,72 @@ describe('VehicleRotationService 監看流程', () => {
     expect(item(h).history.map((entry) => entry.kind)).toEqual(expect.arrayContaining(['retry', 'strand-request', 'strand']));
   });
 
+  describe('收班進場換手：被換車不在月台等接替車到位', () => {
+    const outAt = T0 + 8 * MIN
+    const entryRotation = (h: Harness) => {
+      const { inLeg, outLeg } = addRotation(h, {
+        shunt_order: { window: { row: 1, takeoverDepartAt: T0 + 2 * MIN, moveInMs: 7 * MIN, meetAt: 'E2', cancelled: [], entry: true, outAt } } as never,
+      })
+      const stay: ShuntLeg = {
+        ...task({ tripCode: 'E010007', vehicleCode: 'PMS02', departAt: T0 + 9 * MIN, arriveAt: T0 + 90 * MIN, row: 1, kind: 'maintenance', origin: point('E2'), destination: point('E2') }),
+        orderId: 'E010007-ST', role: 'stay', phase: 'hold', attempt: 1,
+      }
+      item(h).shunts.push(stay)
+      return { inLeg, outLeg }
+    }
+
+    it('接替車一出發就發回場，照原本進場時刻；接替車到位後才把那一格的整備交給它', async () => {
+      const h = harness({ planNext: [task({ tripCode: 'NT0600', vehicleCode: 'PMS02', departAt: T0 + 400 * MIN, row: 1 })] })
+      const { inLeg } = entryRotation(h)
+      const order = h.store.addOrder({ orderId: inLeg.orderId, vehicle: 'PMS02', status: 'PROCESSING', startedAt: inLeg.departAt })
+      h.advance(3 * MIN)
+      await h.tick()
+      const out = legs(h, 'out').at(-1)!
+      expect(out.phase).toBe('issued')
+      expect(out.departAt).toBe(outAt)
+      expect(legs(h, 'stay')[0].phase).toBe('hold')
+
+      order.status = 'END'
+      h.advance(6 * MIN)
+      await h.tick()
+      expect(legs(h, 'stay')[0].phase).toBe('issued')
+      expect(item(h).status).toBe('confirmed')
+    })
+
+    it('回場發出後接替車一直失敗：不中止（被換車已離開月台），停車後原地待命，輪替照樣生效', async () => {
+      const h = harness()
+      const { inLeg } = entryRotation(h)
+      h.store.addOrder({ orderId: inLeg.orderId, vehicle: 'PMS02', status: 'PROCESSING', startedAt: inLeg.departAt })
+      h.advance(3 * MIN)
+      await h.tick()
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const leg = legs(h, 'in').at(-1)!
+        h.store.order(leg.orderId).status = 'FAULTED'
+        h.advance(MIN)
+        await h.tick()
+        h.advance(MIN)
+        await h.tick()
+      }
+      expect(item(h).status).toBe('confirmed')
+      h.advance(10_000)
+      await h.tick()
+      expect(legs(h, 'in').at(-1)!.gaveUp).toBe(true)
+      expect(legs(h, 'stay')[0].phase).toBe('hold')
+      expect(item(h).history.map((entry) => entry.kind)).toEqual(expect.arrayContaining(['in-strand-request', 'in-strand']))
+    })
+
+    it('到了被換車該進場的時刻接替車還沒出發：中止，被換車照原計畫進場', async () => {
+      const h = harness()
+      const { inLeg } = entryRotation(h)
+      h.store.addOrder({ orderId: inLeg.orderId, vehicle: 'PMS02', status: 'PENDING' })
+      h.store.busy.add('PMS02')
+      h.advance(10 * MIN)
+      await h.tick()
+      expect(item(h).status).toBe('aborted')
+      expect(legs(h, 'out').at(-1)!.phase).toBe('hold')
+    })
+  })
+
   it('承接只認生效日那一列的第一班由接替車開：別列、別天的載客單不算', async () => {
     const first = task({ tripCode: 'NT0100', vehicleCode: 'PMS02', departAt: T0 + 60 * MIN, row: 1 });
     const h = harness({ planNext: [first] });

@@ -9,6 +9,7 @@ import { collectPlanViolations, compareViolations, type PlanEvaluationContext, t
 import { resolvePassengerRouteOccupancy } from './physics';
 import type { FeasibilityIssue, GeneratedSchedulePlan, GeneratedScheduleBlock } from './types';
 import { minuteToSecond, pushIssue, secondToMinute } from './types';
+import { isStandbyLikeTaskType } from '../../../time-templates/types/editor';
 
 /**
  * 移動卡開在正線上的那一段改成載客（調度載客班次）
@@ -117,8 +118,8 @@ function isSuffix(tail: readonly string[], whole: readonly string[]): boolean {
 }
 
 const FLEXIBLE = (block: GeneratedScheduleBlock | undefined) =>
-  Boolean(block) && (block!.taskType === 'standby' || (block!.taskType === 'idle' && block!.source === 'hold'));
-const YARD_WORK = new Set(['charging', 'inspection', 'servicing', 'washing', 'standby']);
+  Boolean(block) && (isStandbyLikeTaskType(block!.taskType) || (block!.taskType === 'idle' && block!.source === 'hold'));
+const YARD_WORK = new Set(['charging', 'inspection', 'servicing', 'washing', 'standby', 'maneuver']);
 
 export function convertMainlineMovesToService(args: {
   timelines: GeneratedSchedulePlan['timelines'];
@@ -322,7 +323,7 @@ export function convertMainlineMovesToService(args: {
       severity: 'warning',
       kind: 'policy',
       message: `${converted.length} 趟進出場／轉場移動在正線上的那一段改成載客（照路線停站，不受班距約束）：`
-        + converted.map((item) => `時間線 ${item.timelineRow}「${item.label}」→ ${item.routeCodes.join('＋')}`
+        + converted.map((item) => `運用 ${item.timelineRow}「${item.label}」→ ${item.routeCodes.join('＋')}`
           + `${item.shiftSeconds ? `（出發${item.shiftSeconds > 0 ? '晚' : '早'} ${Math.abs(item.shiftSeconds)} 秒）` : ''}`).join('；'),
       detail: { conversions: converted },
     });
@@ -333,7 +334,7 @@ export function convertMainlineMovesToService(args: {
       severity: 'warning',
       kind: 'policy',
       message: `${kept.length} 趟移動有一段開在正線上但仍是空車：`
-        + kept.map((item) => `時間線 ${item.timelineRow}「${item.label}」${item.reason}`).join('；'),
+        + kept.map((item) => `運用 ${item.timelineRow}「${item.label}」${item.reason}`).join('；'),
       detail: { conversions: kept },
     });
   }

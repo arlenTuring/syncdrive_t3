@@ -58,6 +58,7 @@ import {
   resolveNextInstanceId,
   type RouteSuccessorPolicy,
 } from './routeSuccessorPolicy';
+import { isStandbyLikeTaskType } from '../../../time-templates/types/editor';
 
 export function resolveHeadwaySecondsAtMinute(
   minute: number,
@@ -208,7 +209,7 @@ export function validateTimelineOverlaps(
         pushIssue(errors, {
           code: 'TIMELINE_OVERLAP',
           severity: 'error',
-          message: `時間線 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
+          message: `運用 ${timeline.row} 任務時間重疊：${currentLabel} 與 ${nextLabel}`,
           detail: {
             timelineRow: timeline.row,
             blockId: current.id,
@@ -558,7 +559,7 @@ export function validateTimelineCapacity(
       pushIssue(warnings, {
         code: 'INSUFFICIENT_TIMELINES',
         severity: 'warning',
-        message: '時間線數量可能不足以維持設定班距，實際穩態班距將偏大',
+        message: '運用數量可能不足以維持設定班距，實際穩態班距將偏大',
         detail: {
           intervalName: interval.name,
           configuredHeadwaySeconds: headway,
@@ -639,8 +640,8 @@ export function validateRouteSwitchBuffers(
           code: 'ROUTE_SWITCH_BUFFER_INSUFFICIENT',
           severity: 'error',
           message: includeRecovery
-            ? `時間線 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`
-            : `時間線 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需換線緩衝 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`,
+            ? `運用 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`
+            : `運用 ${timeline.row}：路線 ${current.routeName ?? current.routeId} 切換至 ${next.routeName ?? next.routeId} 的空檔不足（需換線緩衝 ${requiredGap} 秒；僅 ${Math.max(0, gapSeconds)} 秒）`,
           detail: {
             timelineRow: timeline.row,
             fromRouteId: current.routeId,
@@ -657,7 +658,7 @@ export function validateRouteSwitchBuffers(
         pushIssue(errors, {
           code: 'RECOVERY_INSUFFICIENT',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${current.label} 與下一班之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒，僅 ${Math.max(0, gapSeconds)} 秒）`,
+          message: `運用 ${timeline.row}：${current.label} 與下一班之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒，僅 ${Math.max(0, gapSeconds)} 秒）`,
           detail: {
             timelineRow: timeline.row,
             fromRouteId: current.routeId,
@@ -720,7 +721,7 @@ function resolveBlockRouteInstance(args: {
     pushIssue(args.errors, {
       code: 'ROUTE_INSTANCE_AMBIGUOUS',
       severity: 'error',
-      message: `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 指定的路線實例 ${explicitInstanceId} 不在目前 selected routes`,
+      message: `運用 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 指定的路線實例 ${explicitInstanceId} 不在目前 selected routes`,
       detail: {
         timelineRow: args.timelineRow,
         blockId: args.block.id,
@@ -741,8 +742,8 @@ function resolveBlockRouteInstance(args: {
     severity: 'error',
     message:
       candidates.length > 1
-        ? `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 僅有 routeId，無法在 ${candidates.length} 個同路線實例中判定關聯圖節點`
-        : `時間線 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 無法解析對應路線實例`,
+        ? `運用 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 僅有 routeId，無法在 ${candidates.length} 個同路線實例中判定關聯圖節點`
+        : `運用 ${args.timelineRow}：班次 ${args.block.routeCode ?? args.block.routeId ?? args.block.label} 無法解析對應路線實例`,
     detail: {
       timelineRow: args.timelineRow,
       blockId: args.block.id,
@@ -857,7 +858,7 @@ export function validateRouteSuccessorContinuity(
         pushIssue(errors, {
           code: 'ROUTE_SUCCESSOR_MISMATCH',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${currentRoute.routeCode}（${currentInstanceId}）下一趟應為關聯圖合法出邊`
+          message: `運用 ${timeline.row}：${currentRoute.routeCode}（${currentInstanceId}）下一趟應為關聯圖合法出邊`
             + `（偏好 ${preferredNextId ?? '無'}），實際為 ${nextRoute.routeCode}（${nextInstanceId}）`,
           detail: {
             timelineRow: timeline.row,
@@ -883,7 +884,7 @@ export function validateRouteSuccessorContinuity(
         pushIssue(errors, {
           code: 'ROUTE_STATION_DISCONTINUITY',
           severity: 'error',
-          message: `時間線 ${timeline.row}：${currentRoute.routeCode} 終點 ${terminalStationId ?? '未知'} 無法銜接 ${nextRoute.routeCode} 起點 ${originStationId ?? '未知'}`,
+          message: `運用 ${timeline.row}：${currentRoute.routeCode} 終點 ${terminalStationId ?? '未知'} 無法銜接 ${nextRoute.routeCode} 起點 ${originStationId ?? '未知'}`,
           detail: {
             timelineRow: timeline.row,
             earlierBlockId: currentBlock.id,
@@ -950,7 +951,7 @@ export function validateStationTimingsWithinBlocks(
         code: 'STATION_TIMING_INFEASIBLE',
         severity: 'error',
         message:
-          `時間線 ${timeline.row}：${block.routeCode ?? block.routeName ?? block.label}`
+          `運用 ${timeline.row}：${block.routeCode ?? block.routeName ?? block.label}`
           + ' 的完整停靠／站間時間無法放入班次卡秒數',
         detail: {
           timelineRow: timeline.row,
@@ -1012,7 +1013,7 @@ export function validateStationBerthCollisions(
    * 佔用窗常常只有 10 秒，跟畫面上的班次卡對不起來（2026-08-08 使用者回報）。
    */
   const labelOf = (occ: StationBerthOccupancy): string =>
-    `${tripCodeOf(occ)}（時間線 ${occ.timelineRow}）`
+    `${tripCodeOf(occ)}（運用 ${occ.timelineRow}）`
     + ` ${formatMinuteHms(occ.blockStartMinute)}–${formatMinuteHms(occ.blockEndMinute)}`;
 
   /**
@@ -1192,14 +1193,14 @@ export function validateStationBerthCollisions(
     const { peak, atMinute, longestIdle, atPeak } = peakConcurrentAtStation(bucket.stationId);
     const peakLabel = atPeak
       .map((occ) =>
-        `${tripCodeOf(occ)}（時間線 ${occ.timelineRow}，`
+        `${tripCodeOf(occ)}（運用 ${occ.timelineRow}，`
         + `${formatMinuteHms(occ.startMinute)}–${formatMinuteHms(occ.actualDepartMinute)}）`)
       .join('、');
     const idleMinutes = longestIdle
       ? (longestIdle.actualDepartMinute - longestIdle.startMinute)
       : 0;
     const longestLabel = longestIdle
-      ? `${tripCodeOf(longestIdle)}（時間線 ${longestIdle.timelineRow}）`
+      ? `${tripCodeOf(longestIdle)}（運用 ${longestIdle.timelineRow}）`
         + ` ${formatMinuteHms(longestIdle.startMinute)} 到站、`
         + `${formatMinuteHms(longestIdle.actualDepartMinute)} 才開走，`
         + `停了 ${idleMinutes.toFixed(1)} 分鐘`
@@ -1295,7 +1296,7 @@ export function validateYardExitContinuity(args: {
     && (block.taskType === 'charging'
       || block.taskType === 'servicing'
       || block.taskType === 'inspection'
-      || block.taskType === 'standby');
+      || isStandbyLikeTaskType(block.taskType));
 
   for (const timeline of timelines) {
     const ordered = [...timeline.blocks].sort(
@@ -1351,7 +1352,7 @@ export function validateYardExitContinuity(args: {
         severity: 'error',
         kind: 'actionable',
         message:
-          `時間線 ${timeline.row}：「${yard.label}」做完後車停在`
+          `運用 ${timeline.row}：「${yard.label}」做完後車停在`
           + `「${allowedOrigins.map(stationLabel).join('」或「')}」，`
           + `但接著排的 ${resolveGeneratedBlockTripCode(next, i, args.sectionCodes ?? null, args.transitionCodes ?? null)}`
           + `（${sourceLabel}）是從「${stationLabel(originStationId)}」發車，`
@@ -1392,7 +1393,7 @@ export function validateRotationCyclesComplete(
       block.taskType === 'charging'
       || block.taskType === 'servicing'
       || block.taskType === 'inspection'
-      || block.taskType === 'standby'
+      || isStandbyLikeTaskType(block.taskType)
     );
   };
 
@@ -1418,7 +1419,7 @@ export function validateRotationCyclesComplete(
         code: 'ROTATION_CYCLE_INCOMPLETE',
         severity: 'error',
         message:
-          `時間線 ${timeline.row} 整備前未跑完路線群組來回`
+          `運用 ${timeline.row} 整備前未跑完路線群組來回`
           + `（本段正線 ${stretch.length} 趟，須為 ${routeCount} 的整數倍）。`
           + `最後一趟：${lastLabel}`,
         detail: {
@@ -1501,13 +1502,13 @@ export function validateYardWorkPreserved(args: {
     const templateSeconds = Math.round((endMinute - templateStart) * 60);
     if (templateSeconds <= 0) continue;
     void args.maintenanceBody;
-    // 硬下限只有「不能歸零」：移動可以把作業壓到低於設定作業時長（使用者 2026-09-30），那部分逐筆揭露、不擋發布
+    // 硬下限只有「不能歸零」：移動可以把作業壓到低於設定作業時長（使用者 2026-09-30），那部分逐筆揭露、不擋部署
     // 充電：模板原長扣掉可被正線佔掉的額度（整備任務設定的讓渡餘裕），再短就擋
     const required = task.taskType === 'charging'
       ? Math.max(nonZeroYardWorkSeconds(), templateSeconds - Math.max(0, task.yieldAllowanceSeconds ?? 0))
       : Math.min(templateSeconds, nonZeroYardWorkSeconds());
     const blocks = findBlocks(task.id);
-    const where = `時間線 ${task.rowIndex}「${task.label}」（模板 ${formatScheduleClockHms(templateStart)} 起 ${Math.round(templateSeconds / 60)} 分鐘）`;
+    const where = `運用 ${task.rowIndex}「${task.label}」（模板 ${formatScheduleClockHms(templateStart)} 起 ${Math.round(templateSeconds / 60)} 分鐘）`;
     if (blocks.length === 0) {
       pushIssue(args.errors, {
         code: 'MAINTENANCE_WORK_INSUFFICIENT',
@@ -1533,7 +1534,7 @@ export function validateYardWorkPreserved(args: {
   }
 }
 
-const YARD_WORK_CHECK_TYPES: ReadonlySet<string> = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby']);
+const YARD_WORK_CHECK_TYPES: ReadonlySet<string> = new Set(['charging', 'servicing', 'inspection', 'washing', 'standby', 'maneuver']);
 
 /** 車真的停在裡面的那幾種整備；暫停卡（source 'hold'）同樣代表車還在格子裡 */
 /**
@@ -1634,8 +1635,8 @@ export function validateFacilityOccupancy(
         kind: 'limit',
         message:
           `設施格「${collision.facilityLabel}」同時被兩台車佔用：`
-          + `時間線 ${earlier.timelineRow} 待到 ${formatMinuteHms(earlier.actualDepartMinute)}，`
-          + `時間線 ${later.timelineRow} 卻在 ${formatMinuteHms(later.startMinute)} 就進來，`
+          + `運用 ${earlier.timelineRow} 待到 ${formatMinuteHms(earlier.actualDepartMinute)}，`
+          + `運用 ${later.timelineRow} 卻在 ${formatMinuteHms(later.startMinute)} 就進來，`
           + `重疊 ${Math.round(collision.overlapSeconds)} 秒`,
         detail,
       });
@@ -1646,8 +1647,8 @@ export function validateFacilityOccupancy(
         kind: 'limit',
         message:
           `設施格「${collision.facilityLabel}」交接太緊：`
-          + `時間線 ${earlier.timelineRow} ${formatMinuteHms(earlier.actualDepartMinute)} 離開、`
-          + `時間線 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} 進來，`
+          + `運用 ${earlier.timelineRow} ${formatMinuteHms(earlier.actualDepartMinute)} 離開、`
+          + `運用 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} 進來，`
           + `只隔 ${Math.round(collision.gapSeconds)} 秒`
           + `（需要 ${Math.round(protectionSeconds * 2)} 秒）`,
         detail,
@@ -1781,7 +1782,7 @@ export function validateVehicleLocationContinuity(args: {
         severity: 'error',
         kind: 'limit',
         message:
-          `時間線 ${timeline.row}：「${fromBlock.label}」${formatMinuteHms(fromBlock.plannedEndMinute)} 結束時車在`
+          `運用 ${timeline.row}：「${fromBlock.label}」${formatMinuteHms(fromBlock.plannedEndMinute)} 結束時車在`
           + `「${fromPlace.label}」，接著「${toBlock.label}」${formatMinuteHms(toBlock.plannedStartMinute)}`
           + ` 要在「${toPlace.label}」，中間沒有任何移動卡——車到不了`,
         detail: {
@@ -1845,7 +1846,7 @@ export function validateMovePathConflicts(args: {
 }
 
 /**
- * 移動卡在同一個轉折點貼太近（警告、擋發布）。
+ * 移動卡在同一個轉折點貼太近（警告、擋部署）。
  *
  * 排卡時 insertMaintenanceTransferCards 會錯開轉折點，但讓站、提早進廠等策略
  * 事後插的移動卡不經過那一關——2026-09-26 實測基準班表有 2 筆兩台車 40 秒內
@@ -1878,7 +1879,7 @@ export function validateMoveJunctionConflicts(args: {
       severity: 'error',
       kind: 'limit',
       message:
-        `時間線 ${gap.timelineRow}：移動卡${what}，無法確認經過時刻與轉折點安全。`
+        `運用 ${gap.timelineRow}：移動卡${what}，無法確認經過時刻與轉折點安全。`
         + (gap.reason === 'missing-time' ? '請到地圖路網補上這一段的行駛時間。' : '請確認地圖路網後重新生成。'),
       detail: {
         timelineRow: gap.timelineRow, blockId: gap.blockId,
@@ -1899,8 +1900,8 @@ export function validateMoveJunctionConflicts(args: {
       severity: 'warning',
       kind: 'limit',
       message:
-        `「${mine.nodeLabel}」：時間線 ${mine.timelineRow} ${formatMinuteHms(secondToMinute(mine.instant))} 經過、`
-        + `時間線 ${other.timelineRow} ${formatMinuteHms(secondToMinute(other.instant))} 經過，`
+        `「${mine.nodeLabel}」：運用 ${mine.timelineRow} ${formatMinuteHms(secondToMinute(mine.instant))} 經過、`
+        + `運用 ${other.timelineRow} ${formatMinuteHms(secondToMinute(other.instant))} 經過，`
         + `只差 ${Math.round(gapSeconds)} 秒（需要 ${Math.round(bufferSeconds)} 秒）`,
       detail: {
         nodeId: mine.nodeId,
@@ -1927,9 +1928,9 @@ export function validateMoveJunctionConflicts(args: {
  *   <li>明細裡標 <code>no_service_window</code> 的脈衝：那個時刻時間模板沒有安排任何一列跑正線，
  *       不算應開（照樣列在明細裡供檢查）。</li>
  *   <li>標 <code>no_vehicle</code> 的脈衝：車不夠，仍屬於應開需求。</li>
- *   <li>其他脈衝班表上找不到載客班次：<code>UNSERVED_SERVICE_PULSE</code>（擋發布）。</li>
+ *   <li>其他脈衝班表上找不到載客班次：<code>UNSERVED_SERVICE_PULSE</code>（擋部署）。</li>
  *   <li>沒有明細、卻是排班引擎產生的班表（班次帶交路識別）：舊產物，核對不了，
- *       <code>SERVICE_DEMAND_UNVERIFIABLE</code>（擋發布）。手動製作的班表沒有班距需求，不檢查。</li>
+ *       <code>SERVICE_DEMAND_UNVERIFIABLE</code>（擋部署）。手動製作的班表沒有班距需求，不檢查。</li>
  * </ul>
  *
  * @param onlyAssigned 產生器自己用：掛車當下已經報過「沒車承接」的脈衝不再重報，
@@ -1984,7 +1985,7 @@ export function validateServicePulseCoverage(args: {
 
 function describeUnservedPulse(pulse: ServicePulseRecord): string {
   if (pulse.status === 'assigned') {
-    return `產生時掛在時間線 ${pulse.assignedRow}，但班表上找不到這一輪的載客班次（被刪除或改掉）`;
+    return `產生時掛在運用 ${pulse.assignedRow}，但班表上找不到這一輪的載客班次（被刪除或改掉）`;
   }
   return pulse.reason ?? '沒有任何一列能合法承接';
 }

@@ -34,6 +34,7 @@ export function resolveTimetableTripCode(
     inspection: 'IN',
     charging: 'CH',
     standby: 'SB',
+    maneuver: 'MV',
     idle: 'ID',
   };
   const code = servicingPrefix[block.taskType];

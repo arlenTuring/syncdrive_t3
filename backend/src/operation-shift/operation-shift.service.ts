@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   OperationShift,
-  OperationShiftPublishStatus,
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 import {
@@ -36,7 +35,6 @@ import {
 export type ListOperationShiftsQuery = {
   keyword?: string;
   usage_status?: 'all' | OperationShiftUsageStatus;
-  publish_status?: 'all' | OperationShiftPublishStatus;
   page?: number;
   page_size?: number;
 };
@@ -46,11 +44,17 @@ export type SaveOperationShiftDraftInput = {
   body?: Record<string, unknown>;
 };
 
+/**
+ * 時刻表讀的是哪一份班表。班表只有使用中／未使用，沒有草稿／發布之分（2026-11-28）：
+ * in_use＝部署中的班表（正式時刻）；latest_saved＝沒有部署中的班表，取最新儲存且有排班結果的那份，僅供參考。
+ */
+export type TimetableSource = 'in_use' | 'latest_saved';
+
 export type TimetableSourceMeta = {
   shift_id: string;
   name: string;
-  publish_status: string;
-  source: 'published' | 'draft_fallback';
+  usage_status: string;
+  source: TimetableSource;
   generated_at: string | null;
   updated_at: string;
   map_id: string | null;
@@ -86,10 +90,6 @@ export class OperationShiftService {
       qb.andWhere('s.usage_status = :us', { us: usageStatus });
     }
 
-    const publishStatus = query.publish_status;
-    if (publishStatus && publishStatus !== 'all') {
-      qb.andWhere('s.publish_status = :ps', { ps: publishStatus });
-    }
 
     qb.orderBy('s.updated_at', 'DESC').addOrderBy('s.created_at', 'DESC');
 
@@ -118,7 +118,6 @@ export class OperationShiftService {
   async getShiftDetail(id: string): Promise<{
     shift_id: string;
     name: string;
-    publish_status: string;
     usage_status: string;
     body: Record<string, unknown>;
     created_at: string;
@@ -128,7 +127,6 @@ export class OperationShiftService {
     return {
       shift_id: row.id,
       name: row.name,
-      publish_status: row.publishStatus,
       usage_status: row.usageStatus,
       body: row.body ?? {},
       created_at: row.createdAt,
@@ -162,7 +160,6 @@ export class OperationShiftService {
     const row = this.repo.create({
       id: this.generateShiftId(),
       name,
-      publishStatus: OperationShiftPublishStatus.DRAFT,
       usageStatus: OperationShiftUsageStatus.IDLE,
       body: input.body ?? {},
       createdAt: now,
@@ -185,13 +182,6 @@ export class OperationShiftService {
       throw new BadRequestException('使用中的班表無法編輯，請先停用或部署其他班表');
     }
     const nextBody = input.body ?? {};
-    // 已完成的班表重新編輯、排班結果變了：回到草稿區，等再次完成建立才算已完成
-    if (
-      row.publishStatus === OperationShiftPublishStatus.PUBLISHED
-      && JSON.stringify((row.body ?? {}).scheduleOutput ?? null) !== JSON.stringify(nextBody.scheduleOutput ?? null)
-    ) {
-      row.publishStatus = OperationShiftPublishStatus.DRAFT;
-    }
     row.name = name;
     row.body = nextBody;
     row.updatedAt = String(Date.now());
@@ -215,7 +205,6 @@ export class OperationShiftService {
     const row = this.repo.create({
       id: this.generateShiftId(),
       name: candidate,
-      publishStatus: OperationShiftPublishStatus.DRAFT,
       usageStatus: OperationShiftUsageStatus.IDLE,
       body,
       createdAt: now,
@@ -253,7 +242,6 @@ export class OperationShiftService {
     const row = this.repo.create({
       id: this.generateShiftId(),
       name: candidate,
-      publishStatus: OperationShiftPublishStatus.DRAFT,
       usageStatus: OperationShiftUsageStatus.IDLE,
       body,
       createdAt: now,
@@ -349,20 +337,8 @@ export class OperationShiftService {
     }
   }
 
-  /** 發布班表（供站顯／外部系統讀取 timetable） */
-  async publishShift(id: string): Promise<OperationShiftListItem> {
-    const row = await this.getShiftById(id);
-    if (!this.bodyHasPlan(row.body ?? {})) {
-      throw new BadRequestException('此班表尚無排班產出（scheduleOutput.plan），無法發布');
-    }
-    this.assertPublishSafe(row.body);
-    row.publishStatus = OperationShiftPublishStatus.PUBLISHED;
-    row.updatedAt = String(Date.now());
-    const saved = await this.repo.save(row);
-    return toOperationShiftListItem(saved);
-  }
 
-  /** 部署為執行班表：此班表 in_use，其餘改 idle，並一併發布 */
+  /** 部署為執行班表：此班表 in_use，其餘改 idle（部署前做排班安全檢查） */
   async deployShift(
     id: string,
     options?: { reviewerName?: string },
@@ -393,7 +369,6 @@ export class OperationShiftService {
 
     const reviewer = String(options?.reviewerName ?? '').trim();
     row.usageStatus = OperationShiftUsageStatus.IN_USE;
-    row.publishStatus = OperationShiftPublishStatus.PUBLISHED;
     row.body = {
       ...(row.body ?? {}),
       deployment: {
@@ -630,45 +605,26 @@ export class OperationShiftService {
     };
   }
 
+  /** 時刻表讀哪一份：部署中的班表；沒有部署中的，取最新儲存、有排班結果的那份（僅供參考） */
   private async resolveTimetableShift(): Promise<{
     row: OperationShift;
-    source: 'published' | 'draft_fallback';
+    source: TimetableSource;
   }> {
-    const published = await this.repo.find({
-      where: { publishStatus: OperationShiftPublishStatus.PUBLISHED },
-      order: { updatedAt: 'DESC' },
-      take: 20,
-    });
-    /*
-     * 更新時間相同時，部署中的那一份優先。部署會把前一份改成 idle 並寫入同一個時間
-     * （見 deployShift），每次部署之後「最新已發布」都是新舊兩份同分——不排這一層，
-     * 對外班表可能回舊的那份，跟調度下單用的部署中班表對不上。
-     */
-    published.sort(
-      (a, b) =>
-        Number(b.updatedAt) - Number(a.updatedAt) ||
-        Number(b.usageStatus === OperationShiftUsageStatus.IN_USE) -
-          Number(a.usageStatus === OperationShiftUsageStatus.IN_USE),
-    );
-    const publishedWithPlan = published.find((row) =>
-      this.bodyHasPlan(row.body ?? {}),
-    );
-    if (publishedWithPlan) {
-      return { row: publishedWithPlan, source: 'published' };
+    const inUse = await this.repo.findOne({ where: { usageStatus: OperationShiftUsageStatus.IN_USE } });
+    if (inUse && this.bodyHasPlan(inUse.body ?? {})) {
+      return { row: inUse, source: 'in_use' };
     }
 
-    const drafts = await this.repo.find({
+    const latest = await this.repo.find({
       order: { updatedAt: 'DESC' },
       take: 40,
     });
-    const draftWithPlan = drafts.find((row) => this.bodyHasPlan(row.body ?? {}));
-    if (draftWithPlan) {
-      return { row: draftWithPlan, source: 'draft_fallback' };
+    const latestWithPlan = latest.find((row) => this.bodyHasPlan(row.body ?? {}));
+    if (latestWithPlan) {
+      return { row: latestWithPlan, source: 'latest_saved' };
     }
 
-    throw new NotFoundException(
-      '找不到可讀取的班表：請先產生排班並儲存，或 POST …/detail/:id/publish 發布',
-    );
+    throw new NotFoundException('找不到可讀取的班表：請先產生排班並儲存，或部署一份班表');
   }
 
   private bodyHasPlan(body: Record<string, unknown>): boolean {
@@ -682,7 +638,7 @@ export class OperationShiftService {
 
   private toTimetableMeta(
     row: OperationShift,
-    source: 'published' | 'draft_fallback',
+    source: TimetableSource,
   ): TimetableSourceMeta {
     const body = row.body ?? {};
     const output = body.scheduleOutput;
@@ -699,7 +655,7 @@ export class OperationShiftService {
     return {
       shift_id: row.id,
       name: row.name,
-      publish_status: row.publishStatus,
+      usage_status: row.usageStatus,
       source,
       generated_at: generatedAt,
       updated_at: row.updatedAt,

@@ -103,7 +103,7 @@ describe('必要轉場被別列車的移動佔住轉折點：回報是誰擋的�
     assert.equal(window.earliestFixed, true, '作業不截尾是使用者固定規則');
     assert.ok(window.latestSecond < 431 * 60 + 20 - 29, '最晚要在時間線 3 進 E1 前讓出（含交接間隔）');
     assert.equal(window.latestFixed, false, '原格下一台進入者是引擎排出來的，可以重排');
-    assert.match(window.latestReason, /時間線 3 要進來/);
+    assert.match(window.latestReason, /運用 3 要進來/);
   });
 
   it('請時間線 3 的保養不要停 E1（改走 G2 去 E5）：G 與 E1 都讓出來，時間線 1 的轉場排得出來', () => {

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
   TimeTemplate,
-  TimeTemplatePublishStatus,
   TimeTemplateUsageStatus,
 } from '../database/entities/time-template.entity';
 import {
@@ -13,7 +12,6 @@ import {
 
 export type ListTimeTemplatesQuery = {
   keyword?: string;
-  publish_status?: 'all' | TimeTemplatePublishStatus;
   page?: number;
   page_size?: number;
 };
@@ -53,10 +51,6 @@ export class TimeTemplateService {
       qb.andWhere('(t.template_id ILIKE :kw OR t.name ILIKE :kw)', { kw: `%${keyword}%` });
     }
 
-    const publishStatus = query.publish_status;
-    if (publishStatus && publishStatus !== 'all') {
-      qb.andWhere('t.publish_status = :ps', { ps: publishStatus });
-    }
 
     qb.orderBy('t.updated_at', 'DESC').addOrderBy('t.created_at', 'DESC');
 
@@ -78,7 +72,6 @@ export class TimeTemplateService {
     Array<{
       template_id: string;
       name: string;
-      publish_status: string;
       usage_status: string;
       body: Record<string, unknown>;
       created_at: string;
@@ -96,7 +89,6 @@ export class TimeTemplateService {
     return rows.map((row) => ({
       template_id: row.id,
       name: row.name,
-      publish_status: row.publishStatus,
       usage_status: row.usageStatus,
       body: row.body ?? {},
       created_at: row.createdAt,
@@ -115,7 +107,6 @@ export class TimeTemplateService {
   async getTemplateDetail(id: string): Promise<{
     template_id: string;
     name: string;
-    publish_status: string;
     usage_status: string;
     body: Record<string, unknown>;
     created_at: string;
@@ -125,7 +116,6 @@ export class TimeTemplateService {
     return {
       template_id: row.id,
       name: row.name,
-      publish_status: row.publishStatus,
       usage_status: row.usageStatus,
       body: row.body ?? {},
       created_at: row.createdAt,
@@ -140,7 +130,6 @@ export class TimeTemplateService {
     const row = this.repo.create({
       id: this.generateTemplateId(),
       name,
-      publishStatus: TimeTemplatePublishStatus.DRAFT,
       usageStatus: TimeTemplateUsageStatus.IDLE,
       body: input.body ?? {},
       createdAt: now,
@@ -182,7 +171,6 @@ export class TimeTemplateService {
     const row = this.repo.create({
       id: this.generateTemplateId(),
       name,
-      publishStatus: TimeTemplatePublishStatus.DRAFT,
       usageStatus: TimeTemplateUsageStatus.IDLE,
       body,
       createdAt: now,

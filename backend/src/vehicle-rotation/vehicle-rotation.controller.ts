@@ -56,7 +56,7 @@ export class VehicleRotationController {
   @AuditAction('VEHICLE_ROTATION_CONFIRM', { param: 'id' })
   @Post('items/:id/confirm')
   @RequirePermission('operations.dispatch.edit')
-  @ApiOperation({ summary: '確認輪替', description: '確認後派遣計畫會加上調車、取消被換車最後一段，下一營運日起兩台車對調列。' })
+  @ApiOperation({ summary: '確認輪替', description: '確認後派遣計畫會加上調車、取消被換車最後一段，下一營運日起兩台車對調運用。' })
   async confirm(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     await this.service.confirm(id, actor(request));
     return { ok: true };

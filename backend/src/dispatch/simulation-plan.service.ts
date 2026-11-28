@@ -133,7 +133,6 @@ export class SimulationPlanService {
             : null,
         creation_mode: creationMode,
         creation_mode_label: operationShiftCreationModeLabel(creationMode),
-        publish_status: row.publishStatus,
         usage_status: row.usageStatus,
         time_template_name:
           readString(body, 'timeTemplateName') ??

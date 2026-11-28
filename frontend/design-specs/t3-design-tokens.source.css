@@ -193,6 +193,8 @@
   --surface-invert: var(--color-gray-200); /* surface/invert */
   --surface-theme: rgb(from var(--color-blue-300) r g b / 8%); /* surface/theme */
   --surface-theme-light: rgb(from var(--color-blue-500) r g b / 4%); /* surface/theme light */
+  --surface-gray: rgb(from var(--color-zinc-300) r g b / 4%); /* surface/gray */
+  --surface-gray-light: rgb(from var(--color-zinc-400) r g b / 4%); /* surface/gray light */
   --surface-background: var(--color-zinc-900); /* surface/background */
   --surface-sub-background: var(--color-black-100); /* surface/sub background */
   --surface-popup: var(--color-zinc-900); /* surface/popup */

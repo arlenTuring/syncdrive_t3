@@ -58,7 +58,7 @@ import {
   ScheduleIntervalHeaderColumnHighlight,
   ScheduleIntervalHeaderHits,
 } from './ScheduleIntervalSelection';
-import { Button, IconButton } from '../../../components/ui';
+import { Button, IconButton, Slider } from '../../../components/ui';
 import { TaskSettingsForm, type TaskSettingsFormHandle } from './TaskSettingsForm';
 import { ScrollPinnedCardLabel } from '../../../components/ScrollPinnedCardLabel';
 import {
@@ -99,14 +99,11 @@ function ScheduleTimeZoomSlider({
 }) {
   const { t } = useTranslation();
   return (
-    <input
-      type="range"
-      min={0}
-      max={100}
+    <Slider
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="schedule-time-zoom-slider w-28 shrink-0"
-      style={{ ['--fill' as string]: `${value}%` }}
+      onChange={onChange}
+      showLabel={false}
+      className="w-28 shrink-0"
       aria-label={t('timeTemplates.scheduling.zoomAria')}
     />
   );

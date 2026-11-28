@@ -169,8 +169,8 @@ function templateBody(tasks: ScheduleTask[], scheduleRowCount = 2, headwaySecond
 
 /**
  * 這幾份測試資料只有少數幾台車、班距比跑一輪還短：時刻表訂的發車脈衝本來就有幾個沒車開。
- * 2026-11-10 起沒車開的脈衝（UNSERVED_SERVICE_PULSE）擋發布，所以 report.ok 是 false；
- * 這些測試驗的是別的行為，這裡明確寫出「除了沒車開的脈衝，沒有其他擋發布的問題」，
+ * 2026-11-10 起沒車開的脈衝（UNSERVED_SERVICE_PULSE）擋部署，所以 report.ok 是 false；
+ * 這些測試驗的是別的行為，這裡明確寫出「除了沒車開的脈衝，沒有其他擋部署的問題」，
  * 不是把那項檢查拿掉。
  */
 function assertOnlyUnservedPulsesBlock(result: { report: { errors: { code: string }[]; warnings: { code: string }[] } }): void {
@@ -178,7 +178,7 @@ function assertOnlyUnservedPulsesBlock(result: { report: { errors: { code: strin
   const blocking = result.report.warnings
     .filter((issue) => PUBLISH_BLOCKING_CODES.has(issue.code as never))
     .map((issue) => issue.code);
-  assert.ok(blocking.every((code) => code === 'UNSERVED_SERVICE_PULSE'), `其他擋發布的問題：${blocking.join(', ')}`);
+  assert.ok(blocking.every((code) => code === 'UNSERVED_SERVICE_PULSE'), `其他擋部署的問題：${blocking.join(', ')}`);
 }
 
 describe('generateShiftSchedule', () => {

@@ -161,7 +161,8 @@ export type MaintenanceBodySectionKey =
   | 'charging'
   | 'carWash'
   | 'maintenance'
-  | 'mobile';
+  | 'mobile'
+  | 'maneuver';
 
 /** 從整備任務 body 抽出指定區段的設施識別（地圖設施 ID；舊資料沒有 ID 時用 equipment.mapCode） */
 export function extractFacilityMapCodes(

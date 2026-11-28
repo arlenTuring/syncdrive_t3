@@ -6,6 +6,7 @@
  * 不可把「全天總數剛好整除」當成過關——否則會出現充電前收在 ST、缺 TN。
  */
 import type { GeneratedScheduleBlock, GeneratedSchedulePlan } from './schedule-engine/types';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 export type TrimIncompleteRotationResult = {
   timelines: GeneratedSchedulePlan['timelines'];
@@ -24,7 +25,7 @@ function isYardSeparator(block: GeneratedScheduleBlock): boolean {
     block.taskType === 'charging'
     || block.taskType === 'servicing'
     || block.taskType === 'inspection'
-    || block.taskType === 'standby'
+    || isStandbyLikeTaskType(block.taskType)
   );
 }
 

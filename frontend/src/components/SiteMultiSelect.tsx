@@ -42,6 +42,8 @@ export function SiteMultiSelect({
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
+  // 選單至少跟輸入框一樣寬：比輸入框窄時，右邊會露出底下的按鈕，看起來像浮出來的元件
+  const [panelWidth, setPanelWidth] = useState(280);
   const selected = useMemo(() => new Set(values), [values]);
   const labels = options.filter((option) => selected.has(option.value)).map((option) => option.label);
   const summary = labels.length === 0 ? allLabel : labels.length === 1 ? labels[0] : `${labels[0]} +${labels.length - 1}`;
@@ -62,10 +64,14 @@ export function SiteMultiSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(fieldClass({ fullWidth: !className }), 'flex h-auto min-h-[34px] items-center justify-between gap-2 text-left', className)}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setPanelWidth(Math.max(280, anchorRef.current?.offsetWidth ?? 0));
+          setOpen((current) => !current);
+        }}
         onKeyDown={(event) => {
           if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
             event.preventDefault();
+            setPanelWidth(Math.max(280, anchorRef.current?.offsetWidth ?? 0));
             setOpen(true);
           }
         }}
@@ -82,7 +88,7 @@ export function SiteMultiSelect({
         ariaMultiselectable
         align="start"
         className={cn(MENU_PANEL_CLASS, 'max-h-80')}
-        style={{ width: 280, maxWidth: 'calc(100vw - 24px)' }}
+        style={{ width: panelWidth, maxWidth: 'calc(100vw - 24px)' }}
       >
         {filterPlaceholder ? (
           <div className="sticky top-0 z-10 border-b border-border-quaternary bg-surface-popup p-2">

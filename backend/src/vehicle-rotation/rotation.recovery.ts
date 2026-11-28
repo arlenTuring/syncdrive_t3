@@ -14,7 +14,7 @@ import type { PlannedDispatch } from '../dispatch/dispatch.plan';
  * rest：被換車回到格位後，接手那一列當天剩下的場內任務（例如備用列整天的待命）。原任務開始時被換車還沒回來，
  * 所以原單取消，改成「回到格位那一刻起、到原本的結束時刻」發給被換車。
  */
-export type LegRole = 'in' | 'out' | 'fallback' | 'return' | 'rest';
+export type LegRole = 'in' | 'out' | 'fallback' | 'return' | 'rest' | 'stay';
 export type LegPhase = 'planned' | 'hold' | 'queued' | 'issued';
 
 export type ShuntLeg = PlannedDispatch & {

@@ -27,13 +27,13 @@ var GROUP_TITLE = {
   GEOMETRY_PASS_REVERTED: "\u5DF2\u64A4\u56DE\u4E0D\u9069\u5408\u7684\u8ABF\u6574",
   STATION_BERTH_BACKUP_USED: "\u5DF2\u6539\u8D70\u66FF\u4EE3\u8DEF\u7DDA",
   ANCHOR_CONFLICT: "\u8D95\u4E0D\u4E0A\u4E0B\u4E00\u9805\u4EFB\u52D9",
-  TIMELINE_OVERLAP: "\u6642\u9593\u7DDA\u4EFB\u52D9\u91CD\u758A",
+  TIMELINE_OVERLAP: "\u904B\u7528\u4EFB\u52D9\u91CD\u758A",
   HEADWAY_PHYSICAL_IMPOSSIBLE: "\u73ED\u8DDD\u4F4E\u65BC\u7269\u7406\u4E0B\u9650",
   HEADWAY_BELOW_TARGET: "\u73ED\u8DDD\u4F4E\u65BC\u76EE\u6A19",
   HEADWAY_PHASE_EVENED: "\u5DF2\u8ABF\u6574\u767C\u8ECA\u9593\u9694",
   UNSERVED_SERVICE_PULSE: "\u76EE\u6A19\u767C\u8ECA\u6642\u523B\u672A\u6392\u5230\u8ECA",
   SERVICE_DEMAND_UNVERIFIABLE: "\u7F3A\u61C9\u958B\u670D\u52D9\u660E\u7D30\uFF0C\u7121\u6CD5\u6838\u5C0D\u8F09\u5BA2\u670D\u52D9",
-  INSUFFICIENT_TIMELINES: "\u6642\u9593\u7DDA\u5217\u6578\u4E0D\u8DB3",
+  INSUFFICIENT_TIMELINES: "\u904B\u7528\u6578\u4E0D\u8DB3",
   RECOVERY_INSUFFICIENT: "\u6062\u5FA9\u7A7A\u6A94\u4E0D\u8DB3",
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: "\u63DB\u7DDA\u7A7A\u6A94\u4E0D\u8DB3",
   ROUTE_SUCCESSOR_POLICY_INVALID: "\u8DEF\u7DDA\u63A5\u7E8C\u8A2D\u5B9A\u9700\u91CD\u65B0\u9A57\u8B49",
@@ -166,7 +166,7 @@ var DEFAULT_META = {
   },
   STATION_BERTH_COLLISION: {
     kind: "limit",
-    guidance: "\u5169\u53F0\u8ECA\u540C\u6642\u5360\u7528\u540C\u4E00\u505C\u9760\u9EDE\u3002\u8ACB\u67E5\u770B\u76F8\u95DC\u73ED\u6B21\uFF0C\u932F\u958B\u62B5\u9054\u8207\u96E2\u958B\u6642\u9593\uFF0C\u6216\u4F7F\u7528\u5F85\u547D\u6E05\u55AE\u4E2D\u53EF\u5230\u9054\u7684\u7A7A\u4F4D\u3002\u4FEE\u6B63\u524D\u7981\u6B62\u767C\u5E03\u3002"
+    guidance: "\u5169\u53F0\u8ECA\u540C\u6642\u5360\u7528\u540C\u4E00\u505C\u9760\u9EDE\u3002\u8ACB\u67E5\u770B\u76F8\u95DC\u73ED\u6B21\uFF0C\u932F\u958B\u62B5\u9054\u8207\u96E2\u958B\u6642\u9593\uFF0C\u6216\u4F7F\u7528\u5F85\u547D\u6E05\u55AE\u4E2D\u53EF\u5230\u9054\u7684\u7A7A\u4F4D\u3002\u4FEE\u6B63\u524D\u7981\u6B62\u90E8\u7F72\u3002"
   },
   STATION_BERTH_PROTECTION_GAP: {
     kind: "actionable",
@@ -191,7 +191,7 @@ var DEFAULT_META = {
   },
   GEOMETRY_BEST_ROUND_USED: {
     kind: "limit",
-    guidance: "\u5DF2\u9054\u672C\u6B21\u8A66\u7B97\u4E0A\u9650\uFF0C\u4FDD\u7559\u76EE\u524D\u8F03\u4F73\u7D50\u679C\u3002\u662F\u5426\u53EF\u767C\u5E03\u4ECD\u4F9D\u5B89\u5168\u6AA2\u67E5\u5224\u5B9A\u3002"
+    guidance: "\u5DF2\u9054\u672C\u6B21\u8A66\u7B97\u4E0A\u9650\uFF0C\u4FDD\u7559\u76EE\u524D\u8F03\u4F73\u7D50\u679C\u3002\u662F\u5426\u53EF\u90E8\u7F72\u4ECD\u4F9D\u5B89\u5168\u6AA2\u67E5\u5224\u5B9A\u3002"
   },
   STATION_BERTH_DELAY_SOURCE: {
     kind: "actionable",
@@ -203,7 +203,7 @@ var DEFAULT_META = {
   },
   ANCHOR_CONFLICT: {
     kind: "limit",
-    guidance: "\u540C\u8ECA\u7121\u6CD5\u5728\u4E0B\u4E00\u9328\u9EDE\u524D\u7D50\u675F\u672C\u8D9F\u3002\u53EF\u8A66\uFF1A\u52A0\u6642\u9593\u7DDA\u5217\u6578\u3001\u7E2E\u77ED\u505C\u9760\uFF0F\u6062\u5FA9\u3001\u6216\u653E\u5BEC\u8A72\u6B63\u7DDA\u8996\u7A97\u3002"
+    guidance: "\u540C\u8ECA\u7121\u6CD5\u5728\u4E0B\u4E00\u9328\u9EDE\u524D\u7D50\u675F\u672C\u8D9F\u3002\u53EF\u8A66\uFF1A\u52A0\u904B\u7528\u6578\u3001\u7E2E\u77ED\u505C\u9760\uFF0F\u6062\u5FA9\u3001\u6216\u653E\u5BEC\u8A72\u6B63\u7DDA\u8996\u7A97\u3002"
   },
   TIMELINE_OVERLAP: {
     kind: "actionable",
@@ -211,7 +211,7 @@ var DEFAULT_META = {
   },
   HEADWAY_PHYSICAL_IMPOSSIBLE: {
     kind: "actionable",
-    guidance: "\u4EE5\u76EE\u524D\u8ECA\u968A\u5217\u6578\u8207\u55AE\u8ECA\u9031\u671F\uFF0C\u7269\u7406\u4E0A\u6490\u4E0D\u8D77\u6B64\u6642\u8DDD\u3002\u8ACB\u589E\u52A0\u6642\u9593\u7DDA\u5217\u6578\uFF0C\u6216\u7E2E\u77ED\u8A72\u8DEF\u7DDA\u5360\u7528\uFF08\u884C\u99DB\uFF0F\u505C\u9760\uFF09\u3002"
+    guidance: "\u4EE5\u76EE\u524D\u8ECA\u968A\u5217\u6578\u8207\u55AE\u8ECA\u9031\u671F\uFF0C\u7269\u7406\u4E0A\u6490\u4E0D\u8D77\u6B64\u6642\u8DDD\u3002\u8ACB\u589E\u52A0\u904B\u7528\u6578\uFF0C\u6216\u7E2E\u77ED\u8A72\u8DEF\u7DDA\u5360\u7528\uFF08\u884C\u99DB\uFF0F\u505C\u9760\uFF09\u3002"
   },
   HEADWAY_PHASE_EVENED: {
     kind: "policy",
@@ -223,11 +223,11 @@ var DEFAULT_META = {
   },
   UNSERVED_SERVICE_PULSE: {
     kind: "limit",
-    guidance: "\u6642\u523B\u8868\u8A02\u7684\u9019\u500B\u767C\u8ECA\u8108\u885D\u6C92\u6709\u8ECA\u958B\uFF0C\u8F09\u5BA2\u670D\u52D9\u4E0D\u5B8C\u6574\uFF0C\u64CB\u767C\u5E03\u3002\u8A0A\u606F\u8207\u660E\u7D30\u5BEB\u8457\u5404\u5217\u4E0D\u80FD\u627F\u63A5\u7684\u539F\u56E0\uFF1B\u8ACB\u67E5\u770B\u76F8\u9130\u73ED\u6B21\u3001\u8ECA\u8F1B\u53EF\u7528\u6642\u9593\u8207\u6574\u5099\u5B89\u6392\u3002"
+    guidance: "\u6642\u523B\u8868\u8A02\u7684\u9019\u500B\u767C\u8ECA\u8108\u885D\u6C92\u6709\u8ECA\u958B\uFF0C\u8F09\u5BA2\u670D\u52D9\u4E0D\u5B8C\u6574\uFF0C\u64CB\u90E8\u7F72\u3002\u8A0A\u606F\u8207\u660E\u7D30\u5BEB\u8457\u5404\u5217\u4E0D\u80FD\u627F\u63A5\u7684\u539F\u56E0\uFF1B\u8ACB\u67E5\u770B\u76F8\u9130\u73ED\u6B21\u3001\u8ECA\u8F1B\u53EF\u7528\u6642\u9593\u8207\u6574\u5099\u5B89\u6392\u3002"
   },
   SERVICE_DEMAND_UNVERIFIABLE: {
     kind: "actionable",
-    guidance: "\u9019\u4EFD\u73ED\u8868\u6C92\u6709\u8A18\u9304\u300C\u61C9\u958B\u7684\u767C\u8ECA\u8108\u885D\u300D\u660E\u7D30\uFF08\u8F03\u820A\u7248\u672C\u7522\u751F\u7684\u73ED\u8868\uFF09\uFF0C\u7121\u6CD5\u78BA\u8A8D\u8F09\u5BA2\u670D\u52D9\u662F\u5426\u5B8C\u6574\uFF0C\u64CB\u767C\u5E03\u3002\u8ACB\u91CD\u65B0\u7522\u751F\u73ED\u8868\u3002"
+    guidance: "\u9019\u4EFD\u73ED\u8868\u6C92\u6709\u8A18\u9304\u300C\u61C9\u958B\u7684\u767C\u8ECA\u8108\u885D\u300D\u660E\u7D30\uFF08\u8F03\u820A\u7248\u672C\u7522\u751F\u7684\u73ED\u8868\uFF09\uFF0C\u7121\u6CD5\u78BA\u8A8D\u8F09\u5BA2\u670D\u52D9\u662F\u5426\u5B8C\u6574\uFF0C\u64CB\u90E8\u7F72\u3002\u8ACB\u91CD\u65B0\u7522\u751F\u73ED\u8868\u3002"
   },
   INSUFFICIENT_TIMELINES: {
     kind: "actionable",
@@ -307,11 +307,11 @@ var DEFAULT_META = {
   },
   MAINTENANCE_WORK_INSUFFICIENT: {
     kind: "limit",
-    guidance: "\u6A21\u677F\u4E0A\u7684\u9019\u4E00\u6BB5\u6574\u5099\u5728\u6392\u597D\u7684\u73ED\u8868\u88E1\u4E0D\u898B\u4E86\uFF0C\u6216\u5269\u4E0B\u7684\u5DE5\u4F5C\u6642\u9593\u4F4E\u65BC\u6700\u4F4E\u8981\u6C42\uFF08\u6709\u8A2D\u5B9A\u4F5C\u696D\u6642\u9577\u5C31\u7528\u5B83\uFF0C\u6C92\u6709\u7684\u81F3\u5C11\u4E0D\u80FD\u662F\u96F6\uFF09\u3002\u6574\u5099\u4E0D\u80FD\u88AB\u58D3\u6210\u96F6\u3001\u4E5F\u4E0D\u80FD\u522A\u5361\u5047\u88DD\u505A\u5B8C\uFF0C\u6240\u4EE5\u73ED\u8868\u7981\u6B62\u767C\u5E03\u3002\u591A\u534A\u662F\u6B63\u7DDA\u8B93\u6E21\u6216\u79FB\u52D5\u5360\u6389\u592A\u591A\u958B\u982D\uFF1A\u52A0\u9577\u6A21\u677F\u4E0A\u7684\u6574\u5099\u3001\u8ABF\u5C0F\u6B63\u7DDA\u53EF\u58D3\u7E2E\u6574\u5099\u958B\u982D\uFF0C\u6216\u628A\u524D\u5F8C\u73ED\u6B21\u932F\u958B\u3002"
+    guidance: "\u6A21\u677F\u4E0A\u7684\u9019\u4E00\u6BB5\u6574\u5099\u5728\u6392\u597D\u7684\u73ED\u8868\u88E1\u4E0D\u898B\u4E86\uFF0C\u6216\u5269\u4E0B\u7684\u5DE5\u4F5C\u6642\u9593\u4F4E\u65BC\u6700\u4F4E\u8981\u6C42\uFF08\u6709\u8A2D\u5B9A\u4F5C\u696D\u6642\u9577\u5C31\u7528\u5B83\uFF0C\u6C92\u6709\u7684\u81F3\u5C11\u4E0D\u80FD\u662F\u96F6\uFF09\u3002\u6574\u5099\u4E0D\u80FD\u88AB\u58D3\u6210\u96F6\u3001\u4E5F\u4E0D\u80FD\u522A\u5361\u5047\u88DD\u505A\u5B8C\uFF0C\u6240\u4EE5\u73ED\u8868\u7981\u6B62\u90E8\u7F72\u3002\u591A\u534A\u662F\u6B63\u7DDA\u8B93\u6E21\u6216\u79FB\u52D5\u5360\u6389\u592A\u591A\u958B\u982D\uFF1A\u52A0\u9577\u6A21\u677F\u4E0A\u7684\u6574\u5099\u3001\u8ABF\u5C0F\u6B63\u7DDA\u53EF\u58D3\u7E2E\u6574\u5099\u958B\u982D\uFF0C\u6216\u628A\u524D\u5F8C\u73ED\u6B21\u932F\u958B\u3002"
   },
   SCHEDULE_SEARCH_INCOMPLETE: {
     kind: "limit",
-    guidance: "\u9019\u6B21\u751F\u6210\u7684\u641C\u5C0B\u6B21\u6578\u6216\u6642\u9593\u4E0A\u9650\u5DF2\u7528\u5B8C\uFF0C\u9084\u6709\u5B89\u5168\u554F\u984C\u6C92\u6392\u958B\u3002\u9019\u4EE3\u8868\u9019\u6B21\u6C92\u6709\u641C\u5B8C\uFF0C\u4E0D\u4EE3\u8868\u5DF2\u8B49\u660E\u6C92\u6709\u5B89\u5168\u6392\u6CD5\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u5834\u57DF\u5BB9\u91CF\u4E0D\u8DB3\u3002\u73ED\u8868\u7981\u6B62\u767C\u5E03\uFF1B\u53EF\u4EE5\u8ABF\u6574\u76F8\u95DC\u73ED\u6B21\u6216\u5F85\u547D\u4F4D\u7F6E\u5F8C\u91CD\u65B0\u751F\u6210\u3002"
+    guidance: "\u9019\u6B21\u751F\u6210\u7684\u641C\u5C0B\u6B21\u6578\u6216\u6642\u9593\u4E0A\u9650\u5DF2\u7528\u5B8C\uFF0C\u9084\u6709\u5B89\u5168\u554F\u984C\u6C92\u6392\u958B\u3002\u9019\u4EE3\u8868\u9019\u6B21\u6C92\u6709\u641C\u5B8C\uFF0C\u4E0D\u4EE3\u8868\u5DF2\u8B49\u660E\u6C92\u6709\u5B89\u5168\u6392\u6CD5\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u5834\u57DF\u5BB9\u91CF\u4E0D\u8DB3\u3002\u73ED\u8868\u7981\u6B62\u90E8\u7F72\uFF1B\u53EF\u4EE5\u8ABF\u6574\u76F8\u95DC\u73ED\u6B21\u6216\u5F85\u547D\u4F4D\u7F6E\u5F8C\u91CD\u65B0\u751F\u6210\u3002"
   },
   GEOMETRY_NOT_CONVERGED: {
     kind: "limit",
@@ -340,7 +340,7 @@ var DEFAULT_META = {
   },
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: {
     kind: "limit",
-    guidance: "\u8ECA\u4E0B\u4E00\u6BB5\u8981\u53BB\u7684\u5730\u65B9\u8DDF\u5B83\u73FE\u5728\u505C\u7684\u5730\u65B9\u4E0D\u540C\uFF0C\u9019\u6B21\u8A08\u7B97\u5728\u8A66\u904E\u7684\u5019\u9078\uFF08\u8A2D\u65BD\u3001\u8DEF\u5F91\u3001\u8F49\u6298\u9EDE\u932F\u958B\u3001\u53EF\u52D5\u6642\u6BB5\u5167\u7684\u51FA\u767C\u6642\u523B\uFF09\u88E1\u6C92\u6709\u6392\u51FA\u5408\u6CD5\u79FB\u52D5\uFF1B\u9019\u4E0D\u4EE3\u8868\u5DF2\u8B49\u660E\u6C92\u6709\u6392\u6CD5\u3002\u73ED\u8868\u8207\u73ED\u6B21\u4FDD\u7559\u4F9B\u6AA2\u67E5\uFF0C\u4F46\u9019\u4E00\u5247\u6703\u64CB\u767C\u5E03\u2014\u2014\u8ECA\u5BE6\u969B\u4E0A\u5230\u4E0D\u4E86\u3002\u539F\u56E0\u8A0A\u606F\u5BEB\u8457\u5361\u5728\u54EA\uFF1A\u8DEF\u5F91\u88AB\u5225\u5217\u8ECA\u5728\u540C\u4E00\u500B\u8F49\u6298\u9EDE\u5361\u4F4F\uFF0C\u5C31\u770B\u90A3\u4E00\u523B\u524D\u5F8C\u8AB0\u80FD\u8B93\uFF1B\u6642\u6BB5\u4E0D\u5920\uFF0C\u5C31\u8981\u4E00\u8D77\u8ABF\u6574\u524D\u5F8C\u73ED\u6B21\uFF0C\u4E0D\u662F\u53EA\u79FB\u52D5\u8F49\u5834\u5361\u3002"
+    guidance: "\u8ECA\u4E0B\u4E00\u6BB5\u8981\u53BB\u7684\u5730\u65B9\u8DDF\u5B83\u73FE\u5728\u505C\u7684\u5730\u65B9\u4E0D\u540C\uFF0C\u9019\u6B21\u8A08\u7B97\u5728\u8A66\u904E\u7684\u5019\u9078\uFF08\u8A2D\u65BD\u3001\u8DEF\u5F91\u3001\u8F49\u6298\u9EDE\u932F\u958B\u3001\u53EF\u52D5\u6642\u6BB5\u5167\u7684\u51FA\u767C\u6642\u523B\uFF09\u88E1\u6C92\u6709\u6392\u51FA\u5408\u6CD5\u79FB\u52D5\uFF1B\u9019\u4E0D\u4EE3\u8868\u5DF2\u8B49\u660E\u6C92\u6709\u6392\u6CD5\u3002\u73ED\u8868\u8207\u73ED\u6B21\u4FDD\u7559\u4F9B\u6AA2\u67E5\uFF0C\u4F46\u9019\u4E00\u5247\u6703\u64CB\u90E8\u7F72\u2014\u2014\u8ECA\u5BE6\u969B\u4E0A\u5230\u4E0D\u4E86\u3002\u539F\u56E0\u8A0A\u606F\u5BEB\u8457\u5361\u5728\u54EA\uFF1A\u8DEF\u5F91\u88AB\u5225\u5217\u8ECA\u5728\u540C\u4E00\u500B\u8F49\u6298\u9EDE\u5361\u4F4F\uFF0C\u5C31\u770B\u90A3\u4E00\u523B\u524D\u5F8C\u8AB0\u80FD\u8B93\uFF1B\u6642\u6BB5\u4E0D\u5920\uFF0C\u5C31\u8981\u4E00\u8D77\u8ABF\u6574\u524D\u5F8C\u73ED\u6B21\uFF0C\u4E0D\u662F\u53EA\u79FB\u52D5\u8F49\u5834\u5361\u3002"
   },
   VEHICLE_LOCATION_DISCONTINUITY: {
     kind: "limit",
@@ -420,6 +420,121 @@ var PUBLISH_BLOCKING_CODES = /* @__PURE__ */ new Set([
   // 沒有應開服務明細就核對不了載客服務是否完整
   "SERVICE_DEMAND_UNVERIFIABLE"
 ]);
+
+// src/features/time-templates/types/editor.ts
+var ATTRIBUTE_COLOR_PALETTE = [
+  "#90A1B9",
+  "#9AE600",
+  "#05DF72",
+  "#00D492",
+  "#00D5BE",
+  "#00D3F2",
+  "#00BCFF",
+  "#51A2FF",
+  "#7C86FF",
+  "#A684FF",
+  "#C27AFF",
+  "#ED6BFF",
+  "#FB64B6",
+  "#FF637E",
+  "#FF6467",
+  "#FF8904",
+  "#FFBA00",
+  "#FFDF20"
+];
+function isStandbyLikeTaskType(key) {
+  return key === "standby" || key === "maneuver";
+}
+var SCHEDULE_DAY_MINUTES = 24 * 60;
+var SCHEDULE_SLOT_WIDTH_DEFAULT = 144;
+var SCHEDULE_SLOT_WIDTH_ZOOM_FACTOR = 3.5;
+var SCHEDULE_SLOT_WIDTH_MIN = SCHEDULE_SLOT_WIDTH_DEFAULT / SCHEDULE_SLOT_WIDTH_ZOOM_FACTOR;
+function blendHexOnBase(hex, amount, baseHex = "#141417") {
+  const parse = (color) => {
+    const n = color.replace("#", "");
+    if (n.length !== 6) return [20, 20, 23];
+    return [
+      Number.parseInt(n.slice(0, 2), 16),
+      Number.parseInt(n.slice(2, 4), 16),
+      Number.parseInt(n.slice(4, 6), 16)
+    ];
+  };
+  const [br, bg, bb] = parse(baseHex);
+  const [fr, fg, fb] = parse(hex);
+  const t = Math.min(1, Math.max(0, amount));
+  return `rgb(${Math.round(br * (1 - t) + fr * t)}, ${Math.round(bg * (1 - t) + fg * t)}, ${Math.round(bb * (1 - t) + fb * t)})`;
+}
+function taskTypeBarBackground(baseHex, tintRgb, tintAlpha = 0.16) {
+  const tintHex = `#${tintRgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  return blendHexOnBase(tintHex, tintAlpha, baseHex);
+}
+var ATTRIBUTE_STANDBY_BASE = "#3F3F46";
+var ATTRIBUTE_STANDBY_TEXT = "#F4F4F5";
+function maneuverColors() {
+  const bar = ATTRIBUTE_COLOR_PALETTE[15];
+  const tint = [1, 3, 5].map((at) => parseInt(bar.slice(at, at + 2), 16));
+  return {
+    bar,
+    base: ATTRIBUTE_STANDBY_BASE,
+    bg: taskTypeBarBackground(ATTRIBUTE_STANDBY_BASE, tint),
+    text: ATTRIBUTE_STANDBY_TEXT
+  };
+}
+var TASK_TYPE_COLORS = {
+  inspection: {
+    bar: "#EFB100",
+    base: "#42381E",
+    bg: taskTypeBarBackground("#42381E", [239, 177, 0]),
+    text: "#F3F4F6"
+  },
+  passenger: {
+    bar: "#2B7FFF",
+    base: "#1D2F4E",
+    bg: taskTypeBarBackground("#1D2F4E", [43, 127, 255]),
+    text: "#F3F4F6"
+  },
+  charging: {
+    bar: "#00C951",
+    base: "#1C3C2B",
+    bg: taskTypeBarBackground("#1C3C2B", [0, 201, 81]),
+    text: "#F3F4F6"
+  },
+  servicing: {
+    bar: "#AD46FF",
+    base: "#382747",
+    bg: taskTypeBarBackground("#382747", [173, 70, 255]),
+    text: "#F3F4F6"
+  },
+  standby: {
+    // 待命＝車在場內候用、沒有實際作業，用灰白色跟「正在做事」的任務區隔開
+    bar: "#D4D4D8",
+    base: ATTRIBUTE_STANDBY_BASE,
+    bg: taskTypeBarBackground(ATTRIBUTE_STANDBY_BASE, [212, 212, 216]),
+    text: ATTRIBUTE_STANDBY_TEXT
+  },
+  maneuver: maneuverColors(),
+  washing: {
+    bar: "#00B8DB",
+    base: "#123C46",
+    bg: taskTypeBarBackground("#123C46", [0, 184, 219]),
+    text: "#F3F4F6"
+  }
+};
+var SCHEDULE_ENGINE_TASK_TYPE_COLORS = {
+  ...TASK_TYPE_COLORS,
+  idle: {
+    bar: "#52525B",
+    base: "#27272A",
+    bg: taskTypeBarBackground("#27272A", [82, 82, 91]),
+    text: "#A1A1AA"
+  },
+  dispatch: {
+    bar: "#38BDF8",
+    base: "#0C4A6E",
+    bg: taskTypeBarBackground("#0C4A6E", [56, 189, 248]),
+    text: "#BAE6FD"
+  }
+};
 
 // src/features/shift-list/utils/stationLegTravel.ts
 function areStationLegTravelsComplete(stationIds, legs) {
@@ -651,14 +766,16 @@ var SECTION_LABEL = {
   carWash: "\u6D17\u8ECA",
   maintenance: "\u4FDD\u990A",
   preTrip: "\u884C\u6AA2",
-  mobile: "\u5F85\u547D"
+  mobile: "\u5F85\u547D",
+  maneuver: "\u6A5F\u52D5"
 };
 var SECTION_KEY_BY_TASK_TYPE = {
   charging: "charging",
   washing: "carWash",
   servicing: "maintenance",
   inspection: "preTrip",
-  standby: "mobile"
+  standby: "mobile",
+  maneuver: "maneuver"
 };
 function normalizeCardCode(raw) {
   return typeof raw === "string" ? raw.trim().toUpperCase() : "";
@@ -706,7 +823,8 @@ function emptyMaintenanceSectionCodeBySection() {
     carWash: "",
     maintenance: "",
     preTrip: "",
-    mobile: ""
+    mobile: "",
+    maneuver: ""
   };
 }
 function sanitizeMaintenanceSectionCodeInput(raw) {
@@ -724,7 +842,8 @@ function normalizeMaintenanceSectionCodeBySection(raw) {
     carWash: normalizeMaintenanceSectionCodeInput(raw.carWash ?? base.carWash),
     maintenance: normalizeMaintenanceSectionCodeInput(raw.maintenance ?? base.maintenance),
     preTrip: normalizeMaintenanceSectionCodeInput(raw.preTrip ?? base.preTrip),
-    mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile)
+    mobile: normalizeMaintenanceSectionCodeInput(raw.mobile ?? base.mobile),
+    maneuver: normalizeMaintenanceSectionCodeInput(raw.maneuver ?? base.maneuver)
   };
 }
 function resolveMaintenanceSectionCodeForTaskType(taskType, codes) {
@@ -733,6 +852,7 @@ function resolveMaintenanceSectionCodeForTaskType(taskType, codes) {
   if (taskType === "charging") return n.charging || null;
   if (taskType === "inspection") return n.preTrip || null;
   if (taskType === "standby") return n.mobile || null;
+  if (taskType === "maneuver") return n.maneuver || null;
   if (taskType === "servicing") return n.maintenance || null;
   if (taskType === "washing") return n.carWash || null;
   return null;
@@ -835,10 +955,10 @@ function resolveGeneratedBlockTripCode(block, index = 0, sectionCodes, transitio
 }
 
 // src/features/shift-list/utils/scheduleDayCycle.ts
-var SCHEDULE_DAY_MINUTES = 24 * 60;
+var SCHEDULE_DAY_MINUTES2 = 24 * 60;
 function formatScheduleClockHms(minute) {
   const totalSeconds = Math.max(0, Math.round(minute * 60));
-  const daySeconds = SCHEDULE_DAY_MINUTES * 60;
+  const daySeconds = SCHEDULE_DAY_MINUTES2 * 60;
   const wrapped = (totalSeconds % daySeconds + daySeconds) % daySeconds;
   const hh = Math.floor(wrapped / 3600);
   const mm = Math.floor(wrapped % 3600 / 60);
@@ -848,7 +968,7 @@ function formatScheduleClockHms(minute) {
 function continuousDayCopiesNear(startMinute, endMinute, nearMinute) {
   if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute)) return [];
   if (endMinute <= startMinute + 1e-12) return [];
-  const day = SCHEDULE_DAY_MINUTES;
+  const day = SCHEDULE_DAY_MINUTES2;
   const baseDayIndex = Math.floor(nearMinute / day);
   const out = [];
   for (const offset of [-1, 0, 1]) {
@@ -903,7 +1023,7 @@ function blocksConflictOnDayCycle(aStartMinute, aEndMinute, bStartMinute, bEndMi
 }
 
 // src/features/shift-list/utils/moveCardShared.ts
-var DAY_SECONDS = SCHEDULE_DAY_MINUTES * 60;
+var DAY_SECONDS = SCHEDULE_DAY_MINUTES2 * 60;
 function daySegmentsOf(startSecond, endSecond) {
   const span2 = endSecond - startSecond;
   if (span2 <= 0) return [];
@@ -1132,7 +1252,7 @@ function collectStationBerthOccupancies(timelines, selectedRoutes, protection) {
         });
         continue;
       }
-      if ((block.taskType === "standby" || block.taskType === "idle" && block.source === "transition") && block.yardFacilityStationId) {
+      if ((isStandbyLikeTaskType(block.taskType) || block.taskType === "idle" && block.source === "transition") && block.yardFacilityStationId) {
         const startMinute = block.plannedStartMinute;
         const endMinute = Math.max(block.plannedEndMinute, startMinute + minPresenceMin);
         out.push({
@@ -1271,7 +1391,7 @@ function findStationBerthCollisions(occupancies, selectedRoutes) {
   }
   return collisions;
 }
-var FACILITY_STAY_TASK_TYPES = /* @__PURE__ */ new Set(["charging", "servicing", "inspection", "standby", "washing"]);
+var FACILITY_STAY_TASK_TYPES = /* @__PURE__ */ new Set(["charging", "servicing", "inspection", "standby", "maneuver", "washing"]);
 var DAY_SECONDS2 = 24 * 60 * 60;
 function facilityPresenceNodeId(block) {
   const nodeId = block.yardFacilityNodeId?.trim();
@@ -2019,7 +2139,7 @@ function findPathConflicts(trajectories, bufferSeconds) {
   return out;
 }
 function describePathConflict(conflict, formatSecond) {
-  const who = (t) => `\u6642\u9593\u7DDA ${t.timelineRow}\u300C${t.label}\u300D`;
+  const who = (t) => `\u904B\u7528 ${t.timelineRow}\u300C${t.label}\u300D`;
   if (conflict.kind === "node") {
     return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} \u7D93\u904E\u300C${conflict.nodeLabel}\u300D\uFF0C${who(conflict.other)} ${formatSecond(conflict.otherSecond)} \u4E5F\u5728\u90A3\u88E1\uFF08\u9593\u9694 ${Math.round(conflict.gapSeconds ?? 0)} \u79D2${conflict.requiredGapSeconds != null ? `\uFF0C\u8981 ${Math.round(conflict.requiredGapSeconds)} \u79D2` : ""}\uFF09`;
   }
@@ -2183,7 +2303,7 @@ function validateTimelineOverlaps(timelines, errors) {
         pushIssue(errors, {
           code: "TIMELINE_OVERLAP",
           severity: "error",
-          message: `\u6642\u9593\u7DDA ${timeline.row} \u4EFB\u52D9\u6642\u9593\u91CD\u758A\uFF1A${currentLabel} \u8207 ${nextLabel}`,
+          message: `\u904B\u7528 ${timeline.row} \u4EFB\u52D9\u6642\u9593\u91CD\u758A\uFF1A${currentLabel} \u8207 ${nextLabel}`,
           detail: {
             timelineRow: timeline.row,
             blockId: current.id,
@@ -2251,7 +2371,7 @@ function validateStationTimingsWithinBlocks(timelines, selectedRoutes, errors) {
       pushIssue(errors, {
         code: "STATION_TIMING_INFEASIBLE",
         severity: "error",
-        message: `\u6642\u9593\u7DDA ${timeline.row}\uFF1A${block.routeCode ?? block.routeName ?? block.label} \u7684\u5B8C\u6574\u505C\u9760\uFF0F\u7AD9\u9593\u6642\u9593\u7121\u6CD5\u653E\u5165\u73ED\u6B21\u5361\u79D2\u6578`,
+        message: `\u904B\u7528 ${timeline.row}\uFF1A${block.routeCode ?? block.routeName ?? block.label} \u7684\u5B8C\u6574\u505C\u9760\uFF0F\u7AD9\u9593\u6642\u9593\u7121\u6CD5\u653E\u5165\u73ED\u6B21\u5361\u79D2\u6578`,
         detail: {
           timelineRow: timeline.row,
           blockId: block.id,
@@ -2284,7 +2404,7 @@ function validateStationBerthCollisions(timelines, selectedRoutes, errors, optio
     if (!block) return occ.routeCode ?? "\u6B63\u7DDA";
     return resolveGeneratedBlockTripCode(block, 0, options?.sectionCodes ?? null, options?.transitionCodes ?? null);
   };
-  const labelOf = (occ) => `${tripCodeOf(occ)}\uFF08\u6642\u9593\u7DDA ${occ.timelineRow}\uFF09 ${formatMinuteHms(occ.blockStartMinute)}\u2013${formatMinuteHms(occ.blockEndMinute)}`;
+  const labelOf = (occ) => `${tripCodeOf(occ)}\uFF08\u904B\u7528 ${occ.timelineRow}\uFF09 ${formatMinuteHms(occ.blockStartMinute)}\u2013${formatMinuteHms(occ.blockEndMinute)}`;
   const peakConcurrentAtStation = (stationId) => {
     const spans = occupancies.filter((occ) => occ.stationId === stationId);
     let longestIdle = null;
@@ -2408,9 +2528,9 @@ function validateStationBerthCollisions(timelines, selectedRoutes, errors, optio
   }
   for (const bucket of protectionByStation.values()) {
     const { peak, atMinute, longestIdle, atPeak } = peakConcurrentAtStation(bucket.stationId);
-    const peakLabel = atPeak.map((occ) => `${tripCodeOf(occ)}\uFF08\u6642\u9593\u7DDA ${occ.timelineRow}\uFF0C${formatMinuteHms(occ.startMinute)}\u2013${formatMinuteHms(occ.actualDepartMinute)}\uFF09`).join("\u3001");
+    const peakLabel = atPeak.map((occ) => `${tripCodeOf(occ)}\uFF08\u904B\u7528 ${occ.timelineRow}\uFF0C${formatMinuteHms(occ.startMinute)}\u2013${formatMinuteHms(occ.actualDepartMinute)}\uFF09`).join("\u3001");
     const idleMinutes = longestIdle ? longestIdle.actualDepartMinute - longestIdle.startMinute : 0;
-    const longestLabel = longestIdle ? `${tripCodeOf(longestIdle)}\uFF08\u6642\u9593\u7DDA ${longestIdle.timelineRow}\uFF09 ${formatMinuteHms(longestIdle.startMinute)} \u5230\u7AD9\u3001${formatMinuteHms(longestIdle.actualDepartMinute)} \u624D\u958B\u8D70\uFF0C\u505C\u4E86 ${idleMinutes.toFixed(1)} \u5206\u9418` : "";
+    const longestLabel = longestIdle ? `${tripCodeOf(longestIdle)}\uFF08\u904B\u7528 ${longestIdle.timelineRow}\uFF09 ${formatMinuteHms(longestIdle.startMinute)} \u5230\u7AD9\u3001${formatMinuteHms(longestIdle.actualDepartMinute)} \u624D\u958B\u8D70\uFF0C\u505C\u4E86 ${idleMinutes.toFixed(1)} \u5206\u9418` : "";
     pushIssue(protectionSink, {
       code: "STATION_BERTH_PROTECTION_GAP",
       severity: "warning",
@@ -2488,7 +2608,7 @@ function validateFacilityOccupancy(timelines, errors, options = {}) {
         code: "FACILITY_SLOT_COLLISION",
         severity: "error",
         kind: "limit",
-        message: `\u8A2D\u65BD\u683C\u300C${collision.facilityLabel}\u300D\u540C\u6642\u88AB\u5169\u53F0\u8ECA\u4F54\u7528\uFF1A\u6642\u9593\u7DDA ${earlier.timelineRow} \u5F85\u5230 ${formatMinuteHms(earlier.actualDepartMinute)}\uFF0C\u6642\u9593\u7DDA ${later.timelineRow} \u537B\u5728 ${formatMinuteHms(later.startMinute)} \u5C31\u9032\u4F86\uFF0C\u91CD\u758A ${Math.round(collision.overlapSeconds)} \u79D2`,
+        message: `\u8A2D\u65BD\u683C\u300C${collision.facilityLabel}\u300D\u540C\u6642\u88AB\u5169\u53F0\u8ECA\u4F54\u7528\uFF1A\u904B\u7528 ${earlier.timelineRow} \u5F85\u5230 ${formatMinuteHms(earlier.actualDepartMinute)}\uFF0C\u904B\u7528 ${later.timelineRow} \u537B\u5728 ${formatMinuteHms(later.startMinute)} \u5C31\u9032\u4F86\uFF0C\u91CD\u758A ${Math.round(collision.overlapSeconds)} \u79D2`,
         detail
       });
     } else if (options.warnings) {
@@ -2496,7 +2616,7 @@ function validateFacilityOccupancy(timelines, errors, options = {}) {
         code: "FACILITY_HANDOVER_GAP",
         severity: "warning",
         kind: "limit",
-        message: `\u8A2D\u65BD\u683C\u300C${collision.facilityLabel}\u300D\u4EA4\u63A5\u592A\u7DCA\uFF1A\u6642\u9593\u7DDA ${earlier.timelineRow} ${formatMinuteHms(earlier.actualDepartMinute)} \u96E2\u958B\u3001\u6642\u9593\u7DDA ${later.timelineRow} ${formatMinuteHms(later.startMinute)} \u9032\u4F86\uFF0C\u53EA\u9694 ${Math.round(collision.gapSeconds)} \u79D2\uFF08\u9700\u8981 ${Math.round(protectionSeconds * 2)} \u79D2\uFF09`,
+        message: `\u8A2D\u65BD\u683C\u300C${collision.facilityLabel}\u300D\u4EA4\u63A5\u592A\u7DCA\uFF1A\u904B\u7528 ${earlier.timelineRow} ${formatMinuteHms(earlier.actualDepartMinute)} \u96E2\u958B\u3001\u904B\u7528 ${later.timelineRow} ${formatMinuteHms(later.startMinute)} \u9032\u4F86\uFF0C\u53EA\u9694 ${Math.round(collision.gapSeconds)} \u79D2\uFF08\u9700\u8981 ${Math.round(protectionSeconds * 2)} \u79D2\uFF09`,
         detail
       });
     }
@@ -2581,7 +2701,7 @@ function validateVehicleLocationContinuity(args) {
         code: "VEHICLE_LOCATION_DISCONTINUITY",
         severity: "error",
         kind: "limit",
-        message: `\u6642\u9593\u7DDA ${timeline.row}\uFF1A\u300C${fromBlock.label}\u300D${formatMinuteHms(fromBlock.plannedEndMinute)} \u7D50\u675F\u6642\u8ECA\u5728\u300C${fromPlace.label}\u300D\uFF0C\u63A5\u8457\u300C${toBlock.label}\u300D${formatMinuteHms(toBlock.plannedStartMinute)} \u8981\u5728\u300C${toPlace.label}\u300D\uFF0C\u4E2D\u9593\u6C92\u6709\u4EFB\u4F55\u79FB\u52D5\u5361\u2014\u2014\u8ECA\u5230\u4E0D\u4E86`,
+        message: `\u904B\u7528 ${timeline.row}\uFF1A\u300C${fromBlock.label}\u300D${formatMinuteHms(fromBlock.plannedEndMinute)} \u7D50\u675F\u6642\u8ECA\u5728\u300C${fromPlace.label}\u300D\uFF0C\u63A5\u8457\u300C${toBlock.label}\u300D${formatMinuteHms(toBlock.plannedStartMinute)} \u8981\u5728\u300C${toPlace.label}\u300D\uFF0C\u4E2D\u9593\u6C92\u6709\u4EFB\u4F55\u79FB\u52D5\u5361\u2014\u2014\u8ECA\u5230\u4E0D\u4E86`,
         detail: {
           timelineRow: timeline.row,
           blockId: toBlock.id,
@@ -2637,7 +2757,7 @@ function validateMoveJunctionConflicts(args) {
       code: "MISSING_TRAVEL_TIME",
       severity: "error",
       kind: "limit",
-      message: `\u6642\u9593\u7DDA ${gap.timelineRow}\uFF1A\u79FB\u52D5\u5361${what}\uFF0C\u7121\u6CD5\u78BA\u8A8D\u7D93\u904E\u6642\u523B\u8207\u8F49\u6298\u9EDE\u5B89\u5168\u3002` + (gap.reason === "missing-time" ? "\u8ACB\u5230\u5730\u5716\u8DEF\u7DB2\u88DC\u4E0A\u9019\u4E00\u6BB5\u7684\u884C\u99DB\u6642\u9593\u3002" : "\u8ACB\u78BA\u8A8D\u5730\u5716\u8DEF\u7DB2\u5F8C\u91CD\u65B0\u751F\u6210\u3002"),
+      message: `\u904B\u7528 ${gap.timelineRow}\uFF1A\u79FB\u52D5\u5361${what}\uFF0C\u7121\u6CD5\u78BA\u8A8D\u7D93\u904E\u6642\u523B\u8207\u8F49\u6298\u9EDE\u5B89\u5168\u3002` + (gap.reason === "missing-time" ? "\u8ACB\u5230\u5730\u5716\u8DEF\u7DB2\u88DC\u4E0A\u9019\u4E00\u6BB5\u7684\u884C\u99DB\u6642\u9593\u3002" : "\u8ACB\u78BA\u8A8D\u5730\u5716\u8DEF\u7DB2\u5F8C\u91CD\u65B0\u751F\u6210\u3002"),
       detail: {
         timelineRow: gap.timelineRow,
         blockId: gap.blockId,
@@ -2659,7 +2779,7 @@ function validateMoveJunctionConflicts(args) {
       code: "MOVE_JUNCTION_CONFLICT",
       severity: "warning",
       kind: "limit",
-      message: `\u300C${mine.nodeLabel}\u300D\uFF1A\u6642\u9593\u7DDA ${mine.timelineRow} ${formatMinuteHms(secondToMinute(mine.instant))} \u7D93\u904E\u3001\u6642\u9593\u7DDA ${other.timelineRow} ${formatMinuteHms(secondToMinute(other.instant))} \u7D93\u904E\uFF0C\u53EA\u5DEE ${Math.round(gapSeconds)} \u79D2\uFF08\u9700\u8981 ${Math.round(bufferSeconds)} \u79D2\uFF09`,
+      message: `\u300C${mine.nodeLabel}\u300D\uFF1A\u904B\u7528 ${mine.timelineRow} ${formatMinuteHms(secondToMinute(mine.instant))} \u7D93\u904E\u3001\u904B\u7528 ${other.timelineRow} ${formatMinuteHms(secondToMinute(other.instant))} \u7D93\u904E\uFF0C\u53EA\u5DEE ${Math.round(gapSeconds)} \u79D2\uFF08\u9700\u8981 ${Math.round(bufferSeconds)} \u79D2\uFF09`,
       detail: {
         nodeId: mine.nodeId,
         nodeLabel: mine.nodeLabel,
@@ -2716,7 +2836,7 @@ function validateServicePulseCoverage(args) {
 }
 function describeUnservedPulse(pulse) {
   if (pulse.status === "assigned") {
-    return `\u7522\u751F\u6642\u639B\u5728\u6642\u9593\u7DDA ${pulse.assignedRow}\uFF0C\u4F46\u73ED\u8868\u4E0A\u627E\u4E0D\u5230\u9019\u4E00\u8F2A\u7684\u8F09\u5BA2\u73ED\u6B21\uFF08\u88AB\u522A\u9664\u6216\u6539\u6389\uFF09`;
+    return `\u7522\u751F\u6642\u639B\u5728\u904B\u7528 ${pulse.assignedRow}\uFF0C\u4F46\u73ED\u8868\u4E0A\u627E\u4E0D\u5230\u9019\u4E00\u8F2A\u7684\u8F09\u5BA2\u73ED\u6B21\uFF08\u88AB\u522A\u9664\u6216\u6539\u6389\uFF09`;
   }
   return pulse.reason ?? "\u6C92\u6709\u4EFB\u4F55\u4E00\u5217\u80FD\u5408\u6CD5\u627F\u63A5";
 }
@@ -2795,7 +2915,7 @@ function runSchedulePublishCheck(args) {
           errors.push({
             code: "MAINTENANCE_WORK_INSUFFICIENT",
             severity: "error",
-            message: `\u6642\u9593\u7DDA ${timeline.row}\uFF1A\u5145\u96FB\u53EA\u5269 ${remaining} \u79D2\uFF0C\u4F4E\u65BC\u539F\u5B9A ${block.requiredChargingSeconds} \u79D2\u3002`,
+            message: `\u904B\u7528 ${timeline.row}\uFF1A\u5145\u96FB\u53EA\u5269 ${remaining} \u79D2\uFF0C\u4F4E\u65BC\u539F\u5B9A ${block.requiredChargingSeconds} \u79D2\u3002`,
             detail: { timelineRow: timeline.row, blockId: block.id, remainingWorkSeconds: remaining, requiredWorkSeconds: block.requiredChargingSeconds }
           });
         }
@@ -2806,7 +2926,7 @@ function runSchedulePublishCheck(args) {
         errors.push({
           code: "NO_ROUTE_FOR_TASK_TYPE",
           severity: "error",
-          message: `\u6642\u9593\u7DDA ${timeline.row}\uFF1A\u73ED\u6B21\u7F3A\u5C11\u5B8C\u6574\u8DEF\u7DDA\uFF0C\u7121\u6CD5\u5B8C\u6210\u5B89\u5168\u6AA2\u67E5\u3002`,
+          message: `\u904B\u7528 ${timeline.row}\uFF1A\u73ED\u6B21\u7F3A\u5C11\u5B8C\u6574\u8DEF\u7DDA\uFF0C\u7121\u6CD5\u5B8C\u6210\u5B89\u5168\u6AA2\u67E5\u3002`,
           detail: { timelineRow: timeline.row, blockId: block.id, routeId: block.routeId }
         });
       }

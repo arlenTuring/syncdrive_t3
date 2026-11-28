@@ -20,12 +20,9 @@ import {
   fetchMaintenanceTaskList,
 } from '../api/maintenanceTasksApi';
 import {
-  PUBLISH_STATUS_OPTIONS,
-  PUBLISH_TAG_TONE,
   USAGE_STATUS_OPTIONS,
   USAGE_TAG_TONE,
   type MaintenanceTaskListItem,
-  type PublishStatusKey,
   type UsageStatusKey,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
@@ -54,7 +51,6 @@ export function MaintenanceTaskListPage({
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [usageStatus, setUsageStatus] = useState<UsageStatusKey | 'all'>('all');
-  const [publishStatus, setPublishStatus] = useState<PublishStatusKey | 'all'>('all');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<MaintenanceTaskListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -74,7 +70,6 @@ export function MaintenanceTaskListPage({
       const res = await fetchMaintenanceTaskList({
         keyword,
         usage_status: usageStatus,
-        publish_status: publishStatus,
         page,
         page_size: PAGE_SIZE,
       });
@@ -87,7 +82,7 @@ export function MaintenanceTaskListPage({
     } finally {
       setLoading(false);
     }
-  }, [keyword, usageStatus, publishStatus, page]);
+  }, [keyword, usageStatus, page]);
 
   useEffect(() => {
     void load();
@@ -139,7 +134,7 @@ export function MaintenanceTaskListPage({
       const detail = await fetchMaintenanceTaskDetail(row.task_id);
       const name = await resolveDuplicateName(row.name);
       await createMaintenanceTaskDraft({ name, body: detail.body ?? {} });
-      // 複製出來的一律是草稿，不繼承原本的發布／使用狀態
+      // 複製出來的是新的一份規劃，不繼承原本的使用狀態
       setPage(1);
       await load();
     } catch (e) {
@@ -191,22 +186,6 @@ export function MaintenanceTaskListPage({
           />
         </div>
         <SiteSelect
-          value={publishStatus}
-          onChange={(e) => {
-            setPublishStatus(e.target.value as PublishStatusKey | 'all');
-            setPage(1);
-          }}
-          size="md"
-        >
-          {PUBLISH_STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.value === 'all'
-                ? t('common.selectPublishStatus')
-                : t(`common.publishStatus.${opt.value}`)}
-            </option>
-          ))}
-        </SiteSelect>
-        <SiteSelect
           value={usageStatus}
           onChange={(e) => {
             setUsageStatus(e.target.value as UsageStatusKey | 'all');
@@ -238,7 +217,6 @@ export function MaintenanceTaskListPage({
               <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.name')}</th>
               <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.preview')}</th>
               <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.usageStatus')}</th>
-              <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.publishStatus')}</th>
               <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.createdAt')}</th>
               <th className="py-3 pr-4 font-medium">{t('maintenanceTasks.columns.updatedAt')}</th>
               <th className="w-10 py-3" />
@@ -247,14 +225,14 @@ export function MaintenanceTaskListPage({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-text-quaternary">
+                <td colSpan={6} className="py-16 text-center text-text-quaternary">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
                   {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-text-quaternary">
+                <td colSpan={6} className="py-16 text-center text-text-quaternary">
                   {t('maintenanceTasks.empty')}
                 </td>
               </tr>
@@ -272,12 +250,6 @@ export function MaintenanceTaskListPage({
                     <StatusTag
                       label={t(`common.usageStatus.${row.usage_status}`)}
                       tone={USAGE_TAG_TONE[row.usage_status]}
-                    />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <StatusTag
-                      label={t(`common.publishStatus.${row.publish_status}`)}
-                      tone={PUBLISH_TAG_TONE[row.publish_status]}
                     />
                   </td>
                   <td className="py-3 pr-4 font-mono text-text-tertiary">{row.created_at}</td>

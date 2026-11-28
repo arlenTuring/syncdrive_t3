@@ -485,7 +485,8 @@ export class DispatchEngineService implements OnModuleInit, OnModuleDestroy {
     const resolved = await this.resolveDailySource(day, { allowAuto: true });
     if (!resolved) return null;
     const source = await resolved.load();
-    return this.buildPlan(source, reference, { rotationOverlay: false });
+    const plan = await this.buildPlan(source, reference, { rotationOverlay: false });
+    return { ...plan, rows: shiftTimelineRows(source.body) };
   }
 
   /**
@@ -973,4 +974,21 @@ export class DailyPlanVersionMismatch extends Error {
       `班表內容已在載入後變更（載入時 ${expected}，目前 ${actual}），請重新載入後再部署`,
     );
   }
+}
+
+/**
+ * 部署中班表的時間線列號（1、2、3…）。照班表排出來的每一條時間線列出，當天沒有任務的那條也算，
+ * 不看今天的計畫裡出現了哪些列。讀不到排班結果時回空陣列。
+ */
+export function shiftTimelineRows(body: Record<string, unknown>): number[] {
+  const output = body.scheduleOutput;
+  const plan = output && typeof output === 'object' ? (output as Record<string, unknown>).plan : null;
+  const timelines = plan && typeof plan === 'object' ? (plan as Record<string, unknown>).timelines : null;
+  if (!Array.isArray(timelines)) return [];
+  const rows = new Set<number>();
+  for (const timeline of timelines) {
+    const row = timeline && typeof timeline === 'object' ? Number((timeline as Record<string, unknown>).row) : NaN;
+    if (Number.isInteger(row) && row > 0) rows.add(row);
+  }
+  return [...rows].sort((a, b) => a - b);
 }

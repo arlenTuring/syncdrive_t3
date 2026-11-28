@@ -9,7 +9,7 @@ import {
 } from '../constants/vehiclePreviewTestSequence';
 import type { VehicleDefinition } from '../types';
 import { readOperationActions } from '../utils/resolveBehaviorActions';
-import { Button, Checkbox, IconButton, fieldClass, cn } from '../../../components/ui';
+import { Button, Checkbox, IconButton, Slider, fieldClass, cn } from '../../../components/ui';
 
 function mergePreviewData(
   base: Record<string, unknown> | undefined,
@@ -140,19 +140,18 @@ export function VehiclePreviewTestPanel({
               <option value={DIR_UP}>{t('vehicleEditor.preview.up')}</option>
             </SiteSelect>
           </label>
-          <label className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5">
             <span className="text-caption-2 text-text-quaternary">
               {t('vehicleEditor.preview.doorOpen', { pct: String(preview.door_open_percent ?? 0) })}
             </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
+            <Slider
               value={Number(preview.door_open_percent ?? 0)}
-              onChange={(e) => patchField('door_open_percent', Number(e.target.value))}
+              onChange={(pct) => patchField('door_open_percent', pct)}
+              showLabel={false}
+              aria-label={t('vehicleEditor.preview.doorOpen', { pct: String(preview.door_open_percent ?? 0) })}
               className="w-32"
             />
-          </label>
+          </div>
           <label className="flex items-center gap-1.5 pb-1">
             <Checkbox checked={Boolean(preview.head_light_on)} onCheckedChange={(checked) => patchField('head_light_on', checked)} />
             <span className="text-text-tertiary">{t('vehicleEditor.preview.headLight')}</span>

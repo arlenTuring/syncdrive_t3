@@ -16,6 +16,7 @@
 | `t3-checkbox-engineering-spec.md`＋`-playground.html` | Checkbox：2 Size × 2 Style × 3 Select × 4 State（42） | `src/components/ui/checkbox/` |
 | `t3-radio-engineering-spec.md`＋`-playground.html` | Radio Basic：2 Size × 2 Select × 4 State（16） | `src/components/ui/radio/` |
 | `t3-switch-engineering-spec.md`＋`-playground.html` | Switch：2 Configuration × 2 Select × 3 State（12） | `src/components/ui/switch/` |
+| `t3-slider-engineering-spec.md`＋`-playground.html` | Slider（2026-11-28 交付）：Basic／Range × Discrete／Continuous × Default／Pressed／Disabled；沒有參考 CSS，素材取自 playground（manifest `reference: playground-assets`） | `src/components/ui/slider/` |
 | `t3-dialog-engineering-spec.md`＋`-playground.html` | Dialog：Basic 提示（Info／Success／Error／Warning，寬 360）＋Overlay 容器（有／無操作列）。一般對話框寬度沿用各畫面需要（表單比 350 寬），其餘尺寸照規格 | `src/components/ui/dialog/` |
 
 ### 2026-11-24 交付的 10 份（2026-11-24 已導入）
@@ -35,7 +36,7 @@
 
 規格以 Ant Design Vue 為互動基底；本專案是 React，**照規格的尺寸、色票、狀態與 CSS 做，不引入 Ant Design**。
 
-已知設計稿問題（待設計確認）：Table「未勾選列 Hover 背景」用 `--surface-gray-light`，定稿色票沒有這個變數。
+2026-11-28 設計交付更新：色票補上 `--surface-gray`、`--surface-gray-light`（Table「未勾選列 Hover 背景」改用正式色票）；新增 Slider 規格。
 
 ## 用設計的對照頁驗收實作
 

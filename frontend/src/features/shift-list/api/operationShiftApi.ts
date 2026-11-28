@@ -1,6 +1,6 @@
 import { getDataSourceById } from '../../dashboard/store/useDataSourceStore';
 import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
-import type { OperationShiftListItem, PublishStatusKey, UsageStatusKey } from '../types';
+import type { OperationShiftListItem, UsageStatusKey } from '../types';
 
 export function resolveOperationShiftBackendUrl(): string {
   return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
@@ -9,7 +9,6 @@ export function resolveOperationShiftBackendUrl(): string {
 export type OperationShiftListQuery = {
   keyword?: string;
   usage_status?: UsageStatusKey | 'all';
-  publish_status?: PublishStatusKey | 'all';
   page?: number;
   page_size?: number;
 };
@@ -24,7 +23,6 @@ export type OperationShiftListResponse = {
 export type OperationShiftDetail = {
   shift_id: string;
   name: string;
-  publish_status: PublishStatusKey;
   usage_status: UsageStatusKey;
   body: Record<string, unknown>;
   created_at: string;
@@ -60,7 +58,6 @@ export async function fetchOperationShiftList(
   const qs = buildQuery({
     keyword: query.keyword,
     usage_status: query.usage_status ?? 'all',
-    publish_status: query.publish_status ?? 'all',
     page: query.page ?? 1,
     page_size: query.page_size ?? 20,
   });
@@ -199,20 +196,6 @@ export async function stopOperationShift(
   return res.json() as Promise<OperationShiftListItem>;
 }
 
-/** 班表完成建立：製作狀態標成「已完成」（後端會再做一次安全重驗） */
-export async function completeOperationShift(
-  shiftId: string,
-  backendUrl = resolveOperationShiftBackendUrl(),
-): Promise<OperationShiftListItem> {
-  const res = await fetch(
-    `${backendUrl}/syncdrive-api/operation-shift/detail/${encodeURIComponent(shiftId)}/publish`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
-  );
-  if (!res.ok) {
-    throw new Error(await readApiError(res, '標成已完成失敗'));
-  }
-  return res.json() as Promise<OperationShiftListItem>;
-}
 
 export async function checkOperationShiftNameUnique(
   name: string,

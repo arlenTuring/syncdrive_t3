@@ -330,7 +330,7 @@ export function expandRowBlocks(
       pushIssue(errors, {
         code: 'CLOCK_ALIGN_VIOLATION',
         severity: 'error',
-        message: `時間線 ${task.rowIndex}：${task.label} 發車錨點未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
+        message: `運用 ${task.rowIndex}：${task.label} 發車錨點未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
         detail: {
           timelineRow: task.rowIndex,
           templateTaskId: task.id,
@@ -359,7 +359,7 @@ export function expandRowBlocks(
           pushIssue(errors, {
             code: 'ANCHOR_CONFLICT',
             severity: 'error',
-            message: `時間線 ${task.rowIndex}：${task.label} 實際結束時間晚於下一個模板發車錨點`,
+            message: `運用 ${task.rowIndex}：${task.label} 實際結束時間晚於下一個模板發車錨點`,
             detail: {
               timelineRow: task.rowIndex,
               templateTaskId: task.id,
@@ -386,7 +386,7 @@ export function expandRowBlocks(
       pushIssue(errors, {
         code: 'CLOCK_ALIGN_VIOLATION',
         severity: 'error',
-        message: `時間線 ${task.rowIndex}：下一發車錨點未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
+        message: `運用 ${task.rowIndex}：下一發車錨點未對齊 ${SHIFT_SCHEDULE_CLOCK_ALIGN_SECONDS} 秒格位`,
         detail: {
           timelineRow: task.rowIndex,
           nextAnchorSecond,
@@ -433,9 +433,9 @@ export function expandRowBlocks(
           severity: 'error',
           message: isRouteSwitch
             ? includeRecovery
-              ? `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒）`
-              : `時間線 ${task.rowIndex}：${task.label} 換線路空檔不足（需換線緩衝 ${requiredGap} 秒）`
-            : `時間線 ${task.rowIndex}：${task.label} 與下一發車錨點之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
+              ? `運用 ${task.rowIndex}：${task.label} 換線路空檔不足（需恢復 ${minimumRecoveryTimeSeconds} 秒＋換線緩衝，共 ${requiredGap} 秒）`
+              : `運用 ${task.rowIndex}：${task.label} 換線路空檔不足（需換線緩衝 ${requiredGap} 秒）`
+            : `運用 ${task.rowIndex}：${task.label} 與下一發車錨點之間的空檔不足恢復時間（需至少 ${minimumRecoveryTimeSeconds} 秒）`,
           detail: {
             timelineRow: task.rowIndex,
             templateTaskId: task.id,

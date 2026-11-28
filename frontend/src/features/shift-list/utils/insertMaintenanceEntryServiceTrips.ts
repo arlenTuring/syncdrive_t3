@@ -27,6 +27,7 @@ import type {
   GeneratedScheduleTimeline,
 } from './schedule-engine/types';
 import { minuteToSecond, pushIssue, secondToMinute } from './schedule-engine/types';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 /**
  * 整備後的調度營運班次（文件 §10）。
@@ -475,7 +476,7 @@ function isYardTemplateBar(block: GeneratedScheduleBlock): boolean {
     block.taskType === 'servicing'
     || block.taskType === 'inspection'
     || block.taskType === 'charging'
-    || block.taskType === 'standby'
+    || isStandbyLikeTaskType(block.taskType)
   );
 }
 
@@ -565,7 +566,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
   // 「有沒有任何一種是開著的」。充電與待命 2026-08-24 起納入——它們的設施不一定離
   // 首發站近（實測待命排在 H1／H2，離 180 秒），接不上時那段移動要載客而不是空跑。
   const dispatchCapableTaskTypes = [
-    'servicing', 'inspection', 'washing', 'charging', 'standby',
+    'servicing', 'inspection', 'washing', 'charging', 'standby', 'maneuver',
   ] as const;
   /**
    * 車做完整備停在哪幾站：依這一類設施在路網上的出場站（實際位置），不依整備任務名稱決定能不能排調度載客
@@ -637,7 +638,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
           severity: 'warning',
           kind: 'actionable',
           message:
-            `時間線 ${timeline.row}：「${yard.label}」查不到出場站，`
+            `運用 ${timeline.row}：「${yard.label}」查不到出場站，`
             + '無法判斷車做完之後停在哪一站，因此不排整備後的調度營運班次'
             + '（請確認整備任務有設定該區段的設施，且設施在路網拓樸上有對應的停靠點）',
           detail: {
@@ -708,7 +709,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
           severity: 'warning',
           kind: 'actionable',
           message:
-            `時間線 ${timeline.row}：「${yard.label}」做完後車在出場站，`
+            `運用 ${timeline.row}：「${yard.label}」做完後車在出場站，`
             + `但下一班正線從別的站發車，需要調度營運班次接過去——${reason}`,
           detail: {
             timelineRow: timeline.row,
@@ -749,7 +750,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
        * - 有退路就不強制插入：路網上這一類整備的設施開得到下一班起點時，「不載客的出場移動卡」可以把車
        *   送過去，排不下就退回那張卡，不帶著站位衝突硬插。
        * - 沒有退路（車不在起點、路網上也開不過去）才非插不可：不插，車就憑空出現在起點。
-       *   這時照插，衝突交給最終驗證擋發布（跟 2026-08-08 的 mandatory 同一個理由）。
+       *   這時照插，衝突交給最終驗證擋部署（跟 2026-08-08 的 mandatory 同一個理由）。
        *   第四批一度一律不強制，沒路網的案例因此排出「車不在起點卻發車」的班表
        *   （shiftScheduleEngine.spec「yields an already-placed same-direction trip」）。
        * - 整串要嘛全部插、要嘛都不插，不會把車留在半路。
@@ -771,7 +772,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
           code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
           severity: 'warning',
           kind: 'policy',
-          message: `時間線 ${timeline.row}：略過「${yard.label}」後的進場載客——沒有路線能從出場接到首班起點`,
+          message: `運用 ${timeline.row}：略過「${yard.label}」後的進場載客——沒有路線能從出場接到首班起點`,
           detail: {
             timelineRow: timeline.row,
             yardBlockId: yard.id,
@@ -810,7 +811,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
             code: 'MAINTENANCE_DISPATCH_UNREACHABLE',
             severity: 'warning',
             kind: 'policy',
-            message: `時間線 ${timeline.row}：略過「${yard.label}」後的進場載客——尾巴時間不夠，或會追上同路線前一班`,
+            message: `運用 ${timeline.row}：略過「${yard.label}」後的進場載客——尾巴時間不夠，或會追上同路線前一班`,
             detail: {
               timelineRow: timeline.row,
               yardBlockId: yard.id,
@@ -897,7 +898,7 @@ export function insertMaintenanceEntryServiceTrips(args: {
         severity: 'warning',
         kind: 'policy',
         message:
-          `時間線 ${timeline.row}：「${yard.label}」做完後，車在「${joinStationName}」`
+          `運用 ${timeline.row}：「${yard.label}」做完後，車在「${joinStationName}」`
           + `${firstItem.hop.joinedFrom ? '中途加入' : '發車'}，載客跑 ${routeNames.join(' → ')}`
           + `（服務 ${servedStationNames.join('、')}），再接首班正線`,
         detail: {

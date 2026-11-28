@@ -51,7 +51,7 @@ import { GenericGroupSettings } from './components/GenericGroupSettings';
 import { VehicleRoofIndicatorSettings } from './components/VehicleRoofIndicatorSettings';
 import { applyTabListContentFontSize } from './elements/TabListWidget';
 import { systemConfirm } from '../../lib/systemDialog';
-import { Button, Checkbox, IconButton } from '../../components/ui';
+import { Button, Checkbox, IconButton, Slider } from '../../components/ui';
 // ─── 共用 UI ────────────────────────────────────────────────────────
 
 const inputCls = `w-full bg-surface-secondary border border-border-quaternary rounded-md px-2.5 py-1.5 text-text-primary text-body-xs
@@ -1755,7 +1755,7 @@ function CanvasSettings({ el, onUpdate, onDelete, onEnterEditGroupMode, onEnterT
           onChange={(url) => onUpdate({ backgroundImage: url, backgroundImageFit: 'contain' })}
         />
       ) : null}
-      <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><input type="range" min={0} max={100} value={el.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-link-theme-filled" /></Field>
+      <Field label={t('dashboard.properties.opacity', { pct: el.opacity })}><Slider value={el.opacity} onChange={(opacity) => onUpdate({ opacity })} showLabel={false} aria-label={t('dashboard.properties.opacity', { pct: el.opacity })} /></Field>
 
       {isShiftCenter && (
         <div className="space-y-3 rounded-lg border border-border-theme-light-trn bg-surface-theme-light p-3">
@@ -2059,7 +2059,7 @@ function ColorBlockSettings({ w, onUpdate, onDelete }: { w: ColorBlockWidget; on
           </div>
         </Field>
         <Field label={t('dashboard.properties.opacityShort', { pct: w.opacity })}>
-          <input type="range" min={0} max={100} value={w.opacity} onChange={e => onUpdate({ opacity: +e.target.value })} className="w-full accent-link-theme-filled" />
+          <Slider value={w.opacity} onChange={(opacity) => onUpdate({ opacity })} showLabel={false} aria-label={t('dashboard.properties.opacityShort', { pct: w.opacity })} />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">
@@ -2497,11 +2497,12 @@ function MapCanvasSettings({ w, onUpdate, onDelete }: { w: MapCanvasWidget; onUp
         )}
       </Field>
       <Field label={t('dashboard.properties.widgets.mapCanvas.zoom', { factor: w.zoomFactor?.toFixed(1) ?? '2.0' })}>
-        <input
-          type="range" min={0.2} max={5} step={0.1}
+        <Slider
+          min={0.2} max={5} step={0.1}
           value={w.zoomFactor ?? 2.0}
-          onChange={e => onUpdate({ zoomFactor: +e.target.value })}
-          className="w-full accent-link-theme-filled"
+          onChange={(zoomFactor) => onUpdate({ zoomFactor })}
+          showLabel={false}
+          aria-label={t('dashboard.properties.widgets.mapCanvas.zoom', { factor: w.zoomFactor?.toFixed(1) ?? '2.0' })}
         />
         <div className="flex justify-between text-caption-2 text-text-quaternary mt-0.5">
           <span>{t('dashboard.properties.widgets.mapCanvas.zoomIn')}</span><span>{t('dashboard.properties.widgets.mapCanvas.zoomOut')}</span>

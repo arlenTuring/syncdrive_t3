@@ -18,7 +18,7 @@
  * 這台車的整備卡；都沒有就當作待命（待命清單有這一格的話），否則歸到第一個列出這一格的區塊。
  */
 
-export const MAINTENANCE_SECTION_KEYS = ['charging', 'carWash', 'maintenance', 'preTrip', 'mobile'] as const;
+export const MAINTENANCE_SECTION_KEYS = ['charging', 'carWash', 'maintenance', 'preTrip', 'mobile', 'maneuver'] as const;
 export type MaintenanceSectionKey = (typeof MAINTENANCE_SECTION_KEYS)[number];
 
 const DEFAULT_SECTION_LABEL: Record<MaintenanceSectionKey, string> = {
@@ -27,6 +27,7 @@ const DEFAULT_SECTION_LABEL: Record<MaintenanceSectionKey, string> = {
   maintenance: '保養',
   preTrip: '行檢',
   mobile: '待命',
+  maneuver: '機動',
 };
 
 /** 班表整備卡的 taskType → 整備區塊（與排班引擎、調度引擎同一組對應） */
@@ -36,6 +37,7 @@ const SECTION_BY_TASK_TYPE: Record<string, MaintenanceSectionKey> = {
   servicing: 'maintenance',
   inspection: 'preTrip',
   standby: 'mobile',
+  maneuver: 'maneuver',
 };
 
 export type MaintenanceDistributionSlot = {
@@ -132,6 +134,8 @@ export function buildMaintenanceDistribution(args: {
   // 各區塊的格位：設備列裡、而且地圖上真的有這個設施的（待命清單也列了正線月台，那不是格位）
   const sections = MAINTENANCE_SECTION_KEYS
     .filter((key) => enabled?.[key] !== false)
+    // 機動是後來加的一步：整備任務沒啟用（舊的整備任務根本沒有這一段）就不列這一類
+    .filter((key) => key !== 'maneuver' || asRecord(maintenanceBody.maneuver)?.stepEnabled === true)
     .map((key) => {
       const rows = asRecord(maintenanceBody[key])?.equipmentRows;
       const slotCodes = [...new Set(
@@ -315,7 +319,7 @@ export type CurrentVehicleTask = {
 
 const TASK_WORD: Record<string, string> = {
   passenger: '載客', charging: '充電', washing: '洗車', servicing: '保養', inspection: '行檢',
-  standby: '待命', idle: '暫停', dispatch: '空車移動',
+  standby: '待命', maneuver: '機動', idle: '暫停', dispatch: '空車移動',
 };
 
 const PURPOSE_WORD = { operation: '營運', maintenance: '整備', standby: '待命' } as const;
@@ -341,7 +345,7 @@ export function classifyVehicle(task: CurrentVehicleTask | undefined): { status:
   if (kind === 'MAINLINE' || kind === 'TEST') return { status: 'IN_SERVICE', reason: `正線任務 ${label}` };
   if (kind === 'MAINTENANCE') return { status: 'MAINTENANCE', reason: `整備任務 ${label}` };
   if (kind === 'TRANSITION') {
-    const from = task.purposeSource === 'shift' ? '（用途由班表時間線補算）' : '';
+    const from = task.purposeSource === 'shift' ? '（用途由班表運用補算）' : '';
     if (task.servicePurpose === 'operation') return { status: 'IN_SERVICE', reason: `過渡 ${label} 服務營運${from}` };
     if (task.servicePurpose === 'maintenance') return { status: 'MAINTENANCE', reason: `過渡 ${label} 服務整備${from}` };
     if (task.servicePurpose === 'standby') return { status: 'STANDBY', reason: `過渡 ${label} 服務待命${from}` };

@@ -484,7 +484,7 @@ export function resolveMovePathConflicts(args: {
         code: 'MOVE_PATH_SHIFTED',
         severity: 'warning',
         kind: 'policy',
-        message: `時間線 ${repair.timelineRow}「${repair.label}」${repair.shiftSeconds < 0 ? '提早' : '延後'} `
+        message: `運用 ${repair.timelineRow}「${repair.label}」${repair.shiftSeconds < 0 ? '提早' : '延後'} `
           + `${Math.abs(repair.shiftSeconds)} 秒，避開途經月台／路段上的別列車`,
         detail: { timelineRow: repair.timelineRow, blockId: repair.blockId, shiftSeconds: repair.shiftSeconds },
       });

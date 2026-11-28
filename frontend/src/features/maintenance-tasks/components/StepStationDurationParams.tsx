@@ -24,6 +24,8 @@ type StepStationDurationParamsProps = {
   draft: StationDurationTaskDraft;
   onChange: (next: StationDurationTaskDraft) => void;
   showFollowTemplateCheckbox?: boolean;
+  /** 時長一律照時間模板（機動）：不顯示勾選框，也不顯示作業時長欄 */
+  durationAlwaysFollowsTemplate?: boolean;
   /**
    * 設施下拉的偏好排序用途（例「保養格」／「調度格」）。
    * 只影響排序，不影響可選範圍——任何設施格都掛得上。
@@ -43,6 +45,7 @@ export function StepStationDurationParams({
   draft,
   onChange,
   showFollowTemplateCheckbox = false,
+  durationAlwaysFollowsTemplate = false,
   preferredFacilityPurpose,
   includeStations = false,
 }: StepStationDurationParamsProps) {
@@ -104,7 +107,7 @@ export function StepStationDurationParams({
       onEnabledChange={(stepEnabled) => patchTask({ stepEnabled })}
     >
       <div className="space-y-6">
-        {showFollowTemplateCheckbox && (
+        {showFollowTemplateCheckbox && !durationAlwaysFollowsTemplate && (
           <div className="rounded-lg border border-border-quaternary bg-surface-primary p-4">
             <label className="flex cursor-pointer items-center gap-2 text-body-s-bold text-text-theme-light">
               <Checkbox checked={task.durationFollowTemplate !== false} onCheckedChange={(checked) => patchTask({
@@ -119,7 +122,7 @@ export function StepStationDurationParams({
           </div>
         )}
 
-        {(!showFollowTemplateCheckbox || task.durationFollowTemplate === false) && (
+        {!durationAlwaysFollowsTemplate && (!showFollowTemplateCheckbox || task.durationFollowTemplate === false) && (
           <div>
             <span className="mb-2 flex items-center gap-1 text-body-s text-text-secondary">
               <span className="text-status-error">*</span>

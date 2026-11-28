@@ -23,7 +23,6 @@ import {
   CREATION_MODE_TAG_STYLE,
   USAGE_STATUS_OPTIONS,
   USAGE_TAG_STYLE,
-  PUBLISH_TAG_STYLE,
   PUBLISH_CHECK_TAG_STYLE,
   type CreationModeKey,
   type OperationShiftListItem,
@@ -224,7 +223,6 @@ export function ShiftListPage({
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.timeTemplate')}</th>
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.creationMode')}</th>
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.usageStatus')}</th>
-              <th className="py-3 pr-4 font-medium">{t('shiftList.columns.publishStatus')}</th>
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.publishCheck')}</th>
               <th className="py-3 pr-4 font-medium">{t('shiftList.columns.version')}</th>
               <th className="w-10 py-3" />
@@ -267,12 +265,6 @@ export function ShiftListPage({
                     <StatusTag
                       label={t(`common.usageStatus.${row.usage_status}`)}
                       style={USAGE_TAG_STYLE[row.usage_status]}
-                    />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <StatusTag
-                      label={t(`shiftList.buildStatus.${row.publish_status}`)}
-                      style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
                   <td className="py-3 pr-4">

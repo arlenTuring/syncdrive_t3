@@ -61,9 +61,11 @@ const DIALOG_FIELD =
 
 type Tab = 'today' | 'fleet' | 'records';
 
+const rowLabel = (row: number) => `第 ${row} 運用`;
+
 function RulesDialog(props: {
   rules: RotationRules;
-  slotOptions: string[];
+  rowOptions: RotationToday['row_options'];
   onClose: () => void;
   onDeploy: (rules: RotationRules) => Promise<void>;
 }) {
@@ -72,7 +74,12 @@ function RulesDialog(props: {
   const patch = (next: Partial<RotationRules>) => setDraft((current) => ({ ...current, ...next }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = draft.intervalKm >= 1 && draft.takeoverSlots.length > 0;
+  const valid = draft.intervalKm >= 1 && draft.takeoverRows.length > 0;
+  const noShift = props.rowOptions == null;
+  // 已選的線如果不在目前部署的班表裡（班表條數變少），照樣保留可移除，但標出來
+  const choiceLabel = (row: number) =>
+    props.rowOptions && !props.rowOptions.includes(row) ? `${rowLabel(row)}（目前班表沒有這個運用）` : rowLabel(row);
+  const rows = [...new Set([...(props.rowOptions ?? []), ...draft.takeoverRows])].sort((a, b) => a - b);
   const deploy = () => {
     setSaving(true);
     setError(null);
@@ -114,29 +121,34 @@ function RulesDialog(props: {
             </span>
           </label>
           <div className="flex flex-col gap-2">
-            可接替車輛的格位
+            可接替的運用
+            <span className="text-body-xs text-text-quaternary">這些運用上的車用來接替別人的工作，不會被排進需要被輪替的隊伍</span>
+            {noShift ? (
+              <span className="text-body-xs text-status-warning">目前沒有部署中的班表，無法選擇可接替的運用</span>
+            ) : (
             <SiteMultiSelect
-              values={draft.takeoverSlots}
-              options={[...new Set([...props.slotOptions, ...draft.takeoverSlots])].map((value) => ({ value, label: value }))}
-              onChange={(takeoverSlots) => patch({ takeoverSlots })}
-              ariaLabel="可接替車輛的格位"
-              allLabel="請加入格位"
-              triggerLabel={draft.takeoverSlots.length ? `已選 ${draft.takeoverSlots.length} 個格位` : '請加入格位'}
-              filterPlaceholder="篩選格位"
+              values={draft.takeoverRows.map(String)}
+              options={rows.map((row) => ({ value: String(row), label: choiceLabel(row) }))}
+              onChange={(values) => patch({ takeoverRows: values.map(Number).sort((a, b) => a - b) })}
+              ariaLabel="可接替的運用"
+              allLabel="請加入運用"
+              triggerLabel={draft.takeoverRows.length ? `已選 ${draft.takeoverRows.length} 個運用` : '請加入運用'}
+              filterPlaceholder="篩選運用"
               hideAllOption
               className="w-full"
             />
-            {draft.takeoverSlots.length ? (
+            )}
+            {draft.takeoverRows.length ? (
               <span className="flex flex-wrap gap-1.5">
-                {draft.takeoverSlots.map((slot) => (
-                  <span key={slot} className="inline-flex items-center gap-1 rounded bg-surface-secondary py-1 pl-2.5 pr-1.5 text-body-s text-text-primary">
-                    {slot}
-                    <IconButton size="small" hierarchy="subordinate" variant="standard" label={`移除 ${slot}`} onPress={() => patch({ takeoverSlots: draft.takeoverSlots.filter((item) => item !== slot) })} icon={<X />} />
+                {draft.takeoverRows.map((row) => (
+                  <span key={row} className="inline-flex items-center gap-1 rounded bg-surface-secondary py-1 pl-2.5 pr-1.5 text-body-s text-text-primary">
+                    {choiceLabel(row)}
+                    <IconButton size="small" hierarchy="subordinate" variant="standard" label={`移除${rowLabel(row)}`} onPress={() => patch({ takeoverRows: draft.takeoverRows.filter((item) => item !== row) })} icon={<X />} />
                   </span>
                 ))}
               </span>
             ) : (
-              <span className="text-body-xs text-status-warning">至少要加入一個格位</span>
+              <span className="text-body-xs text-status-warning">至少要加入一個運用</span>
             )}
           </div>
           <div className="flex flex-col gap-2">
@@ -176,7 +188,7 @@ function AutomationBar(props: { rules: RotationRules; deployedAt: number | null;
   const { rules } = props;
   const summary = [
     `每 ${km(rules.intervalKm)} 公里`,
-    `格位 ${rules.takeoverSlots.join('、')}`,
+    rules.takeoverRows.length ? `可接替 ${rules.takeoverRows.map(rowLabel).join('、')}` : '尚未選可接替的運用',
     `時段 ${rules.windowStart}–${rules.windowEnd}`,
     rules.mode === 'confirm' ? `每日 ${rules.reportBy} 前產出報告` : '報告自動執行',
   ];
@@ -400,7 +412,7 @@ function ReportCard(props: { item: RotationItem; now: number; busy: boolean; onC
         </h2>
         <span className={`rounded px-2 py-0.5 text-body-xs ${status.className}`}>{status.label}</span>
         <span className="text-body-s text-text-tertiary">
-          第 {window.row} 列｜{window.zone} {window.location}｜{clock(window.takeoverDepartAt)} 動身｜{item.effective_day} 起換列
+          第 {window.row} 運用｜{window.zone} {window.location}｜{clock(window.takeoverDepartAt)} 動身｜{item.effective_day} 起換運用
         </span>
         {item.status === 'pending' ? (
           <span className="ml-auto flex gap-2">
@@ -473,7 +485,7 @@ function FleetTab(props: { cars: FleetCar[]; onHold: (code: string, hold: HoldSt
         <thead>
           <tr className="border-b border-border-quaternary text-left text-body-xs text-text-quaternary">
             <th className="py-2.5 pl-5 pr-3 font-medium">車輛</th>
-            <th className="py-2.5 pr-3 font-medium">擔任列</th>
+            <th className="py-2.5 pr-3 font-medium">擔任運用</th>
             <th className="py-2.5 pr-3 font-medium">運營狀態</th>
             <th className="py-2.5 pr-3 font-medium">位置</th>
             <th className="py-2.5 pr-3 text-right font-medium">目前里程</th>
@@ -490,7 +502,10 @@ function FleetTab(props: { cars: FleetCar[]; onHold: (code: string, hold: HoldSt
             return (
               <tr key={car.code} className="border-b border-border-quaternary last:border-b-0">
                 <td className="py-2 pl-5 pr-3 font-medium text-text-primary">{car.code}</td>
-                <td className="py-2 pr-3 tabular-nums text-text-tertiary">{car.row}</td>
+                <td className="py-2 pr-3 tabular-nums text-text-tertiary">
+                  {rowLabel(car.row)}
+                  {car.takeover_row ? <span className="ml-1.5 text-body-xs text-text-theme">可接替</span> : null}
+                </td>
                 <td className="py-2 pr-3 text-text-secondary">{car.state}</td>
                 <td className="py-2 pr-3 tabular-nums text-text-secondary">{car.location ?? '未知'}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-text-secondary">{km(car.current_km)}</td>
@@ -655,7 +670,7 @@ export function VehicleRotationPage() {
       {rulesOpen ? (
         <RulesDialog
           rules={today.rules}
-          slotOptions={today.slot_options}
+          rowOptions={today.row_options ?? null}
           onClose={() => setRulesOpen(false)}
           onDeploy={async (rules) => {
             await deployRules(rules);

@@ -11,7 +11,7 @@
  *
  * <h3>代號從哪裡來</h3>
  * <table>
- *   <tr><td>充電、洗車、保養、行檢、待命</td><td>整備任務步驟設定的整備代號（maintenanceSectionCodeBySection）</td></tr>
+ *   <tr><td>充電、洗車、保養、行檢、待命、機動</td><td>整備任務步驟設定的整備代號（maintenanceSectionCodeBySection）</td></tr>
  *   <tr><td>入場移動（yard_entry_move）</td><td>路線群組的過渡卡代號 entry</td></tr>
  *   <tr><td>出場移動（yard_exit_move）</td><td>過渡卡代號 exit</td></tr>
  *   <tr><td>暫停／停留（idle：hold 暫停、transition 暫停放／提早進廠等待）</td><td>過渡卡代號 hold</td></tr>
@@ -39,7 +39,7 @@ export const TRANSITION_CARD_CODE_LABEL: Record<TransitionCardCodeKey, string> =
   hold: '暫停／停留',
 };
 
-type SectionKey = 'charging' | 'carWash' | 'maintenance' | 'preTrip' | 'mobile';
+type SectionKey = 'charging' | 'carWash' | 'maintenance' | 'preTrip' | 'mobile' | 'maneuver';
 
 const SECTION_KEY_BY_TASK_TYPE: Record<string, SectionKey> = {
   charging: 'charging',
@@ -47,6 +47,7 @@ const SECTION_KEY_BY_TASK_TYPE: Record<string, SectionKey> = {
   servicing: 'maintenance',
   inspection: 'preTrip',
   standby: 'mobile',
+  maneuver: 'maneuver',
 };
 
 const SECTION_LABEL: Record<SectionKey, string> = {
@@ -55,6 +56,7 @@ const SECTION_LABEL: Record<SectionKey, string> = {
   maintenance: '保養',
   preTrip: '行檢',
   mobile: '待命',
+  maneuver: '機動',
 };
 
 export type CardCodeSettings = {
@@ -103,6 +105,7 @@ export function readCardCodeSettings(body: Record<string, unknown>): CardCodeSet
     maintenance: normalizeCardCode(rawSections.maintenance),
     preTrip: normalizeCardCode(rawSections.preTrip),
     mobile: normalizeCardCode(rawSections.mobile),
+    maneuver: normalizeCardCode(rawSections.maneuver),
   };
   const rawTransition = asRecord(body.transitionCardCodes);
   if (!rawTransition) return { version: 1, sectionCodes, transitionCodes: null };

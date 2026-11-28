@@ -9,7 +9,6 @@ import {
 } from './safety/schedule-safety';
 import {
   OperationShift,
-  OperationShiftPublishStatus,
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 
@@ -90,7 +89,6 @@ function fixture(options: { secondTripMinute: number; storedSafe?: boolean }) {
     id: 'shift',
     body,
     usageStatus: OperationShiftUsageStatus.IDLE,
-    publishStatus: OperationShiftPublishStatus.DRAFT,
   } as unknown as OperationShift;
   const query = {
     update: jest.fn().mockReturnThis(),
@@ -114,12 +112,12 @@ function fixture(options: { secondTripMinute: number; storedSafe?: boolean }) {
   };
 }
 
-describe('發布／部署前的獨立安全重驗', () => {
-  for (const method of ['publishShift', 'deployShift'] as const) {
+describe('部署前的獨立安全重驗', () => {
+  for (const method of ['deployShift'] as const) {
     it(`${method}：前端標示通過、實際有站位碰撞，要拒絕，而且不改動任何班表`, async () => {
       const f = fixture({ secondTripMinute: 600, storedSafe: true });
       await expect(f.service[method]('shift')).rejects.toThrow(
-        '禁止發布或部署',
+        '禁止部署',
       );
       expect(f.repo.save).not.toHaveBeenCalled();
       expect(f.repo.createQueryBuilder).not.toHaveBeenCalled();
@@ -168,7 +166,7 @@ describe('發布／部署前的獨立安全重驗', () => {
     expect(result.publishSafe).toBe(false);
     expect(result.blockingIssues.map((issue) => issue.code)).toEqual(['UNSERVED_SERVICE_PULSE']);
     expect(result.blockingIssues[0].message).toContain('11:00:00');
-    await expect(f.service.publishShift('shift')).rejects.toThrow('UNSERVED_SERVICE_PULSE');
+    await expect(f.service.deployShift('shift')).rejects.toThrow('UNSERVED_SERVICE_PULSE');
     expect(f.repo.save).not.toHaveBeenCalled();
 
     (f.plan as Record<string, unknown>).servicePulses = [
@@ -283,32 +281,31 @@ describe('清單上的檢查狀態', () => {
 });
 
 describe('對外班表讀哪一份', () => {
-  it('部署後新舊兩份「最新已發布」同一個更新時間：回部署中的那一份', async () => {
+  const row = (body: Record<string, unknown>, id: string, usage: OperationShiftUsageStatus) =>
+    ({ id, name: id, body, usageStatus: usage, updatedAt: '1790446966554' }) as unknown as OperationShift;
+
+  it('有部署中的班表就讀它（正式時刻），不看誰比較新', async () => {
     const f = fixture({ secondTripMinute: 630 });
-    const row = (id: string, usage: OperationShiftUsageStatus) =>
-      ({
-        id,
-        name: id,
-        body: f.body,
-        publishStatus: OperationShiftPublishStatus.PUBLISHED,
-        usageStatus: usage,
-        updatedAt: '1790446966554',
-      }) as unknown as OperationShift;
     const repo = {
-      // 資料庫對同分的排序不保證：刻意把舊的排前面
-      find: jest
-        .fn()
-        .mockResolvedValue([
-          row('old', OperationShiftUsageStatus.IDLE),
-          row('deployed', OperationShiftUsageStatus.IN_USE),
-        ]),
+      findOne: jest.fn().mockResolvedValue(row(f.body, 'deployed', OperationShiftUsageStatus.IN_USE)),
+      find: jest.fn().mockResolvedValue([row(f.body, 'newer', OperationShiftUsageStatus.IDLE)]),
     };
-    const service = new OperationShiftService(
-      repo as never,
-      { getPublishedMapLibrary: jest.fn() } as never,
-    );
+    const service = new OperationShiftService(repo as never, { getPublishedMapLibrary: jest.fn() } as never);
     const result = await service.getTimetableTrips({});
     expect(result.meta.shift_id).toBe('deployed');
+    expect(result.meta.source).toBe('in_use');
+  });
+
+  it('沒有部署中的班表：取最新儲存、有排班結果的那份，標明僅供參考', async () => {
+    const f = fixture({ secondTripMinute: 630 });
+    const repo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn().mockResolvedValue([row({}, 'empty', OperationShiftUsageStatus.IDLE), row(f.body, 'saved', OperationShiftUsageStatus.IDLE)]),
+    };
+    const service = new OperationShiftService(repo as never, { getPublishedMapLibrary: jest.fn() } as never);
+    const result = await service.getTimetableTrips({});
+    expect(result.meta.shift_id).toBe('saved');
+    expect(result.meta.source).toBe('latest_saved');
   });
 });
 
@@ -330,17 +327,15 @@ describe('停用再部署、使用中不能編輯（2026-11-21）', () => {
     await expect(f.service.stopShift('shift')).rejects.toThrow('不是使用中');
   });
 
-  it('使用中的班表不能編輯；已完成的班表排班結果改了就回到草稿區，沒改仍是已完成', async () => {
+  it('使用中的班表不能編輯；未使用的可以編輯，班表沒有草稿／發布狀態', async () => {
     const f = fixture({ secondTripMinute: 630 });
     (f.service as unknown as { isShiftNameUnique: () => Promise<boolean> }).isShiftNameUnique = async () => true;
     (f.row as unknown as { usageStatus: string }).usageStatus = OperationShiftUsageStatus.IN_USE;
     await expect(f.service.updateDraft('shift', { name: 'x', body: f.body })).rejects.toThrow('使用中的班表無法編輯');
 
     (f.row as unknown as { usageStatus: string }).usageStatus = OperationShiftUsageStatus.IDLE;
-    (f.row as unknown as { publishStatus: string }).publishStatus = OperationShiftPublishStatus.PUBLISHED;
-    const same = await f.service.updateDraft('shift', { name: 'x', body: { ...f.body, currentStep: 3 } });
-    expect(same.publish_status).toBe(OperationShiftPublishStatus.PUBLISHED);
-    const changed = await f.service.updateDraft('shift', { name: 'x', body: { ...f.body, scheduleOutput: { plan: { timelines: [] } } } });
-    expect(changed.publish_status).toBe(OperationShiftPublishStatus.DRAFT);
+    const saved = await f.service.updateDraft('shift', { name: 'x', body: { ...f.body, scheduleOutput: { plan: { timelines: [] } } } });
+    expect(saved.usage_status).toBe(OperationShiftUsageStatus.IDLE);
+    expect(saved).not.toHaveProperty('publish_status');
   });
 });

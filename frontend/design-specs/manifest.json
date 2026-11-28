@@ -121,6 +121,17 @@
       "figma": "240:23231",
       "variants": 12,
       "playground": "design-specs/t3-date-time-picker-playground.html"
+    },
+    {
+      "name": "Slider",
+      "spec": "design-specs/t3-slider-engineering-spec.md",
+      "css": "src/components/ui/slider/slider.css",
+      "component": "src/components/ui/slider/Slider.tsx",
+      "figma": "240:23093",
+      "variants": null,
+      "playground": "design-specs/t3-slider-playground.html",
+      "reference": "playground-assets",
+      "$comment": "規格只有 Vue 範例、沒有參考 CSS：CSS 照 playground 的 .t3-slider 規則改寫成本專案 DOM，測試改成檢查素材（SVG）逐字取自 playground"
     }
   ],
   "pending": {
@@ -135,7 +146,7 @@
         "spec": "design-specs/t3-table-style-spec.md",
         "css": "src/components/table/table.css",
         "usage": "<table className=\"t3-table\">；系統頁面 31 個表格已套用，儀表板 widget 的表格由使用者設定外觀、不套用。勾選列加 data-selected=\"true\"。",
-        "open": "未勾選列 Hover 用的 --surface-gray-light 定稿色票沒有，暫退回 --link-standard，待設計確認"
+        "open": ""
       },
       {
         "name": "Navigation",

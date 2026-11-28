@@ -1,6 +1,6 @@
 import { getDataSourceById } from '../../dashboard/store/useDataSourceStore';
 import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
-import type { MaintenanceTaskListItem, PublishStatusKey, UsageStatusKey } from '../types';
+import type { MaintenanceTaskListItem, UsageStatusKey } from '../types';
 
 export function resolveMaintenanceTasksBackendUrl(): string {
   return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
@@ -9,7 +9,6 @@ export function resolveMaintenanceTasksBackendUrl(): string {
 export type MaintenanceTaskListQuery = {
   keyword?: string;
   usage_status?: UsageStatusKey | 'all';
-  publish_status?: PublishStatusKey | 'all';
   page?: number;
   page_size?: number;
 };
@@ -24,7 +23,6 @@ export type MaintenanceTaskListResponse = {
 export type MaintenanceTaskDetail = {
   task_id: string;
   name: string;
-  publish_status: PublishStatusKey;
   usage_status: UsageStatusKey;
   body: Record<string, unknown>;
   created_at: string;
@@ -60,7 +58,6 @@ export async function fetchMaintenanceTaskList(
   const qs = buildQuery({
     keyword: query.keyword,
     usage_status: query.usage_status ?? 'all',
-    publish_status: query.publish_status ?? 'all',
     page: query.page ?? 1,
     page_size: query.page_size ?? 20,
   });

@@ -25,6 +25,7 @@ import {
 } from './stationBerthConstraint';
 import { resolvePairHeadwayTarget } from './schedule-engine/validate';
 import type { TimeSlotAttribute, TimeSlotInterval } from '../../time-templates/types/editor';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 const DENSIFY_SLACK_SECONDS = 20;
 
@@ -55,7 +56,7 @@ function isYardBlock(block: GeneratedScheduleBlock): boolean {
     block.taskType === 'charging'
     || block.taskType === 'servicing'
     || block.taskType === 'inspection'
-    || block.taskType === 'standby'
+    || isStandbyLikeTaskType(block.taskType)
   );
 }
 

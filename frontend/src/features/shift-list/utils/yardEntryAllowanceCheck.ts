@@ -21,6 +21,7 @@ export const TASK_TYPE_BY_SECTION: Record<MaintenanceEntrySlackSectionKey, strin
   maintenance: 'servicing',
   preTrip: 'inspection',
   mobile: 'standby',
+  maneuver: 'maneuver',
 };
 
 const SECTION_LABEL: Record<MaintenanceEntrySlackSectionKey, string> = {
@@ -29,6 +30,7 @@ const SECTION_LABEL: Record<MaintenanceEntrySlackSectionKey, string> = {
   maintenance: '保養',
   preTrip: '行檢',
   mobile: '待命',
+  maneuver: '機動',
 };
 
 /** 與引擎 normalizeInput.ts 的長整備門檻同一個值（使用者 2026-08-18：「超過一小時可以讓渡一輪」） */
@@ -100,7 +102,7 @@ export function checkYardEntryAllowance(args: {
         && duration > LONG_YARD_ROTATION_THRESHOLD_SECONDS;
       const allowance = useRotation ? args.lockedRotationSeconds! : manual;
       const suggested = configured > 0 ? configured + allowance : null;
-      const where = `時間線 ${task.rowIndex}「${task.label || SECTION_LABEL[section]}」${clock(task.startMinute)} 起 ${minutesText(duration)}`;
+      const where = `運用 ${task.rowIndex}「${task.label || SECTION_LABEL[section]}」${clock(task.startMinute)} 起 ${minutesText(duration)}`;
       let status: YardAllowanceRow['status'] = 'ok';
       let message = '';
       if (!useRotation && manual >= duration) {

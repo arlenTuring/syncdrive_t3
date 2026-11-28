@@ -20,7 +20,7 @@ import type { ShiftScheduleSelectedRoute } from '../types/create';
 import { resolveRouteForBlock } from './buildBlockStationDepartures';
 
 /**
- * 班表發布前檢查
+ * 班表部署前檢查
  * ==============
  *
  * 為什麼要獨立成一個可重跑的動作，而不是只在生成時算一次：
@@ -31,7 +31,7 @@ import { resolveRouteForBlock } from './buildBlockStationDepartures';
  * 三種狀態：
  * <table>
  *   <tr><td>未檢查</td><td>沒檢查過，或檢查後班表又被改動</td></tr>
- *   <tr><td>禁止發布</td><td>有站位重疊或安全間隔不足等問題</td></tr>
+ *   <tr><td>禁止部署</td><td>有站位重疊或安全間隔不足等問題</td></tr>
  *   <tr><td>可發布</td><td>檢查通過</td></tr>
  * </table>
  *
@@ -47,18 +47,18 @@ export type SchedulePublishCheckResult = {
   settingsFingerprint: string;
   /** 檢查當下的路網指紋；見 buildTopologyFingerprint */
   topologyFingerprint: string;
-  /** 沒有任何擋發布的問題 */
+  /** 沒有任何擋部署的問題 */
   publishSafe: boolean;
   publishBlockingCount: number;
   publishBlockingByCode: Record<string, number>;
-  /** 擋發布的問題本身，供畫面直接列出來 */
+  /** 擋部署的問題本身，供畫面直接列出來 */
   blockingIssues: FeasibilityIssue[];
 };
 
 export type SchedulePublishState =
   /** 沒檢查過，或檢查後班表又被改動 */
   | 'unchecked'
-  /** 檢查有發現擋發布的問題 */
+  /** 檢查有發現擋部署的問題 */
   | 'blocked'
   /** 檢查通過 */
   | 'ready';
@@ -163,12 +163,12 @@ export function buildTopologyFingerprint(topology: PointTopology | null | undefi
 }
 
 /**
- * 跑一次發布前檢查。
+ * 跑一次部署前檢查。
  *
  * 檢查「物理上做不到／有行車安全疑慮」的全部幾類：站位重疊與碰撞保護、設施格
  * 重疊與交接間隔、車的位置連續性（缺移動）；以及載客服務完整——時刻表訂的發車脈衝
- * 沒有車開也擋發布（不能靠少開班次排出表面沒衝突的班表）。班距略低屬服務品質，
- * 由分析報表與既有警告呈現，不擋發布。
+ * 沒有車開也擋部署（不能靠少開班次排出表面沒衝突的班表）。班距略低屬服務品質，
+ * 由分析報表與既有警告呈現，不擋部署。
  */
 export function runSchedulePublishCheck(args: {
   plan: GeneratedSchedulePlan;
@@ -188,7 +188,7 @@ export function runSchedulePublishCheck(args: {
         const remaining = Math.round((block.plannedEndMinute - block.plannedStartMinute) * 60);
         if (remaining < block.requiredChargingSeconds) {
           errors.push({ code: 'MAINTENANCE_WORK_INSUFFICIENT', severity: 'error',
-            message: `時間線 ${timeline.row}：充電只剩 ${remaining} 秒，低於原定 ${block.requiredChargingSeconds} 秒。`,
+            message: `運用 ${timeline.row}：充電只剩 ${remaining} 秒，低於原定 ${block.requiredChargingSeconds} 秒。`,
             detail: { timelineRow: timeline.row, blockId: block.id, remainingWorkSeconds: remaining, requiredWorkSeconds: block.requiredChargingSeconds } });
         }
       }
@@ -196,7 +196,7 @@ export function runSchedulePublishCheck(args: {
       const route = resolveRouteForBlock(block, selectedRoutes);
       if (!route || (route.stationIds?.length ?? 0) < 2) {
         errors.push({ code: 'NO_ROUTE_FOR_TASK_TYPE', severity: 'error',
-          message: `時間線 ${timeline.row}：班次缺少完整路線，無法完成安全檢查。`,
+          message: `運用 ${timeline.row}：班次缺少完整路線，無法完成安全檢查。`,
           detail: { timelineRow: timeline.row, blockId: block.id, routeId: block.routeId } });
       }
     }
@@ -317,6 +317,6 @@ export function resolveStoredOutputPublishState(
 
 export const PUBLISH_STATE_LABEL: Record<SchedulePublishState, string> = {
   unchecked: '未檢查',
-  blocked: '禁止發布',
-  ready: '可發布',
+  blocked: '禁止部署',
+  ready: '可部署',
 };

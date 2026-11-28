@@ -15,6 +15,7 @@ import {
 } from './stationClearanceInsert';
 import { resolveEffectiveRouteTravelSeconds } from './stationLegTravel';
 import { daySegmentOverlapSeconds } from './moveCardShared';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 /**
  * 同一列（同一台車）在這個區塊之後，下一個任務幾分鐘開始。
@@ -265,7 +266,7 @@ export function collectStationBerthOccupancies(
       // 待命停在正線停靠站：整段時間都實實在在佔著那一格。
       // 這跟「正線跑完把整備硬掛在末站」不一樣——那是沒有明確地點的推測，
       // 這是使用者指定、引擎也挑定的地點，車真的停在那裡，別台車進不來。
-      if ((block.taskType === 'standby' || (block.taskType === 'idle' && block.source === 'transition'))
+      if ((isStandbyLikeTaskType(block.taskType) || (block.taskType === 'idle' && block.source === 'transition'))
         && block.yardFacilityStationId) {
         const startMinute = block.plannedStartMinute;
         const endMinute = Math.max(block.plannedEndMinute, startMinute + minPresenceMin);
@@ -449,7 +450,7 @@ export function findStationBerthCollisions(
 }
 
 /** 車真的停在裡面、會佔著設施格的整備任務類型 */
-const FACILITY_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby', 'washing']);
+const FACILITY_STAY_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby', 'maneuver', 'washing']);
 
 const DAY_SECONDS = 24 * 60 * 60;
 

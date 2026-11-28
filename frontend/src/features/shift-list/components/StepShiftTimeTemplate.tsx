@@ -192,7 +192,6 @@ export function StepShiftTimeTemplate({
               {items.map((item) => (
                 <option key={item.template_id} value={item.template_id}>
                   {item.name}
-                  {item.publish_status === 'draft' ? `（${item.publish_status_label}）` : ''}
                 </option>
               ))}
             </SiteSelect>

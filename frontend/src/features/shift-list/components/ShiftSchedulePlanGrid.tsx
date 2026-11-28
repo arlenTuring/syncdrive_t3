@@ -390,6 +390,7 @@ const YARD_TASK_TYPES_FOR_UI = new Set([
   'charging',
   'inspection',
   'standby',
+  'maneuver',
   'servicing',
   'washing',
 ]);

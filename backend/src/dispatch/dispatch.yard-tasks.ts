@@ -42,6 +42,7 @@ const YARD_TASK_TYPES = new Set([
   'inspection',
   'servicing',
   'standby',
+  'maneuver',
   'idle',
 ]);
 
@@ -135,6 +136,7 @@ export function extractYardTasks(body: Record<string, unknown>): {
     inspection: 'preTrip',
     servicing: 'maintenance',
     standby: 'mobile',
+    maneuver: 'maneuver',
   };
 
   for (const timeline of timelines) {
@@ -290,7 +292,7 @@ export function extractStationHolds(body: Record<string, unknown>): {
         taskType,
         timelineRow: row,
         tripCode,
-        cardLabel: taskType === 'standby' ? '待命' : '暫停',
+        cardLabel: taskType === 'standby' ? '待命' : taskType === 'maneuver' ? '機動' : '暫停',
         stationId,
         stationName,
         startMinute,

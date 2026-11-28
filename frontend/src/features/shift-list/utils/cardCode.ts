@@ -42,6 +42,7 @@ const SECTION_LABEL: Record<MaintenanceSectionCodeKey, string> = {
   maintenance: '保養',
   preTrip: '行檢',
   mobile: '待命',
+  maneuver: '機動',
 };
 
 const SECTION_KEY_BY_TASK_TYPE: Record<string, MaintenanceSectionCodeKey> = {
@@ -50,6 +51,7 @@ const SECTION_KEY_BY_TASK_TYPE: Record<string, MaintenanceSectionCodeKey> = {
   servicing: 'maintenance',
   inspection: 'preTrip',
   standby: 'mobile',
+  maneuver: 'maneuver',
 };
 
 export function emptyTransitionCardCodes(): TransitionCardCodes {

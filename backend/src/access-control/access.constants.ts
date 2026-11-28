@@ -275,7 +275,7 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
     '班表管理模組',
     'shift-list',
     'publish',
-    '發布／撤回',
+    '部署／停用',
     325,
   ),
   permission(
@@ -299,14 +299,6 @@ export const ACCESS_PERMISSIONS: readonly PermissionDefinition[] = [
     false,
   ),
   permission('schedule', '班表管理模組', 'maintenance', 'delete', '刪除', 334),
-  permission(
-    'schedule',
-    '班表管理模組',
-    'maintenance',
-    'publish',
-    '發布／撤回',
-    335,
-  ),
 
   permission(
     'vehicle',

@@ -67,6 +67,7 @@ import {
 } from './routeSuccessorPolicy';
 import { emptyShiftRouteRelationGraph } from '../routeRelationGraph';
 import { emptyShiftRouteThroughAnchorsDraft } from '../routeRelationThroughCycles';
+import { isStandbyLikeTaskType } from '../../../time-templates/types/editor';
 
 export type PassengerTimetableMode = 'template' | 'headway';
 
@@ -850,7 +851,7 @@ function assignDirectionalDepartures(args: {
     return (
       preceding.taskType === 'inspection'
       || preceding.taskType === 'charging'
-      || preceding.taskType === 'standby'
+      || isStandbyLikeTaskType(preceding.taskType)
     );
   };
 
@@ -944,7 +945,7 @@ function assignDirectionalDepartures(args: {
   for (let index = 0; index < departures.length; index += 1) {
     const departure = departures[index]!;
     const pulseId = servicePulseIdOf(departure);
-    /** 這個脈衝沒有車開：寫進明細，並留一則可觀測的 issue（擋發布，見 PUBLISH_BLOCKING_CODES） */
+    /** 這個脈衝沒有車開：寫進明細，並留一則可觀測的 issue（擋部署，見 PUBLISH_BLOCKING_CODES） */
     const recordUnserved = (
       status: Exclude<ServicePulseStatus, 'assigned'>,
       reason: string,
@@ -1861,7 +1862,7 @@ function assignDirectionalDepartures(args: {
       successorPolicy,
     });
     if (!isAcceptablePlannedCycleLength(cycleLegs, routeCount, successorPolicy)) {
-      recordUnserved('unserved', `時間線 ${chosenRow} 展開的整輪交路腿數不完整`);
+      recordUnserved('unserved', `運用 ${chosenRow} 展開的整輪交路腿數不完整`);
       continue;
     }
     {
@@ -1875,7 +1876,7 @@ function assignDirectionalDepartures(args: {
           nextMaintenanceEntrySeconds: winAtCommit.nextMaintenanceEntrySeconds,
         })
       ) {
-        recordUnserved('unserved', `時間線 ${chosenRow} 這一輪會壓進下一段整備超過讓渡額度`);
+        recordUnserved('unserved', `運用 ${chosenRow} 這一輪會壓進下一段整備超過讓渡額度`);
         continue;
       }
     }
@@ -2087,7 +2088,7 @@ function releaseStandbyTailForEarlyDispatch(
   templateTasks: ReadonlyArray<ScheduleTask>,
 ): void {
   for (const task of nonPassengerTasks) {
-    if (task.taskType !== 'standby' || !standbyLeadsIntoPassenger(templateTasks, task)) continue;
+    if (!isStandbyLikeTaskType(task.taskType) || !standbyLeadsIntoPassenger(templateTasks, task)) continue;
     const startMinute = task.startMinute;
     const endMinute = startMinute + task.durationMinutes;
     let firstDeparture = endMinute;
@@ -2305,7 +2306,7 @@ export function normalizeEngineInput(
       pushIssue(errors, {
         code: 'MISSING_TEMPLATE_TASKS',
         severity: 'error',
-        message: '班距時刻生成未產出任何正線發車（時間線可能不足或時段過短）',
+        message: '班距時刻生成未產出任何正線發車（運用可能不足或時段過短）',
       });
       return null;
     }
@@ -2330,7 +2331,7 @@ export function normalizeEngineInput(
     }
     const dispatchWindowTasks = templateTasks.filter((task) => {
       if (task.taskType === 'passenger') return true;
-      if (task.taskType !== 'standby') return false;
+      if (!isStandbyLikeTaskType(task.taskType)) return false;
       // 純待命列不派正線；僅「待命之後仍有正線」才把待命當可派視窗
       return isStandbyDispatchableForMainline(templateTasks, task);
     });
@@ -2461,7 +2462,7 @@ export function normalizeEngineInput(
         nextMaintenanceStartSecond: spill.nextMaintenanceStartSecond,
         entrySlackSeconds: spill.entrySlackSeconds,
         nextMaintenanceEntrySeconds: nextMaint ? yardEntrySecondsFor(nextMaint.taskType) : undefined,
-        ...(args.allowStandbyEarlyRelease && pTask.taskType === 'standby' && standbyLeadsIntoPassenger(templateTasks, pTask)
+        ...(args.allowStandbyEarlyRelease && isStandbyLikeTaskType(pTask.taskType) && standbyLeadsIntoPassenger(templateTasks, pTask)
           ? { standbyEndSecond: endSec, standbyReleaseExtraSeconds: maxChargingEntrySeconds }
           : {}),
       });

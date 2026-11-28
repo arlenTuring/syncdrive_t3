@@ -451,7 +451,7 @@ export class VehicleEtaService {
    */
   private async loadTimetable(): Promise<{
     shiftId: string | null;
-    source: 'published' | 'draft_fallback' | 'none';
+    source: 'in_use' | 'latest_saved' | 'none';
     stations: Array<{ station_id: string; station_name: string }>;
     nameById: Map<string, string>;
     plan: PlanIndex;
@@ -509,8 +509,7 @@ export class VehicleEtaService {
 
       return {
         shiftId: result.meta.shift_id ?? null,
-        source:
-          result.meta.source === 'published' ? 'published' : 'draft_fallback',
+        source: result.meta.source,
         stations: result.stations.map((station) => ({
           station_id: station.station_id,
           station_name: station.station_alias || station.station_name,

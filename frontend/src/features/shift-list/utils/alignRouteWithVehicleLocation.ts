@@ -234,7 +234,7 @@ export function alignRouteWithVehicleLocation(args: {
           severity: 'warning',
           kind: 'policy',
           message:
-            `時間線 ${timeline.row}：車停在`
+            `運用 ${timeline.row}：車停在`
             + `「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
             + `下一班從「${stationDisplayName(currentOrigin, selectedRoutes)}」發，`
             + `出廠卡要空跑${cost ? ` ${cost}` : '一段'}。`
@@ -260,7 +260,7 @@ export function alignRouteWithVehicleLocation(args: {
         severity: 'warning',
         kind: 'policy',
         message:
-          `時間線 ${timeline.row}：車停在「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
+          `運用 ${timeline.row}：車停在「${stationDisplayName(parkedStationId, selectedRoutes)}」，`
           + `原本卻要跑從別站出發的「${currentRoute.routeName ?? currentRoute.routeId}」——`
           + `已改派同終點、從車所在位置出發的「${replacement.route.routeName ?? replacement.route.routeId}」，`
           + `省掉一段空跑。`,

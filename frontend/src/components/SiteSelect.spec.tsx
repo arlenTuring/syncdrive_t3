@@ -46,6 +46,14 @@ describe('SiteSelect', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('picking the option that is already selected is not a change (same as a native select)', () => {
+    const { trigger, onChange } = render();
+    act(() => trigger.click());
+    act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[0].click());
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+  });
+
   it('supports arrows, Enter, Escape and skips disabled options', () => {
     const { trigger, onChange } = render();
     act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));

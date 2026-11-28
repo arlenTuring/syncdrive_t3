@@ -65,6 +65,7 @@ function yieldWouldEraseWork(
 }
 import { resolveContiguousYardBusyUntilMinute } from './maintenancePostTaskPolicy';
 import { MEANINGFUL_IDLE_GAP_SECONDS } from './stationBerthOccupancy';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 function isYieldableMaintenanceBlock(block: GeneratedScheduleBlock): boolean {
   if (block.source !== 'template_bar') return false;
@@ -72,7 +73,7 @@ function isYieldableMaintenanceBlock(block: GeneratedScheduleBlock): boolean {
     block.taskType === 'charging'
     || block.taskType === 'servicing'
     || block.taskType === 'inspection'
-    || block.taskType === 'standby'
+    || isStandbyLikeTaskType(block.taskType)
   );
 }
 

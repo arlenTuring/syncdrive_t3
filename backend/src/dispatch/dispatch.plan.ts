@@ -248,7 +248,7 @@ export function planDispatches(args: {
     if (!vehicleCode) {
       skipped.push({
         tripCode: trip.trip_code,
-        reason: `時間線第 ${trip.timeline_row} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+        reason: `第 ${trip.timeline_row} 運用沒有對應車輛（車隊只有 ${fleet.length} 台）`,
       });
       continue;
     }
@@ -326,7 +326,7 @@ export function planYardMoves(args: {
     if (!vehicleCode) {
       skipped.push({
         tripCode: move.tripCode,
-        reason: `時間線第 ${move.timelineRow} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+        reason: `第 ${move.timelineRow} 運用沒有對應車輛（車隊只有 ${fleet.length} 台）`,
       });
       continue;
     }
@@ -409,7 +409,7 @@ export function planYardTasks(args: {
     if (!vehicleCode) {
       skipped.push({
         tripCode: task.tripCode,
-        reason: `時間線第 ${task.timelineRow} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+        reason: `第 ${task.timelineRow} 運用沒有對應車輛（車隊只有 ${fleet.length} 台）`,
       });
       continue;
     }
@@ -450,7 +450,7 @@ export function planYardTasks(args: {
       routeCode: null,
       routeName: task.cardLabel,
       // 待命、暫停（含暫停放、提早進廠等待）是過渡；其他整備任務沒有過渡用途
-      transitionPurpose: task.taskType === 'standby' ? 'standby' : task.taskType === 'idle' ? 'hold' : null,
+      transitionPurpose: task.taskType === 'standby' || task.taskType === 'maneuver' ? 'standby' : task.taskType === 'idle' ? 'hold' : null,
       servicePurpose: task.servicePurpose ?? null,
       transitionFacility: task.yardSlotId,
       departAt,
@@ -488,7 +488,7 @@ export function planStationHolds(args: {
     if (!vehicleCode) {
       skipped.push({
         tripCode: hold.tripCode,
-        reason: `時間線第 ${hold.timelineRow} 列沒有對應車輛（車隊只有 ${fleet.length} 台）`,
+        reason: `第 ${hold.timelineRow} 運用沒有對應車輛（車隊只有 ${fleet.length} 台）`,
       });
       continue;
     }
@@ -507,7 +507,7 @@ export function planStationHolds(args: {
       cardLabel: hold.cardLabel,
       routeCode: null,
       routeName: hold.cardLabel,
-      transitionPurpose: hold.taskType === 'standby' ? 'standby' : 'hold',
+      transitionPurpose: hold.taskType === 'standby' || hold.taskType === 'maneuver' ? 'standby' : 'hold',
       transitionFacility: hold.stationName,
       servicePurpose: hold.servicePurpose ?? null,
       stationHold: true,

@@ -34,6 +34,7 @@ export { Panel } from './panel/Panel';
 export { Radio, RadioGroup, type RadioOption, type RadioProps, type RadioSize } from './radio/Radio';
 export { headerCheckState } from './checkbox/selection';
 export { Switch, type SwitchConfiguration, type SwitchProps } from './switch/Switch';
+export { Slider, type SliderProps, type SliderThumbStyle, type SliderTickStyle, type SliderVariant } from './slider/Slider';
 export { SegmentedControl, TabPanel, tabPanelProps, Tabs, type TabItem, type TabsVariant } from './tabs/Tabs';
 export {
   buttonAttributes,

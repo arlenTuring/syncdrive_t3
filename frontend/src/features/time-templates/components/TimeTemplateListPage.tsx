@@ -1,4 +1,3 @@
-import { SiteSelect } from '../../../components/SiteSelect';
 import {
   Copy,
   Download,
@@ -23,10 +22,7 @@ import { StatusTag } from '../../../components/StatusTag';
 import { CreateTimeTemplateModal } from './CreateTimeTemplateModal';
 import { TimeTemplatePreviewModal } from './TimeTemplatePreviewModal';
 import {
-  PUBLISH_STATUS_OPTIONS,
-  PUBLISH_TAG_STYLE,
   USAGE_TAG_STYLE,
-  type PublishStatusKey,
   type TimeTemplateListItem,
 } from '../types';
 import { systemAlert, systemConfirm } from '../../../lib/systemDialog';
@@ -52,7 +48,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
   const canExport = can('schedule.time-template.export');
   const [keywordDraft, setKeywordDraft] = useState('');
   const [keyword, setKeyword] = useState('');
-  const [publishStatus, setPublishStatus] = useState<PublishStatusKey | 'all'>('all');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<TimeTemplateListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -77,7 +72,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
     try {
       const res = await fetchTimeTemplateList({
         keyword,
-        publish_status: publishStatus,
         page,
         page_size: PAGE_SIZE,
       });
@@ -91,7 +85,7 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
     } finally {
       setLoading(false);
     }
-  }, [keyword, publishStatus, page]);
+  }, [keyword, page]);
 
   useEffect(() => {
     void load();
@@ -134,7 +128,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
   const resetFilters = () => {
     setKeywordDraft('');
     setKeyword('');
-    setPublishStatus('all');
     setPage(1);
   };
 
@@ -221,22 +214,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
             className={cn(fieldClass({ size: 'md', fullWidth: true }), 'pl-9 pr-3')}
           />
         </div>
-        <SiteSelect
-          value={publishStatus}
-          onChange={(e) => {
-            setPublishStatus(e.target.value as PublishStatusKey | 'all');
-            setPage(1);
-          }}
-          size="md"
-        >
-          {PUBLISH_STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.value === 'all'
-                ? t('common.selectPublishStatus')
-                : t(`common.publishStatus.${opt.value}`)}
-            </option>
-          ))}
-        </SiteSelect>
         <IconButton hierarchy="subordinate" variant="tonal" onPress={applySearch} disabled={!canSearch} title={t('common.search')} label={t('common.search')} icon={<Search />} />
         <Button hierarchy="subordinate" variant="outlined" leadingIcon={<RotateCcw />} onPress={resetFilters} title={t('common.resetFiltersTitle')}>{t('common.resetFilters')}</Button>
         {canExport ? <Button hierarchy="subordinate" variant="outlined" className="ml-auto shrink-0" leadingIcon={exporting ? <Loader2 className="animate-spin" /> : <Download />} onPress={() => void handleDownload()} disabled={exporting || !hasSelection}>{t('common.download')}</Button> : null}
@@ -258,7 +235,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.name')}</th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.preview')}</th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.usageStatus')}</th>
-              <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.publishStatus')}</th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.createdAt')}</th>
               <th className="py-3 pr-4 font-medium">{t('timeTemplates.columns.updatedAt')}</th>
               <th className="w-10 py-3" />
@@ -267,14 +243,14 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-text-quaternary">
+                <td colSpan={7} className="py-16 text-center text-text-quaternary">
                   <Loader2 className="mx-auto mb-2 size-6 animate-spin" />
                   {t('common.loading')}
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-text-quaternary">
+                <td colSpan={7} className="py-16 text-center text-text-quaternary">
                   {t('timeTemplates.empty')}
                 </td>
               </tr>
@@ -296,12 +272,6 @@ export function TimeTemplateListPage({ onBackToHome, embedded = false }: TimeTem
                     <StatusTag
                       label={t(`common.usageStatus.${row.usage_status}`)}
                       style={USAGE_TAG_STYLE[row.usage_status]}
-                    />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <StatusTag
-                      label={t(`common.publishStatus.${row.publish_status}`)}
-                      style={PUBLISH_TAG_STYLE[row.publish_status]}
                     />
                   </td>
                   <td className="py-3 pr-4 font-mono text-text-tertiary">{row.created_at}</td>

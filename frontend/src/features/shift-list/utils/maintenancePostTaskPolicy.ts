@@ -6,6 +6,7 @@ import {
   resolveYardExitStationIdsForSection,
   type MaintenanceFirstTripOrigin,
 } from './maintenanceFirstTripOrigins';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
 /**
  * 整備結束後接正線的策略（對齊排班引擎規則 §八／§十一）：
@@ -38,6 +39,7 @@ const YARD_TASK_TYPES = new Set([
   'servicing',
   'inspection',
   'standby',
+  'maneuver',
   'washing',
 ]);
 
@@ -288,8 +290,9 @@ export function resolveYardPostTaskPolicy(args: {
     };
   }
 
-  if (taskType === 'standby') {
-    const mobileCodes = extractFacilityMapCodes(maintenanceBody, 'mobile');
+  if (isStandbyLikeTaskType(taskType)) {
+    // 機動跟待命同一套規則，只是設施（停車格）在整備任務的機動那一步
+    const mobileCodes = extractFacilityMapCodes(maintenanceBody, taskType === 'maneuver' ? 'maneuver' : 'mobile');
     return {
       rotationExitStationId: resolveUniqueExitStationId(origins, mobileCodes),
       // 待命的 mobile 設施通常涵蓋最多格（E／H／M 都可待命），出得去的站幾乎一定
@@ -383,6 +386,7 @@ export function buildYardExitStationOptionsByTaskType(args: {
     'inspection',
     'charging',
     'standby',
+    'maneuver',
     'servicing',
     'washing',
   ] as const) {
@@ -412,6 +416,7 @@ export function buildYardRotationExitByTaskType(args: {
     'inspection',
     'charging',
     'standby',
+    'maneuver',
     'servicing',
     'washing',
   ] as const) {

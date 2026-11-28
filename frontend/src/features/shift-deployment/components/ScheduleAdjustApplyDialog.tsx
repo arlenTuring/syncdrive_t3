@@ -87,7 +87,6 @@ export function ScheduleAdjustApplyDialog({
     let cancelled = false;
     void fetchOperationShiftList({
       usage_status: 'all',
-      publish_status: 'all',
       page: 1,
       page_size: 200,
     })

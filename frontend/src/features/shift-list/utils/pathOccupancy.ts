@@ -630,7 +630,7 @@ export function escapeShiftsFor(conflicts: readonly PathConflict[], bufferSecond
 
 /** 衝突的白話描述（給報告與診斷） */
 export function describePathConflict(conflict: PathConflict, formatSecond: (second: number) => string): string {
-  const who = (t: VehicleTrajectory) => `時間線 ${t.timelineRow}「${t.label}」`;
+  const who = (t: VehicleTrajectory) => `運用 ${t.timelineRow}「${t.label}」`;
   if (conflict.kind === 'node') {
     return `${who(conflict.mine)} ${formatSecond(conflict.mineSecond)} 經過「${conflict.nodeLabel}」，`
       + `${who(conflict.other)} ${formatSecond(conflict.otherSecond)} 也在那裡`

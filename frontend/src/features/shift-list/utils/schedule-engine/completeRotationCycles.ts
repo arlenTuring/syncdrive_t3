@@ -487,7 +487,7 @@ export function applyRotationCycleCompletion(args: {
           pushIssue(errors, {
             code: 'ROTATION_CYCLE_INCOMPLETE',
             severity: 'error',
-            message: `時間線 ${job.row} 無法補完路線群組回程（缺有效行駛或停靠時間），車輛可能停在對側終點`,
+            message: `運用 ${job.row} 無法補完路線群組回程（缺有效行駛或停靠時間），車輛可能停在對側終點`,
             detail: {
               timelineRow: job.row,
               routeId: lastFail.route.routeId,
@@ -498,7 +498,7 @@ export function applyRotationCycleCompletion(args: {
           pushIssue(errors, {
             code: 'ROTATION_CYCLE_INCOMPLETE',
             severity: 'error',
-            message: `時間線 ${job.row} 無法補完回程：與同車後續正線或整備時窗衝突（物理最早 ${lastFail.physicalEarliestSecond}s，最晚可發 ${lastFail.latestStartSecond}s）`,
+            message: `運用 ${job.row} 無法補完回程：與同車後續正線或整備時窗衝突（物理最早 ${lastFail.physicalEarliestSecond}s，最晚可發 ${lastFail.latestStartSecond}s）`,
             detail: {
               timelineRow: job.row,
               routeId: lastFail.route.routeId,

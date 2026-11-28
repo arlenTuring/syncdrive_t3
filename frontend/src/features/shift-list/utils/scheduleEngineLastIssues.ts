@@ -460,7 +460,7 @@ function renderAcceptanceBox(
   return `
 <section class="accept">
   <h2>檢查結果</h2>
-  <p class="accept-pill ${gateClass}">${acceptance.gatePassed && ok ? '安全檢查通過' : '檢查未通過，禁止發布'} · ${acceptance.publishBlockingCount} 項阻擋問題</p>
+  <p class="accept-pill ${gateClass}">${acceptance.gatePassed && ok ? '安全檢查通過' : '檢查未通過，禁止部署'} · ${acceptance.publishBlockingCount} 項阻擋問題</p>
   <p class="accept-pill ${qualityClass}">${acceptance.qualityPassed ? '服務目標達標' : '服務目標未達標'}${
     qualityCodes ? ` · ${escapeHtml(qualityCodes)}` : ' · 班距與班次數符合目標'
   }</p>

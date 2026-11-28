@@ -5,7 +5,7 @@ import {
   VIEW_BASELINE_WIDTH_M,
   clampMapZoomFactor,
 } from '../constants/map'
-import { Button } from '../../../components/ui';
+import { Button, Slider } from '../../../components/ui';
 
 type TrajectoryZoomBarProps = {
   zoomFactorX: number
@@ -48,55 +48,51 @@ export function TrajectoryZoomBar({
         </p>
       </div>
 
-      <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
+      <div className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
         <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>橫向（左右）</span>
           <span className="font-mono text-text-theme">
             {zoomFactorX.toFixed(2)}×
           </span>
         </span>
-        <input
-          type="range"
+        <Slider
           min={min}
           max={max}
           step={step}
           value={zoomFactorX}
-          onChange={(e) =>
-            onZoomFactorXChange(clampMapZoomFactor(Number(e.target.value)))
-          }
-          className="h-1.5 w-full cursor-pointer accent-link-theme-filled"
+          onChange={(next) => onZoomFactorXChange(clampMapZoomFactor(next))}
+          showLabel={false}
+          aria-label="橫向（左右）倍率"
         />
-        <div className="flex justify-between text-caption-2 text-text-disabled">
+        <div className="flex justify-between px-2.5 text-caption-2 text-text-disabled">
           <span>{min}×</span>
           <span>1×</span>
           <span>{max}×</span>
         </div>
-      </label>
+      </div>
 
-      <label className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
+      <div className="flex min-w-[10rem] max-w-sm flex-1 flex-col gap-1">
         <span className="flex items-center justify-between text-caption-2 text-text-tertiary">
           <span>縱向（上下）</span>
           <span className="font-mono text-text-theme">
             {zoomFactorY.toFixed(2)}×
           </span>
         </span>
-        <input
-          type="range"
+        <Slider
           min={min}
           max={max}
           step={step}
           value={zoomFactorY}
-          onChange={(e) =>
-            onZoomFactorYChange(clampMapZoomFactor(Number(e.target.value)))
-          }
-          className="h-1.5 w-full cursor-pointer accent-link-theme-filled"
+          onChange={(next) => onZoomFactorYChange(clampMapZoomFactor(next))}
+          showLabel={false}
+          aria-label="縱向（上下）倍率"
         />
-        <div className="flex justify-between text-caption-2 text-text-disabled">
+        <div className="flex justify-between px-2.5 text-caption-2 text-text-disabled">
           <span>{min}×</span>
           <span>1×</span>
           <span>{max}×</span>
         </div>
-      </label>
+      </div>
 
       <Button hierarchy="subordinate" variant="outlined" className="shrink-0" onPress={() => {
           onZoomFactorXChange(1)

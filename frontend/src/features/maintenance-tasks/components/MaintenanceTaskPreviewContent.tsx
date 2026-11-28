@@ -98,7 +98,7 @@ export function PreviewList({ items }: { items: string[] }) {
   );
 }
 
-type SectionKey = 'charging' | 'carWash' | 'maintenance' | 'preTrip' | 'mobile';
+type SectionKey = 'charging' | 'carWash' | 'maintenance' | 'preTrip' | 'mobile' | 'maneuver';
 type SectionLines = { enabled: boolean; conditions: string[]; facilities: string[] };
 
 /**
@@ -115,6 +115,7 @@ function buildSectionLines(
   const maintenance = normalizeMaintenanceDraft(draft.maintenance);
   const preTrip = normalizePreTripDraft(draft.preTrip);
   const mobile = normalizeMobileDraft(draft.mobile);
+  const maneuver = normalizeMobileDraft(draft.maneuver);
   const facilities = (rows: ReadonlyArray<Parameters<typeof formatEquipmentRowPreviewLine>[0]>) =>
     rows.filter((row) => row.mapCode).map((row) => formatEquipmentRowPreviewLine(row));
 
@@ -168,6 +169,11 @@ function buildSectionLines(
           : [],
       facilities: facilities(mobile.equipmentRows),
     },
+    maneuver: {
+      enabled: maneuver.stepEnabled,
+      conditions: [t('maintenanceTasks.maneuver.durationFollowSchedule')],
+      facilities: facilities(maneuver.equipmentRows),
+    },
   };
 }
 
@@ -189,6 +195,7 @@ const SECTION_ORDER: Array<{ key: SectionKey; step: number }> = [
   { key: 'maintenance', step: 4 },
   { key: 'preTrip', step: 5 },
   { key: 'mobile', step: 6 },
+  { key: 'maneuver', step: 7 },
 ];
 
 function WizardBulletCard({ title, items }: { title: string; items: string[] }) {

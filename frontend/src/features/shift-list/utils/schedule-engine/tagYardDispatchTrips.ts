@@ -33,6 +33,7 @@ const DISPATCH_TAG_TASK_TYPES = new Set<TaskTypeKey>([
   'inspection',
   'charging',
   'standby',
+  'maneuver',
   'servicing',
 ]);
 

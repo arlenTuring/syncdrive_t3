@@ -26,6 +26,7 @@ const ANCHOR_PURPOSE: Record<string, ServicePurpose> = {
   servicing: 'maintenance',
   washing: 'maintenance',
   standby: 'standby',
+  maneuver: 'standby',
 };
 
 export type BlockPurpose = {

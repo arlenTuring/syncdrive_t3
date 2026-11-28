@@ -358,6 +358,8 @@
   --surface-sub-background: var(--color-black-100); /* surface/sub background */
   --surface-popup: var(--color-zinc-900); /* surface/popup */
   --surface-sub-popup: #1F262F; /* surface/sub popup */
+  --surface-gray: rgb(from var(--color-zinc-300) r g b / 4%); /* surface/gray */
+  --surface-gray-light: rgb(from var(--color-zinc-400) r g b / 4%); /* surface/gray light */
   --text-primary: var(--color-gray-100); /* text/primary */
   --text-secondary: var(--color-gray-300); /* text/secondary */
   --text-tertiary: var(--color-gray-400); /* text/tertiary */
@@ -426,6 +428,8 @@
   --color-surface-sub-background: var(--surface-sub-background);
   --color-surface-popup: var(--surface-popup);
   --color-surface-sub-popup: var(--surface-sub-popup);
+  --color-surface-gray: var(--surface-gray);
+  --color-surface-gray-light: var(--surface-gray-light);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);

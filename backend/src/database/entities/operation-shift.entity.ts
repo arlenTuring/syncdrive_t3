@@ -20,6 +20,11 @@ export class OperationShift {
   @Column({ name: 'name' })
   name: string;
 
+  /**
+   * 舊欄位，已不使用（2026-11-28 使用者：班表只有使用中／未使用，沒有草稿／發布）。
+   * 留在資料表裡只為了不動資料庫結構（本機 synchronize 會刪掉沒對應的欄位、正式環境由 migrate.sh 管）；
+   * 程式不讀也不寫。部署前的排班安全檢查在 deployShift。
+   */
   @Column({
     type: 'varchar',
     name: 'publish_status',

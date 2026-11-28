@@ -40,6 +40,7 @@ const MAINTENANCE_SECTION_ICONS: Record<string, string> = {
   maintenance: presetIconUrl('facility/maintainance.png'),
   preTrip: presetIconUrl('facility/repair.png'),
   mobile: presetIconUrl('facility/park.png'),
+  maneuver: presetIconUrl('facility/park.png'),
 };
 
 /** 編輯模式沒有資料：顯示空的分佈（原本是一組寫死的格位與佔用示範，已移除） */

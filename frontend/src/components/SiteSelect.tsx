@@ -82,9 +82,13 @@ export function SiteSelect({
   const selected = flatOptions.find((option) => option.value === selectedValue);
 
   const pick = (next: string) => {
-    if (value == null) setUncontrolledValue(next);
-    const target = { value: next, name } as HTMLSelectElement;
-    onChange?.({ target, currentTarget: target } as ChangeEvent<HTMLSelectElement>);
+    // 跟原生 select 一樣：選到目前這一項不算變更。以前照樣送 onChange，
+    // 班表精靈「重選同一個整備任務」就把已填的整備代號全清掉。
+    if (next !== selectedValue) {
+      if (value == null) setUncontrolledValue(next);
+      const target = { value: next, name } as HTMLSelectElement;
+      onChange?.({ target, currentTarget: target } as ChangeEvent<HTMLSelectElement>);
+    }
     setOpen(false);
     anchorRef.current?.focus();
   };

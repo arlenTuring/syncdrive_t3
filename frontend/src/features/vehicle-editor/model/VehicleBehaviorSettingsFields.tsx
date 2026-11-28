@@ -8,7 +8,7 @@ import {
   buildVehicleBehaviorActionRules,
   VEHICLE_BEHAVIOR_ACTION_CATALOG,
 } from '../constants/behaviorActionCatalog';
-import { Button, cn, fieldClass } from '../../../components/ui';
+import { Button, cn, fieldClass, Slider } from '../../../components/ui';
 
 /** 車輛行為圖示的設定值（地圖車輛模型設定、儀表板獨立載具容器共用） */
 export type VehicleBehaviorSettings = {
@@ -84,14 +84,14 @@ export function VehicleBehaviorSettingsFields({
           />
         </Field>
         <Field label={t('dashboard.properties.widgets.vehicleContainer.iconSize')}>
-          <input
-            type="range"
+          <Slider
             min={8}
             max={64}
             step={1}
             value={value.behaviorIconSize ?? 20}
-            onChange={(e) => onChange({ behaviorIconSize: Number(e.target.value) })}
-            className="w-full accent-violet-500"
+            onChange={(behaviorIconSize) => onChange({ behaviorIconSize })}
+            showLabel={false}
+            aria-label={t('dashboard.properties.widgets.vehicleContainer.iconSize')}
           />
           <div className="mt-1 flex items-center gap-2">
             <NumberInput

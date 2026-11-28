@@ -153,7 +153,6 @@ export function CreateDispatchConfirmStep({
       try {
         const list = await fetchOperationShiftList({
           usage_status: 'in_use',
-          publish_status: 'all',
           page: 1,
           page_size: 20,
         });

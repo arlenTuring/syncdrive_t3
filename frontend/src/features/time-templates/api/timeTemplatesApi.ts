@@ -1,6 +1,6 @@
 import { getDataSourceById } from '../../dashboard/store/useDataSourceStore';
 import { resolveBrowserApiBaseUrl } from '../../../lib/browserApiBase';
-import type { PublishStatusKey, TimeTemplateListItem } from '../types';
+import type { TimeTemplateListItem } from '../types';
 
 export function resolveTimeTemplatesBackendUrl(): string {
   return resolveBrowserApiBaseUrl(getDataSourceById('default-internal')?.backendUrl);
@@ -8,7 +8,6 @@ export function resolveTimeTemplatesBackendUrl(): string {
 
 export type TimeTemplateListQuery = {
   keyword?: string;
-  publish_status?: PublishStatusKey | 'all';
   page?: number;
   page_size?: number;
 };
@@ -35,7 +34,6 @@ export async function fetchTimeTemplateList(
 ): Promise<TimeTemplateListResponse> {
   const qs = buildQuery({
     keyword: query.keyword,
-    publish_status: query.publish_status ?? 'all',
     page: query.page ?? 1,
     page_size: query.page_size ?? 20,
   });
@@ -49,7 +47,6 @@ export async function fetchTimeTemplateList(
 export type TimeTemplateDetail = {
   template_id: string;
   name: string;
-  publish_status: PublishStatusKey;
   usage_status: string;
   body: Record<string, unknown>;
   created_at: string;

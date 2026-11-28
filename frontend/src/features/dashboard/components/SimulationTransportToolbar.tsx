@@ -17,7 +17,7 @@ import { useDemoSimulation } from '../context/DemoSimulationContext';
 import { VTMS_DEMO_VEHICLE_CODES } from '../api/demoSimulation';
 import type { DemoSimulationTransport } from '../api/demoSimulation';
 import { useSimClockFrame } from '../utils/simClockFrame';
-import { Button } from '../../../components/ui';
+import { Button, Slider } from '../../../components/ui';
 
 const SPEED_STOPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8] as const;
 const HOLD_REPEAT_DELAY_MS = 350;
@@ -272,20 +272,21 @@ export function SimulationTransportToolbar() {
                   <span>{t('dashboard.simulation.sendSpeed')}</span>
                   <span className="font-mono text-text-secondary">{speed.toFixed(2)}×</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={0}
                   max={SPEED_STOPS.length - 1}
                   step={1}
+                  variant="discrete"
                   value={speedIndex}
-                  onChange={(e) => {
-                    const idx = Number(e.target.value);
+                  onChange={(idx) => {
                     void setSpeedMultiplier(SPEED_STOPS[idx] ?? 1);
                   }}
-                  className="h-2 w-full cursor-pointer accent-link-theme-filled"
+                  showLabel={false}
+                  getAriaValueText={(idx) => `${SPEED_STOPS[idx] ?? 1}×`}
                   aria-label={t('dashboard.simulation.sendSpeedAria')}
                 />
-                <div className="flex justify-between font-mono text-caption-2 text-text-disabled">
+                {/* 刻度文字對齊滑桿軌道：Slider 左右各留 10px */}
+                <div className="flex justify-between px-2.5 font-mono text-caption-2 text-text-disabled">
                   {SPEED_STOPS.map((v) => (
                     <span key={v}>{v}×</span>
                   ))}

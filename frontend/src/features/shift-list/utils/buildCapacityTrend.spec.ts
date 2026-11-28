@@ -749,7 +749,7 @@ describe('formatCapacityGapHint', () => {
     assert.ok(hint);
     assert.match(hint!, /218/);
     assert.match(hint!, /180/);
-    assert.match(hint!, /時間線/);
+    assert.match(hint!, /運用/);
   });
 
   it('stays quiet when near target', () => {

@@ -199,6 +199,7 @@ const DEFAULT_SECTION_CARD_LABELS: Record<string, string> = {
   servicing: '保養',
   inspection: '行檢',
   standby: '待命',
+  maneuver: '機動',
   idle: '暫停',
   dispatch: '調度',
 };
@@ -221,7 +222,7 @@ function resolveCardLabel(args: {
         ? 'preTrip'
         : block.taskType === 'standby'
           ? 'mobile'
-          : block.taskType;
+          : block.taskType;  // maneuver 的區塊鍵就是 maneuver
   const configured = typeof labels?.[key] === 'string' ? String(labels[key]).trim() : '';
   return configured || DEFAULT_SECTION_CARD_LABELS[block.taskType] || block.label?.trim() || '整備';
 }

@@ -7,7 +7,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import {
   MaintenanceTask,
-  MaintenanceTaskPublishStatus,
   MaintenanceTaskUsageStatus,
 } from '../database/entities/maintenance-task.entity';
 import {
@@ -25,7 +24,6 @@ import {
 export type ListMaintenanceTasksQuery = {
   keyword?: string;
   usage_status?: 'all' | MaintenanceTaskUsageStatus;
-  publish_status?: 'all' | MaintenanceTaskPublishStatus;
   page?: number;
   page_size?: number;
 };
@@ -120,11 +118,6 @@ export class MaintenanceTaskService {
       qb.andWhere('t.usage_status = :us', { us: usageStatus });
     }
 
-    const publishStatus = query.publish_status;
-    if (publishStatus && publishStatus !== 'all') {
-      qb.andWhere('t.publish_status = :ps', { ps: publishStatus });
-    }
-
     qb.orderBy('t.updated_at', 'DESC').addOrderBy('t.created_at', 'DESC');
 
     const total = await qb.getCount();
@@ -152,7 +145,6 @@ export class MaintenanceTaskService {
   async getTaskDetail(id: string): Promise<{
     task_id: string;
     name: string;
-    publish_status: string;
     usage_status: string;
     body: Record<string, unknown>;
     created_at: string;
@@ -162,7 +154,6 @@ export class MaintenanceTaskService {
     return {
       task_id: row.id,
       name: row.name,
-      publish_status: row.publishStatus,
       usage_status: row.usageStatus,
       body: await this.withResolvedFacilities(row.body ?? {}),
       created_at: row.createdAt,
@@ -201,7 +192,6 @@ export class MaintenanceTaskService {
     const row = this.repo.create({
       id: this.generateTaskId(),
       name,
-      publishStatus: MaintenanceTaskPublishStatus.DRAFT,
       usageStatus: MaintenanceTaskUsageStatus.IDLE,
       body: await this.withResolvedFacilities(input.body ?? {}, 'write'),
       createdAt: now,

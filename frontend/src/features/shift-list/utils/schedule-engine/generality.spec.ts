@@ -188,7 +188,7 @@ describe('排班引擎泛用性', () => {
     assert.equal(buildPlanFingerprint(regenerated.plan), buildPlanFingerprint(baseline.plan));
   });
 
-  it('高衝突（碰撞保護時間極大）＋很小的共用搜尋預算：很快停下；仍有安全問題就標搜尋未完成、禁止發布', () => {
+  it('高衝突（碰撞保護時間極大）＋很小的共用搜尋預算：很快停下；仍有安全問題就標搜尋未完成、禁止部署', () => {
     const crowded = input();
     crowded.draft.routeGroups.collisionProtectionSeconds = 900;
     const startedAt = Date.now();

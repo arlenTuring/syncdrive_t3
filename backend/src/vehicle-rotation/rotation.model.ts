@@ -7,7 +7,10 @@
  * 超過只是排得比較前面。
  *
  * <h3>誰能上去</h3>
- * 停在規則指定的格位、車輛清單沒有被鎖住（保留、大保養）。電量與休息時間不當門檻，
+ * 擔任規則指定的時間線（例如保養線、機動線）的車、車輛清單沒有被鎖住（保留、大保養）。
+ * 一條時間線就是一台車：可接替的線是用來接別人工作的，那條線上的車不會被排進「需要被輪替」的隊伍。
+ * 先前用「停在哪些格位」判斷，格位只說明車現在停哪，收班剛好停進同一格的線上車也會被當成備用車，
+ * 停在別格的備用車反而選不到。電量與休息時間不當門檻，
  * 電量夠不夠撐到下次充電系統判斷不了，所以只在確認報告上寫清楚，由人判斷。
  * 當天剛換下來的車不會被選中，避免換下來馬上又被換回去。
  *
@@ -18,6 +21,8 @@
  *   <li>場內：該列本來就進場（充電、待命、行檢），被換車留在場內，接手車去接下一班。</li>
  *   <li>收班後：這一列當天最後一段任務。班表是 24 小時循環，這裡就是換日點：接手車接下最後那段，
  *   當天載客班次都不受影響，下一營運日起這一列由接手車擔任。</li>
+ *   <li>收班進場：最後一班載客之後進場停過夜（之後只剩 0 秒的換日占位）。接手車先開進那一格，
+ *   被換車下了最後一班直接開去接手車的格位，兩台車不用互搶同一格。</li>
  *   <li>月台空檔：連續兩班之間停得夠久。T3 目前停站接近 0 秒，不會出現在這裡。</li>
  * </ul>
  * 第一版只用收班後換手：白天換手要改派已排定的班次，先不開放。
@@ -44,8 +49,8 @@ export type RotationMode = 'confirm' | 'auto';
 export type RotationRules = {
   /** 每多少公里需要接替 */
   intervalKm: number;
-  /** 停在這些格位的車才能接替 */
-  takeoverSlots: string[];
+  /** 擔任這些時間線（列號）的車才能接替；這些線上的車也不會被排進需要被輪替的隊伍 */
+  takeoverRows: number[];
   /** 期望執行時段（HH:mm），可跨午夜 */
   windowStart: string;
   windowEnd: string;
@@ -57,7 +62,7 @@ export type RotationRules = {
 
 export const DEFAULT_ROTATION_RULES: RotationRules = {
   intervalKm: 1000,
-  takeoverSlots: ['M3', 'M4', 'D4', 'E1'],
+  takeoverRows: [],
   windowStart: '23:00',
   windowEnd: '02:00',
   mode: 'confirm',
@@ -106,8 +111,13 @@ export function nextRotationKm(car: FleetCar, rules: RotationRules): number {
   return car.lastRotationKm + rules.intervalKm;
 }
 
+/** 擔任可接替時間線的車：它是接別人工作的那一方，不排進需要被輪替的隊伍 */
+export function onTakeoverRow(car: FleetCar, rules: RotationRules): boolean {
+  return rules.takeoverRows.includes(car.row);
+}
+
 export function isDue(car: FleetCar, rules: RotationRules): boolean {
-  return car.onLine && car.currentKm >= nextRotationKm(car, rules);
+  return car.onLine && !onTakeoverRow(car, rules) && car.currentKm >= nextRotationKm(car, rules);
 }
 
 /** 需要被輪替的隊伍：超過基數最多的排最前面 */
@@ -118,31 +128,23 @@ export function rotationQueue(cars: readonly FleetCar[], rules: RotationRules): 
 }
 
 /** 不能接替的原因；空陣列代表可以接替 */
-export function takeoverBlockers(
-  car: FleetCar,
-  rules: RotationRules,
-  location: string | null,
-  dayStart: number,
-): string[] {
-  if (car.onLine) return ['線上服務中'];
+export function takeoverBlockers(car: FleetCar, rules: RotationRules, dayStart: number): string[] {
+  if (!onTakeoverRow(car, rules)) return [car.onLine ? '線上服務中' : '不在可接替的運用'];
   const reasons: string[] = [];
   if (car.hold !== 'available') reasons.push(HOLD_LABEL[car.hold]);
   if (car.rotatedOutAt != null && car.rotatedOutAt >= dayStart) reasons.push('今天剛換下');
-  if (!location || !rules.takeoverSlots.includes(location)) reasons.push('不在可接替格位');
   return reasons;
 }
 
 /** 可接替的車：里程低的優先，讓里程平均 */
 export function takeoverCandidates(args: {
-  tasks: readonly PlanTask[];
   cars: readonly FleetCar[];
   rules: RotationRules;
-  now: number;
   dayStart: number;
 }): FleetCar[] {
-  const { tasks, cars, rules, now, dayStart } = args;
+  const { cars, rules, dayStart } = args;
   return cars
-    .filter((car) => takeoverBlockers(car, rules, rowLocationAt(tasks, car.row, now), dayStart).length === 0)
+    .filter((car) => takeoverBlockers(car, rules, dayStart).length === 0)
     .sort((a, b) => a.currentKm - b.currentKm);
 }
 
@@ -168,6 +170,7 @@ function hourlyLoad(tasks: readonly PlanTask[], dayStart: number): HourLoad[] {
 const ZONE_LABEL: Record<string, string> = {
   charging: '充電區',
   standby: '待命區',
+  maneuver: '機動區',
   inspection: '行檢區',
   servicing: '保養區',
   idle: '暫停區',
@@ -204,6 +207,10 @@ export type SwapWindow = {
   moveInMs: number;
   moveInEstimated: boolean;
   takeoverDepartAt: number;
+  /** 被換車開去接手車格位的時刻（舊資料沒有，照 endOfDay 推算） */
+  outAt?: number;
+  /** 收班進場窗口：被換車下了最後一班在月台等接替車到位，接替車晚到不能拖 */
+  entry?: boolean;
 };
 
 const SERVICE_LABEL: Record<string, string> = { charging: '充電', inspection: '行檢', servicing: '保養' };
@@ -218,12 +225,27 @@ const sortByDepart = (tasks: readonly PlanTask[]) =>
 
 const taskEnd = (task: PlanTask) => task.arrive_at ?? task.depart_at;
 
-/** 班表裡每段移動的時間（中位數），當成場內路網 */
-function movementEdges(tasks: readonly PlanTask[]): Map<string, Map<string, number>> {
+const slotGroup = (name: string) => /^([A-Z]+)\d+$/.exec(name)?.[1] ?? null;
+
+/** 班表沒有這一格的移動時，用同一區相鄰格位的移動代替（M4 → M1） */
+function siblingSlot(edges: Map<string, Map<string, number>>, name: string, wantTarget: boolean): string | null {
+  const group = slotGroup(name);
+  if (!group) return null;
+  const nodes = wantTarget ? [...edges.values()].flatMap((targets) => [...targets.keys()]) : [...edges.keys()];
+  return nodes.filter((node) => slotGroup(node) === group).sort()[0] ?? null;
+}
+
+/**
+ * 班表裡每段路的時間（中位數），載客班次也算：接替車走到正線上時，實際車程跟載客車一樣。
+ * 先前只用移動單估，那些常是繞場、含等待的長移動，估出來的時間比實際長很多，
+ * 車端照計畫到站時刻放慢，就會在正線上慢慢爬、擋住後面的載客車（2026-11-27 23:47 PMS09 M3 → NWD
+ * 估 780 秒，實際約 5 分鐘，擋住 PMS06 的 TN2354 晚到 228 秒，連鎖到 00:07 場區互等）。
+ */
+export function travelEdges(tasks: readonly PlanTask[]): Map<string, Map<string, number>> {
   const samples = new Map<string, Map<string, number[]>>();
   for (const task of tasks) {
     const ms = taskEnd(task) - task.depart_at;
-    if (task.kind !== 'movement' || task.origin === task.destination || ms <= 0) continue;
+    if (task.kind === 'maintenance' || task.origin === task.destination || ms <= 0) continue;
     const from = samples.get(task.origin) ?? new Map<string, number[]>();
     from.set(task.destination, [...(from.get(task.destination) ?? []), ms]);
     samples.set(task.origin, from);
@@ -235,29 +257,30 @@ function movementEdges(tasks: readonly PlanTask[]): Map<string, Map<string, numb
   return edges;
 }
 
-const slotGroup = (name: string) => /^([A-Z]+)\d+$/.exec(name)?.[1] ?? null;
+export type MoveHop = { from: string; to: string; ms: number };
 
-/** 班表沒有這一格的移動時，用同一區相鄰格位的移動代替（M4 → M1） */
-function siblingSlot(edges: Map<string, Map<string, number>>, name: string, wantTarget: boolean): string | null {
-  const group = slotGroup(name);
-  if (!group) return null;
-  const nodes = wantTarget ? [...edges.values()].flatMap((targets) => [...targets.keys()]) : [...edges.keys()];
-  return nodes.filter((node) => slotGroup(node) === group).sort()[0] ?? null;
-}
+/** 同一區格位之間換格的時間 */
+const IN_PLACE_MS = MINUTE_MS;
 
-/** 沿班表出現過的移動找最短時間；班表裡走不到就用預設值，畫面標「預估」 */
-function moveEstimate(
+/** 沿班表出現過的路段找最短時間，回傳經過哪幾段（檢查會不會跟別的車搶路用）；走不到就用預設值，畫面標「預估」 */
+export function movePath(
   edges: Map<string, Map<string, number>>,
   from: string,
   to: string,
   fallbackMs: number,
-): { ms: number; estimated: boolean } {
-  if (from === to) return { ms: 0, estimated: false };
+): { ms: number; estimated: boolean; hops: MoveHop[] } {
+  if (from === to) return { ms: 0, estimated: false, hops: [] };
+  // 同一區的兩格（M4 → M2）：場區裡原地換格，不上正線；照班表最短路會繞正線一圈，估出十幾分鐘
+  if (slotGroup(from) != null && slotGroup(from) === slotGroup(to)) {
+    return { ms: IN_PLACE_MS, estimated: false, hops: [{ from, to, ms: IN_PLACE_MS }] };
+  }
   const start = edges.has(from) ? from : siblingSlot(edges, from, false);
   const hasTarget = [...edges.values()].some((targets) => targets.has(to));
   const end = hasTarget ? to : siblingSlot(edges, to, true);
-  if (!start || !end) return { ms: fallbackMs, estimated: true };
+  const fallback = { ms: fallbackMs, estimated: true, hops: [{ from, to, ms: fallbackMs }] };
+  if (!start || !end) return fallback;
   const best = new Map<string, number>([[start, 0]]);
+  const prev = new Map<string, string>();
   const open = new Set([start]);
   while (open.size) {
     const here = [...open].sort((a, b) => best.get(a)! - best.get(b)!)[0];
@@ -266,14 +289,93 @@ function moveEstimate(
       const total = best.get(here)! + ms;
       if (total < (best.get(next) ?? Infinity)) {
         best.set(next, total);
+        prev.set(next, here);
         open.add(next);
       }
     }
   }
   const found = best.get(end);
-  if (found == null) return { ms: fallbackMs, estimated: true };
-  return { ms: found, estimated: start !== from || end !== to };
+  if (found == null) return fallback;
+  const hops: MoveHop[] = [];
+  for (let node = end; node !== start; node = prev.get(node)!) {
+    const back = prev.get(node)!;
+    hops.unshift({ from: back, to: node, ms: edges.get(back)!.get(node)! });
+  }
+  return { ms: found, estimated: start !== from || end !== to, hops };
 }
+
+/** 同一段路前後車至少相隔多久；對向、場區同一區的移動也至少錯開這麼久 */
+const SHUNT_HEADWAY_MS = 60 * 1000;
+
+/**
+ * 調車照這個時刻出發，會不會跟班表上別的車搶路。回傳衝突的班次代號，沒有衝突回 null。
+ *
+ * - 同方向同一段：只能排在別的車前面或後面，前後都要隔一個班距，不能在路上被追上或追上別人。
+ * - 反方向同一段、或兩頭在同一個場區（M、E、H…）：時間不能重疊。
+ * - 到位後在終點等著（holdUntil）：這段時間別的車不能停在或開進那個點。
+ * 被換車、接手車自己的任務不算（ignoreRows），換手後取消的任務也不算（ignore）。
+ */
+export function shuntConflict(args: {
+  tasks: readonly PlanTask[];
+  ignoreRows: ReadonlySet<number>;
+  ignore: ReadonlySet<string>;
+  hops: readonly MoveHop[];
+  departAt: number;
+  holdUntil?: number;
+}): string | null {
+  const { tasks, ignoreRows, ignore, hops, departAt } = args;
+  const others = tasks.filter(
+    (task) => task.kind !== 'maintenance' && !ignoreRows.has(task.timeline_row) && !ignore.has(task.order_id),
+  );
+  const H = SHUNT_HEADWAY_MS;
+  let at = departAt;
+  for (const hop of hops) {
+    const s = at;
+    const e = at + hop.ms;
+    at = e;
+    const groups = new Set([slotGroup(hop.from), slotGroup(hop.to)].filter((group): group is string => group != null));
+    for (const task of others) {
+      const os = task.depart_at;
+      const oe = taskEnd(task);
+      if (task.origin === hop.from && task.destination === hop.to) {
+        const behind = s >= os + H && e >= oe + H;
+        const ahead = s + H <= os && e + H <= oe;
+        if (!behind && !ahead) return task.trip_code;
+        continue;
+      }
+      const touchesGroup =
+        groups.size > 0 && [slotGroup(task.origin), slotGroup(task.destination)].some((group) => group != null && groups.has(group));
+      const reverse = task.origin === hop.to && task.destination === hop.from;
+      if ((reverse || touchesGroup) && s < oe + H && os < e + H) return task.trip_code;
+    }
+  }
+  const last = hops.at(-1);
+  if (last && args.holdUntil != null && args.holdUntil > at) {
+    const point = last.to;
+    const rows = new Map<number, PlanTask[]>();
+    for (const task of tasks) {
+      if (ignoreRows.has(task.timeline_row) || ignore.has(task.order_id)) continue;
+      rows.set(task.timeline_row, [...(rows.get(task.timeline_row) ?? []), task]);
+    }
+    for (const list of rows.values()) {
+      const own = sortByDepart(list);
+      for (let index = 0; index < own.length; index += 1) {
+        const task = own[index];
+        if (task.destination !== point) continue;
+        const after = own[index + 1];
+        const from = task.origin === point ? task.depart_at : taskEnd(task);
+        const until = after && after.origin === point ? after.depart_at : taskEnd(task);
+        if (from < args.holdUntil + H && at < until + H) return task.trip_code;
+      }
+    }
+  }
+  return null;
+}
+
+/** 找換手出發時刻時，每次往前挪多少 */
+const DEPART_STEP_MS = 15 * 1000;
+/** 最多比「剛好到」提早多久出發：再早就是在終點乾等，佔著那個點太久 */
+const MAX_EARLY_MS = 20 * MINUTE_MS;
 
 /**
  * 某一列在某時刻依計畫的位置。計畫上已開始、還沒抵達的任務回報 moving，不當成已在終點；
@@ -314,15 +416,27 @@ export function findSwapWindows(args: {
   takeoverRow: number;
   dayStart: number;
   notBefore: number;
+  /** 接手車可以出發的時刻（規則的換手時段）；不給就不限 */
+  allowDepart?: (at: number) => boolean;
 }): SwapWindow[] {
-  const { tasks, row, takeoverRow, dayStart, notBefore } = args;
+  const { tasks, row, takeoverRow, dayStart, notBefore, allowDepart = () => true } = args;
   const own = sortByDepart(tasks.filter((task) => task.timeline_row === row));
   const takeoverTasks = sortByDepart(tasks.filter((task) => task.timeline_row === takeoverRow));
   const load = hourlyLoad(tasks, dayStart);
-  const edges = movementEdges(tasks);
+  const edges = travelEdges(tasks);
   const windows: SwapWindow[] = [];
 
   const lastPassenger = own.findLastIndex((task) => task.kind === 'passenger');
+  /**
+   * 接手車在 at 動身之後還有事要做嗎（場內整備不算，動身前會被結束）。
+   * 收班換手時看到當天結束：輪替隔天才生效，接手車那一列當天之後的移動、載客還是派給接手車，
+   * 它人已經在別列的位置，只能瞬移或卡住。
+   */
+  const takeoverBusy = (at: number, until: number) =>
+    takeoverTasks.some(
+      (task) =>
+        task.kind !== 'maintenance' && task.origin !== task.destination && task.depart_at < until && taskEnd(task) > at,
+    );
 
   own.forEach((next, index) => {
     const endOfDay = next.kind === 'movement' && index === own.length - 1 && lastPassenger >= 0;
@@ -373,23 +487,41 @@ export function findSwapWindows(args: {
     // 被換車跟接手車停在同一個入口（白天或收班後都一樣）：接手車出場要經過被換車，
     // 被換車又要等接手車到位才回接手車的格位，兩邊互等，接手車晚到就趕不上第一班
     if (type === 'yard' && slotGroup(location) != null && slotGroup(location) === slotGroup(from)) return;
-    const moveIn = moveEstimate(edges, from, meetAt, fallbackMs);
+    const moveIn = movePath(edges, from, meetAt, fallbackMs);
+    const moveOut = movePath(edges, location, from, 3 * MINUTE_MS);
     const deadline = endOfDay ? taskEnd(next) : next.depart_at;
-    // 收班後接替車取代那趟出場，到位時刻照原班表：場區單線上的對向移動都是照這個時間排開的，
-    // 提早出場會跟其他車對向卡死
     const arriveBy = deadline - (endOfDay ? 0 : MARGIN_MS);
-    const takeoverDepartAt = arriveBy - moveIn.ms;
+    const ignoreRows = new Set([row, takeoverRow]);
+    /*
+     * 出發時刻：先試「剛好在要接手時到」，跟班表上別的車搶路（同方向會被追上、對向或同一場區重疊、
+     * 終點被佔著）就往前挪，挪到被換車到位或不能出發為止。收班後的窗口也一樣：先前固定照原班表
+     * 出場時刻到位，接替車走的路跟原本那趟不同，跟正線載客車搶在一起也不知道。
+     */
+    let takeoverDepartAt: number | null = null;
+    let dropped: PlanTask[] = [];
+    let windowOutAt = 0;
+    const latest = arriveBy - moveIn.ms;
+    const earliest = Math.max(readyAt, notBefore, latest - MAX_EARLY_MS);
+    for (let at = latest; at >= earliest; at -= DEPART_STEP_MS) {
+      if (!allowDepart(at)) continue;
+      const arriveAt = at + moveIn.ms;
+      if (takeoverBusy(at, endOfDay ? Infinity : deadline)) continue;
+      // 接手車到位前就做完的場內任務照做：被換車手上有任務才不會閒置擋住場區入口
+      const drop = (endOfDay ? [...cancelled, next] : cancelled).filter(
+        (task) => task.kind !== 'maintenance' || taskEnd(task) > arriveAt,
+      );
+      const ignore = new Set(drop.map((task) => task.order_id));
+      if (shuntConflict({ tasks, ignoreRows, ignore, hops: moveIn.hops, departAt: at, holdUntil: deadline })) continue;
+      // 被換車回接手車原本的格位：接手車到位就走（收班後），白天等下一班發車後
+      const outAt = endOfDay ? arriveAt : Math.max(arriveAt, next.depart_at);
+      if (shuntConflict({ tasks, ignoreRows, ignore, hops: moveOut.hops, departAt: outAt })) continue;
+      takeoverDepartAt = at;
+      dropped = drop;
+      windowOutAt = outAt;
+      break;
+    }
+    if (takeoverDepartAt == null) return;
     const slackMs = takeoverDepartAt - readyAt;
-    if (slackMs < 0 || takeoverDepartAt < notBefore) return;
-    const busy = takeoverTasks.some(
-      (task) => task.kind !== 'maintenance' && task.depart_at < deadline && taskEnd(task) > takeoverDepartAt,
-    );
-    if (busy) return;
-
-    // 接手車到位前就做完的場內任務照做：被換車手上有任務才不會閒置擋住場區入口
-    const dropped = (endOfDay ? [...cancelled, next] : cancelled).filter(
-      (task) => task.kind !== 'maintenance' || taskEnd(task) > arriveBy,
-    );
 
     windows.push({
       id: next.trip_code,
@@ -408,8 +540,12 @@ export function findSwapWindows(args: {
       moveInMs: moveIn.ms,
       moveInEstimated: moveIn.estimated,
       takeoverDepartAt,
+      outAt: windowOutAt,
     });
   });
+
+  const entry = entryWindow({ tasks, own, takeoverRow, edges, notBefore, allowDepart, takeoverBusy, load, dayStart });
+  if (entry) windows.push(entry);
 
   const rank = (item: SwapWindow) => {
     if (item.skippedService.length) return 3;
@@ -417,6 +553,109 @@ export function findSwapWindows(args: {
     return item.slackMs >= COMFORT_SLACK_MS ? 1 : 2;
   };
   return windows.sort((a, b) => rank(a) - rank(b) || a.hourDepartures - b.hourDepartures || b.slackMs - a.slackMs);
+}
+
+/**
+ * 收班進場的換手窗口：最後一班載客之後進場停過夜，當天之後只剩 0 秒的換日占位。
+ *
+ * 這類列的最後一段是「停在 E1、E1 → E1 0 秒」，舊做法把換手地點算成被換車自己停的那一格，
+ * 接手車進不去就整列放棄（2026-11-28 第 3、6、7、8 列都是這樣，報告寫「找不到可換手的時間」）。
+ * 改成在進場那一刻換：被換車下了最後一班不進場，照原本進場的時刻直接從月台開去接手車的格位；
+ * 接手車在那之前出發（格位才會空出來），在被換車原本到那一格的時刻前進去。被換車不在月台等接手車
+ * 到位：停在月台會擋住後面進站的車。接手車沒出發就中止，被換車還在月台，照原計畫進場即可。
+ *
+ * 進場之後當天還有真的移動（例如半夜換格）就不用這個窗口：接手車停在進場那一格，
+ * 跟這一列隔天開頭的位置對不上。
+ */
+function entryWindow(args: {
+  tasks: readonly PlanTask[];
+  own: readonly PlanTask[];
+  takeoverRow: number;
+  edges: Map<string, Map<string, number>>;
+  notBefore: number;
+  allowDepart: (at: number) => boolean;
+  takeoverBusy: (at: number, until: number) => boolean;
+  load: HourLoad[];
+  dayStart: number;
+}): SwapWindow | null {
+  const { tasks, own, takeoverRow, edges, notBefore, allowDepart, takeoverBusy, load, dayStart } = args;
+  const lastPassenger = own.findLastIndex((task) => task.kind === 'passenger');
+  if (lastPassenger < 0) return null;
+  const after = own.slice(lastPassenger + 1);
+  const parkIndex = after.findIndex(
+    (task) => task.kind === 'maintenance' && taskEnd(task) - task.depart_at >= MIN_DWELL_MS,
+  );
+  if (parkIndex < 0) return null;
+  const park = after[parkIndex];
+  const slot = park.origin;
+  const entry = [...after.slice(0, parkIndex)]
+    .reverse()
+    .find((task) => task.kind === 'movement' && task.destination === slot && task.origin !== slot);
+  if (!entry) return null;
+  if (after.slice(parkIndex).some((task) => task.kind !== 'maintenance' && task.origin !== task.destination)) return null;
+
+  const last = own[lastPassenger];
+  const readyAt = taskEnd(last);
+  const platform = entry.origin;
+  const from = rowLocationAt(tasks, takeoverRow, readyAt);
+  if (!from || from === slot || from === platform) return null;
+  const moveIn = movePath(edges, from, slot, 5 * MINUTE_MS);
+  const moveOut = movePath(edges, platform, from, 5 * MINUTE_MS);
+  // 被換車照原本進場的時刻離開月台；接手車要在那之前出發，在被換車原本進到那一格的時刻前到
+  const outAt = entry.depart_at;
+  const arriveBy = taskEnd(entry);
+  const dropIds = new Set(after.map((task) => task.order_id));
+  const takeoverIds = tasks.filter((task) => task.timeline_row === takeoverRow).map((task) => task.order_id);
+  const ownPastIds = own.filter((task) => taskEnd(task) <= outAt).map((task) => task.order_id);
+  const latest = arriveBy - moveIn.ms;
+  const earliest = Math.max(notBefore, latest - MAX_EARLY_MS);
+  for (let at = latest; at >= earliest; at -= DEPART_STEP_MS) {
+    if (at > outAt || !allowDepart(at) || takeoverBusy(at, Infinity)) continue;
+    // 被換車最後一班之前的載客、空車照常跑，接手車不能跟它們搶路
+    const inIgnore = new Set([...dropIds, ...takeoverIds]);
+    if (shuntConflict({ tasks, ignoreRows: new Set(), ignore: inIgnore, hops: moveIn.hops, departAt: at, holdUntil: taskEnd(entry) })) continue;
+    // 被換車回格位：接手車那趟也要算進去（兩趟可能在同一段路上對向）
+    let hopAt = at;
+    const incomingHops: PlanTask[] = moveIn.hops.map((hop, index) => {
+      const departAt = hopAt;
+      hopAt += hop.ms;
+      return {
+        order_id: `rotation-in-${index}`,
+        trip_code: '輪替接替',
+        vehicle_code: null,
+        timeline_row: -1,
+        depart_at: departAt,
+        arrive_at: hopAt,
+        kind: 'movement',
+        origin: hop.from,
+        destination: hop.to,
+      };
+    });
+    const outIgnore = new Set([...dropIds, ...ownPastIds, ...takeoverIds]);
+    if (shuntConflict({ tasks: [...tasks, ...incomingHops], ignoreRows: new Set(), ignore: outIgnore, hops: moveOut.hops, departAt: outAt })) continue;
+    return {
+      id: entry.trip_code,
+      type: 'yard',
+      row: entry.timeline_row,
+      location: platform,
+      zone: '收班進場',
+      readyAt,
+      next: entry,
+      endOfDay: true,
+      meetAt: slot,
+      // 被換車下線休息，不會因為沒做到這些整備而撐不下去；進場後的整備改由接手車在那一格做
+      skippedService: [],
+      cancelled: after,
+      hourDepartures: load[Math.floor((entry.depart_at - dayStart) / HOUR_MS)]?.departures ?? 0,
+      slackMs: arriveBy - (at + moveIn.ms),
+      moveInMs: moveIn.ms,
+      moveInEstimated: moveIn.estimated,
+      takeoverDepartAt: at,
+      outAt,
+      entry: true,
+    };
+  }
+  return null;
 }
 
 export type ChangeKind = 'add' | 'cancel' | 'reassign';
@@ -458,10 +697,10 @@ export function buildShuntOrder(args: {
 }): ShuntOrder {
   const { tasks, outgoing, incoming, window } = args;
   const pickup = rowLocationAt(tasks, incoming.row, window.readyAt) ?? '原停放位置';
-  const moveOut = moveEstimate(movementEdges(tasks), window.location, pickup, 3 * MINUTE_MS);
+  const moveOut = movePath(travelEdges(tasks), window.location, pickup, 3 * MINUTE_MS);
   const arrivedAt = window.takeoverDepartAt + window.moveInMs;
-  // 接手車承接之後，換下的車才離開；收班後沒有下一班要等，到位就走
-  const moveOutAt = window.endOfDay ? arrivedAt : Math.max(arrivedAt, window.next.depart_at);
+  // 接手車承接之後，換下的車才離開；收班後沒有下一班要等，到位就走（收班進場則照原本進場時刻離開月台）
+  const moveOutAt = window.outAt || (window.endOfDay ? arrivedAt : Math.max(arrivedAt, window.next.depart_at));
 
   const changes: ShuntChange[] = [
     {
@@ -573,6 +812,63 @@ export function inTimeRange(at: number, start: string, end: string): boolean {
   return from <= to ? minute >= from && minute <= to : minute >= from || minute <= to;
 }
 
+const hm = (ms: number) => {
+  const date = new Date(ms);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+/** 排不進去的原因，盡量講出這一列在時段內實際在做什麼 */
+export function noWindowReason(tasks: readonly PlanTask[], row: number, rules: RotationRules): string {
+  const range = `${rules.windowStart}–${rules.windowEnd}`;
+  const generic = `${range} 內找不到可換手的時間`;
+  const inWindow = (at: number) => inTimeRange(at, rules.windowStart, rules.windowEnd);
+  const own = sortByDepart(tasks.filter((task) => task.timeline_row === row));
+  // 時段內停著的那一段（過夜停放）；一天開頭延續前一晚的那段不算
+  const park = [...own].reverse().find((task) => {
+    if (task.kind !== 'maintenance' || taskEnd(task) - task.depart_at < MIN_DWELL_MS) return false;
+    for (let at = task.depart_at; at <= taskEnd(task); at += 5 * MINUTE_MS) if (inWindow(at)) return true;
+    return inWindow(taskEnd(task));
+  });
+  if (!park) return generic;
+  const before = own.filter((task) => task.depart_at <= park.depart_at);
+  const entry = [...before].reverse().find((task) => task.kind === 'movement' && task.destination === park.origin && task.origin !== park.origin);
+  if (!entry || inWindow(entry.depart_at)) return generic;
+  const move = own.find(
+    (task) => task.kind === 'movement' && task.origin !== task.destination && task.depart_at >= taskEnd(park) && inWindow(task.depart_at),
+  );
+  const head = `收班進場 ${hm(entry.depart_at)}（${park.origin}）`;
+  if (!move) return `${head}，${range} 內一直停在場內，沒有換手的時機`;
+  const carriesPassengers = own.some((task) => task.kind === 'passenger' && task.depart_at >= taskEnd(move));
+  return carriesPassengers
+    ? `${head}，${range} 內下一次移動是 ${hm(move.depart_at)} ${move.origin} → ${move.destination} 出場接載客；在那裡換手要改派當天班次，第一版不做`
+    : generic;
+}
+
+/**
+ * 這一列時段內其實有換手的時機，但可接替的車都不能用時，講出是哪台車、還有什麼任務。
+ * 輪替隔天才生效，接替車那一列當天之後的移動、載客還是派給它，所以那一列當天還要出車就不能去接別人。
+ */
+function blockedReason(
+  tasks: readonly PlanTask[],
+  outgoing: FleetCar,
+  spares: readonly FleetCar[],
+  rules: RotationRules,
+  dayStart: number,
+): string {
+  const base = noWindowReason(tasks, outgoing.row, rules);
+  if (!base.endsWith('找不到可換手的時間')) return base;
+  const from = dayStart + parseHm(rules.windowStart) * MINUTE_MS;
+  const notes = spares.flatMap((spare) => {
+    const next = sortByDepart(tasks.filter((task) => task.timeline_row === spare.row)).find(
+      (task) => task.kind !== 'maintenance' && task.origin !== task.destination && task.depart_at >= from,
+    );
+    return next ? [`${spare.code}（第 ${spare.row} 運用）${hm(next.depart_at)} 還要出車`] : [];
+  });
+  return notes.length === spares.length && notes.length > 0
+    ? `${rules.windowStart}–${rules.windowEnd} 的可接替車今天都還有任務：${notes.join('、')}`
+    : base;
+}
+
 export type DailyReport = {
   orders: ShuntOrder[];
   /** 到了輪替里程但今天排不進去 */
@@ -617,7 +913,7 @@ export function buildDailyReport(args: {
   const used = new Set(kept.flatMap((item) => [item.order.outgoing, item.order.incoming]));
   const spans = kept.filter((item) => item.status !== 'skipped').map((item) => orderSpan(item.order));
   const orders: ShuntOrder[] = [];
-  const spares = takeoverCandidates({ tasks, cars, rules, now, dayStart }).filter((car) => !used.has(car.code));
+  const spares = takeoverCandidates({ cars, rules, dayStart }).filter((car) => !used.has(car.code));
   const blocked: DailyReport['blocked'] = [];
 
   for (const outgoing of rotationQueue(cars, rules)) {
@@ -628,7 +924,14 @@ export function buildDailyReport(args: {
     }
     let match: { incoming: FleetCar; order: ShuntOrder } | null = null;
     for (const incoming of spares) {
-      const windows = findSwapWindows({ tasks, row: outgoing.row, takeoverRow: incoming.row, dayStart, notBefore }).filter(
+      const windows = findSwapWindows({
+        tasks,
+        row: outgoing.row,
+        takeoverRow: incoming.row,
+        dayStart,
+        notBefore,
+        allowDepart: (at) => inTimeRange(at, rules.windowStart, rules.windowEnd),
+      }).filter(
         (window) =>
           window.endOfDay &&
           window.skippedService.length === 0 &&
@@ -644,7 +947,7 @@ export function buildDailyReport(args: {
       if (match) break;
     }
     if (!match) {
-      blocked.push({ code: outgoing.code, reason: `${rules.windowStart}–${rules.windowEnd} 內找不到可換手的時間` });
+      blocked.push({ code: outgoing.code, reason: blockedReason(tasks, outgoing, spares, rules, dayStart) });
       continue;
     }
     orders.push(match.order);

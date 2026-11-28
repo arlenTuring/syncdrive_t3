@@ -153,5 +153,5 @@ export function describeSafetyFailure(result: StoredShiftSafetyResult): string {
     .map(([code, count]) => `${code} ×${count}`)
     .join('、');
   const first = result.blockingIssues[0]?.message?.split('\n')[0] ?? '';
-  return `班表有 ${result.blockingIssues.length} 筆安全問題（${summary}），禁止發布或部署。${first ? `例：${first}` : ''}`;
+  return `班表有 ${result.blockingIssues.length} 筆安全問題（${summary}），禁止部署。${first ? `例：${first}` : ''}`;
 }

@@ -19,7 +19,7 @@ export function roundJoinNote(args: {
     code: 'ROUND_JOINED_MIDWAY',
     severity: 'warning',
     kind: 'policy',
-    message: `時間線 ${args.timelineRow}：${args.why}，${args.description}。之後各段時刻不變。`,
+    message: `運用 ${args.timelineRow}：${args.why}，${args.description}。之後各段時刻不變。`,
     detail: {
       timelineRow: args.timelineRow,
       blockId: args.joinBlockId,

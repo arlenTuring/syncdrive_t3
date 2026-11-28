@@ -38,8 +38,9 @@ import type {
   GeneratedSchedulePlan,
   GeneratedScheduleBlock,
 } from './schedule-engine/types';
+import { isStandbyLikeTaskType } from '../../time-templates/types/editor';
 
-const YARD_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby']);
+const YARD_TASK_TYPES = new Set(['charging', 'servicing', 'inspection', 'standby', 'maneuver']);
 
 function routeOriginStationId(route: ShiftScheduleSelectedRoute): string | null {
   return route.stationIds?.[0]?.trim() || null;
@@ -102,7 +103,7 @@ export function alignRouteWithMaintenanceEntry(args: {
        * 同理，停在<strong>正線停靠站</strong>的整備（<code>yardFacilityStationId</code>
        * 有值）也不算：那是站位不是廠，車沒有被設施接手。
        */
-      if (yard.taskType === 'standby') continue;
+      if (isStandbyLikeTaskType(yard.taskType)) continue;
       if (yard.yardFacilityStationId?.trim()) continue;
       const facilityNodeId = yard.yardFacilityNodeId?.trim();
       if (!facilityNodeId) continue;
@@ -201,7 +202,7 @@ export function alignRouteWithMaintenanceEntry(args: {
         severity: 'warning',
         kind: 'policy',
         message:
-          `時間線 ${timeline.row}：進廠前那一趟原本開到`
+          `運用 ${timeline.row}：進廠前那一趟原本開到`
           + `「${stationDisplayName(currentDestination, selectedRoutes)}」，`
           + `而那一站在拓樸上到不了 ${yard.yardFacilityLabel ?? facilityNodeId}，入廠卡排不出來。`
           + `已改跑同起點的「${toLabel}」（原本是「${fromLabel}」），`

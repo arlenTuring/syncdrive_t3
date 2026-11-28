@@ -44,13 +44,13 @@ const GROUP_TITLE: Record<FeasibilityViolationCode, string> = {
   GEOMETRY_PASS_REVERTED: '已撤回不適合的調整',
   STATION_BERTH_BACKUP_USED: '已改走替代路線',
   ANCHOR_CONFLICT: '趕不上下一項任務',
-  TIMELINE_OVERLAP: '時間線任務重疊',
+  TIMELINE_OVERLAP: '運用任務重疊',
   HEADWAY_PHYSICAL_IMPOSSIBLE: '班距低於物理下限',
   HEADWAY_BELOW_TARGET: '班距低於目標',
   HEADWAY_PHASE_EVENED: '已調整發車間隔',
   UNSERVED_SERVICE_PULSE: '目標發車時刻未排到車',
   SERVICE_DEMAND_UNVERIFIABLE: '缺應開服務明細，無法核對載客服務',
-  INSUFFICIENT_TIMELINES: '時間線列數不足',
+  INSUFFICIENT_TIMELINES: '運用數不足',
   RECOVERY_INSUFFICIENT: '恢復空檔不足',
   ROUTE_SWITCH_BUFFER_INSUFFICIENT: '換線空檔不足',
   ROUTE_SUCCESSOR_POLICY_INVALID: '路線接續設定需重新驗證',
@@ -192,7 +192,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   STATION_BERTH_COLLISION: {
     kind: 'limit',
     guidance:
-      '兩台車同時占用同一停靠點。請查看相關班次，錯開抵達與離開時間，或使用待命清單中可到達的空位。修正前禁止發布。',
+      '兩台車同時占用同一停靠點。請查看相關班次，錯開抵達與離開時間，或使用待命清單中可到達的空位。修正前禁止部署。',
   },
   STATION_BERTH_PROTECTION_GAP: {
     kind: 'actionable',
@@ -223,7 +223,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   GEOMETRY_BEST_ROUND_USED: {
     kind: 'limit',
     guidance:
-      '已達本次試算上限，保留目前較佳結果。是否可發布仍依安全檢查判定。',
+      '已達本次試算上限，保留目前較佳結果。是否可部署仍依安全檢查判定。',
   },
   STATION_BERTH_DELAY_SOURCE: {
     kind: 'actionable',
@@ -238,7 +238,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   ANCHOR_CONFLICT: {
     kind: 'limit',
     guidance:
-      '同車無法在下一錨點前結束本趟。可試：加時間線列數、縮短停靠／恢復、或放寬該正線視窗。',
+      '同車無法在下一錨點前結束本趟。可試：加運用數、縮短停靠／恢復、或放寬該正線視窗。',
   },
   TIMELINE_OVERLAP: {
     kind: 'actionable',
@@ -247,7 +247,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   HEADWAY_PHYSICAL_IMPOSSIBLE: {
     kind: 'actionable',
     guidance:
-      '以目前車隊列數與單車週期，物理上撐不起此時距。請增加時間線列數，或縮短該路線占用（行駛／停靠）。',
+      '以目前車隊列數與單車週期，物理上撐不起此時距。請增加運用數，或縮短該路線占用（行駛／停靠）。',
   },
   HEADWAY_PHASE_EVENED: {
     kind: 'policy',
@@ -262,12 +262,12 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   UNSERVED_SERVICE_PULSE: {
     kind: 'limit',
     guidance:
-      '時刻表訂的這個發車脈衝沒有車開，載客服務不完整，擋發布。訊息與明細寫著各列不能承接的原因；請查看相鄰班次、車輛可用時間與整備安排。',
+      '時刻表訂的這個發車脈衝沒有車開，載客服務不完整，擋部署。訊息與明細寫著各列不能承接的原因；請查看相鄰班次、車輛可用時間與整備安排。',
   },
   SERVICE_DEMAND_UNVERIFIABLE: {
     kind: 'actionable',
     guidance:
-      '這份班表沒有記錄「應開的發車脈衝」明細（較舊版本產生的班表），無法確認載客服務是否完整，擋發布。請重新產生班表。',
+      '這份班表沒有記錄「應開的發車脈衝」明細（較舊版本產生的班表），無法確認載客服務是否完整，擋部署。請重新產生班表。',
   },
   INSUFFICIENT_TIMELINES: {
     kind: 'actionable',
@@ -358,12 +358,12 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   MAINTENANCE_WORK_INSUFFICIENT: {
     kind: 'limit',
     guidance:
-      '模板上的這一段整備在排好的班表裡不見了，或剩下的工作時間低於最低要求（有設定作業時長就用它，沒有的至少不能是零）。整備不能被壓成零、也不能刪卡假裝做完，所以班表禁止發布。多半是正線讓渡或移動占掉太多開頭：加長模板上的整備、調小正線可壓縮整備開頭，或把前後班次錯開。',
+      '模板上的這一段整備在排好的班表裡不見了，或剩下的工作時間低於最低要求（有設定作業時長就用它，沒有的至少不能是零）。整備不能被壓成零、也不能刪卡假裝做完，所以班表禁止部署。多半是正線讓渡或移動占掉太多開頭：加長模板上的整備、調小正線可壓縮整備開頭，或把前後班次錯開。',
   },
   SCHEDULE_SEARCH_INCOMPLETE: {
     kind: 'limit',
     guidance:
-      '這次生成的搜尋次數或時間上限已用完，還有安全問題沒排開。這代表這次沒有搜完，不代表已證明沒有安全排法，也不代表場域容量不足。班表禁止發布；可以調整相關班次或待命位置後重新生成。',
+      '這次生成的搜尋次數或時間上限已用完，還有安全問題沒排開。這代表這次沒有搜完，不代表已證明沒有安全排法，也不代表場域容量不足。班表禁止部署；可以調整相關班次或待命位置後重新生成。',
   },
   GEOMETRY_NOT_CONVERGED: {
     kind: 'limit',
@@ -399,7 +399,7 @@ const DEFAULT_META: Record<FeasibilityViolationCode, Omit<FeasibilityIssueMeta, 
   MAINTENANCE_TRANSFER_REQUIRED_MISSING: {
     kind: 'limit',
     guidance:
-      '車下一段要去的地方跟它現在停的地方不同，這次計算在試過的候選（設施、路徑、轉折點錯開、可動時段內的出發時刻）裡沒有排出合法移動；這不代表已證明沒有排法。班表與班次保留供檢查，但這一則會擋發布——車實際上到不了。原因訊息寫著卡在哪：路徑被別列車在同一個轉折點卡住，就看那一刻前後誰能讓；時段不夠，就要一起調整前後班次，不是只移動轉場卡。',
+      '車下一段要去的地方跟它現在停的地方不同，這次計算在試過的候選（設施、路徑、轉折點錯開、可動時段內的出發時刻）裡沒有排出合法移動；這不代表已證明沒有排法。班表與班次保留供檢查，但這一則會擋部署——車實際上到不了。原因訊息寫著卡在哪：路徑被別列車在同一個轉折點卡住，就看那一刻前後誰能讓；時段不夠，就要一起調整前後班次，不是只移動轉場卡。',
   },
   VEHICLE_LOCATION_DISCONTINUITY: {
     kind: 'limit',

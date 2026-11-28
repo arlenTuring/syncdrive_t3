@@ -22,7 +22,6 @@ import {
   TimetableTripsResponseDto,
 } from './dto/timetable.dto';
 import {
-  OperationShiftPublishStatus,
   OperationShiftUsageStatus,
 } from '../database/entities/operation-shift.entity';
 import { OperationShiftService } from './operation-shift.service';
@@ -46,7 +45,6 @@ export class OperationShiftController {
   async listShifts(
     @Query('keyword') keyword?: string,
     @Query('usage_status') usage_status?: string,
-    @Query('publish_status') publish_status?: string,
     @Query('page') page?: string,
     @Query('page_size') page_size?: string,
   ) {
@@ -56,16 +54,9 @@ export class OperationShiftController {
         ? usage_status
         : 'all';
 
-    const ps =
-      publish_status === OperationShiftPublishStatus.DRAFT ||
-      publish_status === OperationShiftPublishStatus.PUBLISHED
-        ? publish_status
-        : 'all';
-
     return this.operationShiftService.listShifts({
       keyword,
       usage_status: us,
-      publish_status: ps,
       page: page ? Number(page) : undefined,
       page_size: page_size ? Number(page_size) : undefined,
     });
@@ -168,19 +159,12 @@ export class OperationShiftController {
     });
   }
 
-  @AuditAction('SHIFT_PUBLISH')
-  @Post('detail/:id/publish')
-  @RequirePermission('schedule.shift-list.publish')
-  @ApiOperation({ summary: '發布班表（供 timetable API 優先讀取）' })
-  async publishShift(@Param('id') id: string) {
-    return this.operationShiftService.publishShift(id);
-  }
 
   @AuditAction('SHIFT_DEPLOY')
   @Post('detail/:id/deploy')
   @RequirePermission('schedule.shift-list.publish')
   @ApiOperation({
-    summary: '部署班表為使用中（同時發布）；已有其他使用中的班表要先停用，否則回 409',
+    summary: '部署班表為使用中（先做排班安全檢查）；已有其他使用中的班表要先停用，否則回 409',
   })
   async deployShift(
     @Param('id') id: string,
