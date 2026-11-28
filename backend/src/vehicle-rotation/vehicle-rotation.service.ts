@@ -567,8 +567,21 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     return this.dataSource.query(`SELECT * FROM vehicle_rotation_items WHERE ${where} ORDER BY created_at`, params);
   }
 
-  /** 產出（或重排）某營運日的報告。確認過的項目不動 */
+  /**
+   * 產出（或重排）某營運日的報告。確認過的項目不動。
+   *
+   * 一次只跑一份：開機時的自動產出跟手動重排同時跑，後跑完的那份會把先產出、剛被確認的項目
+   * 當成「待確認」刪掉重插（2026-11-28 21:37 實際發生：確認的那筆不見了，輪替被自動略過）。
+   */
+  private generating: Promise<void> = Promise.resolve();
+
   async generate(day = this.day()): Promise<void> {
+    const run = this.generating.then(() => this.generateNow(day));
+    this.generating = run.catch(() => undefined);
+    return run;
+  }
+
+  private async generateNow(day: string): Promise<void> {
     if (!isOperatingDay(day)) throw new BadRequestException(`營運日格式不對：${day}`);
     const plan = await this.planFor(day, true);
     const start = operatingDayStart(day);
@@ -687,12 +700,14 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
     const { window } = item.shunt_order;
     const startsAt = Math.min(window.takeoverDepartAt, ...window.cancelled.map((task) => task.depart_at));
     if (this.now() >= startsAt) throw new ConflictException('已經過了換手開始時間，今天不能再確認');
-    await this.dataSource.query(
+    const updated: unknown[] = await this.dataSource.query(
       `UPDATE vehicle_rotation_items SET status = 'confirmed', confirmed_at = $2, confirmed_by = $3,
          history = history || $4::jsonb
-       WHERE id = $1 AND status = 'pending'`,
+       WHERE id = $1 AND status = 'pending' RETURNING id`,
       [id, Date.now(), by, JSON.stringify([{ at: this.now(), kind: 'confirm', text: `${by} 確認` }])],
     );
+    // 沒改到任何一筆（報告剛好被重排、或已被處理）不能回成功，不然畫面以為確認了、輪替其實會被略過
+    if (!Array.isArray(updated) || rowsOf(updated) === 0) throw new ConflictException('這筆輪替已經不在待確認狀態（報告可能剛重排），請重新整理後再確認');
     this.invalidatePlans();
   }
 
@@ -721,12 +736,13 @@ export class VehicleRotationService implements OnModuleInit, OnModuleDestroy {
   async skip(id: string, by: string): Promise<void> {
     const item = await this.findItem(id);
     if (item.status !== 'pending') throw new ConflictException('這筆輪替已經處理過了');
-    await this.dataSource.query(
+    const updated: unknown[] = await this.dataSource.query(
       `UPDATE vehicle_rotation_items SET status = 'skipped', confirmed_at = $2, confirmed_by = $3, finished_at = $2,
          history = history || $4::jsonb
-       WHERE id = $1 AND status = 'pending'`,
+       WHERE id = $1 AND status = 'pending' RETURNING id`,
       [id, Date.now(), by, JSON.stringify([{ at: this.now(), kind: 'skip', text: `${by} 略過` }])],
     );
+    if (!Array.isArray(updated) || rowsOf(updated) === 0) throw new ConflictException('這筆輪替已經不在待確認狀態，請重新整理');
   }
 
   /** 這筆輪替所有調車段與等待中的舊單的最新狀態 */
@@ -1616,4 +1632,13 @@ function parseRules(input: unknown): RotationRules {
   if (value.mode !== 'confirm' && value.mode !== 'auto') throw new BadRequestException('執行方式不對');
   if (!isTime(value.reportBy)) throw new BadRequestException('報告產出時間格式不對');
   return { intervalKm, takeoverRows: rows, windowStart: value.windowStart, windowEnd: value.windowEnd, mode: value.mode, reportBy: value.reportBy };
+}
+
+/**
+ * UPDATE … RETURNING 改到幾筆。TypeORM 的 postgres 驅動對 UPDATE 回 [rows, count]，
+ * 測試替身可能直接回 rows：兩種都認。
+ */
+function rowsOf(result: unknown[]): number {
+  if (result.length === 2 && Array.isArray(result[0]) && typeof result[1] === 'number') return result[1];
+  return result.length;
 }

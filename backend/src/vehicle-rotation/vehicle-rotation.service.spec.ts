@@ -683,3 +683,48 @@ describe('VehicleRotationService 監看流程', () => {
     expect(h.issued.some((leg) => leg.role === 'rest')).toBe(false);
   });
 });
+
+describe('報告重排跟確認不能互相吃掉（2026-11-28 21:37）', () => {
+  const make = (query: jest.Mock) => {
+    const service = new VehicleRotationService({ query, transaction: jest.fn() } as never, {} as never, { now: () => 0, operatingDay: () => '2026-11-28' } as never, {} as never, {} as never);
+    const later = Date.now() + 3_600_000;
+    jest.spyOn(service as never as { findItem: () => Promise<unknown> }, 'findItem').mockResolvedValue({
+      id: 'x', status: 'pending', shunt_order: { window: { takeoverDepartAt: later, cancelled: [] } },
+    });
+    return service;
+  };
+
+  it('確認時那一筆已經不是待確認（被重排刪掉）：回錯誤，不能假裝成功', async () => {
+    const service = make(jest.fn().mockResolvedValue([[], 0]));
+    await expect(service.confirm('x', 'tester')).rejects.toThrow('不在待確認狀態');
+    await expect(service.skip('x', 'tester')).rejects.toThrow('不在待確認狀態');
+  });
+
+  it('確認有改到那一筆：正常結束', async () => {
+    const service = make(jest.fn().mockResolvedValue([[{ id: 'x' }], 1]));
+    await expect(service.confirm('x', 'tester')).resolves.toBeUndefined();
+  });
+
+  it('同時要求產出兩次報告：一次只跑一份，第二份等第一份做完才開始', async () => {
+    const service = make(jest.fn());
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let calls = 0;
+    jest.spyOn(service as never as { generateNow: (day: string) => Promise<void> }, 'generateNow').mockImplementation(async (day: string) => {
+      calls += 1;
+      const n = calls;
+      order.push(`start${n}`);
+      if (n === 1) await gate;
+      order.push(`end${n}`);
+      void day;
+    });
+    const first = service.generate('2026-11-28');
+    const second = service.generate('2026-11-28');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual(['start1']);
+    release();
+    await Promise.all([first, second]);
+    expect(order).toEqual(['start1', 'end1', 'start2', 'end2']);
+  });
+});
